@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Image Processing App</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="/static/app.js"></script>
+</head>
+<body>
+  <div id="sidebar">
+    <h3>Single Image Processing Steps</h3>
+    <button class="proc-btn" data-target="laz_to_dtm">LAZ to DTM</button>
+    <button class="proc-btn" data-target="hillshade">Hillshade</button>
+    <button class="proc-btn" data-target="slope">Slope</button>
+    <button class="proc-btn" data-target="aspect">Aspect</button>
+    <button class="proc-btn" data-target="color_relief">Color-relief</button>
+    <button class="proc-btn" data-target="tri">TRI</button>
+    <button class="proc-btn" data-target="tpi">TPI</button>
+    <button class="proc-btn" data-target="roughness">Roughness</button>
+  </div>
+
+  <div id="main">
+    <div id="grid">
+      <div class="grid-cell" id="cell-laz_to_dtm"><button class="proc-btn" data-target="laz_to_dtm">LAZ to DTM</button></div>
+      <div class="grid-cell" id="cell-hillshade"><button class="proc-btn" data-target="hillshade">Hillshade</button></div>
+      <div class="grid-cell" id="cell-slope"><button class="proc-btn" data-target="slope">Slope</button></div>
+      <div class="grid-cell" id="cell-aspect"><button class="proc-btn" data-target="aspect">Aspect</button></div>
+      <div class="grid-cell" id="cell-color_relief"><button class="proc-btn" data-target="color_relief">Color-relief</button></div>
+      <div class="grid-cell" id="cell-tri"><button class="proc-btn" data-target="tri">TRI</button></div>
+      <div class="grid-cell" id="cell-tpi"><button class="proc-btn" data-target="tpi">TPI</button></div>
+      <div class="grid-cell" id="cell-roughness"><button class="proc-btn" data-target="roughness">Roughness</button></div>
+      <div class="grid-cell"></div>
+      <div class="grid-cell"></div>
+    </div>
+  </div>
+
+  <div id="chatbar">
+    <div id="chat-log"></div>
+    <div id="chat-controls">
+      <textarea id="chat-input" placeholder="Type a prompt..."></textarea>
+      <select id="chat-model">
+        <option value="o3">o3</option>
+        <option value="4o">4o</option>
+      </select>
+      <button id="chat-send">Send</button>
+    </div>
+  </div>
+</body>
+</html>
