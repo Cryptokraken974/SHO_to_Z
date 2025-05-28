@@ -319,6 +319,43 @@ def convert_las_to_dtm(input_file: str, output_file: str, resolution: float = 1.
             
             print(f"{'='*40}")
             
+            # Apply GDAL FillNodata to interpolate gaps in the DTM
+            print(f"\n🔧 Applying GDAL FillNodata interpolation...")
+            try:
+                from osgeo import gdal
+                
+                # Open the DTM dataset
+                dataset = gdal.Open(output_file, gdal.GA_Update)
+                if dataset is None:
+                    print(f"⚠️ Could not open DTM file for FillNodata processing")
+                else:
+                    band = dataset.GetRasterBand(1)
+                    
+                    # Create mask band (None means use nodata values as mask)
+                    mask_band = None
+                    
+                    # Apply FillNodata with smooth interpolation
+                    print(f"   🎯 Max distance: 100 pixels")
+                    print(f"   🌊 Smooth iterations: 2")
+                    print(f"   🚫 NoData value: -9999")
+                    
+                    fillnodata_start = time.time()
+                    result = gdal.FillNodata(band, mask_band, maxSearchDist=100, smoothingIterations=2)
+                    fillnodata_time = time.time() - fillnodata_start
+                    
+                    if result == 0:  # CE_None (success)
+                        print(f"✅ FillNodata completed successfully in {fillnodata_time:.2f} seconds")
+                    else:
+                        print(f"⚠️ FillNodata returned error code: {result}")
+                    
+                    # Close dataset to flush changes
+                    dataset = None
+                    
+            except ImportError:
+                print(f"⚠️ GDAL Python bindings not available. Skipping FillNodata step.")
+            except Exception as e:
+                print(f"⚠️ Error during FillNodata processing: {str(e)}")
+            
             success_msg = f"DTM generated successfully at {output_file}"
             print(f"✅ {success_msg}")
             print(f"{'='*60}\n")
