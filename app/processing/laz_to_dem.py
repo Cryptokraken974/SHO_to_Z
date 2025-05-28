@@ -3,6 +3,7 @@ import json
 import os
 import time
 from typing import Tuple
+from .pipelines import create_laz_to_dem_pipeline, get_pipeline_json, print_pipeline_info
 
 def laz_to_dem(input_file: str) -> str:
     """
@@ -20,8 +21,8 @@ def laz_to_dem(input_file: str) -> str:
     # Extract the base name without path and extension
     laz_basename = os.path.splitext(os.path.basename(input_file))[0]
     
-    # Create output directory structure: output/<laz_basename>/
-    output_dir = os.path.join("output", laz_basename)
+    # Create output directory structure: output/<laz_basename>/DEM/
+    output_dir = os.path.join("output", laz_basename, "DEM")
     os.makedirs(output_dir, exist_ok=True)
     
     # Generate output filename: <laz_basename>_DEM.tif
@@ -81,19 +82,13 @@ def convert_las_to_dem(input_file: str, output_file: str, resolution: float = 1.
     
     # Create PDAL pipeline
     print(f"\n🔧 Creating PDAL pipeline...")
-    pipeline = {
-        "pipeline": [
-            input_file,
-            {
-                "type": "writers.gdal",
-                "filename": output_file,
-                "resolution": resolution,
-                "output_type": "mean",
-                "nodata": -9999,
-                "gdaldriver": "GTiff"
-            }
-        ]
-    }
+    pipeline = create_laz_to_dem_pipeline(
+        input_file=input_file,
+        output_file=output_file,
+        resolution=resolution,
+        output_type="mean",
+        nodata=-9999
+    )
     
     print(f"🗂️ GDAL Writer Parameters:")
     print(f"   📄 Output file: {output_file}")
@@ -102,13 +97,11 @@ def convert_las_to_dem(input_file: str, output_file: str, resolution: float = 1.
     print(f"   🚫 NoData value: -9999")
     print(f"   💾 GDAL driver: GTiff")
     
-    print(f"\n⚙️ Full Pipeline Configuration:")
-    pipeline_formatted = json.dumps(pipeline, indent=4)
-    print(f"{pipeline_formatted}")
+    print_pipeline_info(pipeline, "LAZ to DEM Pipeline")
     
     # Execute PDAL pipeline
     print(f"\n🚀 Executing PDAL pipeline...")
-    pipeline_json = json.dumps(pipeline)
+    pipeline_json = get_pipeline_json(pipeline)
     pdal_pipeline = pdal.Pipeline(pipeline_json)
     
     try:

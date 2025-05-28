@@ -2,9 +2,10 @@ import asyncio
 import time
 import os
 import logging
-import numpy as np
-from PIL import Image
+import subprocess
 from typing import Dict, Any
+from osgeo import gdal
+from .dtm import dtm
 
 logger = logging.getLogger(__name__)
 
@@ -149,39 +150,116 @@ async def process_slope(laz_file_path: str, output_dir: str, parameters: Dict[st
 
 def slope(input_file: str) -> str:
     """
-    Synchronous wrapper for slope analysis
+    Generate slope analysis from LAZ file using GDAL DEM processing
     
     Args:
         input_file: Path to the input LAZ file
         
     Returns:
-        Path to the generated TIF file
+        Path to the generated slope TIF file
     """
     print(f"\n📐 SLOPE: Starting analysis for {input_file}")
+    start_time = time.time()
     
+    # Extract the base name without path and extension
     laz_basename = os.path.splitext(os.path.basename(input_file))[0]
-    output_dir = os.path.join("output", laz_basename)
+    
+    # Create output directory structure: output/<laz_basename>/Slope/
+    output_dir = os.path.join("output", laz_basename, "Slope")
     os.makedirs(output_dir, exist_ok=True)
     
+    # Generate output filename: <laz_basename>_slope.tif
     output_filename = f"{laz_basename}_slope.tif"
     output_path = os.path.join(output_dir, output_filename)
     
     print(f"📂 Output directory: {output_dir}")
     print(f"📄 Output file: {output_path}")
     
-    # Generate placeholder slope data
-    print(f"🎨 Generating placeholder slope data...")
-    
-    size = 256
-    x, y = np.meshgrid(np.linspace(0, 1, size), np.linspace(0, 1, size))
-    
-    # Create slope-like data (0-90 degrees)
-    slope_data = np.abs(np.sin(x * 4) * np.cos(y * 4)) * 90
-    slope_data = np.clip(slope_data + np.random.normal(0, 5, (size, size)), 0, 90)
-    slope_data = (slope_data / 90 * 255).astype(np.uint8)
-    
-    slope_image = Image.fromarray(slope_data, mode='L')
-    slope_image.save(output_path)
-    
-    print(f"✅ Slope file generated: {output_path}")
-    return output_path
+    try:
+        # Step 1: Generate or locate DTM
+        print(f"\n🏔️ Step 1: Generating DTM as source for slope analysis...")
+        dtm_path = dtm(input_file)
+        print(f"✅ DTM ready: {dtm_path}")
+        
+        # Step 2: Generate slope using GDAL DEMProcessing
+        print(f"\n📐 Step 2: Generating slope using GDAL DEMProcessing...")
+        print(f"📁 Source DTM: {dtm_path}")
+        print(f"📁 Target slope: {output_path}")
+        
+        # Configure slope parameters
+        compute_edges = True  # Compute values at edges
+        scale = 1.0          # Scale factor for degrees
+        
+        print(f"⚙️ Slope parameters:")
+        print(f"   📊 Output format: degrees")
+        print(f"   🔢 Scale factor: {scale}")
+        print(f"   🔲 Compute edges: {compute_edges}")
+        
+        # Use GDAL DEMProcessing for slope analysis
+        processing_start = time.time()
+        
+        result = gdal.DEMProcessing(
+            destName=output_path,
+            srcDS=dtm_path,
+            processing="slope",
+            computeEdges=compute_edges,
+            scale=scale,
+            format="GTiff"
+        )
+        
+        processing_time = time.time() - processing_start
+        
+        if result is None:
+            raise RuntimeError("GDAL DEMProcessing failed to generate slope")
+        
+        print(f"✅ Slope analysis completed in {processing_time:.2f} seconds")
+        
+        # Step 3: Validate output file
+        print(f"\n🔍 Validating output file...")
+        if os.path.exists(output_path):
+            output_size = os.path.getsize(output_path)
+            print(f"✅ Output file created successfully")
+            print(f"📊 Output file size: {output_size:,} bytes ({output_size / (1024**2):.2f} MB)")
+            print(f"📄 Output file path: {os.path.abspath(output_path)}")
+            
+            # Run gdalinfo to get information about the generated slope
+            print(f"\n📊 GDALINFO OUTPUT:")
+            print(f"{'='*40}")
+            try:
+                gdalinfo_result = subprocess.run(
+                    ['gdalinfo', output_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                
+                if gdalinfo_result.returncode == 0:
+                    print(gdalinfo_result.stdout)
+                else:
+                    print(f"❌ gdalinfo failed with return code {gdalinfo_result.returncode}")
+                    print(f"❌ Error: {gdalinfo_result.stderr}")
+                    
+            except FileNotFoundError:
+                print(f"⚠️ gdalinfo command not found. Please ensure GDAL is installed and in PATH.")
+            except subprocess.TimeoutExpired:
+                print(f"⚠️ gdalinfo command timed out after 30 seconds.")
+            except Exception as e:
+                print(f"⚠️ Error running gdalinfo: {str(e)}")
+            
+            print(f"{'='*40}")
+            
+        else:
+            raise FileNotFoundError(f"Slope output file was not created: {output_path}")
+        
+        total_time = time.time() - start_time
+        print(f"✅ SLOPE analysis completed successfully in {total_time:.2f} seconds")
+        print(f"📐 Slope file: {output_path}")
+        
+        return output_path
+        
+    except Exception as e:
+        total_time = time.time() - start_time
+        error_msg = f"Slope analysis failed: {str(e)}"
+        print(f"❌ {error_msg}")
+        print(f"❌ Failed after {total_time:.2f} seconds")
+        raise Exception(error_msg)

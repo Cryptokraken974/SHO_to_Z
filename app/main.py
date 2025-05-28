@@ -4,8 +4,8 @@ from fastapi.staticfiles import StaticFiles
 import os
 import glob
 
-from .convert import tif_to_png_base64
-from .processing import laz_to_dem, hillshade, slope, aspect, color_relief, tri, tpi, roughness
+from .convert import convert_geotiff_to_png_base64
+from .processing import laz_to_dem, dtm, hillshade, slope, aspect, color_relief, tri, tpi, roughness
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
@@ -45,7 +45,7 @@ async def list_laz_files():
 # Utility to handle image generation endpoints
 def handle_generation(generator):
     tif_path = generator.generate()
-    image_b64 = tif_to_png_base64(tif_path)
+    image_b64 = convert_geotiff_to_png_base64(tif_path)
     return {"image": image_b64}
 
 @app.post("/api/laz_to_dem")
@@ -62,7 +62,7 @@ async def api_laz_to_dem(input_file: str = Form(...)):
         tif_path = laz_to_dem(input_file)
         print(f"✅ TIF generated: {tif_path}")
         
-        image_b64 = tif_to_png_base64(tif_path)
+        image_b64 = convert_geotiff_to_png_base64(tif_path)
         print(f"✅ Base64 conversion complete")
         
         return {"image": image_b64}
@@ -71,6 +71,25 @@ async def api_laz_to_dem(input_file: str = Form(...)):
         print(f"❌ Error in api_laz_to_dem: {str(e)}")
         print(f"❌ Error type: {type(e).__name__}")
         raise
+        print(f"❌ Error type: {type(e).__name__}")
+        raise
+
+@app.post("/api/dtm")
+async def api_dtm(input_file: str = Form(...)):
+    """Convert LAZ to DTM (ground points only)"""
+    print(f"\n🎯 API CALL: /api/dtm")
+    print(f"📥 Input file: {input_file}")
+    
+    try:
+        tif_path = dtm(input_file)
+        print(f"✅ TIF generated: {tif_path}")
+        
+        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        print(f"✅ Base64 conversion complete")
+        
+        return {"image": image_b64}
+    except Exception as e:
+        print(f"❌ Error in api_dtm: {str(e)}")
         print(f"❌ Error type: {type(e).__name__}")
         raise
 
@@ -84,7 +103,7 @@ async def api_hillshade(input_file: str = Form(...)):
         tif_path = hillshade(input_file)
         print(f"✅ TIF generated: {tif_path}")
         
-        image_b64 = tif_to_png_base64(tif_path)
+        image_b64 = convert_geotiff_to_png_base64(tif_path)
         print(f"✅ Base64 conversion complete")
         
         return {"image": image_b64}
@@ -101,7 +120,7 @@ async def api_slope(input_file: str = Form(...)):
     
     try:
         tif_path = slope(input_file)
-        image_b64 = tif_to_png_base64(tif_path)
+        image_b64 = convert_geotiff_to_png_base64(tif_path)
         return {"image": image_b64}
     except Exception as e:
         print(f"❌ Error in api_slope: {str(e)}")
@@ -115,7 +134,7 @@ async def api_aspect(input_file: str = Form(...)):
     
     try:
         tif_path = aspect(input_file)
-        image_b64 = tif_to_png_base64(tif_path)
+        image_b64 = convert_geotiff_to_png_base64(tif_path)
         return {"image": image_b64}
     except Exception as e:
         print(f"❌ Error in api_aspect: {str(e)}")
@@ -129,7 +148,7 @@ async def api_color_relief(input_file: str = Form(...)):
     
     try:
         tif_path = color_relief(input_file)
-        image_b64 = tif_to_png_base64(tif_path)
+        image_b64 = convert_geotiff_to_png_base64(tif_path)
         return {"image": image_b64}
     except Exception as e:
         print(f"❌ Error in api_color_relief: {str(e)}")
@@ -143,7 +162,7 @@ async def api_tri(input_file: str = Form(...)):
     
     try:
         tif_path = tri(input_file)
-        image_b64 = tif_to_png_base64(tif_path)
+        image_b64 = convert_geotiff_to_png_base64(tif_path)
         return {"image": image_b64}
     except Exception as e:
         print(f"❌ Error in api_tri: {str(e)}")
@@ -157,7 +176,7 @@ async def api_tpi(input_file: str = Form(...)):
     
     try:
         tif_path = tpi(input_file)
-        image_b64 = tif_to_png_base64(tif_path)
+        image_b64 = convert_geotiff_to_png_base64(tif_path)
         return {"image": image_b64}
     except Exception as e:
         print(f"❌ Error in api_tpi: {str(e)}")
@@ -171,7 +190,7 @@ async def api_roughness(input_file: str = Form(...)):
     
     try:
         tif_path = roughness(input_file)
-        image_b64 = tif_to_png_base64(tif_path)
+        image_b64 = convert_geotiff_to_png_base64(tif_path)
         return {"image": image_b64}
     except Exception as e:
         print(f"❌ Error in api_roughness: {str(e)}")

@@ -2,9 +2,10 @@ import asyncio
 import time
 import os
 import logging
-import numpy as np
-from PIL import Image
+import subprocess
 from typing import Dict, Any
+from osgeo import gdal
+from .dtm import dtm
 
 logger = logging.getLogger(__name__)
 
@@ -159,21 +160,22 @@ async def process_hillshade(laz_file_path: str, output_dir: str, parameters: Dic
 
 def hillshade(input_file: str) -> str:
     """
-    Synchronous wrapper for hillshade generation
+    Generate hillshade from LAZ file using GDAL DEM processing
     
     Args:
         input_file: Path to the input LAZ file
         
     Returns:
-        Path to the generated TIF file
+        Path to the generated hillshade TIF file
     """
     print(f"\n🌄 HILLSHADE: Starting generation for {input_file}")
+    start_time = time.time()
     
     # Extract the base name without path and extension
     laz_basename = os.path.splitext(os.path.basename(input_file))[0]
     
-    # Create output directory structure: output/<laz_basename>/
-    output_dir = os.path.join("output", laz_basename)
+    # Create output directory structure: output/<laz_basename>/Hillshade/
+    output_dir = os.path.join("output", laz_basename, "Hillshade")
     os.makedirs(output_dir, exist_ok=True)
     
     # Generate output filename: <laz_basename>_hillshade.tif
@@ -183,29 +185,96 @@ def hillshade(input_file: str) -> str:
     print(f"📂 Output directory: {output_dir}")
     print(f"📄 Output file: {output_path}")
     
-    # Generate placeholder hillshade image
-    print(f"🎨 Generating placeholder hillshade data...")
-    
-    size = 256
-    # Create hillshade-like pattern with light direction from NW
-    x, y = np.meshgrid(np.linspace(0, 1, size), np.linspace(0, 1, size))
-    
-    # Simulate elevation gradients and shading
-    elevation = np.sin(x * 6) * np.cos(y * 6) + np.random.normal(0, 0.1, (size, size))
-    
-    # Calculate hillshade effect (simplified)
-    light_angle = np.pi / 4  # 45 degrees from NW
-    dx = np.gradient(elevation, axis=1)
-    dy = np.gradient(elevation, axis=0)
-    
-    hillshade_value = np.cos(light_angle) * dx + np.sin(light_angle) * dy
-    hillshade_value = (hillshade_value - hillshade_value.min()) / (hillshade_value.max() - hillshade_value.min())
-    hillshade_value = (hillshade_value * 255).astype(np.uint8)
-    
-    # Save as TIFF
-    hillshade_image = Image.fromarray(hillshade_value, mode='L')
-    hillshade_image.save(output_path)
-    
-    print(f"✅ Hillshade file generated: {output_path}")
-    
-    return output_path
+    try:
+        # Step 1: Generate or locate DTM
+        print(f"\n🏔️ Step 1: Generating DTM as source for hillshade...")
+        dtm_path = dtm(input_file)
+        print(f"✅ DTM ready: {dtm_path}")
+        
+        # Step 2: Generate hillshade using GDAL DEMProcessing
+        print(f"\n🌄 Step 2: Generating hillshade using GDAL DEMProcessing...")
+        print(f"📁 Source DTM: {dtm_path}")
+        print(f"📁 Target hillshade: {output_path}")
+        
+        # Configure hillshade parameters
+        azimuth = 315.0  # Light source azimuth (NW direction)
+        altitude = 45.0  # Light source altitude angle
+        z_factor = 1.0   # Vertical exaggeration
+        scale = 1.0      # Scale factor
+        
+        print(f"⚙️ Hillshade parameters:")
+        print(f"   🧭 Azimuth: {azimuth}° (NW)")
+        print(f"   📐 Altitude: {altitude}°")
+        print(f"   📏 Z-factor: {z_factor}")
+        print(f"   📊 Scale: {scale}")
+        
+        # Use GDAL DEMProcessing for hillshade generation
+        processing_start = time.time()
+        
+        result = gdal.DEMProcessing(
+            destName=output_path,
+            srcDS=dtm_path,
+            processing="hillshade",
+            azimuth=azimuth,
+            altitude=altitude,
+            zFactor=z_factor,
+            scale=scale,
+            format="GTiff"
+        )
+        
+        processing_time = time.time() - processing_start
+        
+        if result is None:
+            raise RuntimeError("GDAL DEMProcessing failed to generate hillshade")
+        
+        print(f"✅ Hillshade generation completed in {processing_time:.2f} seconds")
+        
+        # Step 3: Validate output file
+        print(f"\n🔍 Validating output file...")
+        if os.path.exists(output_path):
+            output_size = os.path.getsize(output_path)
+            print(f"✅ Output file created successfully")
+            print(f"📊 Output file size: {output_size:,} bytes ({output_size / (1024**2):.2f} MB)")
+            print(f"📄 Output file path: {os.path.abspath(output_path)}")
+            
+            # Run gdalinfo to get information about the generated hillshade
+            print(f"\n📊 GDALINFO OUTPUT:")
+            print(f"{'='*40}")
+            try:
+                gdalinfo_result = subprocess.run(
+                    ['gdalinfo', output_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                
+                if gdalinfo_result.returncode == 0:
+                    print(gdalinfo_result.stdout)
+                else:
+                    print(f"❌ gdalinfo failed with return code {gdalinfo_result.returncode}")
+                    print(f"❌ Error: {gdalinfo_result.stderr}")
+                    
+            except FileNotFoundError:
+                print(f"⚠️ gdalinfo command not found. Please ensure GDAL is installed and in PATH.")
+            except subprocess.TimeoutExpired:
+                print(f"⚠️ gdalinfo command timed out after 30 seconds.")
+            except Exception as e:
+                print(f"⚠️ Error running gdalinfo: {str(e)}")
+            
+            print(f"{'='*40}")
+            
+        else:
+            raise FileNotFoundError(f"Hillshade output file was not created: {output_path}")
+        
+        total_time = time.time() - start_time
+        print(f"✅ HILLSHADE generation completed successfully in {total_time:.2f} seconds")
+        print(f"🌄 Hillshade file: {output_path}")
+        
+        return output_path
+        
+    except Exception as e:
+        total_time = time.time() - start_time
+        error_msg = f"Hillshade generation failed: {str(e)}"
+        print(f"❌ {error_msg}")
+        print(f"❌ Failed after {total_time:.2f} seconds")
+        raise Exception(error_msg)

@@ -2,9 +2,10 @@ import asyncio
 import time
 import os
 import logging
-import numpy as np
-from PIL import Image
+import subprocess
 from typing import Dict, Any
+from osgeo import gdal
+from .dtm import dtm
 
 logger = logging.getLogger(__name__)
 
@@ -86,38 +87,114 @@ async def process_tpi(laz_file_path: str, output_dir: str, parameters: Dict[str,
 
 def tpi(input_file: str) -> str:
     """
-    Synchronous wrapper for TPI (Topographic Position Index) analysis
+    Generate TPI (Topographic Position Index) from LAZ file using GDAL DEM processing
     
     Args:
         input_file: Path to the input LAZ file
         
     Returns:
-        Path to the generated TIF file
+        Path to the generated TPI TIF file
     """
     print(f"\n📍 TPI: Starting analysis for {input_file}")
+    start_time = time.time()
     
+    # Extract the base name without path and extension
     laz_basename = os.path.splitext(os.path.basename(input_file))[0]
-    output_dir = os.path.join("output", laz_basename)
+    
+    # Create output directory structure: output/<laz_basename>/TPI/
+    output_dir = os.path.join("output", laz_basename, "TPI")
     os.makedirs(output_dir, exist_ok=True)
     
+    # Generate output filename: <laz_basename>_tpi.tif
     output_filename = f"{laz_basename}_tpi.tif"
     output_path = os.path.join(output_dir, output_filename)
     
     print(f"📂 Output directory: {output_dir}")
     print(f"📄 Output file: {output_path}")
     
-    # Generate placeholder TPI data
-    print(f"🎨 Generating placeholder TPI data...")
-    
-    size = 256
-    x, y = np.meshgrid(np.linspace(-1, 1, size), np.linspace(-1, 1, size))
-    
-    # Create TPI-like data (relative elevation position)
-    tpi_data = np.sin(x * 4) * np.cos(y * 4) + np.random.normal(0, 0.2, (size, size))
-    tpi_data = ((tpi_data + 1) / 2 * 255).astype(np.uint8)  # Normalize to 0-255
-    
-    tpi_image = Image.fromarray(tpi_data, mode='L')
-    tpi_image.save(output_path)
-    
-    print(f"✅ TPI file generated: {output_path}")
-    return output_path
+    try:
+        # Step 1: Generate or locate DTM
+        print(f"\n🏔️ Step 1: Generating DTM as source for TPI analysis...")
+        dtm_path = dtm(input_file)
+        print(f"✅ DTM ready: {dtm_path}")
+        
+        # Step 2: Generate TPI using GDAL DEMProcessing
+        print(f"\n📍 Step 2: Generating TPI using GDAL DEMProcessing...")
+        print(f"📁 Source DTM: {dtm_path}")
+        print(f"📁 Target TPI: {output_path}")
+        
+        # Configure TPI parameters
+        compute_edges = True  # Compute values at edges
+        
+        print(f"⚙️ TPI parameters:")
+        print(f"   📊 Algorithm: Difference between elevation and mean of surrounding cells")
+        print(f"   🔲 Compute edges: {compute_edges}")
+        print(f"   📏 Output: Positive=ridges/peaks, Negative=valleys, Zero=flat/slopes")
+        
+        # Use GDAL DEMProcessing for TPI analysis
+        processing_start = time.time()
+        
+        result = gdal.DEMProcessing(
+            destName=output_path,
+            srcDS=dtm_path,
+            processing="TPI",
+            computeEdges=compute_edges,
+            format="GTiff"
+        )
+        
+        processing_time = time.time() - processing_start
+        
+        if result is None:
+            raise RuntimeError("GDAL DEMProcessing failed to generate TPI")
+        
+        print(f"✅ TPI analysis completed in {processing_time:.2f} seconds")
+        
+        # Step 3: Validate output file
+        print(f"\n🔍 Validating output file...")
+        if os.path.exists(output_path):
+            output_size = os.path.getsize(output_path)
+            print(f"✅ Output file created successfully")
+            print(f"📊 Output file size: {output_size:,} bytes ({output_size / (1024**2):.2f} MB)")
+            print(f"📄 Output file path: {os.path.abspath(output_path)}")
+            
+            # Run gdalinfo to get information about the generated TPI
+            print(f"\n📊 GDALINFO OUTPUT:")
+            print(f"{'='*40}")
+            try:
+                gdalinfo_result = subprocess.run(
+                    ['gdalinfo', output_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                
+                if gdalinfo_result.returncode == 0:
+                    print(gdalinfo_result.stdout)
+                else:
+                    print(f"❌ gdalinfo failed with return code {gdalinfo_result.returncode}")
+                    print(f"❌ Error: {gdalinfo_result.stderr}")
+                    
+            except FileNotFoundError:
+                print(f"⚠️ gdalinfo command not found. Please ensure GDAL is installed and in PATH.")
+            except subprocess.TimeoutExpired:
+                print(f"⚠️ gdalinfo command timed out after 30 seconds.")
+            except Exception as e:
+                print(f"⚠️ Error running gdalinfo: {str(e)}")
+            
+            print(f"{'='*40}")
+            
+        else:
+            raise FileNotFoundError(f"TPI output file was not created: {output_path}")
+        
+        total_time = time.time() - start_time
+        print(f"✅ TPI analysis completed successfully in {total_time:.2f} seconds")
+        print(f"📍 TPI file: {output_path}")
+        
+        return output_path
+        
+    except Exception as e:
+        total_time = time.time() - start_time
+        error_msg = f"TPI analysis failed: {str(e)}"
+        print(f"❌ {error_msg}")
+        print(f"❌ Failed after {total_time:.2f} seconds")
+        raise Exception(error_msg)
