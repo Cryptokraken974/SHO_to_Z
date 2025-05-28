@@ -1,0 +1,12 @@
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "description": "Frontend for Image Processing App",
+  "main": "app.js",
+  "scripts": {
+    "start": "echo \"No start script specified, open index.html directly in a browser.\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}

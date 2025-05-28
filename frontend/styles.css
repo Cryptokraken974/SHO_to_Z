@@ -22,6 +22,7 @@ body {
 #main {
   margin-left: 210px;
   padding: 10px;
+  background: #000; /* Changed background to black */
 }
 
 #grid {
@@ -32,10 +33,11 @@ body {
 }
 
 .grid-cell {
-  background: #e0e0e0;
+  background: #000; /* Changed to black */
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid white; /* Added small white border */
 }
 
 .proc-btn {
@@ -44,6 +46,19 @@ body {
   border: none;
   color: #fff;
   cursor: pointer;
+}
+
+.select-btn {
+  padding: 5px 10px;
+  background: #28a745;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.select-btn:hover {
+  background: #218838;
 }
 
 #chatbar {
@@ -79,4 +94,189 @@ body {
 
 #chat-input {
   flex: 1;
+}
+
+/* Accordion Styles */
+.accordion-section {
+  margin-bottom: 20px;
+  border: 1px solid #333;
+  border-radius: 4px;
+}
+
+.accordion-header {
+  background: #002a5c;
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 4px 4px 0 0;
+  transition: background 0.3s;
+}
+
+.accordion-header:hover {
+  background: #003366;
+}
+
+.accordion-header h3 {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.accordion-arrow {
+  font-size: 12px;
+  transition: transform 0.3s;
+}
+
+.accordion-content {
+  padding: 10px;
+  background: #001a3f;
+  border-radius: 0 0 4px 4px;
+  max-height: 100px;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+}
+
+.accordion-content.collapsed {
+  max-height: 0;
+  padding: 0 10px;
+}
+
+.selected-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+#selected-file-name {
+  color: #00bfff;
+  font-size: 12px;
+  flex: 1;
+  min-width: 120px;
+  word-break: break-all;
+}
+
+.browse-btn {
+  padding: 4px 8px;
+  background: #00bfff;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  border-radius: 2px;
+  font-size: 11px;
+}
+
+.browse-btn:hover {
+  background: #0099cc;
+}
+
+/* Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+  background-color: #001f3f;
+  margin: 5% auto;
+  border: 1px solid #333;
+  border-radius: 4px;
+  width: 80%;
+  max-width: 600px;
+  color: #fff;
+}
+
+.modal-header {
+  padding: 15px;
+  border-bottom: 1px solid #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h4 {
+  margin: 0;
+}
+
+.close {
+  font-size: 24px;
+  cursor: pointer;
+  color: #aaa;
+}
+
+.close:hover {
+  color: #fff;
+}
+
+.modal-body {
+  padding: 15px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.file-search {
+  margin-bottom: 15px;
+}
+
+.file-search input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #333;
+  border-radius: 2px;
+  background: #002a5c;
+  color: #fff;
+}
+
+.file-search input::placeholder {
+  color: #aaa;
+}
+
+.file-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.file-item {
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 2px;
+  margin-bottom: 2px;
+  transition: background 0.2s;
+}
+
+.file-item:hover {
+  background: #002a5c;
+}
+
+.file-item.selected {
+  background: #00bfff;
+  color: #000;
+}
+
+.modal-footer {
+  padding: 15px;
+  border-top: 1px solid #333;
+  text-align: right;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.cancel-btn {
+  padding: 8px 16px;
+  background: #666;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.cancel-btn:hover {
+  background: #555;
 }

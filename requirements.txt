@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+gdal
+pdal
+python-multipart
+jinja2
+Pillow
+numpy

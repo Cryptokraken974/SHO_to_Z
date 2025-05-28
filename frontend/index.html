@@ -9,8 +9,21 @@
 </head>
 <body>
   <div id="sidebar">
+    <!-- LAZ File Selection Section -->
+    <div class="accordion-section">
+      <div class="accordion-header" id="laz-accordion">
+        <h3>Select LAZ <span class="accordion-arrow">▼</span></h3>
+      </div>
+      <div class="accordion-content" id="laz-content">
+        <div class="selected-file">
+          <span id="selected-file-name">lion_takanawa.copc.laz</span>
+          <button id="browse-files" class="browse-btn">Browse...</button>
+        </div>
+      </div>
+    </div>
+
     <h3>Single Image Processing Steps</h3>
-    <button class="proc-btn" data-target="laz_to_dtm">LAZ to DTM</button>
+    <button class="proc-btn" data-target="laz_to_dem">LAZ to DEM</button>
     <button class="proc-btn" data-target="hillshade">Hillshade</button>
     <button class="proc-btn" data-target="slope">Slope</button>
     <button class="proc-btn" data-target="aspect">Aspect</button>
@@ -22,7 +35,7 @@
 
   <div id="main">
     <div id="grid">
-      <div class="grid-cell" id="cell-laz_to_dtm"><button class="proc-btn" data-target="laz_to_dtm">LAZ to DTM</button></div>
+      <div class="grid-cell" id="cell-laz_to_dem"><button class="proc-btn" data-target="laz_to_dem">LAZ to DEM</button></div>
       <div class="grid-cell" id="cell-hillshade"><button class="proc-btn" data-target="hillshade">Hillshade</button></div>
       <div class="grid-cell" id="cell-slope"><button class="proc-btn" data-target="slope">Slope</button></div>
       <div class="grid-cell" id="cell-aspect"><button class="proc-btn" data-target="aspect">Aspect</button></div>
@@ -44,6 +57,28 @@
         <option value="4o">4o</option>
       </select>
       <button id="chat-send">Send</button>
+    </div>
+  </div>
+
+  <!-- Modal for file selection -->
+  <div id="file-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4>Select LAZ File</h4>
+        <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="file-search">
+          <input type="text" id="file-search-input" placeholder="Search files...">
+        </div>
+        <div class="file-list" id="file-list">
+          <!-- Files will be populated here -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="select-file" class="select-btn">Select</button>
+        <button id="cancel-select" class="cancel-btn">Cancel</button>
+      </div>
     </div>
   </div>
 </body>
