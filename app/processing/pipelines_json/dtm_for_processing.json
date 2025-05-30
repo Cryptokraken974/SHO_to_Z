@@ -1,0 +1,18 @@
+{
+  "comment": "This pipeline creates a DEM that can be used as input for GDAL DEMProcessing operations like hillshade, slope, aspect, etc.",
+  "pipeline": [
+    "input/default.laz",
+    {
+      "type": "filters.range",
+      "limits": "Classification[2:2]"
+    },
+    {
+      "type": "writers.gdal",
+      "filename": "output/default_dtm_for_processing.tif",
+      "resolution": 1.0,
+      "output_type": "min",
+      "nodata": -9999,
+      "gdaldriver": "GTiff"
+    }
+  ]
+}

@@ -272,6 +272,8 @@ def get_image_overlay_data(base_filename: str, processing_type: str) -> Optional
         filename_mapping = {
             'DEM': 'DEM',           # FoxIsland_DEM.png
             'DTM': 'DTM',           # FoxIsland_DTM.png
+            'DSM': 'DSM',           # FoxIsland_DSM.png
+            'CHM': 'CHM',           # FoxIsland_CHM.png
             'Hillshade': 'hillshade',   # FoxIsland_hillshade.png
             'Slope': 'slope',           # FoxIsland_slope.png
             'Aspect': 'aspect',         # FoxIsland_aspect.png

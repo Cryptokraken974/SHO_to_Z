@@ -1,0 +1,18 @@
+{
+  "comment": "Pipeline for creating a classification raster - filters points based on classification codes",
+  "pipeline": [
+    "input/default.laz",
+    {
+      "type": "filters.range",
+      "limits": "Classification[2:2]"
+    },
+    {
+      "type": "writers.gdal",
+      "filename": "output/default_classification.tif",
+      "resolution": 1.0,
+      "output_type": "mean",
+      "nodata": -9999,
+      "gdaldriver": "GTiff"
+    }
+  ]
+}

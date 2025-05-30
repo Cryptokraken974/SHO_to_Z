@@ -1,0 +1,14 @@
+{
+  "pipeline": [
+    "input/default.laz",
+    {
+      "type": "writers.gdal",
+      "filename": "output/default_intensity.tif",
+      "resolution": 1.0,
+      "output_type": "mean",
+      "dimension": "Intensity",
+      "nodata": -9999,
+      "gdaldriver": "GTiff"
+    }
+  ]
+}

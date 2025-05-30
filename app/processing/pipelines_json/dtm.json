@@ -1,0 +1,27 @@
+{
+  "pipeline": [
+    "input/default.laz",
+    {
+      "type": "filters.outlier",
+      "method": "statistical",
+      "multiplier": 3,
+      "mean_k": 8
+    },
+    {
+      "type": "filters.range",
+      "limits": "Classification![135:146],Z[-10:3000]"
+    },
+    {
+      "type": "filters.range",
+      "limits": "Classification[2:2]"
+    },
+    {
+      "type": "writers.gdal",
+      "filename": "output/default_DTM.tif",
+      "resolution": 2.0,
+      "output_type": "min",
+      "nodata": -9999,
+      "gdaldriver": "GTiff"
+    }
+  ]
+}

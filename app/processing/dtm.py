@@ -3,179 +3,42 @@ import time
 import os
 import logging
 import subprocess
+import json
 from typing import Dict, Any
 import pdal
 
-from .pipelines import create_laz_to_dtm_pipeline, get_pipeline_json, print_pipeline_info
-
 logger = logging.getLogger(__name__)
 
-async def process_dtm(laz_file_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+
+def create_dtm_fallback_pipeline(input_file: str, output_file: str, resolution: float = 1.0) -> Dict[str, Any]:
     """
-    Process DTM (Digital Terrain Model) from LAZ file
-    
-    Args:
-        laz_file_path: Path to the input LAZ file
-        output_dir: Directory to save output files
-        parameters: Processing parameters
-    
-    Returns:
-        Dict containing processing results
+    Create fallback DTM pipeline when JSON pipeline is not available
     """
-    start_time = time.time()
-    
-    # Enhanced logging
-    print(f"\n{'='*50}")
-    print(f"🚀 STARTING DTM PROCESSING")
-    print(f"{'='*50}")
-    print(f"📁 Input LAZ file: {laz_file_path}")
-    print(f"📂 Output directory: {output_dir}")
-    print(f"⚙️ Parameters: {parameters}")
-    print(f"🕐 Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))}")
-    
-    logger.info(f"Starting DTM processing for {laz_file_path}")
-    logger.info(f"Output directory: {output_dir}")
-    logger.info(f"Parameters: {parameters}")
-    
-    try:
-        # Create output directory if it doesn't exist
-        print(f"📁 Creating output directory if needed...")
-        os.makedirs(output_dir, exist_ok=True)
-        print(f"✅ Output directory ready: {output_dir}")
-        logger.info(f"Output directory created/verified: {output_dir}")
-        
-        # Check if input file exists
-        print(f"🔍 Validating input file...")
-        if not os.path.exists(laz_file_path):
-            error_msg = f"LAZ file not found: {laz_file_path}"
-            print(f"❌ {error_msg}")
-            logger.error(error_msg)
-            raise FileNotFoundError(error_msg)
-        
-        file_size = os.path.getsize(laz_file_path)
-        print(f"✅ Input file validated: {laz_file_path}")
-        print(f"📊 File size: {file_size:,} bytes ({file_size / (1024**2):.2f} MB)")
-        logger.info(f"Input file validated - Size: {file_size} bytes")
-        
-        print(f"🔄 Processing DTM (simulated)...")
-        print(f"   🌍 Filtering ground points...")
-        print(f"   📐 Creating terrain model...")
-        print(f"   🗺️ Generating raster...")
-        
-        # Simulate processing time
-        await asyncio.sleep(2)
-        print(f"⏳ DTM processing simulation completed")
-        
-        # TODO: Implement actual DTM processing
-        # This would typically involve:
-        # 1. Reading LAZ file with laspy
-        # 2. Filtering points to ground returns only
-        # 3. Creating a DEM using interpolation
-        # 4. Saving as GeoTIFF
-        
-        # Generate output filename using new naming convention: <laz_filename_without_ext>_<processing_step>
-        laz_basename = os.path.splitext(os.path.basename(laz_file_path))[0]
-        output_filename = f"{laz_basename}_DTM.tif"
-        output_file = os.path.join(output_dir, output_filename)
-        print(f"📄 Creating output file: {output_file}")
-        
-        # Simulate creating output file
-        with open(output_file, 'w') as f:
-            f.write("DTM placeholder file")
-        
-        output_size = os.path.getsize(output_file)
-        print(f"✅ Output file created successfully")
-        print(f"📊 Output file size: {output_size} bytes")
-        
-        processing_time = time.time() - start_time
-        
-        print(f"⏱️ Processing completed in {processing_time:.2f} seconds")
-        print(f"✅ DTM PROCESSING SUCCESSFUL")
-        print(f"{'='*50}\n")
-        
-        logger.info(f"DTM processing completed in {processing_time:.2f} seconds")
-        logger.info(f"Output file created: {output_file}")
-        
-        return {
-            "success": True,
-            "message": "DTM processing completed successfully",
-            "output_file": output_file,
-            "processing_time": processing_time,
-            "input_file": laz_file_path,
-            "file_info": {
-                "input_size_bytes": file_size,
-                "output_size_bytes": output_size
+    return {
+        "pipeline": [
+            {
+                "type": "readers.las",
+                "filename": input_file
+            },
+            {
+                "type": "filters.range",
+                "limits": "Classification[2:2]"  # Ground points only
+            },
+            {
+                "type": "writers.gdal",
+                "filename": output_file,
+                "resolution": resolution,
+                "output_type": "mean",
+                "nodata": -9999
             }
-        }
-        
-    except FileNotFoundError as e:
-        processing_time = time.time() - start_time
-        error_msg = str(e)
-        
-        print(f"❌ FILE NOT FOUND ERROR after {processing_time:.2f}s")
-        print(f"❌ Error: {error_msg}")
-        print(f"{'='*50}\n")
-        
-        logger.error(f"File not found error in DTM processing: {error_msg}")
-        
-        return {
-            "success": False,
-            "message": error_msg,
-            "error_type": "FileNotFoundError",
-            "processing_time": processing_time,
-            "input_file": laz_file_path
-        }
-        
-    except Exception as e:
-        processing_time = time.time() - start_time
-        error_msg = str(e)
-        
-        print(f"❌ UNEXPECTED ERROR after {processing_time:.2f}s")
-        print(f"❌ Error type: {type(e).__name__}")
-        print(f"❌ Error message: {error_msg}")
-        print(f"{'='*50}\n")
-        
-        logger.error(f"Unexpected error in DTM processing: {error_msg}", exc_info=True)
-        
-        return {
-            "success": False,
-            "message": f"Processing failed: {error_msg}",
-            "error_type": type(e).__name__,
-            "processing_time": processing_time,
-            "input_file": laz_file_path
-        }
-        
-        return {
-            "success": True,
-            "message": "DTM processing completed successfully",
-            "output_file": output_file,
-            "processing_time": processing_time,
-            "metadata": {
-                "input_file": laz_file_path,
-                "processing_type": "DTM",
-                "resolution": parameters.get("resolution", "1.0m"),
-                "interpolation_method": parameters.get("interpolation", "IDW")
-            }
-        }
-        
-    except Exception as e:
-        processing_time = time.time() - start_time
-        logger.error(f"DTM processing failed: {str(e)}")
-        
-        return {
-            "success": False,
-            "message": f"DTM processing failed: {str(e)}",
-            "processing_time": processing_time,
-            "metadata": {
-                "input_file": laz_file_path,
-                "processing_type": "DTM",
-                "error": str(e)
-            }
-        }
+        ]
+    }
+
 
 def dtm(input_file: str) -> str:
     """
     Convert LAZ file to DTM (Digital Terrain Model) - Ground points only
+    Implements caching to avoid regenerating DTM if it already exists and is up-to-date
     
     Args:
         input_file: Path to the input LAZ file
@@ -200,6 +63,31 @@ def dtm(input_file: str) -> str:
     print(f"📂 Output directory: {output_dir}")
     print(f"📄 Output file: {output_path}")
     
+    # Check if DTM already exists and is up-to-date (caching optimization)
+    if os.path.exists(output_path) and os.path.exists(input_file):
+        try:
+            # Compare modification times
+            dtm_mtime = os.path.getmtime(output_path)
+            laz_mtime = os.path.getmtime(input_file)
+            
+            if dtm_mtime > laz_mtime:
+                # Validate the cached DTM file
+                if validate_dtm_cache(output_path):
+                    processing_time = time.time() - start_time
+                    print(f"🚀 DTM cache hit! Using existing DTM file (created {time.ctime(dtm_mtime)})")
+                    print(f"✅ DTM ready in {processing_time:.3f} seconds (cached)")
+                    return output_path
+                else:
+                    print(f"⚠️ Cached DTM file failed validation, regenerating...")
+            else:
+                print(f"⏰ DTM file exists but is outdated. LAZ modified: {time.ctime(laz_mtime)}, DTM created: {time.ctime(dtm_mtime)}")
+        except OSError as e:
+            print(f"⚠️ Error checking file timestamps: {e}")
+    elif os.path.exists(output_path):
+        print(f"⚠️ DTM exists but input LAZ file not found, regenerating DTM")
+    else:
+        print(f"📝 No existing DTM found, generating new DTM")
+    
     # Set default resolution
     resolution = 1.0
     
@@ -216,6 +104,7 @@ def dtm(input_file: str) -> str:
         print(f"❌ DTM conversion failed after {processing_time:.2f} seconds")
         print(f"❌ Error: {message}")
         raise Exception(f"DTM conversion failed: {message}")
+
 
 def convert_las_to_dtm(input_file: str, output_file: str, resolution: float = 1.0) -> tuple[bool, str]:
     """
@@ -237,148 +126,293 @@ def convert_las_to_dtm(input_file: str, output_file: str, resolution: float = 1.
     print(f"📏 Resolution: {resolution} units")
     print(f"🕐 Start time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # Validate input file
-    print(f"\n🔍 Validating input file...")
-    if not os.path.exists(input_file):
-        error_msg = f"Input file not found: {input_file}"
-        print(f"❌ {error_msg}")
-        return False, error_msg
+    # Try JSON pipeline first, then fall back to hardcoded pipeline
+    json_pipeline_path = os.path.join(os.path.dirname(__file__), "pipelines_json", "dtm.json")
     
-    file_size = os.path.getsize(input_file)
-    print(f"✅ Input file validated")
-    print(f"📊 File size: {file_size:,} bytes ({file_size / (1024**2):.2f} MB)")
+    success = False
+    message = ""
     
-    # Create PDAL pipeline for DTM (ground points only)
-    print(f"\n🔧 Creating PDAL DTM pipeline...")
-    pipeline = create_laz_to_dtm_pipeline(
-        input_file=input_file,
-        output_file=output_file,
-        resolution=resolution,
-        nodata=-9999,
-        ground_only=True
-    )
-    
-    print(f"🗂️ DTM Pipeline Parameters:")
-    print(f"   📄 Output file: {output_file}")
-    print(f"   📏 Resolution: {resolution} units")
-    print(f"   📊 Output type: min (ground surface)")
-    print(f"   🚫 NoData value: -9999")
-    print(f"   🌍 Ground points only: Classification 2")
-    print(f"   💾 GDAL driver: GTiff")
-    
-    print_pipeline_info(pipeline, "LAZ to DTM Pipeline")
-    
-    # Execute PDAL pipeline
-    print(f"\n🚀 Executing PDAL pipeline...")
-    pipeline_json = get_pipeline_json(pipeline)
-    pdal_pipeline = pdal.Pipeline(pipeline_json)
-    
-    try:
-        print(f"   🔄 Running PDAL execution...")
-        execution_start = time.time()
-        
-        count = pdal_pipeline.execute()
-        
-        execution_time = time.time() - execution_start
-        print(f"   ✅ PDAL execution completed in {execution_time:.2f} seconds")
-        print(f"   📊 Total points processed: {count:,}")
-        
-        # Validate output file
-        print(f"\n🔍 Validating output file...")
-        if os.path.exists(output_file):
-            output_size = os.path.getsize(output_file)
-            print(f"✅ Output file created successfully")
-            print(f"📊 Output file size: {output_size:,} bytes ({output_size / (1024**2):.2f} MB)")
+    # First try JSON pipeline
+    if os.path.exists(json_pipeline_path):
+        print(f"🔄 Attempting to use JSON pipeline: {json_pipeline_path}")
+        try:
+            # Load and adapt JSON pipeline
+            with open(json_pipeline_path, 'r') as f:
+                pipeline_config = json.load(f)
             
-            # Additional file info
-            print(f"📄 Output file path: {os.path.abspath(output_file)}")
+            # Replace placeholders with actual file paths
+            pipeline_str = json.dumps(pipeline_config)
+            pipeline_str = pipeline_str.replace("input/default.laz", input_file)
+            pipeline_str = pipeline_str.replace("output/default_DTM.tif", output_file)
+            pipeline_str = pipeline_str.replace("2.0", str(resolution))
+            pipeline_config = json.loads(pipeline_str)
             
-            # Run gdalinfo to get detailed information about the generated DTM
-            print(f"\n📊 GDALINFO OUTPUT:")
-            print(f"{'='*40}")
-            try:
-                gdalinfo_result = subprocess.run(
-                    ['gdalinfo', output_file],
-                    capture_output=True,
-                    text=True,
-                    timeout=30
-                )
+            print(f"📋 Using JSON pipeline configuration")
+            pipeline = pdal.Pipeline(json.dumps(pipeline_config))
+            
+            # Execute pipeline
+            pipeline.execute()
+            
+            if os.path.exists(output_file):
+                success = True
+                message = f"DTM generated successfully using JSON pipeline: {output_file}"
+                print(f"✅ {message}")
+            else:
+                raise Exception("Output file was not created")
                 
-                if gdalinfo_result.returncode == 0:
-                    print(gdalinfo_result.stdout)
-                else:
-                    print(f"❌ gdalinfo failed with return code {gdalinfo_result.returncode}")
-                    print(f"❌ Error: {gdalinfo_result.stderr}")
-                    
-            except FileNotFoundError:
-                print(f"⚠️ gdalinfo command not found. Please ensure GDAL is installed and in PATH.")
-            except subprocess.TimeoutExpired:
-                print(f"⚠️ gdalinfo command timed out after 30 seconds.")
-            except Exception as e:
-                print(f"⚠️ Error running gdalinfo: {str(e)}")
+        except Exception as e:
+            print(f"⚠️ JSON pipeline failed: {str(e)}")
+            print(f"🔄 Falling back to hardcoded pipeline...")
+    
+    # Fall back to hardcoded pipeline if JSON failed or doesn't exist
+    if not success:
+        try:
+            print(f"🔄 Using hardcoded DTM pipeline...")
+            pipeline_config = create_dtm_fallback_pipeline(input_file, output_file, resolution)
+            pipeline = pdal.Pipeline(json.dumps(pipeline_config))
             
-            print(f"{'='*40}")
+            # Execute pipeline
+            pipeline.execute()
             
-            # Apply GDAL FillNodata to interpolate gaps in the DTM
-            print(f"\n🔧 Applying GDAL FillNodata interpolation...")
-            try:
-                from osgeo import gdal
+            if os.path.exists(output_file):
+                success = True
+                message = f"DTM generated successfully using hardcoded pipeline: {output_file}"
+                print(f"✅ {message}")
+            else:
+                raise Exception("Output file was not created")
                 
-                # Open the DTM dataset
-                dataset = gdal.Open(output_file, gdal.GA_Update)
-                if dataset is None:
-                    print(f"⚠️ Could not open DTM file for FillNodata processing")
+        except Exception as e:
+            success = False
+            message = f"Both JSON and hardcoded pipelines failed: {str(e)}"
+            print(f"❌ {message}")
+    
+    # If processing succeeded, apply additional post-processing
+    if success and os.path.exists(output_file):
+        print(f"\n🔧 Applying post-processing...")
+        
+        # Run gdalinfo to get detailed information about the generated DTM
+        print(f"\n📊 GDALINFO OUTPUT:")
+        print(f"{'='*40}")
+        try:
+            gdalinfo_result = subprocess.run(
+                ['gdalinfo', output_file],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if gdalinfo_result.returncode == 0:
+                print(gdalinfo_result.stdout)
+            else:
+                print(f"❌ gdalinfo failed with return code {gdalinfo_result.returncode}")
+                print(f"❌ Error: {gdalinfo_result.stderr}")
+                
+        except FileNotFoundError:
+            print(f"⚠️ gdalinfo command not found. Please ensure GDAL is installed and in PATH.")
+        except subprocess.TimeoutExpired:
+            print(f"⚠️ gdalinfo command timed out after 30 seconds.")
+        except Exception as e:
+            print(f"⚠️ Error running gdalinfo: {str(e)}")
+        
+        print(f"{'='*40}")
+        
+        # Apply GDAL FillNodata to interpolate gaps in the DTM
+        print(f"\n🔧 Applying GDAL FillNodata interpolation...")
+        try:
+            from osgeo import gdal
+            
+            # Open the DTM dataset
+            dataset = gdal.Open(output_file, gdal.GA_Update)
+            if dataset is None:
+                print(f"⚠️ Could not open DTM file for FillNodata processing")
+            else:
+                band = dataset.GetRasterBand(1)
+                
+                # Create mask band (None means use nodata values as mask)
+                mask_band = None
+                
+                # Apply FillNodata with smooth interpolation
+                print(f"   🎯 Max distance: 100 pixels")
+                print(f"   🌊 Smooth iterations: 2")
+                print(f"   🚫 NoData value: -9999")
+                
+                fillnodata_start = time.time()
+                result = gdal.FillNodata(band, mask_band, maxSearchDist=100, smoothingIterations=2)
+                fillnodata_time = time.time() - fillnodata_start
+                
+                if result == 0:  # CE_None (success)
+                    print(f"✅ FillNodata completed successfully in {fillnodata_time:.2f} seconds")
                 else:
-                    band = dataset.GetRasterBand(1)
-                    
-                    # Create mask band (None means use nodata values as mask)
-                    mask_band = None
-                    
-                    # Apply FillNodata with smooth interpolation
-                    print(f"   🎯 Max distance: 100 pixels")
-                    print(f"   🌊 Smooth iterations: 2")
-                    print(f"   🚫 NoData value: -9999")
-                    
-                    fillnodata_start = time.time()
-                    result = gdal.FillNodata(band, mask_band, maxSearchDist=100, smoothingIterations=2)
-                    fillnodata_time = time.time() - fillnodata_start
-                    
-                    if result == 0:  # CE_None (success)
-                        print(f"✅ FillNodata completed successfully in {fillnodata_time:.2f} seconds")
-                    else:
-                        print(f"⚠️ FillNodata returned error code: {result}")
-                    
-                    # Close dataset to flush changes
-                    dataset = None
-                    
-            except ImportError:
-                print(f"⚠️ GDAL Python bindings not available. Skipping FillNodata step.")
-            except Exception as e:
-                print(f"⚠️ Error during FillNodata processing: {str(e)}")
-            
-            success_msg = f"DTM generated successfully at {output_file}"
-            print(f"✅ {success_msg}")
-            print(f"{'='*60}\n")
-            
-            return True, success_msg
+                    print(f"⚠️ FillNodata returned error code: {result}")
+                
+                # Close dataset to flush changes
+                dataset = None
+                
+        except ImportError:
+            print(f"⚠️ GDAL Python bindings not available. Skipping FillNodata step.")
+        except Exception as e:
+            print(f"⚠️ Error during FillNodata processing: {str(e)}")
+    
+    return success, message
+
+
+def clear_dtm_cache(input_file: str = None) -> None:
+    """
+    Clear DTM cache for a specific LAZ file or all DTM files
+    
+    Args:
+        input_file: Path to specific LAZ file to clear cache for, or None to clear all
+    """
+    if input_file:
+        # Clear cache for specific file
+        laz_basename = os.path.splitext(os.path.basename(input_file))[0]
+        dtm_path = os.path.join("output", laz_basename, "DTM", f"{laz_basename}_DTM.tif")
+        
+        if os.path.exists(dtm_path):
+            try:
+                os.remove(dtm_path)
+                print(f"🗑️ Cleared DTM cache for {laz_basename}")
+            except OSError as e:
+                print(f"⚠️ Failed to clear DTM cache: {e}")
         else:
-            error_msg = "Output file was not created"
-            print(f"❌ {error_msg}")
-            print(f"{'='*60}\n")
-            return False, error_msg
-            
-    except RuntimeError as e:
-        error_msg = f"PDAL execution failed: {str(e)}"
-        print(f"❌ {error_msg}")
-        print(f"❌ Error type: RuntimeError")
-        print(f"❌ Full error: {str(e)}")
-        print(f"{'='*60}\n")
-        return False, error_msg
+            print(f"📭 No DTM cache found for {laz_basename}")
+    else:
+        # Clear all DTM caches
+        import glob
+        dtm_files = glob.glob("output/*/DTM/*_DTM.tif")
+        
+        cleared_count = 0
+        for dtm_file in dtm_files:
+            try:
+                os.remove(dtm_file)
+                cleared_count += 1
+            except OSError as e:
+                print(f"⚠️ Failed to remove {dtm_file}: {e}")
+        
+        print(f"🗑️ Cleared {cleared_count} DTM cache files")
+
+
+def get_dtm_cache_info() -> dict:
+    """
+    Get information about current DTM cache status
     
+    Returns:
+        Dictionary with cache statistics
+    """
+    import glob
+    
+    dtm_files = glob.glob("output/*/DTM/*_DTM.tif")
+    
+    cache_info = {
+        "total_cached_dtms": len(dtm_files),
+        "cached_files": []
+    }
+    
+    total_size = 0
+    for dtm_file in dtm_files:
+        try:
+            file_stat = os.stat(dtm_file)
+            size_mb = file_stat.st_size / (1024 * 1024)
+            total_size += size_mb
+            
+            cache_info["cached_files"].append({
+                "file": dtm_file,
+                "size_mb": round(size_mb, 2),
+                "created": time.ctime(file_stat.st_mtime)
+            })
+        except OSError:
+            continue
+    
+    cache_info["total_size_mb"] = round(total_size, 2)
+    
+    return cache_info
+
+
+def validate_dtm_cache(dtm_path: str) -> bool:
+    """
+    Validate that a cached DTM file is properly formatted and not corrupted
+    
+    Args:
+        dtm_path: Path to the DTM file to validate
+        
+    Returns:
+        True if DTM is valid, False otherwise
+    """
+    try:
+        from osgeo import gdal
+        
+        # Try to open the DTM file
+        dataset = gdal.Open(dtm_path, gdal.GA_ReadOnly)
+        if dataset is None:
+            print(f"⚠️ DTM validation failed: Cannot open {dtm_path}")
+            return False
+        
+        # Check basic properties
+        width = dataset.RasterXSize
+        height = dataset.RasterYSize
+        bands = dataset.RasterCount
+        
+        if width <= 0 or height <= 0 or bands != 1:
+            print(f"⚠️ DTM validation failed: Invalid dimensions {width}x{height}, bands={bands}")
+            dataset = None
+            return False
+        
+        # Check that we can read the first band
+        band = dataset.GetRasterBand(1)
+        if band is None:
+            print(f"⚠️ DTM validation failed: Cannot access raster band")
+            dataset = None
+            return False
+        
+        # Check data type
+        data_type = band.DataType
+        if data_type not in [gdal.GDT_Float32, gdal.GDT_Float64, gdal.GDT_Int16, gdal.GDT_Int32]:
+            print(f"⚠️ DTM validation failed: Unexpected data type {data_type}")
+            dataset = None
+            return False
+        
+        # Clean up
+        dataset = None
+        return True
+        
+    except ImportError:
+        print(f"⚠️ GDAL not available for DTM validation, assuming valid")
+        return True
     except Exception as e:
-        error_msg = f"Unexpected error during PDAL execution: {str(e)}"
-        print(f"❌ {error_msg}")
-        print(f"❌ Error type: {type(e).__name__}")
-        print(f"❌ Full error: {str(e)}")
-        print(f"{'='*60}\n")
-        return False, error_msg
+        print(f"⚠️ DTM validation failed with error: {e}")
+        return False
+
+
+def get_cache_statistics() -> str:
+    """
+    Generate a formatted report of DTM cache performance and usage
+    
+    Returns:
+        Formatted string with cache statistics
+    """
+    cache_info = get_dtm_cache_info()
+    
+    report = []
+    report.append("📊 DTM CACHE STATISTICS")
+    report.append("=" * 50)
+    report.append(f"🗂️ Total cached DTMs: {cache_info['total_cached_dtms']}")
+    report.append(f"💾 Total cache size: {cache_info['total_size_mb']} MB")
+    
+    if cache_info['cached_files']:
+        report.append("\n📁 Cached Files:")
+        for i, file_info in enumerate(cache_info['cached_files'], 1):
+            basename = os.path.basename(file_info['file'])
+            report.append(f"   {i}. {basename}")
+            report.append(f"      Size: {file_info['size_mb']} MB")
+            report.append(f"      Created: {file_info['created']}")
+    else:
+        report.append("\n📭 No DTM files currently cached")
+    
+    # Calculate potential time savings
+    if cache_info['total_cached_dtms'] > 0:
+        # Estimate: each DTM would take ~20 seconds to generate
+        estimated_savings = (cache_info['total_cached_dtms'] - 1) * 20
+        report.append(f"\n⚡ Estimated time saved by caching: {estimated_savings} seconds")
+        report.append(f"🚀 Performance improvement: ~{cache_info['total_cached_dtms']}x faster for repeated operations")
+    
+    return "\n".join(report)

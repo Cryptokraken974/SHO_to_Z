@@ -1,9 +1,29 @@
+# filepath: /Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/app/processing/laz_to_dem.py
 import pdal
 import json
 import os
 import time
-from typing import Tuple
-from .pipelines import create_laz_to_dem_pipeline, get_pipeline_json, print_pipeline_info
+from typing import Tuple, Dict, Any
+
+def create_dem_fallback_pipeline(input_file: str, output_file: str, resolution: float = 1.0) -> Dict[str, Any]:
+    """
+    Create fallback DEM pipeline when JSON pipeline is not available
+    """
+    return {
+        "pipeline": [
+            {
+                "type": "readers.las",
+                "filename": input_file
+            },
+            {
+                "type": "writers.gdal",
+                "filename": output_file,
+                "resolution": resolution,
+                "output_type": "mean",
+                "nodata": -9999
+            }
+        ]
+    }
 
 def laz_to_dem(input_file: str) -> str:
     """
@@ -15,7 +35,7 @@ def laz_to_dem(input_file: str) -> str:
     Returns:
         Path to the generated TIF file
     """
-    print(f"\n🚀 LAZ_TO_DEM: Starting conversion for {input_file}")
+    print(f"\n�� LAZ_TO_DEM: Starting conversion for {input_file}")
     start_time = time.time()
     
     # Extract the base name without path and extension
@@ -51,7 +71,7 @@ def laz_to_dem(input_file: str) -> str:
 
 def convert_las_to_dem(input_file: str, output_file: str, resolution: float = 1.0) -> Tuple[bool, str]:
     """
-    Convert LAZ file to DEM using PDAL with comprehensive logging
+    Convert LAZ file to DEM using PDAL
     
     Args:
         input_file: Path to the input LAZ file
@@ -69,84 +89,64 @@ def convert_las_to_dem(input_file: str, output_file: str, resolution: float = 1.
     print(f"📏 Resolution: {resolution} units")
     print(f"🕐 Start time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # Validate input file
-    print(f"\n🔍 Validating input file...")
-    if not os.path.exists(input_file):
-        error_msg = f"Input file not found: {input_file}"
-        print(f"❌ {error_msg}")
-        return False, error_msg
+    # Try JSON pipeline first, then fall back to hardcoded pipeline
+    json_pipeline_path = os.path.join(os.path.dirname(__file__), "pipelines_json", "laz_to_dem.json")
     
-    file_size = os.path.getsize(input_file)
-    print(f"✅ Input file validated")
-    print(f"📊 File size: {file_size:,} bytes ({file_size / (1024**2):.2f} MB)")
+    success = False
+    message = ""
     
-    # Create PDAL pipeline
-    print(f"\n🔧 Creating PDAL pipeline...")
-    pipeline = create_laz_to_dem_pipeline(
-        input_file=input_file,
-        output_file=output_file,
-        resolution=resolution,
-        output_type="mean",
-        nodata=-9999
-    )
-    
-    print(f"🗂️ GDAL Writer Parameters:")
-    print(f"   📄 Output file: {output_file}")
-    print(f"   📏 Resolution: {resolution} units")
-    print(f"   📊 Output type: mean")
-    print(f"   🚫 NoData value: -9999")
-    print(f"   💾 GDAL driver: GTiff")
-    
-    print_pipeline_info(pipeline, "LAZ to DEM Pipeline")
-    
-    # Execute PDAL pipeline
-    print(f"\n🚀 Executing PDAL pipeline...")
-    pipeline_json = get_pipeline_json(pipeline)
-    pdal_pipeline = pdal.Pipeline(pipeline_json)
-    
-    try:
-        print(f"   🔄 Running PDAL execution...")
-        execution_start = time.time()
-        
-        count = pdal_pipeline.execute()
-        
-        execution_time = time.time() - execution_start
-        print(f"   ✅ PDAL execution completed in {execution_time:.2f} seconds")
-        print(f"   📊 Total points processed: {count:,}")
-        
-        # Validate output file
-        print(f"\n🔍 Validating output file...")
-        if os.path.exists(output_file):
-            output_size = os.path.getsize(output_file)
-            print(f"✅ Output file created successfully")
-            print(f"📊 Output file size: {output_size:,} bytes ({output_size / (1024**2):.2f} MB)")
+    # First try JSON pipeline
+    if os.path.exists(json_pipeline_path):
+        print(f"🔄 Attempting to use JSON pipeline: {json_pipeline_path}")
+        try:
+            # Load and adapt JSON pipeline
+            with open(json_pipeline_path, 'r') as f:
+                pipeline_config = json.load(f)
             
-            # Additional file info
-            print(f"📄 Output file path: {os.path.abspath(output_file)}")
+            # Replace placeholders with actual file paths
+            pipeline_str = json.dumps(pipeline_config)
+            pipeline_str = pipeline_str.replace("input/default.laz", input_file)
+            pipeline_str = pipeline_str.replace("output/default_DEM.tif", output_file)
+            pipeline_str = pipeline_str.replace("DEFAULT_RESOLUTION", str(resolution))
+            pipeline_config = json.loads(pipeline_str)
             
-            success_msg = f"DEM generated successfully at {output_file}"
-            print(f"✅ {success_msg}")
-            print(f"{'='*60}\n")
+            print(f"📋 Using JSON pipeline configuration")
+            pipeline = pdal.Pipeline(json.dumps(pipeline_config))
             
-            return True, success_msg
-        else:
-            error_msg = "Output file was not created"
-            print(f"❌ {error_msg}")
-            print(f"{'='*60}\n")
-            return False, error_msg
+            # Execute pipeline
+            pipeline.execute()
             
-    except RuntimeError as e:
-        error_msg = f"PDAL execution failed: {str(e)}"
-        print(f"❌ {error_msg}")
-        print(f"❌ Error type: RuntimeError")
-        print(f"❌ Full error: {str(e)}")
-        print(f"{'='*60}\n")
-        return False, error_msg
+            if os.path.exists(output_file):
+                success = True
+                message = f"DEM generated successfully using JSON pipeline: {output_file}"
+                print(f"✅ {message}")
+            else:
+                raise Exception("Output file was not created")
+                
+        except Exception as e:
+            print(f"⚠️ JSON pipeline failed: {str(e)}")
+            print(f"🔄 Falling back to hardcoded pipeline...")
     
-    except Exception as e:
-        error_msg = f"Unexpected error during PDAL execution: {str(e)}"
-        print(f"❌ {error_msg}")
-        print(f"❌ Error type: {type(e).__name__}")
-        print(f"❌ Full error: {str(e)}")
-        print(f"{'='*60}\n")
-        return False, error_msg
+    # Fall back to hardcoded pipeline if JSON failed or doesn't exist
+    if not success:
+        try:
+            print(f"🔄 Using hardcoded DEM pipeline...")
+            pipeline_config = create_dem_fallback_pipeline(input_file, output_file, resolution)
+            pipeline = pdal.Pipeline(json.dumps(pipeline_config))
+            
+            # Execute pipeline
+            pipeline.execute()
+            
+            if os.path.exists(output_file):
+                success = True
+                message = f"DEM generated successfully using hardcoded pipeline: {output_file}"
+                print(f"✅ {message}")
+            else:
+                raise Exception("Output file was not created")
+                
+        except Exception as e:
+            success = False
+            message = f"Both JSON and hardcoded pipelines failed: {str(e)}"
+            print(f"❌ {message}")
+    
+    return success, message

@@ -1,0 +1,19 @@
+{
+  "comment": "Pipeline for processing multiple classifications at once",
+  "pipeline": [
+    "input/default.laz",
+    {
+      "type": "filters.stats",
+      "dimensions": "Classification"
+    },
+    {
+      "type": "writers.gdal",
+      "filename": "output/default_all_classes.tif",
+      "resolution": 1.0,
+      "output_type": "mean",
+      "dimension": "Classification",
+      "nodata": -9999,
+      "gdaldriver": "GTiff"
+    }
+  ]
+}

@@ -61,17 +61,52 @@
       <!-- Processing Steps -->
       <div class="flex-1">
         <h3 class="text-white font-semibold mb-4">Processing Steps</h3>
-        <div class="space-y-2">
+        <div class="space-y-2" id="processing-steps-container">
           <button id="test-overlay-btn" class="w-full bg-[#ff6b35] hover:bg-[#e55a2e] text-white px-4 py-3 rounded-lg font-medium transition-colors">🧪 Test Overlay</button>
-          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="laz_to_dem">LAZ to DEM</button>
-          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="dtm">DTM</button>
-          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="hillshade">Hillshade</button>
-          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="slope">Slope</button>
-          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="aspect">Aspect</button>
-          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="color_relief">Color Relief</button>
-          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="tri">TRI</button>
-          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="tpi">TPI</button>
-          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="roughness">Roughness</button>
+          <div>
+            <input type="checkbox" id="dem-checkbox" data-target="laz_to_dem" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+            <label for="dem-checkbox" class="ml-2 text-white">DEM</label>
+          </div>
+          <div>
+            <input type="checkbox" id="dsm-checkbox" data-target="dsm" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+            <label for="dsm-checkbox" class="ml-2 text-white">DSM</label>
+          </div>
+          <div>
+            <input type="checkbox" id="chm-checkbox" data-target="chm" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+            <label for="chm-checkbox" class="ml-2 text-white">CHM</label>
+          </div>
+          <div>
+            <input type="checkbox" id="dtm-checkbox" data-target="dtm" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
+            <label for="dtm-checkbox" class="ml-2 text-white">DTM</label>
+          </div>
+          <div>
+            <input type="checkbox" id="hillshade-checkbox" data-target="hillshade" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
+            <label for="hillshade-checkbox" class="ml-2 text-white">Hillshade</label>
+          </div>
+          <div>
+            <input type="checkbox" id="slope-checkbox" data-target="slope" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
+            <label for="slope-checkbox" class="ml-2 text-white">Slope</label>
+          </div>
+          <div>
+            <input type="checkbox" id="aspect-checkbox" data-target="aspect" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+            <label for="aspect-checkbox" class="ml-2 text-white">Aspect</label>
+          </div>
+          <div>
+            <input type="checkbox" id="color_relief-checkbox" data-target="color_relief" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
+            <label for="color_relief-checkbox" class="ml-2 text-white">Color Relief</label>
+          </div>
+          <div>
+            <input type="checkbox" id="tri-checkbox" data-target="tri" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+            <label for="tri-checkbox" class="ml-2 text-white">TRI</label>
+          </div>
+          <div>
+            <input type="checkbox" id="tpi-checkbox" data-target="tpi" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+            <label for="tpi-checkbox" class="ml-2 text-white">TPI</label>
+          </div>
+          <div>
+            <input type="checkbox" id="roughness-checkbox" data-target="roughness" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+            <label for="roughness-checkbox" class="ml-2 text-white">Roughness</label>
+          </div>
         </div>
       </div>
     </div>
@@ -94,7 +129,7 @@
         <div id="gallery" class="flex gap-4 overflow-x-auto pb-4">
           <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-laz_to_dem">
             <div class="flex-1 flex items-center justify-center">
-              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="laz_to_dem">LAZ to DEM</button>
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="laz_to_dem">DEM</button>
             </div>
             <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="laz_to_dem">Add to Map</button>
           </div>
@@ -103,6 +138,18 @@
               <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="dtm">DTM</button>
             </div>
             <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="dtm">Add to Map</button>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-dsm">
+            <div class="flex-1 flex items-center justify-center">
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="dsm">DSM</button>
+            </div>
+            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="dsm">Add to Map</button>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-chm">
+            <div class="flex-1 flex items-center justify-center">
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="chm">CHM</button>
+            </div>
+            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="chm">Add to Map</button>
           </div>
           <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-hillshade">
             <div class="flex-1 flex items-center justify-center">
@@ -149,7 +196,6 @@
         </div>
       </div>
     </div>
-  </div>
   </div>
 
   <!-- Chat interface with modern styling -->

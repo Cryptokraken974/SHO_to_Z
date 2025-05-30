@@ -417,13 +417,59 @@ $(function () {
     });
   }
 
-  // Event handlers for processing buttons
-  $('.proc-btn[data-target]').on('click', function () {
+  // Event handlers for processing checkboxes
+  $('#processing-steps-container input[type="checkbox"]').on('change', function () {
     const target = $(this).data('target');
-    console.log('Button clicked, target:', target);
-    console.log('Button element:', this);
+    const galleryItem = $(`#cell-${target}`);
+    const procButtonInGallery = galleryItem.find('.proc-btn');
+
+    if ($(this).is(':checked')) {
+      galleryItem.show();
+      // If the item was not processed yet, trigger processing
+      // This assumes that if an image isn't there, it needs processing.
+      // You might need a more robust check, e.g., checking if the image src is a placeholder
+      if (!procButtonInGallery.next('.add-to-map-btn').length || procButtonInGallery.next('.add-to-map-btn').hasClass('hidden')) {
+          if (selectedLazFile) { // Only process if a file is selected
+            sendProcess(target);
+          } else {
+            // Optionally, you could show a placeholder or a message to select a file
+            console.log(`Checkbox for ${target} checked, but no LAZ file selected. Processing deferred.`);
+          }
+      }
+    } else {
+      galleryItem.hide();
+      // Optionally, remove overlay if it's on the map when unchecking
+      if (mapOverlays[target]) {
+        removeOverlayFromMap(target);
+      }
+    }
+  });
+
+  // Function to initialize gallery visibility based on checkboxes
+  function initializeGalleryVisibility() {
+    $('#processing-steps-container input[type="checkbox"]').each(function() {
+      const target = $(this).data('target');
+      const galleryItem = $(`#cell-${target}`);
+      if ($(this).is(':checked')) {
+        galleryItem.show();
+      } else {
+        galleryItem.hide();
+      }
+    });
+  }
+
+  // Call on page load to set initial visibility
+  initializeGalleryVisibility();
+
+
+  // Event handlers for processing buttons (within gallery items)
+  // These remain to allow re-processing if needed, or initial processing if checkbox is checked later
+  $(document).on('click', '.gallery-item .proc-btn', function () {
+    const target = $(this).data('target');
+    console.log('Gallery process button clicked, target:', target);
     sendProcess(target);
   });
+
 
   // Event handlers for Add to Map buttons
   $(document).on('click', '.add-to-map-btn[data-target]', function() {

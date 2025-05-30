@@ -1,0 +1,13 @@
+{
+  "pipeline": [
+    "input/default.laz",
+    {
+      "type": "writers.gdal",
+      "filename": "output/default_DEM.tif",
+      "resolution": 1.0,
+      "output_type": "mean",
+      "nodata": -9999,
+      "gdaldriver": "GTiff"
+    }
+  ]
+}

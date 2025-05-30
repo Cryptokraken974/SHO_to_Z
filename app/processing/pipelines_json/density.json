@@ -1,0 +1,13 @@
+{
+  "pipeline": [
+    "input/default.laz",
+    {
+      "type": "writers.gdal",
+      "filename": "output/default_density.tif",
+      "resolution": 1.0,
+      "output_type": "count",
+      "nodata": -9999,
+      "gdaldriver": "GTiff"
+    }
+  ]
+}

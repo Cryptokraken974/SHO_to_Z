@@ -3,6 +3,8 @@
 # Import the main processing functions
 from .laz_to_dem import laz_to_dem
 from .dtm import dtm
+from .dsm import dsm
+from .chm import chm
 from .hillshade import hillshade
 from .slope import slope
 from .aspect import aspect
@@ -14,6 +16,8 @@ from .roughness import roughness
 __all__ = [
     'laz_to_dem',
     'dtm',
+    'dsm',
+    'chm',
     'hillshade', 
     'slope',
     'aspect',
