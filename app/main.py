@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import os
 import glob
+import base64
 
 from .convert import convert_geotiff_to_png_base64
 from .processing import laz_to_dem, dtm, hillshade, slope, aspect, color_relief, tri, tpi, roughness
@@ -203,3 +204,161 @@ async def api_chat(data: dict):
     # Placeholder response; integrate with real LLM here
     response = f"Model {model} says: {prompt}"
     return {"response": response}
+
+@app.get("/api/overlay/{processing_type}/{filename}")
+async def get_overlay_data(processing_type: str, filename: str):
+    """Get overlay data for a processed image including bounds and base64 encoded image"""
+    print(f"\n🗺️  API CALL: /api/overlay/{processing_type}/{filename}")
+    
+    try:
+        from .geo_utils import get_image_overlay_data
+        
+        # Extract base filename (remove path and extension)
+        base_filename = os.path.splitext(os.path.basename(filename))[0]
+        if base_filename.endswith('.copc'):
+            base_filename = base_filename[:-5]  # Remove .copc suffix
+            
+        print(f"📂 Base filename: {base_filename}")
+        print(f"🔄 Processing type: {processing_type}")
+        
+        # Map API processing types to actual folder names
+        type_mapping = {
+            'laz_to_dem': 'DEM',
+            'dtm': 'DTM',
+            'hillshade': 'Hillshade',
+            'slope': 'Slope',
+            'aspect': 'Aspect',
+            'color_relief': 'ColorRelief',
+            'tri': 'TRI',
+            'tpi': 'TPI',
+            'roughness': 'Roughness'
+        }
+        
+        # Get the actual folder name
+        actual_processing_type = type_mapping.get(processing_type, processing_type.title())
+        print(f"📁 Mapped processing type: {processing_type} -> {actual_processing_type}")
+        
+        overlay_data = get_image_overlay_data(base_filename, actual_processing_type)
+        
+        if not overlay_data:
+            print(f"❌ No overlay data found for {base_filename}/{actual_processing_type}")
+            # Debug: List available directories
+            output_base = f"output/{base_filename}"
+            if os.path.exists(output_base):
+                available_dirs = [d for d in os.listdir(output_base) if os.path.isdir(os.path.join(output_base, d))]
+                print(f"🔍 Available directories: {available_dirs}")
+            else:
+                print(f"🔍 Output directory doesn't exist: {output_base}")
+            
+            return JSONResponse(
+                status_code=404, 
+                content={"error": "Overlay data not found or could not extract coordinates"}
+            )
+            
+        print(f"✅ Overlay data retrieved successfully")
+        print(f"📍 Bounds: {overlay_data['bounds']}")
+        
+        return overlay_data
+        
+    except Exception as e:
+        print(f"❌ Error getting overlay data: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to get overlay data: {str(e)}"}
+        )
+
+@app.get("/api/test-overlay/{filename}")
+async def get_test_overlay(filename: str):
+    """Create a simple black overlay at the LAZ file coordinates for testing"""
+    print(f"\n🧪 TEST OVERLAY: /api/test-overlay/{filename}")
+    
+    try:
+        from PIL import Image, ImageDraw
+        import io
+        
+        # Map known LAZ files to their approximate coordinates in WGS84
+        laz_coordinates = {
+            'FoxIsland.laz': {
+                'center_lat': 44.4268,
+                'center_lng': -68.2048,
+                'size_deg': 0.01  # ~1km at this latitude
+            },
+            'OR_WizardIsland.laz': {
+                'center_lat': 42.9446,
+                'center_lng': -122.1090,
+                'size_deg': 0.01  # ~1km at this latitude
+            }
+        }
+        
+        # Extract base filename
+        base_filename = os.path.splitext(os.path.basename(filename))[0]
+        if base_filename.endswith('.copc'):
+            base_filename = base_filename[:-5]
+            
+        print(f"📂 Base filename: {base_filename}")
+        
+        # Find matching LAZ file
+        matching_coords = None
+        for laz_file, coords in laz_coordinates.items():
+            if base_filename in laz_file or laz_file.replace('.laz', '') in base_filename:
+                matching_coords = coords
+                break
+                
+        if not matching_coords:
+            print(f"❌ No coordinates found for {base_filename}")
+            return JSONResponse(
+                status_code=404,
+                content={"success": False, "error": "No test coordinates available for this file"}
+            )
+            
+        print(f"📍 Using coordinates: {matching_coords}")
+        
+        # Calculate bounds
+        half_size = matching_coords['size_deg'] / 2
+        bounds = {
+            'north': matching_coords['center_lat'] + half_size,
+            'south': matching_coords['center_lat'] - half_size,
+            'east': matching_coords['center_lng'] + half_size,
+            'west': matching_coords['center_lng'] - half_size,
+            'center_lat': matching_coords['center_lat'],
+            'center_lng': matching_coords['center_lng']
+        }
+        
+        print(f"🗺️  Test bounds: {bounds}")
+        
+        # Create a simple black square image
+        img_size = 200
+        img = Image.new('RGBA', (img_size, img_size), (0, 0, 0, 128))  # Semi-transparent black
+        
+        # Add a red border for visibility
+        draw = ImageDraw.Draw(img)
+        border_width = 5
+        draw.rectangle([0, 0, img_size-1, img_size-1], outline=(255, 0, 0, 255), width=border_width)
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        print(f"✅ Created test overlay image ({len(image_data)} chars)")
+        
+        return {
+            'success': True,
+            'bounds': bounds,
+            'image_data': image_data,
+            'processing_type': 'test',
+            'filename': base_filename
+        }
+        
+    except Exception as e:
+        print(f"❌ Error creating test overlay: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Failed to create test overlay: {str(e)}"}
+        )
+
+

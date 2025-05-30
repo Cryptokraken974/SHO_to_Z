@@ -51,11 +51,85 @@ html, body {
 }
 
 /* Grid cell image styling */
-.grid-cell img {
+.grid-cell img, .gallery-item img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
   border-radius: 6px;
+}
+
+/* Gallery styling */
+#gallery {
+  scrollbar-width: thin;
+  scrollbar-color: #404040 #262626;
+}
+
+#gallery::-webkit-scrollbar {
+  height: 8px;
+}
+
+#gallery::-webkit-scrollbar-track {
+  background: #262626;
+  border-radius: 4px;
+}
+
+#gallery::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 4px;
+}
+
+#gallery::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Gallery item styling */
+.gallery-item {
+  position: relative;
+}
+
+.gallery-item .flex-1 {
+  min-height: 0; /* Allow flex item to shrink */
+}
+
+.gallery-item img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Add to Map button styling */
+.add-to-map-btn {
+  position: relative;
+  width: 100%;
+  margin-top: auto;
+  z-index: 10;
+}
+
+.add-to-map-btn.hidden {
+  display: none !important;
+}
+
+/* Ensure button stays at bottom */
+.gallery-item {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Map styling */
+#map {
+  z-index: 1;
+  height: 800px !important;
+  width: 100% !important;
+}
+
+.leaflet-container {
+  background: #1a1a1a !important;
+  height: 800px !important;
+  width: 100% !important;
+}
+
+.leaflet-tile {
+  filter: brightness(0.6) contrast(1.2) hue-rotate(200deg);
 }
 
 /* Accordion animation */
@@ -99,4 +173,43 @@ input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: #00bfff !important;
     box-shadow: 0 0 0 1px #00bfff;
+}
+
+/* Leaflet drawing controls dark theme styling */
+.leaflet-draw-toolbar a {
+  background-color: #303030 !important;
+  border-color: #404040 !important;
+  color: white !important;
+}
+
+.leaflet-draw-toolbar a:hover {
+  background-color: #404040 !important;
+  border-color: #555 !important;
+}
+
+.leaflet-draw-actions a {
+  background-color: #303030 !important;
+  border-color: #404040 !important;
+  color: white !important;
+}
+
+.leaflet-draw-actions a:hover {
+  background-color: #404040 !important;
+}
+
+.leaflet-draw-tooltip {
+  background: #1a1a1a !important;
+  border: 1px solid #404040 !important;
+  color: white !important;
+}
+
+.leaflet-draw-tooltip:before {
+  border-top-color: #404040 !important;
+}
+
+/* Custom styling for drawn rectangles */
+.leaflet-interactive {
+  stroke: #00bfff !important;
+  stroke-width: 2px !important;
+  fill: rgba(0, 191, 255, 0.2) !important;
 }

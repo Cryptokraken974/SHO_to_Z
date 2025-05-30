@@ -6,6 +6,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="" />
   <link rel="stylesheet" as="style" onload="this.rel='stylesheet'" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Inter%3Awght%40400%3B500%3B700%3B900&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900" />
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <!-- Leaflet CSS and JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
   <link rel="stylesheet" href="/static/styles.css" />
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="/static/app.js"></script>
@@ -47,7 +52,7 @@
         </div>
         <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="laz-content">
           <div class="selected-file flex items-center gap-3">
-            <span id="selected-file-name" class="text-[#00bfff] text-sm flex-1 min-w-0 break-all">lion_takanawa.copc.laz</span>
+            <span id="selected-file-name" class="text-[#666] text-sm flex-1 min-w-0 break-all">No file selected</span>
             <button id="browse-files" class="browse-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-3 py-1 rounded text-sm font-medium transition-colors">Browse...</button>
           </div>
         </div>
@@ -57,6 +62,7 @@
       <div class="flex-1">
         <h3 class="text-white font-semibold mb-4">Processing Steps</h3>
         <div class="space-y-2">
+          <button id="test-overlay-btn" class="w-full bg-[#ff6b35] hover:bg-[#e55a2e] text-white px-4 py-3 rounded-lg font-medium transition-colors">🧪 Test Overlay</button>
           <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="laz_to_dem">LAZ to DEM</button>
           <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="dtm">DTM</button>
           <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="hillshade">Hillshade</button>
@@ -70,40 +76,76 @@
       </div>
     </div>
 
-    <!-- Main processing grid -->
+    <!-- Main processing area with map and gallery -->
     <div id="main" class="flex-1 p-6 bg-[#141414] overflow-y-auto">
       <div class="mb-6">
         <h1 class="text-white text-2xl font-bold">Terrain Analysis Results</h1>
         <p class="text-[#ababab] text-sm mt-2">Select processing steps from the sidebar to generate terrain analysis outputs</p>
       </div>
       
-      <div id="grid" class="grid grid-cols-3 gap-4 auto-rows-[200px] pb-6">
-        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-laz_to_dem">
-          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="laz_to_dem">LAZ to DEM</button>
-        </div>
-        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-dtm">
-          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="dtm">DTM</button>
-        </div>
-        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-hillshade">
-          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="hillshade">Hillshade</button>
-        </div>
-        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-slope">
-          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="slope">Slope</button>
-        </div>
-        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-aspect">
-          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="aspect">Aspect</button>
-        </div>
-        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-color_relief">
-          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="color_relief">Color Relief</button>
-        </div>
-        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-tri">
-          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="tri">TRI</button>
-        </div>
-        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-tpi">
-          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="tpi">TPI</button>
-        </div>
-        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-roughness">
-          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="roughness">Roughness</button>
+      <!-- World Map Canvas -->
+      <div class="mb-6">
+        <div id="map" class="w-full h-[800px] bg-[#1a1a1a] border border-[#303030] rounded-lg"></div>
+      </div>
+      
+      <!-- Processing Results Gallery -->
+      <div class="mb-4">
+        <h2 class="text-white text-lg font-semibold mb-4">Processing Results</h2>
+        <div id="gallery" class="flex gap-4 overflow-x-auto pb-4">
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-laz_to_dem">
+            <div class="flex-1 flex items-center justify-center">
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="laz_to_dem">LAZ to DEM</button>
+            </div>
+            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="laz_to_dem">Add to Map</button>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-dtm">
+            <div class="flex-1 flex items-center justify-center">
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="dtm">DTM</button>
+            </div>
+            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="dtm">Add to Map</button>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-hillshade">
+            <div class="flex-1 flex items-center justify-center">
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="hillshade">Hillshade</button>
+            </div>
+            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="hillshade">Add to Map</button>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-slope">
+            <div class="flex-1 flex items-center justify-center">
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="slope">Slope</button>
+            </div>
+            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="slope">Add to Map</button>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-aspect">
+            <div class="flex-1 flex items-center justify-center">
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="aspect">Aspect</button>
+            </div>
+            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="aspect">Add to Map</button>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-color_relief">
+            <div class="flex-1 flex items-center justify-center">
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="color_relief">Color Relief</button>
+            </div>
+            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="color_relief">Add to Map</button>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-tri">
+            <div class="flex-1 flex items-center justify-center">
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="tri">TRI</button>
+            </div>
+            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="tri">Add to Map</button>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-tpi">
+            <div class="flex-1 flex items-center justify-center">
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="tpi">TPI</button>
+            </div>
+            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="tpi">Add to Map</button>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-roughness">
+            <div class="flex-1 flex items-center justify-center">
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="roughness">Roughness</button>
+            </div>
+            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="roughness">Add to Map</button>
+          </div>
         </div>
       </div>
     </div>
