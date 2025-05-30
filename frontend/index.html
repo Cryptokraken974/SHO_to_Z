@@ -2,84 +2,145 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Image Processing App</title>
+  <title>LAZ Terrain Processor</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="" />
+  <link rel="stylesheet" as="style" onload="this.rel='stylesheet'" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Inter%3Awght%40400%3B500%3B700%3B900&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900" />
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link rel="stylesheet" href="/static/styles.css" />
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="/static/app.js"></script>
 </head>
-<body>
-  <div id="sidebar">
-    <!-- LAZ File Selection Section -->
-    <div class="accordion-section">
-      <div class="accordion-header" id="laz-accordion">
-        <h3>Select LAZ <span class="accordion-arrow">▼</span></h3>
+<body class="bg-[#141414] text-white" style='font-family: Inter, "Noto Sans", sans-serif;'>
+  <div class="flex flex-col h-screen overflow-hidden">
+  <!-- Header with modern design -->
+  <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#303030] px-10 py-3">
+    <div class="flex items-center gap-4 text-white">
+      <div class="size-4">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path>
+        </svg>
       </div>
-      <div class="accordion-content" id="laz-content">
-        <div class="selected-file">
-          <span id="selected-file-name">lion_takanawa.copc.laz</span>
-          <button id="browse-files" class="browse-btn">Browse...</button>
+      <h2 class="text-white text-lg font-bold leading-tight tracking-[-0.015em]">LAZ Terrain Processor</h2>
+    </div>
+    <div class="flex flex-1 justify-end gap-8">
+      <button class="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 bg-[#303030] text-white gap-2 text-sm font-bold leading-normal tracking-[0.015em] min-w-0 px-2.5">
+        <div class="text-white" data-icon="Question" data-size="20px" data-weight="regular">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
+            <path d="M140,180a12,12,0,1,1-12-12A12,12,0,0,1,140,180ZM128,72c-22.06,0-40,16.15-40,36v4a8,8,0,0,0,16,0v-4c0-11,10.77-20,24-20s24,9,24,20-10.77,20-24,20a8,8,0,0,0-8,8v8a8,8,0,0,0,16,0v-.72c18.24-3.35,32-17.9,32-35.28C168,88.15,150.06,72,128,72Zm104,56A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"></path>
+          </svg>
+        </div>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main content area with modern layout -->
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Sidebar -->
+    <div id="sidebar" class="bg-[#1a1a1a] border-r border-[#303030] w-64 p-6 flex flex-col overflow-y-auto">
+      <!-- LAZ File Selection Section -->
+      <div class="accordion-section mb-6">
+        <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="laz-accordion">
+          <h3 class="text-white font-semibold flex justify-between items-center m-0">
+            Select LAZ File
+            <span class="accordion-arrow text-sm transition-transform">▼</span>
+          </h3>
+        </div>
+        <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="laz-content">
+          <div class="selected-file flex items-center gap-3">
+            <span id="selected-file-name" class="text-[#00bfff] text-sm flex-1 min-w-0 break-all">lion_takanawa.copc.laz</span>
+            <button id="browse-files" class="browse-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-3 py-1 rounded text-sm font-medium transition-colors">Browse...</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Processing Steps -->
+      <div class="flex-1">
+        <h3 class="text-white font-semibold mb-4">Processing Steps</h3>
+        <div class="space-y-2">
+          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="laz_to_dem">LAZ to DEM</button>
+          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="dtm">DTM</button>
+          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="hillshade">Hillshade</button>
+          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="slope">Slope</button>
+          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="aspect">Aspect</button>
+          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="color_relief">Color Relief</button>
+          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="tri">TRI</button>
+          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="tpi">TPI</button>
+          <button class="proc-btn w-full bg-[#303030] hover:bg-[#404040] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-target="roughness">Roughness</button>
         </div>
       </div>
     </div>
 
-    <h3>Single Image Processing Steps</h3>
-    <button class="proc-btn" data-target="laz_to_dem">LAZ to DEM</button>
-    <button class="proc-btn" data-target="dtm">DTM</button>
-    <button class="proc-btn" data-target="hillshade">Hillshade</button>
-    <button class="proc-btn" data-target="slope">Slope</button>
-    <button class="proc-btn" data-target="aspect">Aspect</button>
-    <button class="proc-btn" data-target="color_relief">Color-relief</button>
-    <button class="proc-btn" data-target="tri">TRI</button>
-    <button class="proc-btn" data-target="tpi">TPI</button>
-    <button class="proc-btn" data-target="roughness">Roughness</button>
-  </div>
-
-  <div id="main">
-    <div id="grid">
-      <div class="grid-cell" id="cell-laz_to_dem"><button class="proc-btn" data-target="laz_to_dem">LAZ to DEM</button></div>
-      <div class="grid-cell" id="cell-dtm"><button class="proc-btn" data-target="dtm">DTM</button></div>
-      <div class="grid-cell" id="cell-hillshade"><button class="proc-btn" data-target="hillshade">Hillshade</button></div>
-      <div class="grid-cell" id="cell-slope"><button class="proc-btn" data-target="slope">Slope</button></div>
-      <div class="grid-cell" id="cell-aspect"><button class="proc-btn" data-target="aspect">Aspect</button></div>
-      <div class="grid-cell" id="cell-color_relief"><button class="proc-btn" data-target="color_relief">Color-relief</button></div>
-      <div class="grid-cell" id="cell-tri"><button class="proc-btn" data-target="tri">TRI</button></div>
-      <div class="grid-cell" id="cell-tpi"><button class="proc-btn" data-target="tpi">TPI</button></div>
-      <div class="grid-cell" id="cell-roughness"><button class="proc-btn" data-target="roughness">Roughness</button></div>
-      <div class="grid-cell" id="cell-tpi"><button class="proc-btn" data-target="tpi">TPI</button></div>
-      <div class="grid-cell"></div>
+    <!-- Main processing grid -->
+    <div id="main" class="flex-1 p-6 bg-[#141414] overflow-y-auto">
+      <div class="mb-6">
+        <h1 class="text-white text-2xl font-bold">Terrain Analysis Results</h1>
+        <p class="text-[#ababab] text-sm mt-2">Select processing steps from the sidebar to generate terrain analysis outputs</p>
+      </div>
+      
+      <div id="grid" class="grid grid-cols-3 gap-4 auto-rows-[200px] pb-6">
+        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-laz_to_dem">
+          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="laz_to_dem">LAZ to DEM</button>
+        </div>
+        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-dtm">
+          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="dtm">DTM</button>
+        </div>
+        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-hillshade">
+          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="hillshade">Hillshade</button>
+        </div>
+        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-slope">
+          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="slope">Slope</button>
+        </div>
+        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-aspect">
+          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="aspect">Aspect</button>
+        </div>
+        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-color_relief">
+          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="color_relief">Color Relief</button>
+        </div>
+        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-tri">
+          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="tri">TRI</button>
+        </div>
+        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-tpi">
+          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="tpi">TPI</button>
+        </div>
+        <div class="grid-cell bg-[#1a1a1a] border border-[#303030] rounded-lg flex items-center justify-center hover:border-[#404040] transition-colors" id="cell-roughness">
+          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="roughness">Roughness</button>
+        </div>
+      </div>
     </div>
   </div>
+  </div>
 
-  <div id="chatbar">
-    <div id="chat-log"></div>
-    <div id="chat-controls">
-      <textarea id="chat-input" placeholder="Type a prompt..."></textarea>
-      <select id="chat-model">
+  <!-- Chat interface with modern styling -->
+  <div id="chatbar" class="bg-[#1a1a1a] border-t border-[#303030] p-4">
+    <div id="chat-log" class="max-h-[150px] overflow-y-auto mb-3 space-y-2"></div>
+    <div id="chat-controls" class="flex gap-3">
+      <textarea id="chat-input" placeholder="Type a prompt..." class="flex-1 bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-[#ababab] resize-none focus:outline-none focus:border-[#00bfff]"></textarea>
+      <select id="chat-model" class="bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#00bfff]">
         <option value="o3">o3</option>
         <option value="4o">4o</option>
       </select>
-      <button id="chat-send">Send</button>
+      <button id="chat-send" class="bg-[#00bfff] hover:bg-[#0099cc] text-white px-6 py-2 rounded-lg font-medium transition-colors">Send</button>
     </div>
   </div>
 
-  <!-- Modal for file selection -->
-  <div id="file-modal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h4>Select LAZ File</h4>
-        <span class="close">&times;</span>
+  <!-- Modal for file selection with modern design -->
+  <div id="file-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="modal-content bg-[#1a1a1a] border border-[#303030] rounded-lg w-[90%] max-w-2xl">
+      <div class="modal-header flex justify-between items-center p-6 border-b border-[#303030]">
+        <h4 class="text-white text-lg font-semibold m-0">Select LAZ File</h4>
+        <span class="close text-[#ababab] hover:text-white text-2xl cursor-pointer">&times;</span>
       </div>
-      <div class="modal-body">
-        <div class="file-search">
-          <input type="text" id="file-search-input" placeholder="Search files...">
+      <div class="modal-body p-6">
+        <div class="file-search mb-4">
+          <input type="text" id="file-search-input" placeholder="Search files..." class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-[#ababab] focus:outline-none focus:border-[#00bfff]">
         </div>
-        <div class="file-list" id="file-list">
+        <div class="file-list max-h-80 overflow-y-auto bg-[#262626] rounded-lg border border-[#404040]" id="file-list">
           <!-- Files will be populated here -->
         </div>
       </div>
-      <div class="modal-footer">
-        <button id="select-file" class="select-btn">Select</button>
-        <button id="cancel-select" class="cancel-btn">Cancel</button>
+      <div class="modal-footer flex justify-end gap-3 p-6 border-t border-[#303030]">
+        <button id="cancel-select" class="cancel-btn bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
+        <button id="select-file" class="select-btn bg-[#28a745] hover:bg-[#218838] text-white px-4 py-2 rounded-lg font-medium transition-colors">Select</button>
       </div>
     </div>
   </div>
