@@ -114,6 +114,18 @@ $(function () {
     map.on(L.Draw.Event.DELETED, function (e) {
       console.log('Shapes deleted');
     });
+    
+    // Add coordinate display functionality
+    map.on('mousemove', function(e) {
+      const lat = e.latlng.lat.toFixed(6);
+      const lng = e.latlng.lng.toFixed(6);
+      document.getElementById('coordinate-display').textContent = `Lat: ${lat}, Lng: ${lng}`;
+    });
+    
+    // Hide coordinates when mouse leaves the map
+    map.on('mouseout', function(e) {
+      document.getElementById('coordinate-display').textContent = 'Lat: ---, Lng: ---';
+    });
   }
 
   // Function to show dialog for processing selected area

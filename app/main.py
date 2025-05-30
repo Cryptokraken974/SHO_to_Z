@@ -6,7 +6,7 @@ import glob
 import base64
 
 from .convert import convert_geotiff_to_png_base64
-from .processing import laz_to_dem, dtm, dsm, chm, hillshade, slope, aspect, color_relief, tri, tpi, roughness
+from .processing import laz_to_dem, dtm, dsm, chm, hillshade, hillshade_315_45_08, hillshade_225_45_08, slope, aspect, color_relief, tri, tpi, roughness
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
@@ -151,6 +151,44 @@ async def api_hillshade(input_file: str = Form(...)):
         print(f"❌ Error type: {type(e).__name__}")
         raise
 
+@app.post("/api/hillshade_315_45_08")
+async def api_hillshade_315_45_08(input_file: str = Form(...)):
+    """Generate hillshade with 315° azimuth, 45° altitude, 0.8 z-factor"""
+    print(f"\n🎯 API CALL: /api/hillshade_315_45_08")
+    print(f"📥 Input file: {input_file}")
+    
+    try:
+        tif_path = hillshade_315_45_08(input_file)
+        print(f"✅ TIF generated: {tif_path}")
+        
+        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        print(f"✅ Base64 conversion complete")
+        
+        return {"image": image_b64}
+    except Exception as e:
+        print(f"❌ Error in api_hillshade_315_45_08: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
+        raise
+
+@app.post("/api/hillshade_225_45_08")
+async def api_hillshade_225_45_08(input_file: str = Form(...)):
+    """Generate hillshade with 225° azimuth, 45° altitude, 0.8 z-factor"""
+    print(f"\n🎯 API CALL: /api/hillshade_225_45_08")
+    print(f"📥 Input file: {input_file}")
+    
+    try:
+        tif_path = hillshade_225_45_08(input_file)
+        print(f"✅ TIF generated: {tif_path}")
+        
+        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        print(f"✅ Base64 conversion complete")
+        
+        return {"image": image_b64}
+    except Exception as e:
+        print(f"❌ Error in api_hillshade_225_45_08: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
+        raise
+
 @app.post("/api/slope")
 async def api_slope(input_file: str = Form(...)):
     """Generate slope from LAZ file"""
@@ -263,7 +301,11 @@ async def get_overlay_data(processing_type: str, filename: str):
         type_mapping = {
             'laz_to_dem': 'DEM',
             'dtm': 'DTM',
+            'dsm': 'DSM',
+            'chm': 'CHM',
             'hillshade': 'Hillshade',
+            'hillshade_315_45_08': 'Hillshade',
+            'hillshade_225_45_08': 'Hillshade',
             'slope': 'Slope',
             'aspect': 'Aspect',
             'color_relief': 'ColorRelief',
@@ -276,7 +318,10 @@ async def get_overlay_data(processing_type: str, filename: str):
         actual_processing_type = type_mapping.get(processing_type, processing_type.title())
         print(f"📁 Mapped processing type: {processing_type} -> {actual_processing_type}")
         
-        overlay_data = get_image_overlay_data(base_filename, actual_processing_type)
+        # For hillshade variants, pass the original processing type for filename mapping
+        filename_processing_type = processing_type if processing_type.startswith('hillshade_') else actual_processing_type
+        
+        overlay_data = get_image_overlay_data(base_filename, actual_processing_type, filename_processing_type)
         
         if not overlay_data:
             print(f"❌ No overlay data found for {base_filename}/{actual_processing_type}")

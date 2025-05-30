@@ -158,17 +158,22 @@ async def process_hillshade(laz_file_path: str, output_dir: str, parameters: Dic
             "input_file": laz_file_path
         }
 
-def hillshade(input_file: str) -> str:
+def generate_hillshade_with_params(input_file: str, azimuth: float, altitude: float, z_factor: float, suffix: str = "") -> str:
     """
-    Generate hillshade from LAZ file using GDAL DEM processing
+    Generate hillshade from LAZ file with specific parameters
     
     Args:
         input_file: Path to the input LAZ file
+        azimuth: Light source azimuth in degrees
+        altitude: Light source altitude in degrees  
+        z_factor: Vertical exaggeration factor
+        suffix: Optional suffix for the output filename
         
     Returns:
         Path to the generated hillshade TIF file
     """
     print(f"\n🌄 HILLSHADE: Starting generation for {input_file}")
+    print(f"⚙️ Parameters: Azimuth={azimuth}°, Altitude={altitude}°, Z-factor={z_factor}")
     start_time = time.time()
     
     # Extract the base name without path and extension
@@ -178,12 +183,36 @@ def hillshade(input_file: str) -> str:
     output_dir = os.path.join("output", laz_basename, "Hillshade")
     os.makedirs(output_dir, exist_ok=True)
     
-    # Generate output filename: <laz_basename>_hillshade.tif
-    output_filename = f"{laz_basename}_hillshade.tif"
+    # Generate output filename with suffix if provided
+    if suffix:
+        output_filename = f"{laz_basename}_hillshade_{suffix}.tif"
+    else:
+        output_filename = f"{laz_basename}_hillshade.tif"
     output_path = os.path.join(output_dir, output_filename)
     
     print(f"📂 Output directory: {output_dir}")
     print(f"📄 Output file: {output_path}")
+    
+    # Check if hillshade already exists and is up-to-date (caching optimization)
+    if os.path.exists(output_path) and os.path.exists(input_file):
+        try:
+            # Compare modification times
+            hillshade_mtime = os.path.getmtime(output_path)
+            laz_mtime = os.path.getmtime(input_file)
+            
+            if hillshade_mtime > laz_mtime:
+                processing_time = time.time() - start_time
+                print(f"🚀 Hillshade cache hit! Using existing file (created {time.ctime(hillshade_mtime)})")
+                print(f"✅ Hillshade ready in {processing_time:.3f} seconds (cached)")
+                return output_path
+            else:
+                print(f"⏰ Hillshade exists but is outdated. LAZ modified: {time.ctime(laz_mtime)}, Hillshade created: {time.ctime(hillshade_mtime)}")
+        except OSError as e:
+            print(f"⚠️ Error checking file timestamps: {e}")
+    elif os.path.exists(output_path):
+        print(f"⚠️ Hillshade exists but input LAZ file not found, regenerating hillshade")
+    else:
+        print(f"📝 No existing hillshade found, generating new hillshade")
     
     try:
         # Step 1: Generate or locate DTM
@@ -196,17 +225,11 @@ def hillshade(input_file: str) -> str:
         print(f"📁 Source DTM: {dtm_path}")
         print(f"📁 Target hillshade: {output_path}")
         
-        # Configure hillshade parameters
-        azimuth = 315.0  # Light source azimuth (NW direction)
-        altitude = 45.0  # Light source altitude angle
-        z_factor = 1.0   # Vertical exaggeration
-        scale = 1.0      # Scale factor
-        
         print(f"⚙️ Hillshade parameters:")
-        print(f"   🧭 Azimuth: {azimuth}° (NW)")
+        print(f"   🧭 Azimuth: {azimuth}°")
         print(f"   📐 Altitude: {altitude}°")
         print(f"   📏 Z-factor: {z_factor}")
-        print(f"   📊 Scale: {scale}")
+        print(f"   📊 Scale: 1.0")
         
         # Use GDAL DEMProcessing for hillshade generation
         processing_start = time.time()
@@ -218,7 +241,7 @@ def hillshade(input_file: str) -> str:
             azimuth=azimuth,
             altitude=altitude,
             zFactor=z_factor,
-            scale=scale,
+            scale=1.0,
             format="GTiff"
         )
         
@@ -236,33 +259,6 @@ def hillshade(input_file: str) -> str:
             print(f"✅ Output file created successfully")
             print(f"📊 Output file size: {output_size:,} bytes ({output_size / (1024**2):.2f} MB)")
             print(f"📄 Output file path: {os.path.abspath(output_path)}")
-            
-            # Run gdalinfo to get information about the generated hillshade
-            print(f"\n📊 GDALINFO OUTPUT:")
-            print(f"{'='*40}")
-            try:
-                gdalinfo_result = subprocess.run(
-                    ['gdalinfo', output_path],
-                    capture_output=True,
-                    text=True,
-                    timeout=30
-                )
-                
-                if gdalinfo_result.returncode == 0:
-                    print(gdalinfo_result.stdout)
-                else:
-                    print(f"❌ gdalinfo failed with return code {gdalinfo_result.returncode}")
-                    print(f"❌ Error: {gdalinfo_result.stderr}")
-                    
-            except FileNotFoundError:
-                print(f"⚠️ gdalinfo command not found. Please ensure GDAL is installed and in PATH.")
-            except subprocess.TimeoutExpired:
-                print(f"⚠️ gdalinfo command timed out after 30 seconds.")
-            except Exception as e:
-                print(f"⚠️ Error running gdalinfo: {str(e)}")
-            
-            print(f"{'='*40}")
-            
         else:
             raise FileNotFoundError(f"Hillshade output file was not created: {output_path}")
         
@@ -278,3 +274,39 @@ def hillshade(input_file: str) -> str:
         print(f"❌ {error_msg}")
         print(f"❌ Failed after {total_time:.2f} seconds")
         raise Exception(error_msg)
+
+def hillshade(input_file: str) -> str:
+    """
+    Generate standard hillshade from LAZ file (default parameters)
+    
+    Args:
+        input_file: Path to the input LAZ file
+        
+    Returns:
+        Path to the generated hillshade TIF file
+    """
+    return generate_hillshade_with_params(input_file, 315.0, 45.0, 1.0, "standard")
+
+def hillshade_315_45_08(input_file: str) -> str:
+    """
+    Generate hillshade with 315° azimuth, 45° altitude, 0.8 z-factor
+    
+    Args:
+        input_file: Path to the input LAZ file
+        
+    Returns:
+        Path to the generated hillshade TIF file
+    """
+    return generate_hillshade_with_params(input_file, 315.0, 45.0, 0.8, "315_45_08")
+
+def hillshade_225_45_08(input_file: str) -> str:
+    """
+    Generate hillshade with 225° azimuth, 45° altitude, 0.8 z-factor
+    
+    Args:
+        input_file: Path to the input LAZ file
+        
+    Returns:
+        Path to the generated hillshade TIF file
+    """
+    return generate_hillshade_with_params(input_file, 225.0, 45.0, 0.8, "225_45_08")

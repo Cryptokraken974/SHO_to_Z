@@ -81,7 +81,15 @@
           </div>
           <div>
             <input type="checkbox" id="hillshade-checkbox" data-target="hillshade" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
-            <label for="hillshade-checkbox" class="ml-2 text-white">Hillshade</label>
+            <label for="hillshade-checkbox" class="ml-2 text-white">Hillshade (Standard)</label>
+          </div>
+          <div>
+            <input type="checkbox" id="hillshade315-checkbox" data-target="hillshade_315_45_08" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+            <label for="hillshade315-checkbox" class="ml-2 text-white">Hillshade 315° (0.8z)</label>
+          </div>
+          <div>
+            <input type="checkbox" id="hillshade225-checkbox" data-target="hillshade_225_45_08" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+            <label for="hillshade225-checkbox" class="ml-2 text-white">Hillshade 225° (0.8z)</label>
           </div>
           <div>
             <input type="checkbox" id="slope-checkbox" data-target="slope" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
@@ -119,8 +127,12 @@
       </div>
       
       <!-- World Map Canvas -->
-      <div class="mb-6">
+      <div class="mb-6 relative">
         <div id="map" class="w-full h-[800px] bg-[#1a1a1a] border border-[#303030] rounded-lg"></div>
+        <!-- Coordinate Display Overlay -->
+        <div id="coordinate-display" class="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded font-mono pointer-events-none z-[1000]">
+          Lat: ---, Lng: ---
+        </div>
       </div>
       
       <!-- Processing Results Gallery -->
@@ -153,9 +165,21 @@
           </div>
           <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-hillshade">
             <div class="flex-1 flex items-center justify-center">
-              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="hillshade">Hillshade</button>
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="hillshade">Hillshade (Std)</button>
             </div>
             <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="hillshade">Add to Map</button>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-hillshade_315_45_08">
+            <div class="flex-1 flex items-center justify-center">
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="hillshade_315_45_08">Hillshade 315°</button>
+            </div>
+            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="hillshade_315_45_08">Add to Map</button>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-hillshade_225_45_08">
+            <div class="flex-1 flex items-center justify-center">
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="hillshade_225_45_08">Hillshade 225°</button>
+            </div>
+            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="hillshade_225_45_08">Add to Map</button>
           </div>
           <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-slope">
             <div class="flex-1 flex items-center justify-center">

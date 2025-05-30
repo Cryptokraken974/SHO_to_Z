@@ -5,7 +5,7 @@ from .laz_to_dem import laz_to_dem
 from .dtm import dtm
 from .dsm import dsm
 from .chm import chm
-from .hillshade import hillshade
+from .hillshade import hillshade, hillshade_315_45_08, hillshade_225_45_08
 from .slope import slope
 from .aspect import aspect
 from .color_relief import color_relief
@@ -18,7 +18,9 @@ __all__ = [
     'dtm',
     'dsm',
     'chm',
-    'hillshade', 
+    'hillshade',
+    'hillshade_315_45_08',
+    'hillshade_225_45_08',
     'slope',
     'aspect',
     'color_relief',

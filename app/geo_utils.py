@@ -258,15 +258,25 @@ def get_image_bounds_from_geotiff(tiff_path: str) -> Optional[Dict]:
         print(f"Error reading GeoTIFF {tiff_path}: {e}")
         return None
 
-def get_image_overlay_data(base_filename: str, processing_type: str) -> Optional[Dict]:
+def get_image_overlay_data(base_filename: str, processing_type: str, filename_processing_type: str = None) -> Optional[Dict]:
     """
     Get overlay data for a processed image including bounds and base64 encoded image.
+    
+    Args:
+        base_filename: The base name of the LAZ file (e.g., 'OR_WizardIsland')
+        processing_type: The folder name (e.g., 'Hillshade')
+        filename_processing_type: The specific processing type for filename mapping (e.g., 'hillshade_315_45_08')
     """
     try:
         print(f"\n🔍 Getting overlay data for {base_filename}/{processing_type}")
+        if filename_processing_type:
+            print(f"🔍 Using filename processing type: {filename_processing_type}")
         
         # Construct paths - processing_type should already be the correct folder name
         output_dir = f"output/{base_filename}/{processing_type}"
+        
+        # Use filename_processing_type for mapping if provided, otherwise use processing_type
+        mapping_key = filename_processing_type if filename_processing_type else processing_type
         
         # Map processing type to filename suffix - based on actual file naming convention
         filename_mapping = {
@@ -274,7 +284,9 @@ def get_image_overlay_data(base_filename: str, processing_type: str) -> Optional
             'DTM': 'DTM',           # FoxIsland_DTM.png
             'DSM': 'DSM',           # FoxIsland_DSM.png
             'CHM': 'CHM',           # FoxIsland_CHM.png
-            'Hillshade': 'hillshade',   # FoxIsland_hillshade.png
+            'Hillshade': 'hillshade_standard',   # FoxIsland_hillshade_standard.png
+            'hillshade_315_45_08': 'hillshade_315_45_08',   # FoxIsland_hillshade_315_45_08.png
+            'hillshade_225_45_08': 'hillshade_225_45_08',   # FoxIsland_hillshade_225_45_08.png
             'Slope': 'slope',           # FoxIsland_slope.png
             'Aspect': 'aspect',         # FoxIsland_aspect.png
             'ColorRelief': 'color_relief', # FoxIsland_color_relief.png
@@ -283,7 +295,7 @@ def get_image_overlay_data(base_filename: str, processing_type: str) -> Optional
             'Roughness': 'roughness'    # FoxIsland_roughness.png
         }
         
-        filename_suffix = filename_mapping.get(processing_type, processing_type.lower())
+        filename_suffix = filename_mapping.get(mapping_key, mapping_key.lower())
         
         png_path = f"{output_dir}/{base_filename}_{filename_suffix}.png"
         tiff_path = f"{output_dir}/{base_filename}_{filename_suffix}.tif"
