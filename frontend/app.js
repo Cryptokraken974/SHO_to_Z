@@ -1517,8 +1517,31 @@ $(function () {
     console.log(`*** Successfully displayed Sentinel-2 ${fileInfo.band} image ***`);
   }
 
-  // Function to add Sentinel-2 image as overlay on the map
+  // Function to toggle Sentinel-2 image overlay on the map
   window.addSentinel2ToMap = async function(regionName, bandName) {
+    const overlayKey = `sentinel2_${bandName}`;
+    
+    // Find the button that was clicked
+    const button = document.querySelector(`button[onclick*="addSentinel2ToMap('${regionName}', '${bandName}')"]`);
+    
+    // Check if overlay already exists
+    if (mapOverlays[overlayKey]) {
+      // Remove existing overlay
+      console.log(`*** Removing Sentinel-2 ${bandName} overlay from map ***`);
+      map.removeLayer(mapOverlays[overlayKey]);
+      delete mapOverlays[overlayKey];
+      
+      // Update button to "Add to Map"
+      if (button) {
+        button.innerHTML = '📍 Add to Map';
+        button.className = 'btn btn-map';
+      }
+      
+      showSuccessMessage(`Removed Sentinel-2 ${bandName} overlay from map`);
+      console.log(`*** Successfully removed Sentinel-2 ${bandName} overlay from map ***`);
+      return;
+    }
+    
     console.log(`*** Adding Sentinel-2 ${bandName} to map for region: ${regionName} ***`);
     
     try {
@@ -1528,13 +1551,7 @@ $(function () {
       if (response.ok) {
         const overlayData = await response.json();
         
-        if (overlayData.success && overlayData.bounds && overlayData.image_data) {
-          // Remove existing Sentinel-2 overlay if any
-          const overlayKey = `sentinel2_${bandName}`;
-          if (mapOverlays[overlayKey]) {
-            map.removeLayer(mapOverlays[overlayKey]);
-          }
-          
+        if (overlayData.bounds && overlayData.image_data) {
           // Create image overlay
           const bounds = [
             [overlayData.bounds.south, overlayData.bounds.west],
@@ -1549,6 +1566,12 @@ $(function () {
           
           overlay.addTo(map);
           mapOverlays[overlayKey] = overlay;
+          
+          // Update button to "Remove from Map"
+          if (button) {
+            button.innerHTML = '🗑️ Remove from Map';
+            button.className = 'btn btn-remove';
+          }
           
           // Fit map to overlay bounds
           map.fitBounds(bounds);

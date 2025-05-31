@@ -398,13 +398,102 @@ async def api_chat(data: dict):
     response = f"Model {model} says: {prompt}"
     return {"response": response}
 
+# Sentinel-2 specific overlay endpoint (must come before general overlay endpoint)
+@app.get("/api/overlay/sentinel2/{region_band}")
+async def get_sentinel2_overlay_data(region_band: str):
+    """Get overlay data for a Sentinel-2 image including bounds and base64 encoded image"""
+    print(f"\n🛰️ API CALL: /api/overlay/sentinel2/{region_band}")
+    
+    try:
+        # Parse region_band format: "region_xxx_BAND_BXX" 
+        # Examples: "region_10_12S_42_23W_RED_B04", "region_3_13S_58_29W_NIR_B08"
+        # Strategy: Always split on last 2 parts for band (RED_B04, NIR_B08)
+        parts = region_band.split('_')
+        if len(parts) < 3:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Invalid region_band format. Expected: region_xxx_BAND_BXX"}
+            )
+        
+        # Always take last 2 parts as band_info, everything else as region_name
+        band_info = '_'.join(parts[-2:])  # RED_B04 or NIR_B08
+        region_name = '_'.join(parts[:-2])  # region_10_12S_42_23W
+        
+        print(f"🏷️ Region: {region_name}")
+        print(f"📻 Band Info: {band_info}")
+        
+        # Use the new Sentinel-2 specific function
+        from .geo_utils import get_sentinel2_overlay_data_util
+        
+        # Call Sentinel-2 specific function with region_name and band_info
+        overlay_data = get_sentinel2_overlay_data_util(region_name, band_info)
+        
+        if not overlay_data:
+            print(f"❌ No overlay data found for Sentinel-2 {band_info} in region {region_name}")
+            # Debug: Check what files exist and suggest alternatives
+            from pathlib import Path
+            s2_dir = Path("output") / region_name / "sentinel-2"
+            if s2_dir.exists():
+                files = list(s2_dir.glob("*sentinel2*.png"))
+                print(f"🔍 PNG files in Sentinel-2 directory: {[f.name for f in files]}")
+                
+                # Extract available bands for user guidance
+                available_bands = set()
+                for f in files:
+                    parts = f.name.split('_')
+                    if len(parts) >= 2:
+                        band = '_'.join(parts[-2:]).replace('.png', '')
+                        available_bands.add(band)
+                
+                error_msg = f"Sentinel-2 {band_info} overlay data not found for region {region_name}"
+                if available_bands:
+                    error_msg += f". Available bands: {sorted(available_bands)}"
+                    
+                return JSONResponse(
+                    status_code=404,
+                    content={
+                        "error": error_msg,
+                        "available_bands": sorted(available_bands),
+                        "region": region_name,
+                        "requested_band": band_info
+                    }
+                )
+            else:
+                print(f"🔍 Sentinel-2 directory doesn't exist: {s2_dir}")
+            
+            return JSONResponse(
+                status_code=404,
+                content={"error": f"Sentinel-2 {band_info} overlay data not found for region {region_name}"}
+            )
+        
+        # Add Sentinel-2 specific metadata
+        overlay_data.update({
+            "band": band_info,
+            "region": region_name,
+            "source": "Sentinel-2"
+        })
+        
+        print(f"✅ Sentinel-2 overlay data retrieved successfully")
+        print(f"📍 Bounds: {overlay_data['bounds']}")
+        
+        return overlay_data
+        
+    except Exception as e:
+        print(f"❌ Error in get_sentinel2_overlay_data: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
+
 @app.get("/api/overlay/{processing_type}/{filename}")
 async def get_overlay_data(processing_type: str, filename: str):
     """Get overlay data for a processed image including bounds and base64 encoded image"""
     print(f"\n🗺️  API CALL: /api/overlay/{processing_type}/{filename}")
     
     try:
-        from .geo_utils import get_image_overlay_data
+        from .geo_utils import get_laz_overlay_data
         
         # Extract base filename (remove path and extension)
         base_filename = os.path.splitext(os.path.basename(filename))[0]
@@ -438,7 +527,7 @@ async def get_overlay_data(processing_type: str, filename: str):
         # For hillshade variants, pass the original processing type for filename mapping
         filename_processing_type = processing_type if processing_type.startswith('hillshade_') else actual_processing_type
         
-        overlay_data = get_image_overlay_data(base_filename, actual_processing_type, filename_processing_type)
+        overlay_data = get_laz_overlay_data(base_filename, actual_processing_type, filename_processing_type)
         
         if not overlay_data:
             print(f"❌ No overlay data found for {base_filename}/{actual_processing_type}")
@@ -962,70 +1051,5 @@ async def convert_sentinel2_images(region_name: str = Form(...)):
             "files": [],
             "errors": []
         }
-
-@app.get("/api/overlay/sentinel2/{region_band}")
-async def get_sentinel2_overlay_data(region_band: str):
-    """Get overlay data for a Sentinel-2 image including bounds and base64 encoded image"""
-    print(f"\n🛰️ API CALL: /api/overlay/sentinel2/{region_band}")
-    
-    try:
-        # Parse region_band format: "region_name_band" (e.g., "Portland_Oregon_45.515_-122.678_Red")
-        parts = region_band.split('_')
-        if len(parts) < 2:
-            return JSONResponse(
-                status_code=400,
-                content={"error": "Invalid region_band format. Expected: region_name_band"}
-            )
-        
-        # Extract band (last part) and region name (everything else)
-        band_name = parts[-1]  # Red or NIR
-        region_name = '_'.join(parts[:-1])
-        
-        print(f"🏷️ Region: {region_name}")
-        print(f"📻 Band: {band_name}")
-        
-        # Use the existing geo_utils function - treat each sentinel-2 band as a separate "base filename"
-        from .geo_utils import get_image_overlay_data
-        
-        # The geo_utils function expects: base_filename, processing_type, filename_processing_type
-        # For Sentinel-2: base_filename = region_name, processing_type = "sentinel-2", filename = band
-        overlay_data = get_image_overlay_data(region_name, "sentinel-2", band_name)
-        
-        if not overlay_data:
-            print(f"❌ No overlay data found for Sentinel-2 {band_name} in region {region_name}")
-            # Debug: Check what files exist
-            from pathlib import Path
-            s2_dir = Path("output") / region_name / "sentinel-2"
-            if s2_dir.exists():
-                files = list(s2_dir.glob("*"))
-                print(f"🔍 Files in Sentinel-2 directory: {[f.name for f in files]}")
-            else:
-                print(f"🔍 Sentinel-2 directory doesn't exist: {s2_dir}")
-            
-            return JSONResponse(
-                status_code=404,
-                content={"error": f"Sentinel-2 {band_name} overlay data not found for region {region_name}"}
-            )
-        
-        # Add Sentinel-2 specific metadata
-        overlay_data.update({
-            "band": band_name,
-            "region": region_name,
-            "source": "Sentinel-2"
-        })
-        
-        print(f"✅ Sentinel-2 overlay data retrieved successfully")
-        print(f"📍 Bounds: {overlay_data['bounds']}")
-        
-        return overlay_data
-        
-    except Exception as e:
-        print(f"❌ Error in get_sentinel2_overlay_data: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
 
 

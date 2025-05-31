@@ -582,6 +582,15 @@ input:focus, textarea:focus, select:focus {
   background: #218838;
 }
 
+.btn-remove {
+  background: #dc3545;
+  color: white;
+}
+
+.btn-remove:hover {
+  background: #c82333;
+}
+
 .btn-download {
   background: #007bff;
   color: white;

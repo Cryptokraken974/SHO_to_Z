@@ -258,76 +258,157 @@ def get_image_bounds_from_geotiff(tiff_path: str) -> Optional[Dict]:
         print(f"Error reading GeoTIFF {tiff_path}: {e}")
         return None
 
-def get_image_overlay_data(base_filename: str, processing_type: str, filename_processing_type: str = None) -> Optional[Dict]:
+def get_laz_overlay_data(base_filename: str, processing_type: str, filename_processing_type: str = None) -> Optional[Dict]:
     """
-    Get overlay data for a processed image including bounds and base64 encoded image.
+    Get overlay data for LAZ-processed images (DTM, Hillshade, etc.) including bounds and base64 encoded image.
     
     Args:
-        base_filename: The base name of the LAZ file (e.g., 'OR_WizardIsland')
-        processing_type: The folder name (e.g., 'Hillshade')
+        base_filename: The base name of the LAZ file (e.g., 'OR_WizardIsland', 'FoxIsland')
+        processing_type: The folder name (e.g., 'Hillshade', 'DTM', 'Slope')
         filename_processing_type: The specific processing type for filename mapping (e.g., 'hillshade_315_45_08')
     """
     try:
-        print(f"\n🔍 Getting overlay data for {base_filename}/{processing_type}")
+        print(f"\n🔍 Getting LAZ overlay data for {base_filename}/{processing_type}")
         if filename_processing_type:
             print(f"🔍 Using filename processing type: {filename_processing_type}")
         
-        # Construct paths - processing_type should already be the correct folder name
+        # Construct paths for LAZ-processed files
+        # Structure: output/{base_filename}/{processing_type}/{base_filename}_{suffix}.png
         output_dir = f"output/{base_filename}/{processing_type}"
         
         # Use filename_processing_type for mapping if provided, otherwise use processing_type
         mapping_key = filename_processing_type if filename_processing_type else processing_type
         
-        # Special handling for Sentinel-2 files
-        if processing_type == "sentinel-2":
-            # For Sentinel-2, filename_processing_type is the band name (Red, NIR)
-            band_name = filename_processing_type or mapping_key
-            png_path = f"{output_dir}/{band_name}.png"
-            tiff_path = f"{output_dir}/{band_name}.tif"  # Won't exist, but needed for worldfile naming
-            world_path = f"{output_dir}/{band_name}.pgw"  # Worldfile created by convert_geotiff_to_png
-        else:
-            # Map processing type to filename suffix - based on actual file naming convention
-            filename_mapping = {
-                'DEM': 'DEM',           # FoxIsland_DEM.png
-                'DTM': 'DTM',           # FoxIsland_DTM.png
-                'DSM': 'DSM',           # FoxIsland_DSM.png
-                'CHM': 'CHM',           # FoxIsland_CHM.png
-                'Hillshade': 'hillshade_standard',   # FoxIsland_hillshade_standard.png
-                'hillshade_315_45_08': 'hillshade_315_45_08',   # FoxIsland_hillshade_315_45_08.png
-                'hillshade_225_45_08': 'hillshade_225_45_08',   # FoxIsland_hillshade_225_45_08.png
-                'Slope': 'slope',           # FoxIsland_slope.png
-                'Aspect': 'aspect',         # FoxIsland_aspect.png
-                'ColorRelief': 'color_relief', # FoxIsland_color_relief.png
-                'TRI': 'tri',               # FoxIsland_tri.png
-                'TPI': 'tpi',               # FoxIsland_tpi.png
-                'Roughness': 'roughness'    # FoxIsland_roughness.png
-            }
-            
-            filename_suffix = filename_mapping.get(mapping_key, mapping_key.lower())
-            
-            png_path = f"{output_dir}/{base_filename}_{filename_suffix}.png"
-            tiff_path = f"{output_dir}/{base_filename}_{filename_suffix}.tif"
-            world_path = f"{output_dir}/{base_filename}_{filename_suffix}.wld"
+        # Map processing type to filename suffix - based on actual file naming convention
+        filename_mapping = {
+            'DEM': 'DEM',           # FoxIsland_DEM.png
+            'DTM': 'DTM',           # FoxIsland_DTM.png
+            'DSM': 'DSM',           # FoxIsland_DSM.png
+            'CHM': 'CHM',           # FoxIsland_CHM.png
+            'Hillshade': 'hillshade_standard',   # FoxIsland_hillshade_standard.png
+            'hillshade_315_45_08': 'hillshade_315_45_08',   # FoxIsland_hillshade_315_45_08.png
+            'hillshade_225_45_08': 'hillshade_225_45_08',   # FoxIsland_hillshade_225_45_08.png
+            'Slope': 'slope',           # FoxIsland_slope.png
+            'Aspect': 'aspect',         # FoxIsland_aspect.png
+            'ColorRelief': 'color_relief', # FoxIsland_color_relief.png
+            'TRI': 'tri',               # FoxIsland_tri.png
+            'TPI': 'tpi',               # FoxIsland_tpi.png
+            'Roughness': 'roughness'    # FoxIsland_roughness.png
+        }
+        
+        filename_suffix = filename_mapping.get(mapping_key, mapping_key.lower())
+        
+        png_path = f"{output_dir}/{base_filename}_{filename_suffix}.png"
+        tiff_path = f"{output_dir}/{base_filename}_{filename_suffix}.tif"
+        world_path = f"{output_dir}/{base_filename}_{filename_suffix}.wld"
         
         print(f"📂 Output directory: {output_dir}")
         print(f"🖼️  PNG path: {png_path}")
         print(f"🗺️  TIFF path: {tiff_path}")
         print(f"🌍 World file path: {world_path}")
         
-        # Check if files exist
-        print(f"📁 Directory exists: {os.path.exists(output_dir)}")
-        print(f"🖼️  PNG exists: {os.path.exists(png_path)}")
-        print(f"🗺️  TIFF exists: {os.path.exists(tiff_path)}")
-        print(f"🌍 World file exists: {os.path.exists(world_path)}")
+        return _process_overlay_files(png_path, tiff_path, world_path, processing_type, base_filename)
         
-        if not os.path.exists(png_path):
+    except Exception as e:
+        print(f"❌ Error getting LAZ overlay data for {base_filename}/{processing_type}: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def get_sentinel2_overlay_data_util(region_name: str, band_name: str) -> Optional[Dict]:
+    """
+    Get overlay data for Sentinel-2 images including bounds and base64 encoded image.
+    
+    Args:
+        region_name: The region name (e.g., 'region_13_96S_48_33W')
+        band_name: The band name (e.g., 'RED_B04', 'NIR_B08')
+    """
+    try:
+        print(f"\n🛰️ Getting Sentinel-2 overlay data for {region_name}/{band_name}")
+        
+        # Construct paths for Sentinel-2 files
+        # Structure: output/{region_name}/sentinel-2/{region_name}_{timestamp}_sentinel2_{band_name}.png
+        output_dir = f"output/{region_name}/sentinel-2"
+        
+        # Find actual files matching the pattern since they include timestamps
+        import glob
+        
+        # Pattern: region_*_sentinel2_{band_name}.png
+        png_pattern = f"{output_dir}/*_sentinel2_{band_name}.png"
+        tiff_pattern = f"{output_dir}/*_sentinel2_{band_name}.tif"
+        
+        print(f"📂 Output directory: {output_dir}")
+        print(f"🔍 PNG pattern: {png_pattern}")
+        print(f"🔍 TIFF pattern: {tiff_pattern}")
+        
+        png_files = glob.glob(png_pattern)
+        tiff_files = glob.glob(tiff_pattern)
+        
+        print(f"📁 Found PNG files: {png_files}")
+        print(f"📁 Found TIFF files: {tiff_files}")
+        
+        if png_files:
+            # Sort files by modification time to get the most recent
+            png_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+            png_path = png_files[0]  # Use the most recent file
+            # Derive world file path from PNG (replace .png with .wld)
+            world_path = png_path.replace('.png', '.wld')
+            # Use corresponding TIF file if available
+            if tiff_files:
+                # Find matching TIF file with same timestamp
+                png_basename = os.path.basename(png_path).replace('.png', '')
+                matching_tiff = next((tf for tf in tiff_files if png_basename in tf), tiff_files[0])
+                tiff_path = matching_tiff
+            else:
+                tiff_path = png_path.replace('.png', '.tif')
+            
+            print(f"📄 Selected files from {len(png_files)} available PNG files")
+        else:
+            print(f"❌ No PNG files found matching pattern: {png_pattern}")
             # Debug: List what files actually exist
             if os.path.exists(output_dir):
                 files = os.listdir(output_dir)
                 print(f"🔍 Files in directory: {files}")
+                # Suggest available bands if any sentinel-2 files exist
+                s2_files = [f for f in files if 'sentinel2' in f and f.endswith('.png')]
+                if s2_files:
+                    available_bands = set()
+                    for f in s2_files:
+                        parts = f.split('_')
+                        if len(parts) >= 2:
+                            band = '_'.join(parts[-2:]).replace('.png', '')
+                            available_bands.add(band)
+                    print(f"💡 Available Sentinel-2 bands: {list(available_bands)}")
+            else:
+                print(f"📂 Directory doesn't exist: {output_dir}")
+            return None
+        
+        print(f"🖼️  PNG path: {png_path}")
+        print(f"🗺️  TIFF path: {tiff_path}")
+        print(f"🌍 World file path: {world_path}")
+        
+        return _process_overlay_files(png_path, tiff_path, world_path, "sentinel-2", region_name)
+        
+    except Exception as e:
+        print(f"❌ Error getting Sentinel-2 overlay data for {region_name}/{band_name}: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, processing_type: str, base_filename: str) -> Optional[Dict]:
+    """
+    Common function to process overlay files and extract bounds and image data.
+    """
+    try:
+        # Check if files exist
+        print(f"📁 PNG exists: {os.path.exists(png_path)}")
+        print(f"🗺️  TIFF exists: {os.path.exists(tiff_path)}")
+        print(f"🌍 World file exists: {os.path.exists(world_path)}")
+        
+        if not os.path.exists(png_path):
             print(f"❌ PNG file not found: {png_path}")
             return None
-            
+        
         # Try to get bounds from GeoTIFF first, then world file
         bounds = None
         epsg_code = None
@@ -390,7 +471,25 @@ def get_image_overlay_data(base_filename: str, processing_type: str, filename_pr
         }
         
     except Exception as e:
-        print(f"❌ Error getting overlay data for {base_filename}/{processing_type}: {e}")
+        print(f"❌ Error processing overlay files: {e}")
         import traceback
         traceback.print_exc()
         return None
+
+# Keep original function for backwards compatibility, but route to appropriate new function
+def get_image_overlay_data(base_filename: str, processing_type: str, filename_processing_type: str = None) -> Optional[Dict]:
+    """
+    DEPRECATED: Use get_laz_overlay_data or get_sentinel2_overlay_data instead.
+    Get overlay data for a processed image including bounds and base64 encoded image.
+    
+    Args:
+        base_filename: The base name of the LAZ file (e.g., 'OR_WizardIsland') or region (e.g., 'region_13_96S_48_33W')
+        processing_type: The folder name (e.g., 'Hillshade', 'sentinel-2')
+        filename_processing_type: The specific processing type for filename mapping (e.g., 'hillshade_315_45_08', 'RED_B04')
+    """
+    if processing_type == "sentinel-2":
+        # Route to Sentinel-2 specific function
+        return get_sentinel2_overlay_data_util(base_filename, filename_processing_type)
+    else:
+        # Route to LAZ processing function
+        return get_laz_overlay_data(base_filename, processing_type, filename_processing_type)

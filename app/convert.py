@@ -7,7 +7,7 @@ import subprocess
 
 def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None) -> str:
     """
-    Convert GeoTIFF file to PNG file with worldfile preservation
+    Convert GeoTIFF file to PNG file with proper scaling and worldfile preservation
     
     Args:
         tif_path: Path to the input TIF file
@@ -16,7 +16,7 @@ def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None) -> str
     Returns:
         Path to the generated PNG file
     """
-    print(f"\n🎨 GEOTIFF TO PNG: Starting conversion")
+    print(f"\n🎨 GEOTIFF TO PNG: Starting conversion with proper scaling")
     print(f"📁 Input TIF: {tif_path}")
     
     start_time = time.time()
@@ -35,16 +35,59 @@ def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None) -> str
             os.makedirs(output_dir)
             print(f"📁 Created output directory: {output_dir}")
         
-        # Open GeoTIFF with GDAL
+        # Open GeoTIFF with GDAL to get statistics
         ds = gdal.Open(tif_path)
         if ds is None:
             error_msg = f"GDAL failed to open TIF file: {tif_path}"
             print(f"❌ {error_msg}")
             raise Exception(error_msg)
         
-        # Convert to PNG with worldfile using GDAL
-        print(f"🎨 Converting with GDAL (worldfile enabled)...")
-        gdal.Translate(png_path, ds, format="PNG", options="-co worldfile=yes")
+        # Get band statistics for proper scaling
+        band = ds.GetRasterBand(1)
+        band.ComputeStatistics(False)
+        
+        # Get min/max values for scaling
+        min_val, max_val, mean_val, std_val = band.GetStatistics(True, True)
+        print(f"📊 Data range: Min={min_val:.0f}, Max={max_val:.0f}, Mean={mean_val:.1f}, StdDev={std_val:.1f}")
+        
+        # Use 2% linear stretch to improve contrast and avoid outliers
+        # This is a common technique in remote sensing visualization
+        histogram = band.GetHistogram(min_val, max_val, 1000, False, False)
+        if histogram:
+            # Calculate 2% and 98% percentiles for better contrast
+            total_pixels = sum(histogram)
+            low_percentile = total_pixels * 0.02
+            high_percentile = total_pixels * 0.98
+            
+            cumulative = 0
+            stretch_min = min_val
+            stretch_max = max_val
+            
+            for i, count in enumerate(histogram):
+                cumulative += count
+                if cumulative >= low_percentile and stretch_min == min_val:
+                    stretch_min = min_val + (max_val - min_val) * i / len(histogram)
+                if cumulative >= high_percentile:
+                    stretch_max = min_val + (max_val - min_val) * i / len(histogram)
+                    break
+            
+            print(f"📈 Using 2-98% stretch: {stretch_min:.0f} to {stretch_max:.0f}")
+        else:
+            # Fallback to min/max if histogram fails
+            stretch_min = min_val
+            stretch_max = max_val
+            print(f"📈 Using full range stretch: {stretch_min:.0f} to {stretch_max:.0f}")
+        
+        # Convert to PNG with proper scaling using gdal_translate
+        # Use -scale to map input range to 0-255 for PNG
+        scale_options = [
+            "-scale", str(stretch_min), str(stretch_max), "0", "255",
+            "-ot", "Byte",  # Output as 8-bit for PNG
+            "-co", "WORLDFILE=YES"
+        ]
+        
+        print(f"🎨 Converting with GDAL scaling: {stretch_min:.0f}-{stretch_max:.0f} → 0-255...")
+        gdal.Translate(png_path, ds, format="PNG", options=scale_options)
         
         # Close dataset
         ds = None
