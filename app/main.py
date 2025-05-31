@@ -1,15 +1,132 @@
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, Form, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 import os
 import glob
 import base64
+import asyncio
+import json
+import math
+from typing import Optional, List, Dict, Any
 
 from .convert import convert_geotiff_to_png_base64
 from .processing import laz_to_dem, dtm, dsm, chm, hillshade, hillshade_315_45_08, hillshade_225_45_08, slope, aspect, color_relief, tri, tpi, roughness
+from .data_acquisition import DataAcquisitionManager
+from .config import get_settings, validate_api_keys, get_data_source_config
+
+# Get application settings
+settings = get_settings()
+
+# Initialize data acquisition manager with settings
+data_manager = DataAcquisitionManager(
+    cache_dir=settings.cache_dir,
+    output_dir=settings.output_dir,
+    settings=settings
+)
+
+# WebSocket connection manager for progress updates
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+        self.active_downloads: Dict[str, Any] = {}  # Store active download tasks
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def send_progress_update(self, message: dict):
+        """Send progress update to all connected clients."""
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(json.dumps(message))
+            except:
+                # Remove disconnected clients
+                try:
+                    self.active_connections.remove(connection)
+                except ValueError:
+                    pass
+    
+    def add_download_task(self, download_id: str, source_instance):
+        """Add a download task that can be cancelled."""
+        self.active_downloads[download_id] = source_instance
+    
+    def cancel_download(self, download_id: str):
+        """Cancel a specific download task."""
+        if download_id in self.active_downloads:
+            source_instance = self.active_downloads[download_id]
+            if hasattr(source_instance, 'cancel'):
+                source_instance.cancel()
+            del self.active_downloads[download_id]
+            return True
+        return False
+
+manager = ConnectionManager()
+
+# Pydantic models for API requests
+class CoordinateRequest(BaseModel):
+    lat: float
+    lng: float
+    buffer_km: float = 1.0
+    data_types: Optional[List[str]] = None
+
+class DataAcquisitionRequest(BaseModel):
+    lat: float
+    lng: float
+    buffer_km: float = 1.0
+    data_sources: Optional[List[str]] = None
+    max_file_size_mb: float = 500.0
+
+class Sentinel2Request(BaseModel):
+    lat: float
+    lng: float
+    buffer_km: float = 2.0  # 2km radius = 4km x 4km box (smaller for better processing)
+    bands: Optional[List[str]] = ["B04", "B08"]  # Sentinel-2 red and NIR bands
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
+app.mount("/output", StaticFiles(directory="output"), name="output")
+
+@app.websocket("/ws/progress")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time progress updates and cancellation commands."""
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Listen for messages from client
+            message = await websocket.receive_text()
+            try:
+                data = json.loads(message)
+                
+                # Handle cancellation messages
+                if data.get("type") == "cancel_download":
+                    download_id = data.get("download_id")
+                    if download_id:
+                        success = manager.cancel_download(download_id)
+                        await websocket.send_text(json.dumps({
+                            "type": "cancellation_response",
+                            "download_id": download_id,
+                            "success": success
+                        }))
+                        
+                        # Broadcast cancellation to all clients
+                        await manager.send_progress_update({
+                            "type": "download_cancelled",
+                            "message": "Download cancelled by user",
+                            "download_id": download_id,
+                            "band": "Cancelled"
+                        })
+                        
+            except json.JSONDecodeError:
+                # Ignore malformed messages - might be keepalive
+                pass
+                
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -528,5 +645,387 @@ async def toggle_json_pipelines(data: dict):
             "success": False,
             "error": str(e)
         }
+
+# Data Acquisition Endpoints
+
+@app.get("/api/config")
+async def get_configuration():
+    """Get current configuration and API key status"""
+    try:
+        api_keys = validate_api_keys()
+        
+        return {
+            "success": True,
+            "config": {
+                "cache_dir": settings.cache_dir,
+                "output_dir": settings.output_dir,
+                "default_buffer_km": settings.default_buffer_km,
+                "max_file_size_mb": settings.max_file_size_mb,
+                "cache_expiry_days": settings.cache_expiry_days,
+                "source_priorities": settings.source_priorities
+            },
+            "api_keys": api_keys,
+            "data_sources": {
+                "opentopography": get_data_source_config("opentopography"),
+                "sentinel2": get_data_source_config("sentinel2"),
+                "ornl_daac": get_data_source_config("ornl_daac")
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/check-data-availability")
+async def check_data_availability(request: CoordinateRequest):
+    """Check what data is available for given coordinates"""
+    try:
+        availability = await data_manager.check_availability(request.lat, request.lng)
+        
+        return {
+            "success": True,
+            "availability": {
+                "high_res_lidar": availability.high_res_lidar,
+                "srtm_dem": availability.srtm_dem,
+                "sentinel2": availability.sentinel2,
+                "landsat": availability.landsat,
+                "source_priorities": availability.source_priorities
+            },
+            "coordinates": {
+                "lat": request.lat,
+                "lng": request.lng
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/acquire-data")
+async def acquire_data(request: DataAcquisitionRequest):
+    """Acquire data for given coordinates"""
+    try:
+        # Run data acquisition 
+        result = await data_manager.acquire_data_for_coordinates(
+            request.lat,
+            request.lng,
+            request.buffer_km,
+            request.data_sources
+        )
+        
+        return {
+            "success": result.success,
+            "files": result.files,
+            "metadata": result.metadata,
+            "errors": result.errors,
+            "source_used": result.source_used,
+            "download_size_mb": result.download_size_mb,
+            "processing_time_seconds": result.processing_time_seconds,
+            "roi": {
+                "center_lat": result.roi.center_lat,
+                "center_lng": result.roi.center_lng,
+                "buffer_km": result.roi.buffer_km,
+                "name": result.roi.name
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/estimate-download-size")
+async def estimate_download_size(request: CoordinateRequest):
+    """Estimate download size for different data types"""
+    try:
+        estimates = data_manager.estimate_download_size(
+            request.lat, 
+            request.lng, 
+            request.buffer_km
+        )
+        
+        return {
+            "success": True,
+            "estimates_mb": estimates,
+            "coordinates": {
+                "lat": request.lat,
+                "lng": request.lng,
+                "buffer_km": request.buffer_km
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/acquisition-history")
+async def get_acquisition_history():
+    """Get history of data acquisitions"""
+    try:
+        history = data_manager.get_acquisition_history()
+        return {
+            "success": True,
+            "history": history
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/cleanup-cache")
+async def cleanup_cache(older_than_days: int = 30):
+    """Clean up cached data older than specified days"""
+    try:
+        data_manager.cleanup_cache(older_than_days)
+        return {
+            "success": True,
+            "message": f"Cache cleanup completed for files older than {older_than_days} days"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/storage-stats")
+async def get_storage_stats():
+    """Get storage statistics"""
+    try:
+        stats = data_manager.file_manager.get_storage_stats()
+        return {
+            "success": True,
+            "stats": stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/download-sentinel2")
+async def download_sentinel2(request: Sentinel2Request):
+    """Download Sentinel-2 red and NIR bands for given coordinates using Copernicus CDSE"""
+    try:
+        # Validate coordinates
+        if not (-90 <= request.lat <= 90):
+            raise HTTPException(status_code=400, detail=f"Invalid latitude: {request.lat}. Must be between -90 and 90.")
+        if not (-180 <= request.lng <= 180):
+            raise HTTPException(status_code=400, detail=f"Invalid longitude: {request.lng}. Must be between -180 and 180.")
+        
+        # Check if coordinates are over land (basic validation)
+        # Reject obvious ocean areas where no meaningful data exists
+        if abs(request.lat) > 80:  # Arctic/Antarctic regions with limited coverage
+            raise HTTPException(status_code=400, detail=f"Coordinates {request.lat}, {request.lng} are in polar regions with limited Sentinel-2 coverage.")
+        
+        import uuid
+        from .data_acquisition.sources.copernicus_sentinel2 import CopernicusSentinel2Source
+        from .data_acquisition.sources.base import DownloadRequest, DataType, DataResolution
+        from .data_acquisition.utils.coordinates import BoundingBox
+        
+        # Generate unique download ID
+        download_id = str(uuid.uuid4())
+        
+        # Create progress callback that sends updates via WebSocket
+        async def progress_callback(update):
+            await manager.send_progress_update({
+                "source": "copernicus_sentinel2",
+                "coordinates": {"lat": request.lat, "lng": request.lng},
+                "download_id": download_id,
+                **update
+            })
+        
+        # Create Copernicus Sentinel-2 data source with progress callback
+        sentinel2_source = CopernicusSentinel2Source(
+            token=settings.cdse_token,
+            client_id=settings.cdse_client_id,
+            client_secret=settings.cdse_client_secret,
+            progress_callback=progress_callback
+        )
+        
+        # Register this download task for cancellation
+        manager.add_download_task(download_id, sentinel2_source)
+        
+        # Calculate bounding box from center point and buffer
+        lat_delta = request.buffer_km / 111.0  # Rough conversion: 1 degree ≈ 111 km
+        # For longitude, adjust for latitude (longitude lines get closer at higher latitudes)
+        lng_delta = request.buffer_km / (111.0 * abs(math.cos(math.radians(request.lat))))
+        
+        bbox = BoundingBox(
+            west=request.lng - lng_delta,
+            south=request.lat - lat_delta,
+            east=request.lng + lng_delta,
+            north=request.lat + lat_delta
+        )
+        
+        print(f"🗺️ Sentinel-2 Request:")
+        print(f"📍 Center: {request.lat}, {request.lng}")
+        print(f"📏 Buffer: {request.buffer_km}km")
+        print(f"🔲 BBox: West={bbox.west:.4f}, South={bbox.south:.4f}, East={bbox.east:.4f}, North={bbox.north:.4f}")
+        print(f"📐 Size: {(bbox.east-bbox.west)*111:.2f}km x {(bbox.north-bbox.south)*111:.2f}km")
+        
+        # Create download request
+        download_request = DownloadRequest(
+            bbox=bbox,
+            data_type=DataType.IMAGERY,
+            resolution=DataResolution.HIGH,
+            max_file_size_mb=100.0,
+            output_format="GeoTIFF"
+        )
+        
+        # Check availability first
+        available = await sentinel2_source.check_availability(download_request)
+        if not available:
+            # Clean up download registration
+            manager.cancel_download(download_id)
+            return {
+                "success": False,
+                "error_message": "No Sentinel-2 data available for the requested area and time period"
+            }
+        
+        # Download the data
+        result = await sentinel2_source.download(download_request)
+        
+        # Clean up and close
+        manager.cancel_download(download_id)  # Remove from active downloads
+        await sentinel2_source.close()
+        
+        if result.success:
+            return {
+                "success": True,
+                "file_path": result.file_path,
+                "file_size_mb": result.file_size_mb,
+                "resolution_m": result.resolution_m,
+                "metadata": result.metadata
+            }
+        else:
+            return {
+                "success": False,
+                "error_message": result.error_message
+            }
+            
+    except Exception as e:
+        # Clean up download registration on error
+        if 'download_id' in locals():
+            manager.cancel_download(download_id)
+        
+        import traceback
+        error_details = f"Sentinel-2 download failed: {str(e)}\n{traceback.format_exc()}"
+        print(error_details)  # Log to console for debugging
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/convert-sentinel2")
+async def convert_sentinel2_images(region_name: str = Form(...)):
+    """Convert downloaded Sentinel-2 TIF files to PNG for display"""
+    print(f"\n🛰️ API CALL: /api/convert-sentinel2")
+    print(f"🏷️ Region name: {region_name}")
+    
+    try:
+        from .convert import convert_sentinel2_to_png
+        from pathlib import Path
+        
+        # Find the data directory for this region
+        data_dir = Path("data/acquired") / region_name / "sentinel-2"
+        
+        if not data_dir.exists():        return {
+            "success": False,
+            "error_message": f"Sentinel-2 data directory not found: {data_dir}",
+            "files": [],
+            "errors": []
+        }
+        
+        # Convert TIF files to PNG
+        conversion_result = convert_sentinel2_to_png(str(data_dir), region_name)
+        
+        if conversion_result['success']:
+            # Generate base64 encoded images for immediate display
+            display_files = []
+            for file_info in conversion_result['files']:
+                try:
+                    from .convert import convert_geotiff_to_png_base64
+                    # Use the original TIF for base64 conversion to get the best quality
+                    image_b64 = convert_geotiff_to_png_base64(file_info['tif_path'])
+                    
+                    display_files.append({
+                        'band': file_info['band'],
+                        'png_path': file_info['png_path'],
+                        'image': image_b64,
+                        'size_mb': file_info['size_mb']
+                    })
+                except Exception as e:
+                    print(f"❌ Error generating base64 for {file_info['band']}: {e}")
+            
+            return {
+                "success": True,
+                "region_name": region_name,
+                "files": display_files,
+                "total_files": len(display_files),
+                "errors": conversion_result['errors']
+            }
+        else:
+            return {
+                "success": False,
+                "error_message": "Conversion failed",
+                "files": [],
+                "errors": conversion_result['errors']
+            }
+            
+    except Exception as e:
+        print(f"❌ Error in convert_sentinel2_images: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "error_message": str(e),
+            "files": [],
+            "errors": []
+        }
+
+@app.get("/api/overlay/sentinel2/{region_band}")
+async def get_sentinel2_overlay_data(region_band: str):
+    """Get overlay data for a Sentinel-2 image including bounds and base64 encoded image"""
+    print(f"\n🛰️ API CALL: /api/overlay/sentinel2/{region_band}")
+    
+    try:
+        # Parse region_band format: "region_name_band" (e.g., "Portland_Oregon_45.515_-122.678_Red")
+        parts = region_band.split('_')
+        if len(parts) < 2:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Invalid region_band format. Expected: region_name_band"}
+            )
+        
+        # Extract band (last part) and region name (everything else)
+        band_name = parts[-1]  # Red or NIR
+        region_name = '_'.join(parts[:-1])
+        
+        print(f"🏷️ Region: {region_name}")
+        print(f"📻 Band: {band_name}")
+        
+        # Use the existing geo_utils function - treat each sentinel-2 band as a separate "base filename"
+        from .geo_utils import get_image_overlay_data
+        
+        # The geo_utils function expects: base_filename, processing_type, filename_processing_type
+        # For Sentinel-2: base_filename = region_name, processing_type = "sentinel-2", filename = band
+        overlay_data = get_image_overlay_data(region_name, "sentinel-2", band_name)
+        
+        if not overlay_data:
+            print(f"❌ No overlay data found for Sentinel-2 {band_name} in region {region_name}")
+            # Debug: Check what files exist
+            from pathlib import Path
+            s2_dir = Path("output") / region_name / "sentinel-2"
+            if s2_dir.exists():
+                files = list(s2_dir.glob("*"))
+                print(f"🔍 Files in Sentinel-2 directory: {[f.name for f in files]}")
+            else:
+                print(f"🔍 Sentinel-2 directory doesn't exist: {s2_dir}")
+            
+            return JSONResponse(
+                status_code=404,
+                content={"error": f"Sentinel-2 {band_name} overlay data not found for region {region_name}"}
+            )
+        
+        # Add Sentinel-2 specific metadata
+        overlay_data.update({
+            "band": band_name,
+            "region": region_name,
+            "source": "Sentinel-2"
+        })
+        
+        print(f"✅ Sentinel-2 overlay data retrieved successfully")
+        print(f"📍 Bounds: {overlay_data['bounds']}")
+        
+        return overlay_data
+        
+    except Exception as e:
+        print(f"❌ Error in get_sentinel2_overlay_data: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
 
 

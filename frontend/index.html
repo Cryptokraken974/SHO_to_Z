@@ -58,62 +58,105 @@
         </div>
       </div>
 
+      <!-- Test Section -->
+      <div class="accordion-section mb-6">
+        <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="test-accordion">
+          <h3 class="text-white font-semibold flex justify-between items-center m-0">
+            Test
+            <span class="accordion-arrow text-sm transition-transform">▼</span>
+          </h3>
+        </div>
+        <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="test-content">
+          <div class="space-y-3">
+            <!-- Test Overlay Button -->
+            <button id="test-overlay-btn" class="w-full bg-[#ff6b35] hover:bg-[#e55a2e] text-white px-4 py-3 rounded-lg font-medium transition-colors">🧪 Test Overlay</button>
+            
+            <!-- Coordinate Input Fields -->
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label for="lat-input" class="block text-xs text-[#ababab] mb-1">Latitude</label>
+                <input type="text" id="lat-input" placeholder="Click map to capture" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm placeholder-[#666] focus:outline-none focus:border-[#00bfff] font-mono" readonly>
+              </div>
+              <div>
+                <label for="lng-input" class="block text-xs text-[#ababab] mb-1">Longitude</label>
+                <input type="text" id="lng-input" placeholder="Click map to capture" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm placeholder-[#666] focus:outline-none focus:border-[#00bfff] font-mono" readonly>
+              </div>
+            </div>
+            
+            <!-- Download Button -->
+            <button id="download-laz-btn" class="w-full bg-[#28a745] hover:bg-[#218838] text-white px-4 py-3 rounded-lg font-medium transition-colors">📥 Download Data</button>
+            
+            <!-- Test Data Button -->
+            <button id="test-data-btn" class="w-full bg-[#007bff] hover:bg-[#0056b3] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2">🌍 Test: Portland LiDAR Area</button>
+            
+            <!-- Sentinel-2 Test Button -->
+            <button id="test-sentinel2-btn" class="w-full bg-[#dc3545] hover:bg-[#c82333] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2">🛰️ Test: Sentinel-2 Images</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Processing Steps -->
-      <div class="flex-1">
-        <h3 class="text-white font-semibold mb-4">Processing Steps</h3>
-        <div class="space-y-2" id="processing-steps-container">
-          <button id="test-overlay-btn" class="w-full bg-[#ff6b35] hover:bg-[#e55a2e] text-white px-4 py-3 rounded-lg font-medium transition-colors">🧪 Test Overlay</button>
-          <div>
-            <input type="checkbox" id="dem-checkbox" data-target="laz_to_dem" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-            <label for="dem-checkbox" class="ml-2 text-white">DEM</label>
-          </div>
-          <div>
-            <input type="checkbox" id="dsm-checkbox" data-target="dsm" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-            <label for="dsm-checkbox" class="ml-2 text-white">DSM</label>
-          </div>
-          <div>
-            <input type="checkbox" id="chm-checkbox" data-target="chm" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-            <label for="chm-checkbox" class="ml-2 text-white">CHM</label>
-          </div>
-          <div>
-            <input type="checkbox" id="dtm-checkbox" data-target="dtm" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
-            <label for="dtm-checkbox" class="ml-2 text-white">DTM</label>
-          </div>
-          <div>
-            <input type="checkbox" id="hillshade-checkbox" data-target="hillshade" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
-            <label for="hillshade-checkbox" class="ml-2 text-white">Hillshade (Standard)</label>
-          </div>
-          <div>
-            <input type="checkbox" id="hillshade315-checkbox" data-target="hillshade_315_45_08" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-            <label for="hillshade315-checkbox" class="ml-2 text-white">Hillshade 315° (0.8z)</label>
-          </div>
-          <div>
-            <input type="checkbox" id="hillshade225-checkbox" data-target="hillshade_225_45_08" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-            <label for="hillshade225-checkbox" class="ml-2 text-white">Hillshade 225° (0.8z)</label>
-          </div>
-          <div>
-            <input type="checkbox" id="slope-checkbox" data-target="slope" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
-            <label for="slope-checkbox" class="ml-2 text-white">Slope</label>
-          </div>
-          <div>
-            <input type="checkbox" id="aspect-checkbox" data-target="aspect" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-            <label for="aspect-checkbox" class="ml-2 text-white">Aspect</label>
-          </div>
-          <div>
-            <input type="checkbox" id="color_relief-checkbox" data-target="color_relief" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
-            <label for="color_relief-checkbox" class="ml-2 text-white">Color Relief</label>
-          </div>
-          <div>
-            <input type="checkbox" id="tri-checkbox" data-target="tri" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-            <label for="tri-checkbox" class="ml-2 text-white">TRI</label>
-          </div>
-          <div>
-            <input type="checkbox" id="tpi-checkbox" data-target="tpi" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-            <label for="tpi-checkbox" class="ml-2 text-white">TPI</label>
-          </div>
-          <div>
-            <input type="checkbox" id="roughness-checkbox" data-target="roughness" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-            <label for="roughness-checkbox" class="ml-2 text-white">Roughness</label>
+      <div class="accordion-section flex-1">
+        <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="processing-accordion">
+          <h3 class="text-white font-semibold flex justify-between items-center m-0">
+            Processing Steps
+            <span class="accordion-arrow text-sm transition-transform">▼</span>
+          </h3>
+        </div>
+        <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="processing-content">
+          <div class="space-y-2" id="processing-steps-container">
+            <div>
+              <input type="checkbox" id="dem-checkbox" data-target="laz_to_dem" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+              <label for="dem-checkbox" class="ml-2 text-white">DEM</label>
+            </div>
+            <div>
+              <input type="checkbox" id="dsm-checkbox" data-target="dsm" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+              <label for="dsm-checkbox" class="ml-2 text-white">DSM</label>
+            </div>
+            <div>
+              <input type="checkbox" id="chm-checkbox" data-target="chm" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+              <label for="chm-checkbox" class="ml-2 text-white">CHM</label>
+            </div>
+            <div>
+              <input type="checkbox" id="dtm-checkbox" data-target="dtm" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
+              <label for="dtm-checkbox" class="ml-2 text-white">DTM</label>
+            </div>
+            <div>
+              <input type="checkbox" id="hillshade-checkbox" data-target="hillshade" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
+              <label for="hillshade-checkbox" class="ml-2 text-white">Hillshade (Standard)</label>
+            </div>
+            <div>
+              <input type="checkbox" id="hillshade315-checkbox" data-target="hillshade_315_45_08" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+              <label for="hillshade315-checkbox" class="ml-2 text-white">Hillshade 315° (0.8z)</label>
+            </div>
+            <div>
+              <input type="checkbox" id="hillshade225-checkbox" data-target="hillshade_225_45_08" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+              <label for="hillshade225-checkbox" class="ml-2 text-white">Hillshade 225° (0.8z)</label>
+            </div>
+            <div>
+              <input type="checkbox" id="slope-checkbox" data-target="slope" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
+              <label for="slope-checkbox" class="ml-2 text-white">Slope</label>
+            </div>
+            <div>
+              <input type="checkbox" id="aspect-checkbox" data-target="aspect" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+              <label for="aspect-checkbox" class="ml-2 text-white">Aspect</label>
+            </div>
+            <div>
+              <input type="checkbox" id="color_relief-checkbox" data-target="color_relief" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
+              <label for="color_relief-checkbox" class="ml-2 text-white">Color Relief</label>
+            </div>
+            <div>
+              <input type="checkbox" id="tri-checkbox" data-target="tri" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+              <label for="tri-checkbox" class="ml-2 text-white">TRI</label>
+            </div>
+            <div>
+              <input type="checkbox" id="tpi-checkbox" data-target="tpi" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+              <label for="tpi-checkbox" class="ml-2 text-white">TPI</label>
+            </div>
+            <div>
+              <input type="checkbox" id="roughness-checkbox" data-target="roughness" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
+              <label for="roughness-checkbox" class="ml-2 text-white">Roughness</label>
+            </div>
           </div>
         </div>
       </div>
@@ -219,6 +262,14 @@
           </div>
         </div>
       </div>
+      
+      <!-- Downloaded Satellite Images -->
+      <div class="mb-4">
+        <h2 class="text-white text-lg font-semibold mb-4">Downloaded Satellite Images</h2>
+        <div id="image-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Downloaded images will be displayed here -->
+        </div>
+      </div>
     </div>
   </div>
 
@@ -253,6 +304,27 @@
       <div class="modal-footer flex justify-end gap-3 p-6 border-t border-[#303030]">
         <button id="cancel-select" class="cancel-btn bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
         <button id="select-file" class="select-btn bg-[#28a745] hover:bg-[#218838] text-white px-4 py-2 rounded-lg font-medium transition-colors">Select</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Download LAZ Files -->
+  <div id="download-laz-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="modal-content bg-[#1a1a1a] border border-[#303030] rounded-lg w-[90%] max-w-3xl">
+      <div class="modal-header flex justify-between items-center p-6 border-b border-[#303030]">
+        <h4 class="text-white text-lg font-semibold m-0">Download LAZ Files</h4>
+        <span class="close-download text-[#ababab] hover:text-white text-2xl cursor-pointer">&times;</span>
+      </div>
+      <div class="modal-body p-6">
+        <div class="mb-4">
+          <p class="text-[#ababab] text-sm mb-4">Download high-quality LAZ files for terrain processing. Select from available datasets:</p>
+        </div>
+        <div id="download-laz-list" class="space-y-3">
+          <!-- LAZ download options will be populated here -->
+        </div>
+      </div>
+      <div class="modal-footer flex justify-end gap-3 p-6 border-t border-[#303030]">
+        <button id="cancel-download" class="cancel-btn bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
       </div>
     </div>
   </div>

@@ -278,28 +278,36 @@ def get_image_overlay_data(base_filename: str, processing_type: str, filename_pr
         # Use filename_processing_type for mapping if provided, otherwise use processing_type
         mapping_key = filename_processing_type if filename_processing_type else processing_type
         
-        # Map processing type to filename suffix - based on actual file naming convention
-        filename_mapping = {
-            'DEM': 'DEM',           # FoxIsland_DEM.png
-            'DTM': 'DTM',           # FoxIsland_DTM.png
-            'DSM': 'DSM',           # FoxIsland_DSM.png
-            'CHM': 'CHM',           # FoxIsland_CHM.png
-            'Hillshade': 'hillshade_standard',   # FoxIsland_hillshade_standard.png
-            'hillshade_315_45_08': 'hillshade_315_45_08',   # FoxIsland_hillshade_315_45_08.png
-            'hillshade_225_45_08': 'hillshade_225_45_08',   # FoxIsland_hillshade_225_45_08.png
-            'Slope': 'slope',           # FoxIsland_slope.png
-            'Aspect': 'aspect',         # FoxIsland_aspect.png
-            'ColorRelief': 'color_relief', # FoxIsland_color_relief.png
-            'TRI': 'tri',               # FoxIsland_tri.png
-            'TPI': 'tpi',               # FoxIsland_tpi.png
-            'Roughness': 'roughness'    # FoxIsland_roughness.png
-        }
-        
-        filename_suffix = filename_mapping.get(mapping_key, mapping_key.lower())
-        
-        png_path = f"{output_dir}/{base_filename}_{filename_suffix}.png"
-        tiff_path = f"{output_dir}/{base_filename}_{filename_suffix}.tif"
-        world_path = f"{output_dir}/{base_filename}_{filename_suffix}.wld"
+        # Special handling for Sentinel-2 files
+        if processing_type == "sentinel-2":
+            # For Sentinel-2, filename_processing_type is the band name (Red, NIR)
+            band_name = filename_processing_type or mapping_key
+            png_path = f"{output_dir}/{band_name}.png"
+            tiff_path = f"{output_dir}/{band_name}.tif"  # Won't exist, but needed for worldfile naming
+            world_path = f"{output_dir}/{band_name}.pgw"  # Worldfile created by convert_geotiff_to_png
+        else:
+            # Map processing type to filename suffix - based on actual file naming convention
+            filename_mapping = {
+                'DEM': 'DEM',           # FoxIsland_DEM.png
+                'DTM': 'DTM',           # FoxIsland_DTM.png
+                'DSM': 'DSM',           # FoxIsland_DSM.png
+                'CHM': 'CHM',           # FoxIsland_CHM.png
+                'Hillshade': 'hillshade_standard',   # FoxIsland_hillshade_standard.png
+                'hillshade_315_45_08': 'hillshade_315_45_08',   # FoxIsland_hillshade_315_45_08.png
+                'hillshade_225_45_08': 'hillshade_225_45_08',   # FoxIsland_hillshade_225_45_08.png
+                'Slope': 'slope',           # FoxIsland_slope.png
+                'Aspect': 'aspect',         # FoxIsland_aspect.png
+                'ColorRelief': 'color_relief', # FoxIsland_color_relief.png
+                'TRI': 'tri',               # FoxIsland_tri.png
+                'TPI': 'tpi',               # FoxIsland_tpi.png
+                'Roughness': 'roughness'    # FoxIsland_roughness.png
+            }
+            
+            filename_suffix = filename_mapping.get(mapping_key, mapping_key.lower())
+            
+            png_path = f"{output_dir}/{base_filename}_{filename_suffix}.png"
+            tiff_path = f"{output_dir}/{base_filename}_{filename_suffix}.tif"
+            world_path = f"{output_dir}/{base_filename}_{filename_suffix}.wld"
         
         print(f"📂 Output directory: {output_dir}")
         print(f"🖼️  PNG path: {png_path}")
