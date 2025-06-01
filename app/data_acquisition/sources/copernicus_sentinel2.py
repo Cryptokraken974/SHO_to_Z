@@ -481,26 +481,56 @@ class CopernicusSentinel2Source(BaseDataSource):
         """
         access_token = await self._get_access_token()
         if not access_token:
-            logger.error("No access token for Processing API")
+            logger.error("No CDSE access token available for download")
             return None
-        
+
         try:
             self._check_cancelled()
             
-            # Prepare output directory and filename
-            region_name = metadata.get("region_name", "sentinel2_data")
-            acquisition_date = metadata.get("acquisition_date", "")
-            if acquisition_date:
-                date_str = acquisition_date[:10].replace("-", "")
-                filename = f"{region_name}_{date_str}_sentinel2.tif"
+            # Determine region name: use provided, then metadata, then generate
+            region_name = request.region_name
+            if not region_name:
+                region_name = metadata.get('region_name')
+            if not region_name:
+                # Use the original _generate_region_name if no name is available
+                # This part of the logic for _generate_region_name might need adjustment
+                # if the `bbox` in `metadata` is not always what `_generate_region_name` expects.
+                # For now, we assume metadata['bbox'] is appropriate.
+                region_name = self._generate_region_name(metadata['bbox'], metadata.get('acquisition_date', ''))
+            
+            # Ensure metadata is updated with the final region_name
+            metadata['region_name'] = region_name
+
+            # Create input folder following the standard structure: input/<region_name>/
+            input_folder_path = Path("input") / region_name
+            input_folder_path.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Created input folder: {input_folder_path}")
+
+            # Use acquisition date from metadata for filename, or current date as fallback
+            date_str = metadata.get('acquisition_date')
+            if date_str:
+                try:
+                    date_str = datetime.fromisoformat(date_str.replace("Z", "")).strftime("%Y%m%d")
+                except ValueError:
+                    # Fallback if parsing fails
+                    date_str = datetime.now().strftime("%Y%m%d")
             else:
-                filename = f"{region_name}_sentinel2.tif"
+                date_str = datetime.now().strftime("%Y%m%d")
             
-            # Save to data/acquired/{region_name}/sentinel-2/ to match conversion expectations
-            output_dir = os.path.join("data", "acquired", region_name, "sentinel-2")
-            os.makedirs(output_dir, exist_ok=True)
-            output_path = os.path.join(output_dir, filename)
+            filename = f"{region_name}_{date_str}_sentinel2.tif"
             
+            # Save to input/<region_name>/ following the standard folder structure
+            # The raw downloaded TIF will be saved in input, then conversion will process to output
+            output_dir = input_folder_path
+            output_path = output_dir / filename
+
+            # Check if file already exists (cache hit)
+            if os.path.exists(output_path):
+                logger.info(f"Found cached Sentinel-2 data: {output_path}")
+                if self.progress_callback:
+                    await self.progress_callback({"message": "Using cached data", "type": "cache_hit", "band": "Sentinel-2"})
+                return str(output_path)
+
             # Processing API request body
             bbox = metadata["bbox"]
             process_body = {
@@ -577,7 +607,7 @@ class CopernicusSentinel2Source(BaseDataSource):
                     if self.progress_callback:
                         await self.progress_callback({"message": "Download completed!", "type": "download_complete", "band": "Sentinel-2"})
                     
-                    return output_path
+                    return str(output_path)
                 else:
                     error_text = await response.text()
                     logger.error(f"Processing API error: {response.status} - {error_text}")

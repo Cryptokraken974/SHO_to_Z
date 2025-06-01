@@ -38,6 +38,7 @@ class DownloadRequest:
     resolution: Optional[DataResolution] = None
     output_format: str = "tiff"
     max_file_size_mb: float = 500.0
+    region_name: Optional[str] = None
 
 @dataclass
 class DownloadResult:
@@ -84,7 +85,7 @@ class BaseDataSource(ABC):
         pass
     
     @abstractmethod
-    async def download(self, request: DownloadRequest) -> DownloadResult:
+    async def download(self, request: DownloadRequest, progress_callback=None) -> DownloadResult:
         """Download data for the given request."""
         pass
     

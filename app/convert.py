@@ -162,7 +162,7 @@ def convert_sentinel2_to_png(data_dir: str, region_name: str) -> dict:
     Convert Sentinel-2 TIF files to PNG with proper output structure
     
     Args:
-        data_dir: Path to the data/acquired/<region_name>/sentinel-2/ directory
+        data_dir: Path to the input/<region_name>/ directory containing TIF files
         region_name: Unique region name for the output directory
         
     Returns:

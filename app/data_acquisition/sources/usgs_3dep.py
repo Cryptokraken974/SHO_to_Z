@@ -88,7 +88,7 @@ class USGS3DEPSource(BaseDataSource):
         total_size = bbox_area * size_per_km2
         return min(total_size, request.max_file_size_mb)
     
-    async def download(self, request: DownloadRequest) -> DownloadResult:
+    async def download(self, request: DownloadRequest, progress_callback=None) -> DownloadResult:
         """Download USGS 3DEP data."""
         try:
             if not await self.check_availability(request):
@@ -97,14 +97,41 @@ class USGS3DEPSource(BaseDataSource):
                     error_message="USGS 3DEP data not available for this location (US only)"
                 )
             
+            # Send initial progress update
+            if progress_callback:
+                await progress_callback({
+                    "type": "download_started",
+                    "provider": "USGS 3DEP",
+                    "message": "Starting USGS 3DEP data preparation..."
+                })
+            
             # For now, return a note about manual download
             # In a real implementation, this would query USGS APIs
             
             # Create input folder with descriptive name
             input_folder = self._create_input_folder(request)
             
+            # Progress update for file generation
+            if progress_callback:
+                await progress_callback({
+                    "type": "download_progress",
+                    "message": "Generating download instructions...",
+                    "progress": 50
+                })
+            
             # Create information file about where to get the real data
             info_file = self._create_info_file(input_folder, request)
+            
+            # Brief pause to simulate processing
+            await asyncio.sleep(0.5)
+            
+            # Final progress update
+            if progress_callback:
+                await progress_callback({
+                    "type": "download_completed",
+                    "message": "Download instructions file created",
+                    "progress": 100
+                })
             
             return DownloadResult(
                 success=True,
@@ -124,6 +151,11 @@ class USGS3DEPSource(BaseDataSource):
             )
                     
         except Exception as e:
+            if progress_callback:
+                await progress_callback({
+                    "type": "download_error",
+                    "message": f"USGS 3DEP error: {str(e)}"
+                })
             return DownloadResult(
                 success=False,
                 error_message=f"USGS 3DEP download failed: {str(e)}"
@@ -131,21 +163,24 @@ class USGS3DEPSource(BaseDataSource):
     
     def _create_input_folder(self, request: DownloadRequest) -> Path:
         """Create descriptive folder in input directory."""
-        center_lat = (request.bbox.north + request.bbox.south) / 2
-        center_lng = (request.bbox.east + request.bbox.west) / 2
-        
-        # Determine location name based on coordinates
-        if -125 < center_lng < -120 and 45 < center_lat < 49:
-            region = "PacificNorthwest"
-        elif -125 < center_lng < -110 and 30 < center_lat < 50:
-            region = "USA_West"
-        elif -100 < center_lng < -80 and 30 < center_lat < 50:
-            region = "USA_East"
+        if request.region_name:
+            base_folder_name = request.region_name
         else:
-            region = "USA"
+            center_lat = (request.bbox.north + request.bbox.south) / 2
+            center_lng = (request.bbox.east + request.bbox.west) / 2
+            # Determine location name based on coordinates
+            if -125 < center_lng < -120 and 45 < center_lat < 49:
+                region_prefix = "PacificNorthwest"
+            elif -125 < center_lng < -110 and 30 < center_lat < 50:
+                region_prefix = "USA_West"
+            elif -100 < center_lng < -80 and 30 < center_lat < 50:
+                region_prefix = "USA_East"
+            else:
+                region_prefix = "USA"
+            base_folder_name = f"{region_prefix}_{center_lat:.3f}_{center_lng:.3f}"
         
-        data_type = "laz" if request.data_type == DataType.LAZ else "elevation"
-        folder_name = f"USGS_3DEP_{region}_{center_lat:.3f}_{center_lng:.3f}_{data_type}"
+        data_type_suffix = "laz" if request.data_type == DataType.LAZ else "elevation"
+        folder_name = f"USGS_3DEP_{base_folder_name}_{data_type_suffix}"
         
         input_folder = Path("input") / folder_name
         input_folder.mkdir(parents=True, exist_ok=True)
@@ -153,15 +188,20 @@ class USGS3DEPSource(BaseDataSource):
     
     def _create_info_file(self, input_folder: Path, request: DownloadRequest) -> Path:
         """Create information file with download instructions."""
-        center_lat = (request.bbox.north + request.bbox.south) / 2
-        center_lng = (request.bbox.east + request.bbox.west) / 2
-        
-        info_file = input_folder / "USGS_3DEP_download_instructions.txt"
+        info_file_name = "USGS_3DEP_download_instructions.txt"
+        if request.region_name:
+            info_file_name = f"{request.region_name}_USGS_3DEP_download_instructions.txt"
+            
+        info_file = input_folder / info_file_name
         
         with open(info_file, 'w') as f:
             f.write("# USGS 3D Elevation Program (3DEP) Data Download Instructions\n")
             f.write("#" + "="*60 + "\n\n")
             f.write("LOCATION INFORMATION:\n")
+            if request.region_name:
+                f.write(f"  Region Name: {request.region_name}\n")
+            center_lat = (request.bbox.north + request.bbox.south) / 2
+            center_lng = (request.bbox.east + request.bbox.west) / 2
             f.write(f"  Center Coordinates: {center_lat:.6f}, {center_lng:.6f}\n")
             f.write(f"  Bounding Box: {request.bbox.west:.6f}, {request.bbox.south:.6f}, {request.bbox.east:.6f}, {request.bbox.north:.6f}\n")
             f.write(f"  Data Type: {request.data_type.value}\n")

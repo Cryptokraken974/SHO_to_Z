@@ -203,7 +203,7 @@ class DataAcquisitionManager:
         return availability
     
     async def acquire_data_for_coordinates(self, lat: float, lng: float, buffer_km: float = 1.0, 
-                                   data_sources: Optional[List[str]] = None) -> AcquisitionResult:
+                                   data_sources: Optional[List[str]] = None, progress_callback=None) -> AcquisitionResult:
         """
         Acquire data for a specific coordinate location
         
@@ -212,6 +212,7 @@ class DataAcquisitionManager:
             lng: Longitude in decimal degrees
             buffer_km: Buffer distance in kilometers around the point
             data_sources: List of preferred data sources, if None uses default hierarchy
+            progress_callback: Optional callback for progress updates
             
         Returns:
             AcquisitionResult with information about acquired data
@@ -245,12 +246,28 @@ class DataAcquisitionManager:
                 # Default priority order - prioritize USGS 3DEP for LAZ data
                 data_sources = ['usgs_3dep', 'opentopography', 'sentinel2', 'ornl_daac']
             
+            if progress_callback:
+                await progress_callback({
+                    "type": "acquisition_started",
+                    "message": f"Starting data acquisition for coordinates {lat}, {lng}",
+                    "coordinates": {"lat": lat, "lng": lng},
+                    "sources": data_sources
+                })
+            
             # Try each source in order of preference
             for source_name in data_sources:
                 if source_name in self.sources:
                     try:
                         logger.info(f"Attempting data acquisition from {source_name}")
-                        source_result = await self._acquire_from_source(source_name, roi)
+                        
+                        if progress_callback:
+                            await progress_callback({
+                                "type": "trying_source",
+                                "message": f"Trying data source: {source_name}",
+                                "source": source_name
+                            })
+                        
+                        source_result = await self._acquire_from_source(source_name, roi, progress_callback)
                         
                         if source_result['success']:
                             result.success = True
@@ -264,6 +281,14 @@ class DataAcquisitionManager:
                         error_msg = f"Error with {source_name}: {str(e)}"
                         result.errors.append(error_msg)
                         logger.error(error_msg)
+                        
+                        if progress_callback:
+                            await progress_callback({
+                                "type": "source_error",
+                                "message": error_msg,
+                                "source": source_name,
+                                "error": str(e)
+                            })
                         continue
             
             # Calculate processing time
@@ -272,20 +297,45 @@ class DataAcquisitionManager:
             
             if not result.success:
                 result.errors.append("No data sources were able to provide data for this location")
+                
+                if progress_callback:
+                    await progress_callback({
+                        "type": "acquisition_failed",
+                        "message": "All data sources failed to provide data",
+                        "errors": result.errors
+                    })
+            else:
+                if progress_callback:
+                    await progress_callback({
+                        "type": "acquisition_success",
+                        "message": f"Data acquisition completed successfully using {result.source_used}",
+                        "source": result.source_used,
+                        "files": result.files,
+                        "size_mb": result.download_size_mb,
+                        "time_seconds": result.processing_time_seconds
+                    })
             
         except Exception as e:
             result.errors.append(f"Unexpected error: {str(e)}")
             logger.error(f"Unexpected error in acquire_data_for_coordinates: {e}")
+            
+            if progress_callback:
+                await progress_callback({
+                    "type": "unexpected_error",
+                    "message": f"Unexpected error: {str(e)}",
+                    "error": str(e)
+                })
         
         return result
     
-    async def _acquire_from_source(self, source_name: str, roi: RegionOfInterest) -> Dict[str, Any]:
+    async def _acquire_from_source(self, source_name: str, roi: RegionOfInterest, progress_callback=None) -> Dict[str, Any]:
         """
         Acquire data from a specific source
         
         Args:
             source_name: Name of the data source
             roi: Region of interest
+            progress_callback: Optional callback for progress updates
             
         Returns:
             Dictionary with acquisition results
@@ -300,6 +350,13 @@ class DataAcquisitionManager:
         
         if cached_result:
             logger.info(f"Using cached data for {source_name}")
+            if progress_callback:
+                await progress_callback({
+                    "type": "cache_hit",
+                    "message": f"Using cached data from {source_name}",
+                    "source": source_name,
+                    "progress": 100
+                })
             return cached_result
         
         # Create bounding box from ROI
@@ -333,8 +390,8 @@ class DataAcquisitionManager:
             )
         
         try:
-            # Use the new source interface
-            download_result = await source.download(request)
+            # Use the new source interface with progress callback
+            download_result = await source.download(request, progress_callback=progress_callback)
             
             if download_result.success:
                 # Determine file type based on data type
@@ -354,8 +411,26 @@ class DataAcquisitionManager:
                 
                 # Cache the result
                 self.cache.put(cache_key, result)
+                
+                if progress_callback:
+                    await progress_callback({
+                        "type": "acquisition_completed",
+                        "message": f"Data acquisition completed from {source_name}",
+                        "source": source_name,
+                        "progress": 100,
+                        "file_size_mb": download_result.file_size_mb
+                    })
+                
                 return result
             else:
+                if progress_callback:
+                    await progress_callback({
+                        "type": "acquisition_error",
+                        "message": f"Download failed from {source_name}: {download_result.error_message}",
+                        "source": source_name,
+                        "error": download_result.error_message
+                    })
+                
                 return {
                     'success': False,
                     'error': download_result.error_message,
@@ -366,6 +441,15 @@ class DataAcquisitionManager:
                 
         except Exception as e:
             logger.error(f"Error acquiring data from {source_name}: {e}")
+            
+            if progress_callback:
+                await progress_callback({
+                    "type": "acquisition_error",
+                    "message": f"Error acquiring data from {source_name}: {str(e)}",
+                    "source": source_name,
+                    "error": str(e)
+                })
+            
             return {
                 'success': False,
                 'error': str(e),

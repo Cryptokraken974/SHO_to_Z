@@ -13,7 +13,15 @@
   <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
   <link rel="stylesheet" href="/static/styles.css" />
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="/static/app.js"></script>
+  <!-- Modular JavaScript files - load in dependency order -->
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/websocket.js"></script>
+  <script src="/static/js/map.js"></script>
+  <script src="/static/js/fileManager.js"></script>
+  <script src="/static/js/overlays.js"></script>
+  <script src="/static/js/processing.js"></script>
+  <script src="/static/js/ui.js"></script>
+  <script src="/static/js/app_new.js"></script>
 </head>
 <body class="bg-[#141414] text-white" style='font-family: Inter, "Noto Sans", sans-serif;'>
   <div class="flex flex-col h-screen overflow-hidden">
@@ -44,16 +52,18 @@
     <div id="sidebar" class="bg-[#1a1a1a] border-r border-[#303030] w-64 p-6 flex flex-col overflow-y-auto">
       <!-- LAZ File Selection Section -->
       <div class="accordion-section mb-6">
-        <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="laz-accordion">
+        <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="region-accordion">
           <h3 class="text-white font-semibold flex justify-between items-center m-0">
-            Select LAZ File
+            Select Region
             <span class="accordion-arrow text-sm transition-transform">▼</span>
           </h3>
         </div>
-        <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="laz-content">
-          <div class="selected-file flex items-center gap-3">
-            <span id="selected-file-name" class="text-[#666] text-sm flex-1 min-w-0 break-all">No file selected</span>
-            <button id="browse-files" class="browse-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-3 py-1 rounded text-sm font-medium transition-colors">Browse...</button>
+        <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="region-content">
+          <div class="selected-file space-y-2">
+            <div id="selected-region-name" class="text-[#666] text-sm">No region selected</div>
+            <button id="browse-regions-btn" class="bg-[#007bff] hover:bg-[#0056b3] text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-150 ease-in-out w-full text-sm tooltip" data-tooltip="Browse and select a region to process or visualize">
+              Select Region
+            </button>
           </div>
         </div>
       </div>
@@ -83,14 +93,17 @@
               </div>
             </div>
             
-            <!-- Download Button -->
-            <button id="download-laz-btn" class="w-full bg-[#28a745] hover:bg-[#218838] text-white px-4 py-3 rounded-lg font-medium transition-colors">📥 Download Data</button>
-            
-            <!-- Test Data Button -->
-            <button id="test-data-btn" class="w-full bg-[#007bff] hover:bg-[#0056b3] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2">🌍 Test: Portland LiDAR Area</button>
+            <!-- Region Name Field -->
+            <div class="mt-2">
+              <label for="region-name-input" class="block text-xs text-[#ababab] mb-1">Region Name</label>
+              <input type="text" id="region-name-input" placeholder="Auto-generated from coordinates" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm placeholder-[#666] focus:outline-none focus:border-[#00bfff] font-mono">
+            </div>
             
             <!-- Sentinel-2 Test Button -->
             <button id="test-sentinel2-btn" class="w-full bg-[#dc3545] hover:bg-[#c82333] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2">🛰️ Test: Sentinel-2 Images</button>
+            
+            <!-- Get LIDAR Data Button -->
+            <button id="get-lidar-btn" class="w-full bg-[#6c5ce7] hover:bg-[#5a4fcf] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2">📡 Get LIDAR Data</button>
           </div>
         </div>
       </div>
@@ -266,8 +279,8 @@
       <!-- Downloaded Satellite Images -->
       <div class="mb-4">
         <h2 class="text-white text-lg font-semibold mb-4">Downloaded Satellite Images</h2>
-        <div id="image-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <!-- Downloaded images will be displayed here -->
+        <div id="satellite-gallery" class="flex gap-4 overflow-x-auto pb-4">
+          <!-- Downloaded satellite images will be displayed here -->
         </div>
       </div>
     </div>
@@ -287,46 +300,44 @@
   </div>
 
   <!-- Modal for file selection with modern design -->
-  <div id="file-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-    <div class="modal-content bg-[#1a1a1a] border border-[#303030] rounded-lg w-[90%] max-w-2xl">
-      <div class="modal-header flex justify-between items-center p-6 border-b border-[#303030]">
-        <h4 class="text-white text-lg font-semibold m-0">Select LAZ File</h4>
-        <span class="close text-[#ababab] hover:text-white text-2xl cursor-pointer">&times;</span>
+  <div id="file-modal" class="modal fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center hidden z-50">
+    <div class="modal-content bg-[#2c2c2c] p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+      <div class="flex justify-between items-center mb-4">
+        <h4 class="text-white text-lg font-semibold m-0">Select Region</h4>
+        <button class="modal-close text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
       </div>
-      <div class="modal-body p-6">
-        <div class="file-search mb-4">
-          <input type="text" id="file-search-input" placeholder="Search files..." class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-[#ababab] focus:outline-none focus:border-[#00bfff]">
-        </div>
-        <div class="file-list max-h-80 overflow-y-auto bg-[#262626] rounded-lg border border-[#404040]" id="file-list">
-          <!-- Files will be populated here -->
-        </div>
+      <div class="mb-4">
+        <input type="text" id="file-search-input" placeholder="Search files..." class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-[#ababab] focus:outline-none focus:border-[#00bfff]">
       </div>
-      <div class="modal-footer flex justify-end gap-3 p-6 border-t border-[#303030]">
+      <div class="file-list max-h-[400px] overflow-y-auto" id="file-list">
+        <!-- Files will be populated here -->
+      </div>
+      <div class="flex justify-end gap-3 mt-4">
         <button id="cancel-select" class="cancel-btn bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
-        <button id="select-file" class="select-btn bg-[#28a745] hover:bg-[#218838] text-white px-4 py-2 rounded-lg font-medium transition-colors">Select</button>
+        <button id="confirm-region-selection" class="px-6 py-2.5 bg-[#007bff] hover:bg-[#0056b3] text-white rounded-lg font-medium transition-colors">Select Region</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal for Download LAZ Files -->
-  <div id="download-laz-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-    <div class="modal-content bg-[#1a1a1a] border border-[#303030] rounded-lg w-[90%] max-w-3xl">
+  <!-- Progress Modal -->
+  <div id="progress-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="modal-content bg-[#1a1a1a] border border-[#303030] rounded-lg w-[90%] max-w-md">
       <div class="modal-header flex justify-between items-center p-6 border-b border-[#303030]">
-        <h4 class="text-white text-lg font-semibold m-0">Download LAZ Files</h4>
-        <span class="close-download text-[#ababab] hover:text-white text-2xl cursor-pointer">&times;</span>
+        <h3 class="text-white text-lg font-semibold" id="progress-title">Processing...</h3>
+        <button class="close text-[#ababab] hover:text-white text-xl font-bold" id="progress-close">&times;</button>
       </div>
       <div class="modal-body p-6">
-        <div class="mb-4">
-          <p class="text-[#ababab] text-sm mb-4">Download high-quality LAZ files for terrain processing. Select from available datasets:</p>
+        <div class="text-white mb-4" id="progress-status">Initializing...</div>
+        <div class="w-full bg-[#303030] rounded-full h-2 mb-4">
+          <div class="bg-[#00bfff] h-2 rounded-full transition-all duration-300" id="progress-bar" style="width: 0%"></div>
         </div>
-        <div id="download-laz-list" class="space-y-3">
-          <!-- LAZ download options will be populated here -->
-        </div>
+        <div class="text-[#ababab] text-sm" id="progress-details"></div>
       </div>
       <div class="modal-footer flex justify-end gap-3 p-6 border-t border-[#303030]">
-        <button id="cancel-download" class="cancel-btn bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
+        <button id="cancel-progress" class="cancel-btn bg-[#dc3545] hover:bg-[#c82333] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
       </div>
     </div>
   </div>
+
 </body>
 </html>

@@ -1,0 +1,20 @@
+{
+  "entries": {
+    "cffa8ea0346664dab226b278159a8776": {
+      "original_key": "usgs_3dep_45.5152_-122.6784_1.0",
+      "created": "2025-06-01T11:55:28.069842",
+      "last_accessed": "2025-06-01T11:55:28.069850",
+      "file_size": 334,
+      "metadata": {}
+    },
+    "6a3e3850f5a0dbfa6e75211a39487a06": {
+      "original_key": "opentopography_45.5152_-122.6784_1.0",
+      "created": "2025-06-01T11:58:04.068956",
+      "last_accessed": "2025-06-01T11:58:04.068959",
+      "file_size": 367,
+      "metadata": {}
+    }
+  },
+  "created": "2025-06-01T11:55:03.159945",
+  "last_cleanup": "2025-06-01T11:55:03.159952"
+}
