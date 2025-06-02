@@ -447,13 +447,16 @@ class OpenTopographySource(BaseDataSource):
     
     def _create_input_folder(self, request: DownloadRequest) -> Path:
         """Create descriptive folder in input directory."""
-        center_lat = (request.bbox.north + request.bbox.south) / 2
-        center_lng = (request.bbox.east + request.bbox.west) / 2
-        
-        if request.data_type == DataType.LAZ:
-            folder_name = f"lidar_{center_lat:.2f}S_{abs(center_lng):.2f}W"
+        if request.region_name:
+            folder_name = request.region_name
         else:
-            folder_name = f"elevation_{center_lat:.2f}S_{abs(center_lng):.2f}W"
+            center_lat = (request.bbox.north + request.bbox.south) / 2
+            center_lng = (request.bbox.east + request.bbox.west) / 2
+            
+            if request.data_type == DataType.LAZ:
+                folder_name = f"lidar_{center_lat:.2f}S_{abs(center_lng):.2f}W"
+            else:
+                folder_name = f"elevation_{center_lat:.2f}S_{abs(center_lng):.2f}W"
         
         input_folder = Path("input") / folder_name
         input_folder.mkdir(parents=True, exist_ok=True)
@@ -463,19 +466,23 @@ class OpenTopographySource(BaseDataSource):
         """Copy file from cache to input folder with descriptive name."""
         import shutil
         
-        center_lat = (request.bbox.north + request.bbox.south) / 2
-        center_lng = (request.bbox.east + request.bbox.west) / 2
+        if request.region_name:
+            base_file_name = request.region_name
+        else:
+            center_lat = (request.bbox.north + request.bbox.south) / 2
+            center_lng = (request.bbox.east + request.bbox.west) / 2
+            base_file_name = f"{center_lat:.2f}S_{abs(center_lng):.2f}W"
         
         if request.data_type == DataType.LAZ:
-            filename = f"lidar_{center_lat:.2f}S_{abs(center_lng):.2f}W_lidar.laz"
+            filename = f"{base_file_name}_lidar.laz"
         else:
-            filename = f"elevation_{center_lat:.2f}S_{abs(center_lng):.2f}W_dtm.tif"
+            filename = f"{base_file_name}_dtm.tif"
         
         input_file_path = input_folder / filename
         shutil.copy2(cache_path, input_file_path)
         
         # Create metadata file
-        metadata_path = input_folder / f"metadata_{center_lat:.2f}S_{abs(center_lng):.2f}W.txt"
+        metadata_path = input_folder / f"metadata_{base_file_name}.txt"
         with open(metadata_path, 'w') as f:
             f.write(f"# OpenTopography 3DEP Data\n")
             f.write(f"# Data Type: {'LIDAR Point Cloud' if request.data_type == DataType.LAZ else 'Elevation DTM'}\n")

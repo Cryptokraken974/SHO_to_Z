@@ -316,7 +316,7 @@ class CopernicusSentinel2Source(BaseDataSource):
             
             # Send progress update
             if self.progress_callback:
-                await self.progress_callback({"message": "Searching for Sentinel-2 scenes...", "type": "download_start", "band": "Sentinel-2"})
+                await self.progress_callback({"message": "Searching for Sentinel-2 scenes...", "type": "download_start", "band": "Sentinel2"})
             
             session = await self._get_session()
             
@@ -329,8 +329,8 @@ class CopernicusSentinel2Source(BaseDataSource):
                 )
             
             if self.progress_callback:
-                await self.progress_callback({"message": f"Found scene: {product_id}", "type": "download_info", "band": "Sentinel-2"})
-                await self.progress_callback({"message": "Starting download...", "type": "download_start", "band": "Sentinel-2"})
+                await self.progress_callback({"message": f"Found scene: {product_id}", "type": "download_info", "band": "Sentinel2"})
+                await self.progress_callback({"message": "Starting download...", "type": "download_start", "band": "Sentinel2"})
             
             # Download the data
             file_path = await self._download_processed_data(request, product_id, metadata, session)
@@ -445,7 +445,7 @@ class CopernicusSentinel2Source(BaseDataSource):
                                 "acquisition_date": properties.get("datetime", ""),
                                 "cloud_cover": properties.get("eo:cloud_cover", properties.get("cloudCover", 0)),
                                 "region_name": self._generate_region_name(bbox, properties.get("datetime", "")),
-                                "platform": properties.get("platform", "Sentinel-2"),
+                                "platform": properties.get("platform", "Sentinel2"),
                                 "processing_level": "L2A",  # We're requesting L2A data with DN units
                                 "bbox": bbox,
                                 "geometry": geometry
@@ -504,7 +504,11 @@ class CopernicusSentinel2Source(BaseDataSource):
             # Create input folder following the standard structure: input/<region_name>/
             input_folder_path = Path("input") / region_name
             input_folder_path.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Created input folder: {input_folder_path}")
+            
+            # Create sentinel2 subfolder within the input folder
+            sentinel2_folder = input_folder_path / "sentinel2"
+            sentinel2_folder.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Created Sentinel-2 subfolder: {sentinel2_folder}")
 
             # Use acquisition date from metadata for filename, or current date as fallback
             date_str = metadata.get('acquisition_date')
@@ -519,9 +523,9 @@ class CopernicusSentinel2Source(BaseDataSource):
             
             filename = f"{region_name}_{date_str}_sentinel2.tif"
             
-            # Save to input/<region_name>/ following the standard folder structure
+            # Save to input/<region_name>/sentinel2/ following the standard folder structure
             # The raw downloaded TIF will be saved in input, then conversion will process to output
-            output_dir = input_folder_path
+            output_dir = sentinel2_folder
             output_path = output_dir / filename
 
             # Check if file already exists (cache hit)
@@ -612,18 +616,18 @@ class CopernicusSentinel2Source(BaseDataSource):
                     error_text = await response.text()
                     logger.error(f"Processing API error: {response.status} - {error_text}")
                     if self.progress_callback:
-                        await self.progress_callback({"message": f"Processing failed: {response.status}", "type": "download_error", "band": "Sentinel-2"})
+                        await self.progress_callback({"message": f"Processing failed: {response.status}", "type": "download_error", "band": "Sentinel2"})
                     return None
                     
         except asyncio.CancelledError:
             logger.info("Download cancelled")
             if self.progress_callback:
-                await self.progress_callback({"message": "Download cancelled", "type": "download_error", "band": "Sentinel-2"})
+                await self.progress_callback({"message": "Download cancelled", "type": "download_error", "band": "Sentinel2"})
             raise
         except Exception as e:
             logger.error(f"Download error: {e}")
             if self.progress_callback:
-                await self.progress_callback({"message": f"Download error: {str(e)}", "type": "download_error", "band": "Sentinel-2"})
+                await self.progress_callback({"message": f"Download error: {str(e)}", "type": "download_error", "band": "Sentinel2"})
             return None
     
     def _generate_region_name(self, bbox: List[float], datetime_str: str) -> str:

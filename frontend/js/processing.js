@@ -11,9 +11,12 @@ window.ProcessingManager = {
    * @param {Object} options - Additional processing options
    */
   async sendProcess(processingType, options = {}) {
-    const selectedFile = FileManager.getSelectedFile();
-    if (!selectedFile) {
-      Utils.showNotification('Please select a LAZ file first', 'warning');
+    // Check for region-based processing first, then fall back to LAZ file processing
+    const selectedRegion = FileManager.getSelectedRegion();
+    const selectedFile = typeof FileManager.getSelectedFile === 'function' ? FileManager.getSelectedFile() : null;
+    
+    if (!selectedRegion && !selectedFile) {
+      Utils.showNotification('Please select a region or LAZ file first', 'warning');
       return false;
     }
 
@@ -27,13 +30,26 @@ window.ProcessingManager = {
       this.activeProcesses.add(processingType);
       this.updateProcessingUI(processingType, 'processing');
 
-      // Prepare request data
-      const requestData = {
-        input_file: selectedFile,
-        ...options
-      };
-
-      Utils.log('info', `Starting ${processingType} processing`, requestData);
+      // Prepare request data based on whether we have a region or individual file
+      let requestData;
+      
+      if (selectedRegion) {
+        // Region-based processing: find the LAZ file(s) within the region
+        // The backend will automatically find LAZ files in input/{region}/lidar/ directory
+        requestData = {
+          region_name: selectedRegion,
+          processing_type: processingType,
+          ...options
+        };
+        Utils.log('info', `Starting ${processingType} processing for region: ${selectedRegion}`, requestData);
+      } else {
+        // Individual LAZ file processing (legacy support)
+        requestData = {
+          input_file: selectedFile,
+          ...options
+        };
+        Utils.log('info', `Starting ${processingType} processing for file: ${selectedFile}`, requestData);
+      }
 
       // Send processing request
       const response = await fetch(`/api/${processingType}`, {
@@ -78,6 +94,19 @@ window.ProcessingManager = {
     // Show success notification
     Utils.showNotification(`${processingType} processing completed successfully`, 'success');
     
+    // Display PNG image in gallery cell automatically
+    this.displayProcessingResultImage(processingType);
+    
+    // Also refresh Sentinel-2 images for the region if we're doing region-based processing
+    const selectedRegion = FileManager.getSelectedRegion();
+    if (selectedRegion) {
+      Utils.log('info', `Refreshing Sentinel-2 images for region: ${selectedRegion}`);
+      // Use setTimeout to allow the raster image to display first
+      setTimeout(() => {
+        UIManager.displaySentinel2ImagesForRegion(selectedRegion);
+      }, 100);
+    }
+    
     // Show Add to Map button
     OverlayManager.showAddToMapButton(processingType);
     
@@ -87,6 +116,124 @@ window.ProcessingManager = {
         OverlayManager.addProcessingOverlay(processingType);
       }, 500);
     }
+  },
+
+  /**
+   * Display generated PNG image in the corresponding gallery cell
+   * @param {string} processingType - Type of processing (dtm, hillshade, slope, etc.)
+   */
+  async displayProcessingResultImage(processingType) {
+    // Check if we're processing a region or a LAZ file
+    const selectedRegion = FileManager.getSelectedRegion();
+    const selectedFile = typeof FileManager.getSelectedFile === 'function' ? FileManager.getSelectedFile() : null;
+    
+    if (!selectedRegion && !selectedFile) {
+      Utils.log('warn', 'No selected region or file for image display');
+      return;
+    }
+
+    try {
+      let response;
+      let displayIdentifier;
+
+      if (selectedRegion) {
+        // Region-based processing: use the new raster API endpoint
+        displayIdentifier = selectedRegion;
+        response = await fetch(`/api/overlay/raster/${selectedRegion}/${processingType}`);
+      } else {
+        // LAZ file-based processing: use the original overlay API
+        displayIdentifier = selectedFile.replace(/\.[^/.]+$/, "");
+        response = await fetch(`/api/overlay/${processingType}/${displayIdentifier}`);
+      }
+
+      
+      if (!response.ok) {
+        Utils.log('warn', `No PNG data available for ${processingType}: ${response.status}`);
+        return;
+      }
+
+      const overlayData = await response.json();
+      
+      if (!overlayData || !overlayData.image_data) {
+        Utils.log('warn', `No image data in overlay response for ${processingType}`);
+        return;
+      }
+
+      // Find the corresponding gallery cell
+      const cellId = `cell-${processingType}`;
+      const cell = $(`#${cellId}`);
+      
+      if (!cell.length) {
+        Utils.log('warn', `Gallery cell not found: ${cellId}`);
+        return;
+      }
+
+      // Create base64 data URL for the image
+      const imageDataUrl = `data:image/png;base64,${overlayData.image_data}`;
+      
+      // Get the processing type display name
+      const displayName = this.getProcessingDisplayName(processingType);
+      
+      // Update the cell content to show the image
+      const cellContent = cell.find('.flex-1');
+      cellContent.html(`
+        <div class="relative w-full h-full">
+          <img src="${imageDataUrl}" 
+               alt="${displayName}" 
+               class="processing-result-image cursor-pointer"
+               title="Click to view larger image">
+          <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+            ${displayName}
+          </div>
+          <div class="absolute top-2 right-2 bg-green-600 bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+            ✓ Ready
+          </div>
+        </div>
+      `);
+
+      // Add click handler to show larger image
+      cellContent.find('img').on('click', () => {
+        UIManager.showImageModal(imageDataUrl, `${displayName} - ${displayIdentifier}`);
+      });
+
+      // Show the "Add to Map" button for this processing type
+      const addToMapBtn = cell.find('.add-to-map-btn');
+      if (addToMapBtn.length) {
+        addToMapBtn.removeClass('hidden').show();
+        Utils.log('info', `Showing Add to Map button for ${processingType}`);
+      }
+
+      Utils.log('info', `Successfully displayed ${processingType} image in gallery cell for ${selectedRegion ? 'region' : 'file'}: ${displayIdentifier}`);
+
+    } catch (error) {
+      Utils.log('error', `Error displaying ${processingType} image:`, error);
+      // Don't show error notification as this is a nice-to-have feature
+    }
+  },
+
+  /**
+   * Get display name for processing type
+   * @param {string} processingType - Processing type
+   * @returns {string} Display name
+   */
+  getProcessingDisplayName(processingType) {
+    const displayNames = {
+      'laz_to_dem': 'DEM',
+      'dtm': 'DTM',
+      'dsm': 'DSM',
+      'chm': 'CHM',
+      'hillshade': 'Hillshade',
+      'hillshade_315_45_08': 'Hillshade 315°',
+      'hillshade_225_45_08': 'Hillshade 225°',
+      'slope': 'Slope',
+      'aspect': 'Aspect',
+      'color_relief': 'Color Relief',
+      'tri': 'TRI',
+      'tpi': 'TPI',
+      'roughness': 'Roughness'
+    };
+    
+    return displayNames[processingType] || processingType.charAt(0).toUpperCase() + processingType.slice(1);
   },
 
   /**

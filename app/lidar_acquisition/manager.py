@@ -6,11 +6,12 @@ Coordinates LIDAR data acquisition from multiple providers.
 
 import os
 import asyncio
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any, Callable
 from pathlib import Path
 
 from .providers import get_provider, get_available_providers
 from ..config import get_settings
+from ..processing.raster_generation import RasterGenerator
 
 
 class LidarAcquisitionManager:
@@ -22,16 +23,24 @@ class LidarAcquisitionManager:
     - Download coordination and progress tracking
     - File format conversion and standardization
     - Caching and duplicate detection
+    - Raster product generation from elevation data
     """
     
-    def __init__(self, cache_dir: str = None, output_dir: str = None):
+    def __init__(self, cache_dir: str = None, output_dir: str = None, 
+                 generate_rasters: bool = True, raster_dir: str = None):
         self.settings = get_settings()
         self.cache_dir = Path(cache_dir or self.settings.cache_dir)
         self.output_dir = Path(output_dir or self.settings.output_dir)
         
+        # Raster generation settings
+        self.generate_rasters = generate_rasters
+        self.raster_dir = Path(raster_dir or self.output_dir / "raster_products")
+        
         # Ensure directories exist
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        if self.generate_rasters:
+            self.raster_dir.mkdir(parents=True, exist_ok=True)
         
         # Track active downloads
         self.active_downloads: Dict[str, asyncio.Task] = {}
@@ -112,6 +121,27 @@ class LidarAcquisitionManager:
                 region_name,
                 progress_callback
             )
+            
+            # Generate raster products if enabled
+            if self.generate_rasters:
+                raster_result = await self._generate_raster_products(
+                    processed_result,
+                    region_name,
+                    progress_callback
+                )
+                
+                # Add raster information to the result
+                if raster_result and raster_result.get("success", False):
+                    processed_result["raster_products"] = raster_result
+                    
+                    if progress_callback:
+                        await progress_callback({
+                            "type": "raster_generation_completed",
+                            "message": f"Raster generation completed for {region_name}",
+                            "region": region_name,
+                            "success": True,
+                            "raster_products": raster_result
+                        })
             
             # Cache the results
             await self._cache_results(region_name, processed_result)
@@ -271,6 +301,118 @@ class LidarAcquisitionManager:
             })
         
         return processed_result
+    
+    async def _generate_raster_products(
+        self,
+        lidar_result: Dict,
+        region_name: str,
+        progress_callback: Optional[Callable] = None
+    ) -> Dict:
+        """
+        Generate raster products from elevation data.
+        
+        This method:
+        1. Finds elevation TIFF files in the processed LiDAR data
+        2. Generates various raster products (hillshade, slope, aspect, etc.)
+        3. Organizes outputs in a structured directory
+        4. Returns metadata about the generated products
+        
+        Args:
+            lidar_result: Dictionary with LiDAR processing results
+            region_name: Name of the region
+            progress_callback: Optional callback for progress updates
+            
+        Returns:
+            Dictionary with raster generation results
+        """
+        if progress_callback:
+            await progress_callback({
+                "type": "raster_generation_started",
+                "message": f"Starting raster generation for {region_name}",
+                "region": region_name
+            })
+        
+        try:
+            # Create output directory for raster products
+            region_raster_dir = self.raster_dir / region_name
+            region_raster_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Initialize raster generator
+            raster_generator = RasterGenerator(output_base_dir=str(region_raster_dir))
+            
+            # Get the directory where LiDAR files are located
+            lidar_files = lidar_result.get("files", [])
+            
+            if not lidar_files:
+                if progress_callback:
+                    await progress_callback({
+                        "type": "raster_generation_error",
+                        "message": f"No LiDAR files found for {region_name}",
+                        "region": region_name
+                    })
+                return {
+                    "success": False,
+                    "message": f"No LiDAR files found for {region_name}",
+                    "region": region_name
+                }
+            
+            # Determine the directory containing the LiDAR files
+            lidar_dir = os.path.dirname(lidar_files[0]) if lidar_files else str(self.output_dir / region_name)
+            
+            # Find and process elevation TIFFs
+            result = await raster_generator.find_and_process_elevation_tiffs(
+                input_path=lidar_dir,
+                progress_callback=progress_callback,
+                region_name=region_name
+            )
+            
+            if not result.get("success", False):
+                if progress_callback:
+                    await progress_callback({
+                        "type": "raster_generation_warning",
+                        "message": f"No elevation TIFFs found or processing failed for {region_name}",
+                        "region": region_name,
+                        "details": result.get("message", "Unknown error")
+                    })
+                    
+                # If no elevation TIFFs were found, try to search the output directory
+                output_result = await raster_generator.find_and_process_elevation_tiffs(
+                    input_path=str(self.output_dir),
+                    progress_callback=progress_callback,
+                    region_name=region_name
+                )
+                
+                if output_result.get("success", False):
+                    result = output_result
+                
+            return {
+                "success": result.get("success", False),
+                "message": result.get("message", ""),
+                "region": region_name,
+                "raster_dir": str(region_raster_dir),
+                "files_processed": result.get("files_processed", 0),
+                "successful_count": result.get("successful_count", 0),
+                "failed_count": result.get("failed_count", 0),
+                "details": result.get("results", [])
+            }
+            
+        except Exception as e:
+            error_msg = f"Error generating raster products for {region_name}: {str(e)}"
+            
+            if progress_callback:
+                await progress_callback({
+                    "type": "raster_generation_error",
+                    "message": error_msg,
+                    "region": region_name,
+                    "error": str(e)
+                })
+            
+            return {
+                "success": False,
+                "message": error_msg,
+                "region": region_name,
+                "error": str(e)
+            }
     
     async def _cache_results(self, region_name: str, result: Dict):
         """Cache the acquisition results for future use."""

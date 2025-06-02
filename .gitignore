@@ -1,6 +1,19 @@
 #SHO
 output/
 
+# Elevation data and configuration
+elevation_config.ini
+optimal_elevation_downloads/
+*.tif
+*.tiff
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.staging
+*.env
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

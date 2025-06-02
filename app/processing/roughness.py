@@ -3,6 +3,7 @@ import time
 import os
 import logging
 import subprocess
+from pathlib import Path
 from typing import Dict, Any
 from osgeo import gdal
 from .dtm import dtm
@@ -43,9 +44,15 @@ async def process_roughness(laz_file_path: str, output_dir: str, parameters: Dic
         # 3. Computing standard deviation of elevation
         # 4. Saving as GeoTIFF
         
-        # Generate output filename using new naming convention: <laz_filename_without_ext>_<processing_step>
-        laz_basename = os.path.splitext(os.path.basename(laz_file_path))[0]
-        output_filename = f"{laz_basename}_Roughness.tif"
+        # Extract region name from the file path structure
+        input_path = Path(laz_file_path)
+        if "lidar" in input_path.parts:
+            region_name = input_path.parts[input_path.parts.index("input") + 1]
+        else:
+            region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(laz_file_path))[0]
+        
+        # Generate output filename using new naming convention: <region_name>_<processing_step>
+        output_filename = f"{region_name}_Roughness.tif"
         output_file = os.path.join(output_dir, output_filename)
         
         # Simulate creating output file
@@ -98,15 +105,22 @@ def roughness(input_file: str) -> str:
     print(f"\n🌊 ROUGHNESS: Starting analysis for {input_file}")
     start_time = time.time()
     
-    # Extract the base name without path and extension
-    laz_basename = os.path.splitext(os.path.basename(input_file))[0]
+    # Extract region name from the file path structure
+    # Path structure: input/<region_name>/lidar/<filename> or input/<region_name>/<filename>
+    input_path = Path(input_file)
+    if "lidar" in input_path.parts:
+        # File is in lidar subfolder: extract parent's parent as region name
+        region_name = input_path.parts[input_path.parts.index("input") + 1]
+    else:
+        # File is directly in input folder: extract parent as region name
+        region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
     
-    # Create output directory structure: output/<laz_basename>/Roughness/
-    output_dir = os.path.join("output", laz_basename, "Roughness")
+    # Create output directory structure: output/<region_name>/Roughness/
+    output_dir = os.path.join("output", region_name, "Roughness")
     os.makedirs(output_dir, exist_ok=True)
     
-    # Generate output filename: <laz_basename>_roughness.tif
-    output_filename = f"{laz_basename}_roughness.tif"
+    # Generate output filename: <region_name>_roughness.tif
+    output_filename = f"{region_name}_roughness.tif"
     output_path = os.path.join(output_dir, output_filename)
     
     print(f"📂 Output directory: {output_dir}")

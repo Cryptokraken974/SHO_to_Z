@@ -3,6 +3,7 @@ import time
 import os
 import logging
 import subprocess
+from pathlib import Path
 from typing import Dict, Any
 from osgeo import gdal
 from .dtm import dtm
@@ -24,33 +25,95 @@ async def process_tri(laz_file_path: str, output_dir: str, parameters: Dict[str,
     start_time = time.time()
     
     try:
-        # Create output directory if it doesn't exist
-        os.makedirs(output_dir, exist_ok=True)
+        print(f"\n{'='*60}")
+        print(f"📊 TRI (TERRAIN RUGGEDNESS INDEX) PROCESSING")
+        print(f"{'='*60}")
+        print(f"📂 Input file: {laz_file_path}")
+        print(f"📁 Output directory: {output_dir}")
         
+        # Create output directory if it doesn't exist
+        print(f"📁 [FOLDER CREATION] Creating output directory if needed...")
+        print(f"   🔍 Checking if directory exists: {output_dir}")
+        
+        if os.path.exists(output_dir):
+            print(f"   ✅ Directory already exists: {output_dir}")
+        else:
+            print(f"   🆕 Directory doesn't exist, creating: {output_dir}")
+            
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"   ✅ [FOLDER CREATED] Output directory ready: {output_dir}")
+        logger.info(f"Output directory created/verified: {output_dir}")
+        
+        # Extract region name from file path for consistent naming
+        print(f"🔍 [REGION EXTRACTION] Extracting region name from file path...")
+        input_path = Path(laz_file_path)
+        print(f"   📂 Full input path: {input_path}")
+        print(f"   🧩 Path parts: {input_path.parts}")
+        
+        if "lidar" in input_path.parts:
+            region_name = input_path.parts[input_path.parts.index("input") + 1]
+            print(f"   🎯 Found 'lidar' in path, extracted region: {region_name}")
+        else:
+            region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(laz_file_path))[0]
+            print(f"   🎯 No 'lidar' in path, extracted region: {region_name}")
+            
+        print(f"   ✅ [REGION IDENTIFIED] Using region name: {region_name}")
+        
+        # Generate output filename using new naming convention
+        output_filename = f"{region_name}_TRI.tif"
+        output_file = os.path.join(output_dir, output_filename)
+        print(f"📄 [FILE CREATION] Creating output file: {output_file}")
+        print(f"   📝 Filename pattern: <region_name>_TRI.tif")
+        print(f"   🏷️ Generated filename: {output_filename}")
+
         # Check if input file exists
+        print(f"🔍 [FILE VALIDATION] Validating input file...")
         if not os.path.exists(laz_file_path):
-            raise FileNotFoundError(f"LAZ file not found: {laz_file_path}")
+            error_msg = f"LAZ file not found: {laz_file_path}"
+            print(f"❌ [VALIDATION ERROR] {error_msg}")
+            logger.error(error_msg)
+            raise FileNotFoundError(error_msg)
+        
+        file_size = os.path.getsize(laz_file_path)
+        print(f"✅ [FILE VALIDATED] Input file exists: {laz_file_path}")
+        print(f"📊 [FILE INFO] File size: {file_size:,} bytes ({file_size / (1024**2):.2f} MB)")
+        logger.info(f"Input file validated - Size: {file_size} bytes")
+        
+        print(f"⚙️ [PROCESSING CONFIG] TRI analysis parameters:")
+        print(f"   📏 Algorithm: Riley's Terrain Ruggedness Index")
+        print(f"   🧮 Method: Mean difference between cell and neighbors")
+        print(f"   📊 Output: Higher values = more rugged terrain")
         
         logger.info(f"Starting TRI processing for {laz_file_path}")
+        
+        print(f"🔄 [PROCESSING] Processing TRI Analysis (simulated)...")
+        print(f"   🏔️ Creating DTM from LAZ file...")
+        print(f"   📊 Calculating terrain ruggedness using Riley algorithm...")
+        print(f"   🧮 Computing mean difference between cell and neighbors...")
+        print(f"   💾 Saving as GeoTIFF...")
         
         # Simulate processing time
         await asyncio.sleep(2.5)
         
-        # TODO: Implement actual TRI processing
-        # This would typically involve:
-        # 1. Creating DTM from LAZ file
-        # 2. Calculating terrain ruggedness using Riley algorithm
-        # 3. Computing mean difference between cell and neighbors
-        # 4. Saving as GeoTIFF
-        
-        # Generate output filename using new naming convention: <laz_filename_without_ext>_<processing_step>
-        laz_basename = os.path.splitext(os.path.basename(laz_file_path))[0]
-        output_filename = f"{laz_basename}_TRI.tif"
-        output_file = os.path.join(output_dir, output_filename)
-        
         # Simulate creating output file
+        print(f"💾 [FILE WRITING] Creating output file...")
+        print(f"   📂 Writing to: {output_file}")
+        
         with open(output_file, 'w') as f:
             f.write("TRI placeholder file")
+        
+        output_size = os.path.getsize(output_file)
+        print(f"✅ [FILE CREATED] Output file created successfully")
+        print(f"   📂 File location: {output_file}")
+        print(f"   📊 File size: {output_size} bytes")
+        
+        processing_time = time.time() - start_time
+        
+        print(f"⏱️ [TIMING] Processing completed in {processing_time:.2f} seconds")
+        print(f"✅ [SUCCESS] TRI PROCESSING SUCCESSFUL")
+        print(f"{'='*60}\n")
+        
+        logger.info(f"TRI processing completed in {processing_time:.2f} seconds")
         
         processing_time = time.time() - start_time
         
@@ -98,15 +161,22 @@ def tri(input_file: str) -> str:
     print(f"\n🏔️ TRI: Starting analysis for {input_file}")
     start_time = time.time()
     
-    # Extract the base name without path and extension
-    laz_basename = os.path.splitext(os.path.basename(input_file))[0]
+    # Extract region name from the file path structure
+    # Path structure: input/<region_name>/lidar/<filename> or input/<region_name>/<filename>
+    input_path = Path(input_file)
+    if "lidar" in input_path.parts:
+        # File is in lidar subfolder: extract parent's parent as region name
+        region_name = input_path.parts[input_path.parts.index("input") + 1]
+    else:
+        # File is directly in input folder: extract parent as region name
+        region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
     
-    # Create output directory structure: output/<laz_basename>/TRI/
-    output_dir = os.path.join("output", laz_basename, "TRI")
+    # Create output directory structure: output/<region_name>/TRI/
+    output_dir = os.path.join("output", region_name, "TRI")
     os.makedirs(output_dir, exist_ok=True)
     
-    # Generate output filename: <laz_basename>_tri.tif
-    output_filename = f"{laz_basename}_tri.tif"
+    # Generate output filename: <region_name>_tri.tif
+    output_filename = f"{region_name}_tri.tif"
     output_path = os.path.join(output_dir, output_filename)
     
     print(f"📂 Output directory: {output_dir}")

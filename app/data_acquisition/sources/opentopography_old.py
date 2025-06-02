@@ -355,24 +355,27 @@ class OpenTopographySource(BaseDataSource):
     
     def _create_input_folder(self, request: DownloadRequest) -> Path:
         """Create descriptive folder in input directory."""
-        center_lat = (request.bbox.north + request.bbox.south) / 2
-        center_lng = (request.bbox.east + request.bbox.west) / 2
-        
-        # Determine location name based on coordinates
-        if -125 < center_lng < -110 and 30 < center_lat < 50:
-            region = "USA_West"
-        elif -120 < center_lng < -115 and 33 < center_lat < 35:
-            region = "LosAngeles"
-        elif center_lat > 0:
-            region = "NorthernHemisphere"
+        if request.region_name:
+            folder_name = request.region_name
         else:
-            region = "SouthernHemisphere"
-        
-        if request.data_type == DataType.ELEVATION:
-            dataset = self._get_dataset(request.resolution)
-            folder_name = f"OpenTopo_{dataset}_{region}_{center_lat:.3f}_{center_lng:.3f}_elevation"
-        else:  # LAZ point cloud
-            folder_name = f"OpenTopo_LIDAR_{region}_{center_lat:.3f}_{center_lng:.3f}_pointcloud"
+            center_lat = (request.bbox.north + request.bbox.south) / 2
+            center_lng = (request.bbox.east + request.bbox.west) / 2
+            
+            # Determine location name based on coordinates
+            if -125 < center_lng < -110 and 30 < center_lat < 50:
+                region = "USA_West"
+            elif -120 < center_lng < -115 and 33 < center_lat < 35:
+                region = "LosAngeles"
+            elif center_lat > 0:
+                region = "NorthernHemisphere"
+            else:
+                region = "SouthernHemisphere"
+            
+            if request.data_type == DataType.ELEVATION:
+                dataset = self._get_dataset(request.resolution)
+                folder_name = f"elevation_OpenTopo_{dataset}_{region}_{center_lat:.3f}_{center_lng:.3f}"
+            else:  # LAZ point cloud
+                folder_name = f"lidar_OpenTopo_{region}_{center_lat:.3f}_{center_lng:.3f}_pointcloud"
         
         input_folder = Path("input") / folder_name
         input_folder.mkdir(parents=True, exist_ok=True)
@@ -385,19 +388,35 @@ class OpenTopographySource(BaseDataSource):
         center_lat = (request.bbox.north + request.bbox.south) / 2
         center_lng = (request.bbox.east + request.bbox.west) / 2
         
-        if request.data_type == DataType.ELEVATION:
-            dataset = self._get_dataset(request.resolution)
-            filename = f"elevation_{dataset}_{center_lat:.3f}_{center_lng:.3f}.tiff"
-            metadata_prefix = f"metadata_{dataset}"
-        else:  # LAZ point cloud
-            filename = f"lidar_pointcloud_{center_lat:.3f}_{center_lng:.3f}.laz"
-            metadata_prefix = "metadata_lidar"
+        if request.region_name:
+            # Use region name directly for consistent naming
+            if request.data_type == DataType.ELEVATION:
+                dataset = self._get_dataset(request.resolution)
+                base_file_name = f"{request.region_name}_{dataset}"
+                filename = f"{base_file_name}.tiff"
+                metadata_prefix = f"metadata_{base_file_name}"
+            else:  # LAZ point cloud
+                base_file_name = f"{request.region_name}_pointcloud"
+                filename = f"{base_file_name}.laz"
+                metadata_prefix = f"metadata_{base_file_name}"
+        else:
+            # Use coordinate-based naming with data type prefixes for disambiguation
+            if request.data_type == DataType.ELEVATION:
+                dataset = self._get_dataset(request.resolution)
+                filename = f"elevation_{dataset}_{center_lat:.3f}_{center_lng:.3f}.tiff"
+                metadata_prefix = f"metadata_{dataset}"
+            else:  # LAZ point cloud
+                filename = f"lidar_pointcloud_{center_lat:.3f}_{center_lng:.3f}.laz"
+                metadata_prefix = "metadata_lidar"
         
         input_file_path = input_folder / filename
         shutil.copy2(cache_path, input_file_path)
         
         # Create metadata file
-        metadata_path = input_folder / f"{metadata_prefix}_{center_lat:.3f}_{center_lng:.3f}.txt"
+        if request.region_name:
+            metadata_path = input_folder / f"{metadata_prefix}.txt"
+        else:
+            metadata_path = input_folder / f"{metadata_prefix}_{center_lat:.3f}_{center_lng:.3f}.txt"
         with open(metadata_path, 'w') as f:
             f.write(f"# OpenTopography Data\n")
             if request.data_type == DataType.ELEVATION:

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>LAZ Terrain Processor</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="" />
+  <link rel="stylesheet" as="style" onload="this.rel='stylesheet'" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Inter%3Awght%40400%3B500%3B700%3B900&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900" />
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  
+  <!-- Leaflet CSS and JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="/static/styles.css" />
+  
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  
+  <!-- Component System - Load first -->
+  <script src="/static/js/components.js"></script>
+  
+  <!-- Core JavaScript files - load in dependency order -->
+  <script src="/static/js/utils.js"></script>
+  <script src="/static/js/websocket.js"></script>
+  <script src="/static/js/map.js"></script>
+  <script src="/static/js/fileManager.js"></script>
+  <script src="/static/js/overlays.js"></script>
+  <script src="/static/js/processing.js"></script>
+  <script src="/static/js/ui.js"></script>
+  
+  <!-- Component Modules -->
+  <script src="/static/js/components/header.js"></script>
+  <script src="/static/js/components/sidebar.js"></script>
+  <script src="/static/js/components/map.js"></script>
+  <script src="/static/js/components/gallery.js"></script>
+  <script src="/static/js/components/chat.js"></script>
+  <script src="/static/js/components/modals.js"></script>
+  <script src="/static/js/components/main-content.js"></script>
+  
+  <!-- Component Utilities -->
+  <script src="/static/js/componentUtils.js"></script>
+  
+  <!-- Main App - Load last -->
+  <script src="/static/js/app_new.js"></script>
+</head>
+<body class="bg-[#141414] text-white" style='font-family: Inter, "Noto Sans", sans-serif;'>
+  <div class="flex flex-col h-screen overflow-hidden">
+    <!-- Header Component Container -->
+    <div id="header-container"></div>
+
+    <!-- Main content area with modern layout -->
+    <div class="flex flex-1 overflow-hidden">
+      <!-- Sidebar Component Container -->
+      <div id="sidebar-container"></div>
+
+      <!-- Main Content Component Container -->
+      <div id="main-content-container"></div>
+    </div>
+
+    <!-- Chat Component Container -->
+    <div id="chat-container"></div>
+
+    <!-- Modal Component Containers -->
+    <div id="file-modal-container"></div>
+    <div id="progress-modal-container"></div>
+  </div>
+
+  <!-- Initialize Components -->
+  <script>
+    document.addEventListener('DOMContentLoaded', async function() {
+      try {
+        // Render all main components
+        await window.componentManager.render('header', '#header-container');
+        await window.componentManager.render('sidebar', '#sidebar-container');
+        await window.componentManager.render('main-content', '#main-content-container');
+        await window.componentManager.render('chat', '#chat-container');
+        await window.componentManager.render('file-modal', '#file-modal-container');
+        await window.componentManager.render('progress-modal', '#progress-modal-container');
+        
+        console.log('All components rendered successfully');
+        
+        // Initialize app after components are rendered
+        if (typeof window.initializeApp === 'function') {
+          window.initializeApp();
+        }
+      } catch (error) {
+        console.error('Error rendering components:', error);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -3,6 +3,7 @@ import time
 import os
 import logging
 import subprocess
+from pathlib import Path
 from typing import Dict, Any
 from osgeo import gdal
 from osgeo_utils import gdal_calc
@@ -26,31 +27,143 @@ async def process_chm(laz_file_path: str, output_dir: str, parameters: Dict[str,
     start_time = time.time()
     
     try:
+        print(f"\n{'='*60}")
+        print(f"🌳 CHM (CANOPY HEIGHT MODEL) PROCESSING")
+        print(f"{'='*60}")
+        print(f"📂 Input file: {laz_file_path}")
+        print(f"📁 Output directory: {output_dir}")
+        print(f"⚙️ Parameters: {parameters}")
+        
+        # Create output directory if it doesn't exist
+        print(f"📁 [FOLDER CREATION] Creating output directory if needed...")
+        print(f"   🔍 Checking if directory exists: {output_dir}")
+        
+        if os.path.exists(output_dir):
+            print(f"   ✅ Directory already exists: {output_dir}")
+        else:
+            print(f"   🆕 Directory doesn't exist, creating: {output_dir}")
+            
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"   ✅ [FOLDER CREATED] Output directory ready: {output_dir}")
+        logger.info(f"Output directory created/verified: {output_dir}")
+        
+        # Extract region name from file path for consistent naming
+        print(f"🔍 [REGION EXTRACTION] Extracting region name from file path...")
+        input_path = Path(laz_file_path)
+        print(f"   📂 Full input path: {input_path}")
+        print(f"   🧩 Path parts: {input_path.parts}")
+        
+        if "lidar" in input_path.parts:
+            region_name = input_path.parts[input_path.parts.index("input") + 1]
+            print(f"   🎯 Found 'lidar' in path, extracted region: {region_name}")
+        else:
+            region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(laz_file_path))[0]
+            print(f"   🎯 No 'lidar' in path, extracted region: {region_name}")
+            
+        print(f"   ✅ [REGION IDENTIFIED] Using region name: {region_name}")
+        
+        # Generate output filename using new naming convention
+        output_filename = f"{region_name}_CHM.tif"
+        output_file = os.path.join(output_dir, output_filename)
+        print(f"📄 [FILE CREATION] Creating output file: {output_file}")
+        print(f"   📝 Filename pattern: <region_name>_CHM.tif")
+        print(f"   🏷️ Generated filename: {output_filename}")
+
+        # Check if input file exists
+        print(f"🔍 [FILE VALIDATION] Validating input file...")
+        if not os.path.exists(laz_file_path):
+            error_msg = f"LAZ file not found: {laz_file_path}"
+            print(f"❌ [VALIDATION ERROR] {error_msg}")
+            logger.error(error_msg)
+            raise FileNotFoundError(error_msg)
+        
+        file_size = os.path.getsize(laz_file_path)
+        print(f"✅ [FILE VALIDATED] Input file exists: {laz_file_path}")
+        print(f"📊 [FILE INFO] File size: {file_size:,} bytes ({file_size / (1024**2):.2f} MB)")
+        logger.info(f"Input file validated - Size: {file_size} bytes")
+        
+        print(f"⚙️ [PROCESSING CONFIG] CHM analysis parameters:")
+        print(f"   🧮 Method: DSM - DTM calculation")
+        print(f"   🌳 Output: Vegetation height above ground")
+        print(f"   📏 Units: Same as input elevation units")
+        
         logger.info(f"🌳 Starting CHM processing for {laz_file_path}")
+        
+        print(f"🔄 [PROCESSING] Processing CHM Analysis...")
+        print(f"   🏗️ Generating DSM (Digital Surface Model)...")
+        print(f"   🏔️ Generating DTM (Digital Terrain Model)...")
+        print(f"   🧮 Calculating CHM = DSM - DTM...")
+        print(f"   🌳 Computing vegetation heights...")
         
         # Use the main chm function for processing
         chm_path = chm(laz_file_path)
         
+        # Simulate creating output file in async style (the actual processing happens in chm())
+        if os.path.exists(chm_path):
+            output_size = os.path.getsize(chm_path)
+            print(f"✅ [FILE CREATED] Output file created successfully")
+            print(f"   📂 File location: {chm_path}")
+            print(f"   📊 File size: {output_size} bytes")
+        
         processing_time = time.time() - start_time
+        
+        print(f"⏱️ [TIMING] Processing completed in {processing_time:.2f} seconds")
+        print(f"✅ [SUCCESS] CHM PROCESSING SUCCESSFUL")
+        print(f"{'='*60}\n")
+        
         logger.info(f"✅ CHM processing completed in {processing_time:.2f} seconds")
+        logger.info(f"Output file created: {chm_path}")
         
         return {
             "success": True,
             "message": "CHM (Canopy Height Model) processing completed successfully",
+            "output_file": chm_path,
             "processing_time": processing_time,
-            "output_file": chm_path
+            "input_file": laz_file_path,
+            "parameters_used": {
+                "method": "DSM - DTM calculation"
+            },
+            "file_info": {
+                "input_size_bytes": file_size,
+                "output_size_bytes": output_size if 'output_size' in locals() else 0
+            }
         }
         
-    except Exception as e:
+    except FileNotFoundError as e:
         processing_time = time.time() - start_time
-        error_msg = f"CHM processing failed after {processing_time:.2f} seconds: {str(e)}"
-        logger.error(error_msg)
+        error_msg = str(e)
+        
+        print(f"❌ FILE NOT FOUND ERROR after {processing_time:.2f}s")
+        print(f"❌ Error: {error_msg}")
+        print(f"{'='*60}\n")
+        
+        logger.error(f"File not found error in CHM processing: {error_msg}")
         
         return {
             "success": False,
             "message": error_msg,
+            "error_type": "FileNotFoundError",
             "processing_time": processing_time,
-            "error": str(e)
+            "input_file": laz_file_path
+        }
+        
+    except Exception as e:
+        processing_time = time.time() - start_time
+        error_msg = str(e)
+        
+        print(f"❌ UNEXPECTED ERROR after {processing_time:.2f}s")
+        print(f"❌ Error type: {type(e).__name__}")
+        print(f"❌ Error message: {error_msg}")
+        print(f"{'='*60}\n")
+        
+        logger.error(f"Unexpected error in CHM processing: {error_msg}", exc_info=True)
+        
+        return {
+            "success": False,
+            "message": f"Processing failed: {error_msg}",
+            "error_type": type(e).__name__,
+            "processing_time": processing_time,
+            "input_file": laz_file_path
         }
 
 def chm(input_file: str) -> str:
@@ -67,15 +180,22 @@ def chm(input_file: str) -> str:
     print(f"\n🌳 CHM: Starting generation for {input_file}")
     start_time = time.time()
     
-    # Extract the base name without path and extension
-    laz_basename = os.path.splitext(os.path.basename(input_file))[0]
+    # Extract region name from the file path structure
+    # Path structure: input/<region_name>/lidar/<filename> or input/<region_name>/<filename>
+    input_path = Path(input_file)
+    if "lidar" in input_path.parts:
+        # File is in lidar subfolder: extract parent's parent as region name
+        region_name = input_path.parts[input_path.parts.index("input") + 1]
+    else:
+        # File is directly in input folder: extract parent as region name
+        region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
     
-    # Create output directory structure: output/<laz_basename>/CHM/
-    output_dir = os.path.join("output", laz_basename, "CHM")
+    # Create output directory structure: output/<region_name>/CHM/
+    output_dir = os.path.join("output", region_name, "CHM")
     os.makedirs(output_dir, exist_ok=True)
     
-    # Generate output filename: <laz_basename>_CHM.tif
-    output_filename = f"{laz_basename}_CHM.tif"
+    # Generate output filename: <region_name>_CHM.tif
+    output_filename = f"{region_name}_CHM.tif"
     output_path = os.path.join(output_dir, output_filename)
     
     print(f"📂 Output directory: {output_dir}")
@@ -386,8 +506,13 @@ def clear_chm_cache(input_file: str = None) -> None:
     
     if input_file:
         # Clear cache for specific file
-        laz_basename = os.path.splitext(os.path.basename(input_file))[0]
-        chm_pattern = f"output/{laz_basename}/CHM/*_CHM.tif"
+        input_path = Path(input_file)
+        if "lidar" in input_path.parts:
+            region_name = input_path.parts[input_path.parts.index("input") + 1]
+        else:
+            region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
+        
+        chm_pattern = f"output/{region_name}/CHM/*_CHM.tif"
         chm_files = glob.glob(chm_pattern)
         print(f"🗑️ Clearing CHM cache for {input_file}")
     else:

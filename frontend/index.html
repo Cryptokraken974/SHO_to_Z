@@ -103,7 +103,10 @@
             <button id="test-sentinel2-btn" class="w-full bg-[#dc3545] hover:bg-[#c82333] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2">🛰️ Test: Sentinel-2 Images</button>
             
             <!-- Get LIDAR Data Button -->
-            <button id="get-lidar-btn" class="w-full bg-[#6c5ce7] hover:bg-[#5a4fcf] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2">📡 Get LIDAR Data</button>
+            <button id="get-lidar-btn" class="w-full bg-[#6c5ce7] hover:bg-[#5a4fcf] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2">🏔️ Get Elevation Data</button>
+            
+            <!-- Get Data Button (Combined) -->
+            <button id="get-data-btn" class="w-full bg-[#28a745] hover:bg-[#218838] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2">📊 Get Data (Elevation + Satellite)</button>
           </div>
         </div>
       </div>
@@ -195,47 +198,11 @@
       <div class="mb-4">
         <h2 class="text-white text-lg font-semibold mb-4">Processing Results</h2>
         <div id="gallery" class="flex gap-4 overflow-x-auto pb-4">
-          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-laz_to_dem">
-            <div class="flex-1 flex items-center justify-center">
-              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="laz_to_dem">DEM</button>
-            </div>
-            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="laz_to_dem">Add to Map</button>
-          </div>
-          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-dtm">
-            <div class="flex-1 flex items-center justify-center">
-              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="dtm">DTM</button>
-            </div>
-            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="dtm">Add to Map</button>
-          </div>
-          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-dsm">
-            <div class="flex-1 flex items-center justify-center">
-              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="dsm">DSM</button>
-            </div>
-            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="dsm">Add to Map</button>
-          </div>
-          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-chm">
-            <div class="flex-1 flex items-center justify-center">
-              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="chm">CHM</button>
-            </div>
-            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="chm">Add to Map</button>
-          </div>
           <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-hillshade">
             <div class="flex-1 flex items-center justify-center">
-              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="hillshade">Hillshade (Std)</button>
+              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="hillshade">Hillshade</button>
             </div>
             <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="hillshade">Add to Map</button>
-          </div>
-          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-hillshade_315_45_08">
-            <div class="flex-1 flex items-center justify-center">
-              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="hillshade_315_45_08">Hillshade 315°</button>
-            </div>
-            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="hillshade_315_45_08">Add to Map</button>
-          </div>
-          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-hillshade_225_45_08">
-            <div class="flex-1 flex items-center justify-center">
-              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="hillshade_225_45_08">Hillshade 225°</button>
-            </div>
-            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="hillshade_225_45_08">Add to Map</button>
           </div>
           <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-slope">
             <div class="flex-1 flex items-center justify-center">
@@ -266,12 +233,6 @@
               <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="tpi">TPI</button>
             </div>
             <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="tpi">Add to Map</button>
-          </div>
-          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-roughness">
-            <div class="flex-1 flex items-center justify-center">
-              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="roughness">Roughness</button>
-            </div>
-            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="roughness">Add to Map</button>
           </div>
         </div>
       </div>
@@ -312,9 +273,12 @@
       <div class="file-list max-h-[400px] overflow-y-auto" id="file-list">
         <!-- Files will be populated here -->
       </div>
-      <div class="flex justify-end gap-3 mt-4">
-        <button id="cancel-select" class="cancel-btn bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
-        <button id="confirm-region-selection" class="px-6 py-2.5 bg-[#007bff] hover:bg-[#0056b3] text-white rounded-lg font-medium transition-colors">Select Region</button>
+      <div class="flex justify-between gap-3 mt-4">
+        <button id="delete-region-btn" class="px-4 py-2 bg-[#dc3545] hover:bg-[#c82333] text-white rounded-lg font-medium transition-colors hidden">Delete Region</button>
+        <div class="flex gap-3">
+          <button id="cancel-select" class="cancel-btn bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
+          <button id="confirm-region-selection" class="px-6 py-2.5 bg-[#007bff] hover:bg-[#0056b3] text-white rounded-lg font-medium transition-colors">Select Region</button>
+        </div>
       </div>
     </div>
   </div>

@@ -245,6 +245,11 @@ window.OverlayManager = {
    * @param {string} processingType - Type of processing
    */
   handleAddToMapClick(processingType) {
+    if (!processingType) {
+      Utils.log('warn', 'handleAddToMapClick: processingType is undefined');
+      return;
+    }
+    
     const button = $(`#add-to-map-${processingType.toLowerCase()}`);
     const isActive = button.data('active') || false;
     

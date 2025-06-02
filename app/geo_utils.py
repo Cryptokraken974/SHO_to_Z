@@ -3,6 +3,7 @@ Geospatial utilities for reading coordinate information from world files and Geo
 """
 import os
 import base64
+import re
 from typing import Dict, Tuple, Optional
 from osgeo import gdal, osr
 
@@ -326,16 +327,32 @@ def get_sentinel2_overlay_data_util(region_name: str, band_name: str) -> Optiona
     try:
         print(f"\n🛰️ Getting Sentinel-2 overlay data for {region_name}/{band_name}")
         
-        # Construct paths for Sentinel-2 files
-        # Structure: output/{region_name}/sentinel-2/{region_name}_{timestamp}_sentinel2_{band_name}.png
-        output_dir = f"output/{region_name}/sentinel-2"
+        # Convert region name format from API format to actual folder format
+        # API format: region_5_99S_36_15W -> Folder format: 5.99S_36.15W
+        folder_region_name = region_name
+        if region_name.startswith('region_'):
+            # Remove 'region_' prefix and convert underscores back to dots for coordinates
+            folder_region_name = region_name[7:]  # Remove 'region_' prefix
+            # Convert coordinate format: 5_99S_36_15W -> 5.99S_36.15W
+            # Replace the first underscore with a dot, and the third underscore with a dot
+            # Pattern: X_YYZ_AA_BBW -> X.YYZ_AA.BBW
+            import re
+            # Use regex to replace underscores in coordinate positions with dots
+            # This will convert: 5_99S_36_15W -> 5.99S_36.15W
+            folder_region_name = re.sub(r'^(\d+)_(\d+)([NS])_(\d+)_(\d+)([EW])$', r'\1.\2\3_\4.\5\6', folder_region_name)
+        
+        print(f"🔄 Converted region name: {region_name} -> {folder_region_name}")
+        
+        # Construct paths for Sentinel-2 files using the correct folder format
+        # Structure: output/{folder_region_name}/sentinel2/{folder_region_name}_{timestamp}_sentinel2_{band_name}.png
+        output_dir = f"output/{folder_region_name}/sentinel2"
         
         # Find actual files matching the pattern since they include timestamps
         import glob
         
-        # Pattern: region_*_sentinel2_{band_name}.png
-        png_pattern = f"{output_dir}/*_sentinel2_{band_name}.png"
-        tiff_pattern = f"{output_dir}/*_sentinel2_{band_name}.tif"
+        # Pattern: {folder_region_name}_*_sentinel2_{band_name}.png
+        png_pattern = f"{output_dir}/{folder_region_name}_*_sentinel2_{band_name}.png"
+        tiff_pattern = f"{output_dir}/{folder_region_name}_*_sentinel2_{band_name}.tif"
         
         print(f"📂 Output directory: {output_dir}")
         print(f"🔍 PNG pattern: {png_pattern}")
@@ -387,13 +404,33 @@ def get_sentinel2_overlay_data_util(region_name: str, band_name: str) -> Optiona
         print(f"🗺️  TIFF path: {tiff_path}")
         print(f"🌍 World file path: {world_path}")
         
-        return _process_overlay_files(png_path, tiff_path, world_path, "sentinel-2", region_name)
+        return _process_overlay_files(png_path, tiff_path, world_path, "sentinel-2", folder_region_name)
         
     except Exception as e:
         print(f"❌ Error getting Sentinel-2 overlay data for {region_name}/{band_name}: {e}")
         import traceback
         traceback.print_exc()
         return None
+
+def parse_coordinate_folder_name(folder_name: str) -> Tuple[float, float]:
+    """
+    Parse coordinates from folder names like '11.31S_44.06W' or 'foxisland'
+    Returns (latitude, longitude) as floats
+    """
+    # Pattern for coordinate-based folder names: lat.longDIR_lat.longDIR
+    coord_pattern = r'(\d+\.\d+)([ns])_(\d+\.\d+)([ew])'
+    match = re.match(coord_pattern, folder_name.lower())
+    
+    if match:
+        lat_val, lat_dir, lng_val, lng_dir = match.groups()
+        
+        # Convert to signed values
+        lat = float(lat_val) * (-1 if lat_dir.lower() == 's' else 1)
+        lng = float(lng_val) * (-1 if lng_dir.lower() == 'w' else 1)
+        
+        return lat, lng
+    else:
+        raise ValueError(f"Cannot parse coordinates from folder name: {folder_name}")
 
 def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, processing_type: str, base_filename: str) -> Optional[Dict]:
     """

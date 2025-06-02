@@ -33,6 +33,7 @@ def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None) -> str
         output_dir = os.path.dirname(png_path)
         if output_dir and not os.path.exists(output_dir):
             os.makedirs(output_dir)
+            print(f"CREATED FOLDER (convert_geotiff_to_png): {output_dir}") # LOGGING ADDED
             print(f"📁 Created output directory: {output_dir}")
         
         # Open GeoTIFF with GDAL to get statistics
@@ -181,15 +182,19 @@ def convert_sentinel2_to_png(data_dir: str, region_name: str) -> dict:
     try:
         from pathlib import Path
         
-        # Input directory with TIF files
-        input_dir = Path(data_dir)
+        # Input directory with TIF files - now look in sentinel2 subfolder
+        input_dir = Path(data_dir) / "sentinel2"
         if not input_dir.exists():
-            results['errors'].append(f"Input directory does not exist: {data_dir}")
-            return results
+            print(f"⚠️ Sentinel2 subfolder not found, checking directly in input directory")
+            input_dir = Path(data_dir)  # Fallback for backward compatibility
+            if not input_dir.exists():
+                results['errors'].append(f"Input directory does not exist: {data_dir}")
+                return results
         
-        # Create output directory: output/<region_name>/sentinel-2/
-        output_dir = Path("output") / region_name / "sentinel-2"
+        # Create output directory: output/<region_name>/sentinel2/
+        output_dir = Path("output") / region_name / "sentinel2"
         output_dir.mkdir(parents=True, exist_ok=True)
+        print(f"CREATED FOLDER (convert_sentinel2_to_png): {output_dir}") # LOGGING ADDED
         print(f"📁 Output directory: {output_dir}")
          # Process each 4-band Sentinel-2 TIF file (RED, GREEN, BLUE, NIR bands)
         for tif_file in input_dir.glob("*.tif"):

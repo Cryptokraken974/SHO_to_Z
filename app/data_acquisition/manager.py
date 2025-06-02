@@ -10,11 +10,13 @@ import os
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from .sources.opentopography import OpenTopographySource
 from .sources.ornl_daac import ORNLDAACSource
 from .sources.sentinel2 import Sentinel2Source
 from .sources.usgs_3dep import USGS3DEPSource
+from .sources.brazilian_elevation import BrazilianElevationSource
 from .utils.coordinates import CoordinateValidator, CoordinateConverter
 from .utils.cache import DataCache
 from .utils.file_manager import FileManager
@@ -111,6 +113,10 @@ class DataAcquisitionManager:
                     api_key=opentopo_key, 
                     cache_dir=cache_dir
                 )
+                self.sources['brazilian_elevation'] = BrazilianElevationSource(
+                    api_key=opentopo_key,
+                    cache_dir=cache_dir
+                )
                 self.sources['sentinel2'] = Sentinel2Source()
                 self.sources['ornl_daac'] = ORNLDAACSource(
                     api_key=earthdata_key,
@@ -119,6 +125,7 @@ class DataAcquisitionManager:
             else:
                 # Initialize without API keys
                 self.sources['opentopography'] = OpenTopographySource(cache_dir=cache_dir)
+                self.sources['brazilian_elevation'] = BrazilianElevationSource(cache_dir=cache_dir)
                 self.sources['usgs_3dep'] = USGS3DEPSource(cache_dir=cache_dir)
                 self.sources['sentinel2'] = Sentinel2Source()
                 self.sources['ornl_daac'] = ORNLDAACSource(cache_dir=cache_dir)
@@ -128,6 +135,7 @@ class DataAcquisitionManager:
             # Fallback initialization
             self.sources = {
                 'opentopography': OpenTopographySource(cache_dir=cache_dir),
+                'brazilian_elevation': BrazilianElevationSource(cache_dir=cache_dir),
                 'usgs_3dep': USGS3DEPSource(cache_dir=cache_dir),
                 'sentinel2': Sentinel2Source(),
                 'ornl_daac': ORNLDAACSource(cache_dir=cache_dir)
@@ -509,3 +517,207 @@ class DataAcquisitionManager:
         """
         self.cache.cleanup(older_than_days)
         logger.info(f"Cache cleanup completed for files older than {older_than_days} days")
+    
+    async def download_lidar_data(self, lat: float, lng: float, buffer_km: float = 1.0, 
+                           output_dir: Optional[str] = None, progress_callback=None) -> AcquisitionResult:
+        """
+        Download LiDAR data for a specific location
+        
+        Args:
+            lat: Latitude in decimal degrees
+            lng: Longitude in decimal degrees
+            buffer_km: Buffer distance in kilometers around the point
+            output_dir: Optional output directory, if None uses default manager output dir
+            progress_callback: Optional callback for progress updates
+            
+        Returns:
+            AcquisitionResult with information about acquired LiDAR data
+        """
+        from .sources.base import DownloadRequest, DataType, DataResolution
+        
+        if output_dir is None:
+            output_dir = self.output_dir
+        
+        # Create simplified coordinate-based region name (e.g. 12.53S_53.02W)
+        lat_dir = 'S' if lat < 0 else 'N'
+        lng_dir = 'W' if lng < 0 else 'E'
+        region_name = f"{abs(lat):.2f}{lat_dir}_{abs(lng):.2f}{lng_dir}"
+        
+        # Create a directory for the region if it doesn't exist
+        region_dir = Path(output_dir) / region_name
+        if not region_dir.exists():
+            region_dir.mkdir(parents=True)
+            print(f"CREATED FOLDER (download_lidar_data): {region_dir}") 
+            logger.info(f"Created directory: {region_dir}")
+        else:
+            logger.info(f"Directory already exists: {region_dir}")
+            
+        # Create a 'lidar' subfolder within the region directory
+        lidar_dir = region_dir / "lidar"
+        if not lidar_dir.exists():
+            lidar_dir.mkdir(parents=True)
+            print(f"CREATED FOLDER (download_lidar_data): {lidar_dir}")
+            logger.info(f"Created lidar subdirectory: {lidar_dir}")
+        else:
+            logger.info(f"Lidar subdirectory already exists: {lidar_dir}")
+        
+        # Create bounding box for download request
+        bbox = self.coordinate_converter.create_bounding_box(lat, lng, buffer_km)
+        
+        # Download from USGS 3DEP first (if available)
+        request = DownloadRequest(
+            bbox=bbox,
+            data_type=DataType.LAZ,
+            resolution=DataResolution.HIGH,
+            output_format="laz"
+        )
+        
+        try:
+            # Check availability from USGS 3DEP
+            usgs_source = self.sources['usgs_3dep']
+            availability = await usgs_source.check_availability(request)
+            
+            if availability:
+                logger.info("USGS 3DEP LiDAR data available, proceeding with download")
+                
+                if progress_callback:
+                    await progress_callback({
+                        "type": "acquisition_started",
+                        "message": "Starting LiDAR data download from USGS 3DEP",
+                        "coordinates": {"lat": lat, "lng": lng},
+                        "source": "usgs_3dep"
+                    })
+                
+                # Perform the download
+                download_result = await usgs_source.download(request, progress_callback=progress_callback)
+                
+                if download_result.success:
+                    # Move the downloaded file to the lidar subdirectory
+                    laz_file = download_result.file_path
+                    new_file_path = lidar_dir / os.path.basename(laz_file)
+                    os.rename(laz_file, new_file_path)
+                    logger.info(f"LiDAR data downloaded and moved to: {new_file_path}")
+                    
+                    # Cache the result
+                    self.cache.put(f"usgs_3dep_{lat}_{lng}", {
+                        'success': True,
+                        'files': {'laz': new_file_path},
+                        'metadata': download_result.metadata or {},
+                        'size_mb': download_result.file_size_mb
+                    })
+                    
+                    if progress_callback:
+                        await progress_callback({
+                            "type": "acquisition_completed",
+                            "message": "LiDAR data download completed",
+                            "source": "usgs_3dep",
+                            "file_size_mb": download_result.file_size_mb
+                        })
+                    
+                    return AcquisitionResult(
+                        success=True,
+                        roi=RegionOfInterest(lat, lng, buffer_km),
+                        files={'laz': new_file_path},
+                        metadata=download_result.metadata or {},
+                        errors=[],
+                        source_used="usgs_3dep",
+                        download_size_mb=download_result.file_size_mb
+                    )
+                else:
+                    logger.error(f"Download failed: {download_result.error_message}")
+                    return AcquisitionResult(
+                        success=False,
+                        roi=RegionOfInterest(lat, lng, buffer_km),
+                        files={},
+                        metadata={},
+                        errors=[download_result.error_message],
+                        source_used="usgs_3dep"
+                    )
+            else:
+                logger.info("USGS 3DEP LiDAR data not available, checking alternative sources")
+                
+                # Fallback to OpenTopography or Brazilian Elevation
+                for source_name in ['opentopography', 'brazilian_elevation']:
+                    source = self.sources[source_name]
+                    request.data_type = DataType.ELEVATION  # Change to elevation data type
+                    
+                    # Check availability
+                    availability = await source.check_availability(request)
+                    if availability:
+                        logger.info(f"{source_name} LiDAR data available, proceeding with download")
+                        
+                        if progress_callback:
+                            await progress_callback({
+                                "type": "acquisition_started",
+                                "message": f"Starting LiDAR data download from {source_name}",
+                                "coordinates": {"lat": lat, "lng": lng},
+                                "source": source_name
+                            })
+                        
+                        # Perform the download
+                        download_result = await source.download(request, progress_callback=progress_callback)
+                        
+                        if download_result.success:
+                            # Move the downloaded file to the lidar subdirectory
+                            elevation_file = download_result.file_path
+                            new_file_path = lidar_dir / os.path.basename(elevation_file)
+                            os.rename(elevation_file, new_file_path)
+                            logger.info(f"LiDAR data downloaded and moved to: {new_file_path}")
+                            
+                            print(f"Downloaded file path: {new_file_path}")
+                            # Cache the result
+                            self.cache.put(f"{source_name}_{lat}_{lng}", {
+                                'success': True,
+                                'files': {'elevation': new_file_path},
+                                'metadata': download_result.metadata or {},
+                                'size_mb': download_result.file_size_mb
+                            })
+                            
+                            if progress_callback:
+                                await progress_callback({
+                                    "type": "acquisition_completed",
+                                    "message": "LiDAR data download completed",
+                                    "source": source_name,
+                                    "file_size_mb": download_result.file_size_mb
+                                })
+                            
+                            return AcquisitionResult(
+                                success=True,
+                                roi=RegionOfInterest(lat, lng, buffer_km),
+                                files={'elevation': new_file_path},
+                                metadata=download_result.metadata or {},
+                                errors=[],
+                                source_used=source_name,
+                                download_size_mb=download_result.file_size_mb
+                            )
+                        else:
+                            logger.error(f"Download failed: {download_result.error_message}")
+                            return AcquisitionResult(
+                                success=False,
+                                roi=RegionOfInterest(lat, lng, buffer_km),
+                                files={},
+                                metadata={},
+                                errors=[download_result.error_message],
+                                source_used=source_name
+                            )
+                
+                logger.warning("No LiDAR data available from any source")
+                return AcquisitionResult(
+                    success=False,
+                    roi=RegionOfInterest(lat, lng, buffer_km),
+                    files={},
+                    metadata={},
+                    errors=["No LiDAR data available from any source"],
+                    source_used=""
+                )
+        
+        except Exception as e:
+            logger.error(f"Error during LiDAR data download: {e}")
+            return AcquisitionResult(
+                success=False,
+                roi=RegionOfInterest(lat, lng, buffer_km),
+                files={},
+                metadata={},
+                errors=[str(e)],
+                source_used=""
+            )

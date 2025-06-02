@@ -9,6 +9,11 @@ import asyncio
 import json
 import math
 from typing import Optional, List, Dict, Any
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from .convert import convert_geotiff_to_png_base64
 from .processing import laz_to_dem, dtm, dsm, chm, hillshade, hillshade_315_45_08, hillshade_225_45_08, slope, aspect, color_relief, tri, tpi, roughness
@@ -29,7 +34,9 @@ data_manager = DataAcquisitionManager(
 # Initialize LIDAR acquisition manager
 lidar_manager = LidarAcquisitionManager(
     cache_dir=settings.cache_dir,
-    output_dir=settings.output_dir
+    output_dir=settings.output_dir,
+    generate_rasters=True,
+    raster_dir=Path(settings.output_dir) / "raster_products"
 )
 
 # WebSocket connection manager for progress updates
@@ -96,6 +103,9 @@ class Sentinel2Request(BaseModel):
     buffer_km: float = 2.0  # 2km radius = 4km x 4km box (smaller for better processing)
     bands: Optional[List[str]] = ["B04", "B08"]  # Sentinel-2 red and NIR bands
     region_name: Optional[str] = None
+
+class RasterGenerationRequest(BaseModel):
+    region_name: str
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
@@ -253,11 +263,42 @@ async def api_laz_to_dem(input_file: str = Form(...)):
         raise
 
 @app.post("/api/dtm")
-async def api_dtm(input_file: str = Form(...)):
-    """Convert LAZ to DTM (ground points only)"""
+async def api_dtm(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
+    """Convert LAZ to DTM (ground points only) - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/dtm")
-    print(f"📥 Input file: {input_file}")
     
+    # Determine processing mode: region-based or LAZ file-based
+    if region_name and processing_type:
+        # Region-based processing: find LAZ file in region
+        print(f"📍 Region-based processing: {region_name}")
+        print(f"🔧 Processing type: {processing_type}")
+        
+        # Look for LAZ files in the region's lidar directory
+        import glob
+        from pathlib import Path
+        
+        laz_pattern = f"input/{region_name}/lidar/*.laz"
+        laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            # Fallback: look directly in region directory
+            laz_pattern = f"input/{region_name}/*.laz"
+            laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            raise ValueError(f"No LAZ files found in region {region_name}")
+        
+        # Use the first LAZ file found
+        input_file = laz_files[0]
+        print(f"📥 Using LAZ file: {input_file}")
+        
+    elif input_file:
+        # LAZ file-based processing (legacy support)
+        print(f"📥 LAZ file-based processing: {input_file}")
+        
+    else:
+        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+
     try:
         tif_path = dtm(input_file)
         print(f"✅ TIF generated: {tif_path}")
@@ -272,10 +313,41 @@ async def api_dtm(input_file: str = Form(...)):
         raise
 
 @app.post("/api/dsm")
-async def api_dsm(input_file: str = Form(...)):
-    """Convert LAZ to DSM (surface points)"""
+async def api_dsm(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
+    """Convert LAZ to DSM (surface points) - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/dsm")
-    print(f"📥 Input file: {input_file}")
+    
+    # Determine processing mode: region-based or LAZ file-based
+    if region_name and processing_type:
+        # Region-based processing: find LAZ file in region
+        print(f"📍 Region-based processing: {region_name}")
+        print(f"🔧 Processing type: {processing_type}")
+        
+        # Look for LAZ files in the region's lidar directory
+        import glob
+        from pathlib import Path
+        
+        laz_pattern = f"input/{region_name}/lidar/*.laz"
+        laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            # Fallback: look directly in region directory
+            laz_pattern = f"input/{region_name}/*.laz"
+            laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            raise ValueError(f"No LAZ files found in region {region_name}")
+        
+        # Use the first LAZ file found
+        input_file = laz_files[0]
+        print(f"📥 Using LAZ file: {input_file}")
+        
+    elif input_file:
+        # LAZ file-based processing (legacy support)
+        print(f"📥 LAZ file-based processing: {input_file}")
+        
+    else:
+        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
         tif_path = dsm(input_file)
@@ -291,10 +363,41 @@ async def api_dsm(input_file: str = Form(...)):
         raise
 
 @app.post("/api/chm")
-async def api_chm(input_file: str = Form(...)):
-    """Generate CHM (Canopy Height Model) from LAZ file"""
+async def api_chm(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
+    """Generate CHM (Canopy Height Model) from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/chm")
-    print(f"📥 Input file: {input_file}")
+    
+    # Determine processing mode: region-based or LAZ file-based
+    if region_name and processing_type:
+        # Region-based processing: find LAZ file in region
+        print(f"📍 Region-based processing: {region_name}")
+        print(f"🔧 Processing type: {processing_type}")
+        
+        # Look for LAZ files in the region's lidar directory
+        import glob
+        from pathlib import Path
+        
+        laz_pattern = f"input/{region_name}/lidar/*.laz"
+        laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            # Fallback: look directly in region directory
+            laz_pattern = f"input/{region_name}/*.laz"
+            laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            raise ValueError(f"No LAZ files found in region {region_name}")
+        
+        # Use the first LAZ file found
+        input_file = laz_files[0]
+        print(f"📥 Using LAZ file: {input_file}")
+        
+    elif input_file:
+        # LAZ file-based processing (legacy support)
+        print(f"📥 LAZ file-based processing: {input_file}")
+        
+    else:
+        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
         tif_path = chm(input_file)
@@ -310,10 +413,41 @@ async def api_chm(input_file: str = Form(...)):
         raise
 
 @app.post("/api/hillshade")
-async def api_hillshade(input_file: str = Form(...)):
-    """Generate hillshade from LAZ file"""
+async def api_hillshade(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
+    """Generate hillshade from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/hillshade")
-    print(f"📥 Input file: {input_file}")
+    
+    # Determine processing mode: region-based or LAZ file-based
+    if region_name and processing_type:
+        # Region-based processing: find LAZ file in region
+        print(f"📍 Region-based processing: {region_name}")
+        print(f"🔧 Processing type: {processing_type}")
+        
+        # Look for LAZ files in the region's lidar directory
+        import glob
+        from pathlib import Path
+        
+        laz_pattern = f"input/{region_name}/lidar/*.laz"
+        laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            # Fallback: look directly in region directory
+            laz_pattern = f"input/{region_name}/*.laz"
+            laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            raise ValueError(f"No LAZ files found in region {region_name}")
+        
+        # Use the first LAZ file found
+        input_file = laz_files[0]
+        print(f"📥 Using LAZ file: {input_file}")
+        
+    elif input_file:
+        # LAZ file-based processing (legacy support)
+        print(f"📥 LAZ file-based processing: {input_file}")
+        
+    else:
+        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
         tif_path = hillshade(input_file)
@@ -329,10 +463,41 @@ async def api_hillshade(input_file: str = Form(...)):
         raise
 
 @app.post("/api/hillshade_315_45_08")
-async def api_hillshade_315_45_08(input_file: str = Form(...)):
-    """Generate hillshade with 315° azimuth, 45° altitude, 0.8 z-factor"""
+async def api_hillshade_315_45_08(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
+    """Generate hillshade with 315° azimuth, 45° altitude, 0.8 z-factor - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/hillshade_315_45_08")
-    print(f"📥 Input file: {input_file}")
+    
+    # Determine processing mode: region-based or LAZ file-based
+    if region_name and processing_type:
+        # Region-based processing: find LAZ file in region
+        print(f"📍 Region-based processing: {region_name}")
+        print(f"🔧 Processing type: {processing_type}")
+        
+        # Look for LAZ files in the region's lidar directory
+        import glob
+        from pathlib import Path
+        
+        laz_pattern = f"input/{region_name}/lidar/*.laz"
+        laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            # Fallback: look directly in region directory
+            laz_pattern = f"input/{region_name}/*.laz"
+            laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            raise ValueError(f"No LAZ files found in region {region_name}")
+        
+        # Use the first LAZ file found
+        input_file = laz_files[0]
+        print(f"📥 Using LAZ file: {input_file}")
+        
+    elif input_file:
+        # LAZ file-based processing (legacy support)
+        print(f"📥 LAZ file-based processing: {input_file}")
+        
+    else:
+        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
         tif_path = hillshade_315_45_08(input_file)
@@ -348,10 +513,41 @@ async def api_hillshade_315_45_08(input_file: str = Form(...)):
         raise
 
 @app.post("/api/hillshade_225_45_08")
-async def api_hillshade_225_45_08(input_file: str = Form(...)):
-    """Generate hillshade with 225° azimuth, 45° altitude, 0.8 z-factor"""
+async def api_hillshade_225_45_08(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
+    """Generate hillshade with 225° azimuth, 45° altitude, 0.8 z-factor - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/hillshade_225_45_08")
-    print(f"📥 Input file: {input_file}")
+    
+    # Determine processing mode: region-based or LAZ file-based
+    if region_name and processing_type:
+        # Region-based processing: find LAZ file in region
+        print(f"📍 Region-based processing: {region_name}")
+        print(f"🔧 Processing type: {processing_type}")
+        
+        # Look for LAZ files in the region's lidar directory
+        import glob
+        from pathlib import Path
+        
+        laz_pattern = f"input/{region_name}/lidar/*.laz"
+        laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            # Fallback: look directly in region directory
+            laz_pattern = f"input/{region_name}/*.laz"
+            laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            raise ValueError(f"No LAZ files found in region {region_name}")
+        
+        # Use the first LAZ file found
+        input_file = laz_files[0]
+        print(f"📥 Using LAZ file: {input_file}")
+        
+    elif input_file:
+        # LAZ file-based processing (legacy support)
+        print(f"📥 LAZ file-based processing: {input_file}")
+        
+    else:
+        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
         tif_path = hillshade_225_45_08(input_file)
@@ -367,87 +563,303 @@ async def api_hillshade_225_45_08(input_file: str = Form(...)):
         raise
 
 @app.post("/api/slope")
-async def api_slope(input_file: str = Form(...)):
-    """Generate slope from LAZ file"""
+async def api_slope(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
+    """Generate slope from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/slope")
-    print(f"📥 Input file: {input_file}")
+    
+    # Determine processing mode: region-based or LAZ file-based
+    if region_name and processing_type:
+        # Region-based processing: find LAZ file in region
+        print(f"📍 Region-based processing: {region_name}")
+        print(f"🔧 Processing type: {processing_type}")
+        
+        # Look for LAZ files in the region's lidar directory
+        import glob
+        from pathlib import Path
+        
+        laz_pattern = f"input/{region_name}/lidar/*.laz"
+        laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            # Fallback: look directly in region directory
+            laz_pattern = f"input/{region_name}/*.laz"
+            laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            raise ValueError(f"No LAZ files found in region {region_name}")
+        
+        # Use the first LAZ file found
+        input_file = laz_files[0]
+        print(f"📥 Using LAZ file: {input_file}")
+        
+    elif input_file:
+        # LAZ file-based processing (legacy support)
+        print(f"📥 LAZ file-based processing: {input_file}")
+        
+    else:
+        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
         tif_path = slope(input_file)
+        print(f"✅ TIF generated: {tif_path}")
+        
         image_b64 = convert_geotiff_to_png_base64(tif_path)
+        print(f"✅ Base64 conversion complete")
+        
         return {"image": image_b64}
     except Exception as e:
         print(f"❌ Error in api_slope: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
         raise
 
 @app.post("/api/aspect")
-async def api_aspect(input_file: str = Form(...)):
-    """Generate aspect from LAZ file"""
+async def api_aspect(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
+    """Generate aspect from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/aspect")
-    print(f"📥 Input file: {input_file}")
+    
+    # Determine processing mode: region-based or LAZ file-based
+    if region_name and processing_type:
+        # Region-based processing: find LAZ file in region
+        print(f"📍 Region-based processing: {region_name}")
+        print(f"🔧 Processing type: {processing_type}")
+        
+        # Look for LAZ files in the region's lidar directory
+        import glob
+        from pathlib import Path
+        
+        laz_pattern = f"input/{region_name}/lidar/*.laz"
+        laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            # Fallback: look directly in region directory
+            laz_pattern = f"input/{region_name}/*.laz"
+            laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            raise ValueError(f"No LAZ files found in region {region_name}")
+        
+        # Use the first LAZ file found
+        input_file = laz_files[0]
+        print(f"📥 Using LAZ file: {input_file}")
+        
+    elif input_file:
+        # LAZ file-based processing (legacy support)
+        print(f"📥 LAZ file-based processing: {input_file}")
+        
+    else:
+        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
         tif_path = aspect(input_file)
+        print(f"✅ TIF generated: {tif_path}")
+        
         image_b64 = convert_geotiff_to_png_base64(tif_path)
+        print(f"✅ Base64 conversion complete")
+        
         return {"image": image_b64}
     except Exception as e:
         print(f"❌ Error in api_aspect: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
         raise
 
 @app.post("/api/color_relief")
-async def api_color_relief(input_file: str = Form(...)):
-    """Generate color relief from LAZ file"""
+async def api_color_relief(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
+    """Generate color relief from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/color_relief")
-    print(f"📥 Input file: {input_file}")
+    
+    # Determine processing mode: region-based or LAZ file-based
+    if region_name and processing_type:
+        # Region-based processing: find LAZ file in region
+        print(f"📍 Region-based processing: {region_name}")
+        print(f"🔧 Processing type: {processing_type}")
+        
+        # Look for LAZ files in the region's lidar directory
+        import glob
+        from pathlib import Path
+        
+        laz_pattern = f"input/{region_name}/lidar/*.laz"
+        laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            # Fallback: look directly in region directory
+            laz_pattern = f"input/{region_name}/*.laz"
+            laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            raise ValueError(f"No LAZ files found in region {region_name}")
+        
+        # Use the first LAZ file found
+        input_file = laz_files[0]
+        print(f"📥 Using LAZ file: {input_file}")
+        
+    elif input_file:
+        # LAZ file-based processing (legacy support)
+        print(f"📥 LAZ file-based processing: {input_file}")
+        
+    else:
+        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
         tif_path = color_relief(input_file)
+        print(f"✅ TIF generated: {tif_path}")
+        
         image_b64 = convert_geotiff_to_png_base64(tif_path)
+        print(f"✅ Base64 conversion complete")
+        
         return {"image": image_b64}
     except Exception as e:
         print(f"❌ Error in api_color_relief: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
         raise
 
 @app.post("/api/tri")
-async def api_tri(input_file: str = Form(...)):
-    """Generate TRI from LAZ file"""
+async def api_tri(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
+    """Generate TRI from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/tri")
-    print(f"📥 Input file: {input_file}")
+    
+    # Determine processing mode: region-based or LAZ file-based
+    if region_name and processing_type:
+        # Region-based processing: find LAZ file in region
+        print(f"📍 Region-based processing: {region_name}")
+        print(f"🔧 Processing type: {processing_type}")
+        
+        # Look for LAZ files in the region's lidar directory
+        import glob
+        from pathlib import Path
+        
+        laz_pattern = f"input/{region_name}/lidar/*.laz"
+        laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            # Fallback: look directly in region directory
+            laz_pattern = f"input/{region_name}/*.laz"
+            laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            raise ValueError(f"No LAZ files found in region {region_name}")
+        
+        # Use the first LAZ file found
+        input_file = laz_files[0]
+        print(f"📥 Using LAZ file: {input_file}")
+        
+    elif input_file:
+        # LAZ file-based processing (legacy support)
+        print(f"📥 LAZ file-based processing: {input_file}")
+        
+    else:
+        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
         tif_path = tri(input_file)
+        print(f"✅ TIF generated: {tif_path}")
+        
         image_b64 = convert_geotiff_to_png_base64(tif_path)
+        print(f"✅ Base64 conversion complete")
+        
         return {"image": image_b64}
     except Exception as e:
         print(f"❌ Error in api_tri: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
         raise
 
 @app.post("/api/tpi")
-async def api_tpi(input_file: str = Form(...)):
-    """Generate TPI from LAZ file"""
+async def api_tpi(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
+    """Generate TPI from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/tpi")
-    print(f"📥 Input file: {input_file}")
+    
+    # Determine processing mode: region-based or LAZ file-based
+    if region_name and processing_type:
+        # Region-based processing: find LAZ file in region
+        print(f"📍 Region-based processing: {region_name}")
+        print(f"🔧 Processing type: {processing_type}")
+        
+        # Look for LAZ files in the region's lidar directory
+        import glob
+        from pathlib import Path
+        
+        laz_pattern = f"input/{region_name}/lidar/*.laz"
+        laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            # Fallback: look directly in region directory
+            laz_pattern = f"input/{region_name}/*.laz"
+            laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            raise ValueError(f"No LAZ files found in region {region_name}")
+        
+        # Use the first LAZ file found
+        input_file = laz_files[0]
+        print(f"📥 Using LAZ file: {input_file}")
+        
+    elif input_file:
+        # LAZ file-based processing (legacy support)
+        print(f"📥 LAZ file-based processing: {input_file}")
+        
+    else:
+        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
         tif_path = tpi(input_file)
+        print(f"✅ TIF generated: {tif_path}")
+        
         image_b64 = convert_geotiff_to_png_base64(tif_path)
+        print(f"✅ Base64 conversion complete")
+        
         return {"image": image_b64}
     except Exception as e:
         print(f"❌ Error in api_tpi: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
         raise
 
 @app.post("/api/roughness")
-async def api_roughness(input_file: str = Form(...)):
-    """Generate roughness from LAZ file"""
+async def api_roughness(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
+    """Generate roughness from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/roughness")
-    print(f"📥 Input file: {input_file}")
+    
+    # Determine processing mode: region-based or LAZ file-based
+    if region_name and processing_type:
+        # Region-based processing: find LAZ file in region
+        print(f"📍 Region-based processing: {region_name}")
+        print(f"🔧 Processing type: {processing_type}")
+        
+        # Look for LAZ files in the region's lidar directory
+        import glob
+        from pathlib import Path
+        
+        laz_pattern = f"input/{region_name}/lidar/*.laz"
+        laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            # Fallback: look directly in region directory
+            laz_pattern = f"input/{region_name}/*.laz"
+            laz_files = glob.glob(laz_pattern)
+        
+        if not laz_files:
+            raise ValueError(f"No LAZ files found in region {region_name}")
+        
+        # Use the first LAZ file found
+        input_file = laz_files[0]
+        print(f"📥 Using LAZ file: {input_file}")
+        
+    elif input_file:
+        # LAZ file-based processing (legacy support)
+        print(f"📥 LAZ file-based processing: {input_file}")
+        
+    else:
+        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
         tif_path = roughness(input_file)
+        print(f"✅ TIF generated: {tif_path}")
+        
         image_b64 = convert_geotiff_to_png_base64(tif_path)
+        print(f"✅ Base64 conversion complete")
+        
         return {"image": image_b64}
     except Exception as e:
         print(f"❌ Error in api_roughness: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
         raise
 
 @app.post("/api/chat")
@@ -492,7 +904,7 @@ async def get_sentinel2_overlay_data(region_band: str):
             print(f"❌ No overlay data found for Sentinel-2 {band_info} in region {region_name}")
             # Debug: Check what files exist and suggest alternatives
             from pathlib import Path
-            s2_dir = Path("output") / region_name / "sentinel-2"
+            s2_dir = Path("output") / region_name / "sentinel2"
             if s2_dir.exists():
                 files = list(s2_dir.glob("*sentinel2*.png"))
                 print(f"🔍 PNG files in Sentinel-2 directory: {[f.name for f in files]}")
@@ -505,7 +917,7 @@ async def get_sentinel2_overlay_data(region_band: str):
                         band = '_'.join(parts[-2:]).replace('.png', '')
                         available_bands.add(band)
                 
-                error_msg = f"Sentinel-2 {band_info} overlay data not found for region {region_name}"
+                error_msg = f"Sentinel2 {band_info} overlay data not found for region {region_name}"
                 if available_bands:
                     error_msg += f". Available bands: {sorted(available_bands)}"
                     
@@ -616,6 +1028,144 @@ async def get_overlay_data(processing_type: str, filename: str):
         return JSONResponse(
             status_code=500,
             content={"error": f"Failed to get overlay data: {str(e)}"}
+        )
+
+@app.get("/api/overlay/raster/{region_name}/{processing_type}")
+async def get_raster_overlay_data(region_name: str, processing_type: str):
+    """Get overlay data for raster-processed images from regions including bounds and base64 encoded image"""
+    print(f"\n🗺️  API CALL: /api/overlay/raster/{region_name}/{processing_type}")
+    
+    try:
+        from .geo_utils import get_image_bounds_from_geotiff, get_image_bounds_from_world_file
+        import base64
+        import glob
+        
+        print(f"📂 Region name: {region_name}")
+        print(f"🔄 Processing type: {processing_type}")
+        
+        # Construct path to PNG outputs directory
+        png_outputs_dir = f"output/{region_name}/lidar/png_outputs"
+        
+        if not os.path.exists(png_outputs_dir):
+            print(f"❌ PNG outputs directory not found: {png_outputs_dir}")
+            return JSONResponse(
+                status_code=404,
+                content={"error": f"PNG outputs directory not found for region {region_name}"}
+            )
+        
+        # Map processing type to the actual filename pattern
+        # Files are named like: 5.988S_36.145W_elevation_hillshade.png
+        type_mapping = {
+            'hillshade': 'hillshade', 
+            'slope': 'slope',
+            'aspect': 'aspect',
+            'color_relief': 'color_relief',
+            'tri': 'TRI',
+            'tpi': 'TPI',
+            'roughness': 'TRI'  # Default to TRI for roughness, but could also be TPI
+        }
+        
+        filename_pattern = type_mapping.get(processing_type, processing_type)
+        
+        # Find PNG files matching the pattern: *_elevation_{pattern}.png
+        png_pattern = f"{png_outputs_dir}/*_elevation_{filename_pattern}.png"
+        png_files = glob.glob(png_pattern)
+        
+        print(f"🔍 PNG pattern: {png_pattern}")
+        print(f"📁 Found PNG files: {png_files}")
+        
+        if not png_files:
+            print(f"❌ No PNG files found matching pattern: {png_pattern}")
+            # Debug: List what files actually exist
+            if os.path.exists(png_outputs_dir):
+                files = os.listdir(png_outputs_dir)
+                png_files_available = [f for f in files if f.endswith('.png')]
+                print(f"🔍 Available PNG files: {png_files_available}")
+            
+            return JSONResponse(
+                status_code=404,
+                content={"error": f"No PNG files found for {processing_type} in region {region_name}"}
+            )
+        
+        # Use the most recent file if multiple exist
+        png_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+        png_path = png_files[0]
+        
+        # Derive world file and tiff paths
+        base_path = png_path.replace('.png', '')
+        world_path = f"{base_path}.wld"
+        tiff_path = f"{base_path}.tif"
+        
+        print(f"🖼️  PNG path: {png_path}")
+        print(f"🗺️  TIFF path: {tiff_path}")
+        print(f"🌍 World file path: {world_path}")
+        
+        # Check if files exist
+        print(f"📁 PNG exists: {os.path.exists(png_path)}")
+        print(f"🗺️  TIFF exists: {os.path.exists(tiff_path)}")
+        print(f"🌍 World file exists: {os.path.exists(world_path)}")
+        
+        if not os.path.exists(png_path):
+            return JSONResponse(
+                status_code=404,
+                content={"error": f"PNG file not found: {png_path}"}
+            )
+        
+        # Try to get bounds from GeoTIFF first, then world file
+        bounds = None
+        
+        if os.path.exists(tiff_path):
+            print("🗺️  Trying to extract bounds from GeoTIFF...")
+            bounds = get_image_bounds_from_geotiff(tiff_path)
+            if bounds:
+                print(f"✅ Bounds from GeoTIFF: {bounds}")
+            else:
+                print("❌ Failed to extract bounds from GeoTIFF")
+        
+        if not bounds and os.path.exists(world_path):
+            print("🌍 Trying to extract bounds from world file...")
+            # Get image dimensions from PNG
+            from PIL import Image
+            with Image.open(png_path) as img:
+                width, height = img.size
+            print(f"📏 Image dimensions: {width}x{height}")
+            
+            bounds = get_image_bounds_from_world_file(world_path, width, height, None)
+            if bounds:
+                print(f"✅ Bounds from world file: {bounds}")
+            else:
+                print("❌ Failed to extract bounds from world file")
+        
+        if not bounds:
+            print("❌ No coordinate information found")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Could not extract coordinate information from files"}
+            )
+        
+        # Read and encode PNG image
+        print("🖼️  Reading and encoding PNG image...")
+        with open(png_path, 'rb') as f:
+            image_data = base64.b64encode(f.read()).decode('utf-8')
+        
+        print(f"✅ Successfully prepared raster overlay data")
+        overlay_data = {
+            'bounds': bounds,
+            'image_data': image_data,
+            'processing_type': processing_type,
+            'region_name': region_name,
+            'filename': os.path.basename(png_path)
+        }
+        
+        return overlay_data
+        
+    except Exception as e:
+        print(f"❌ Error getting raster overlay data: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to get raster overlay data: {str(e)}"}
         )
 
 @app.get("/api/test-overlay/{filename}")
@@ -1147,6 +1697,474 @@ async def get_storage_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ============================================================================
+# OPTIMAL ELEVATION DATA API ENDPOINTS
+# ============================================================================
+
+# Import optimal elevation downloader
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+try:
+    from optimal_elevation_downloader import OptimalElevationDownloader, DatasetType, TerrainType
+    OPTIMAL_ELEVATION_AVAILABLE = True
+except ImportError:
+    OPTIMAL_ELEVATION_AVAILABLE = False
+    print("Warning: optimal_elevation_downloader not available")
+
+# Initialize optimal elevation downloader if available
+if OPTIMAL_ELEVATION_AVAILABLE:
+    try:
+        optimal_elevation_downloader = OptimalElevationDownloader()
+    except Exception as e:
+        print(f"Warning: Could not initialize optimal elevation downloader: {e}")
+        OPTIMAL_ELEVATION_AVAILABLE = False
+
+class ElevationRequest(BaseModel):
+    region_key: str
+    force_dataset: Optional[str] = None
+
+@app.get("/api/elevation/regions")
+async def get_elevation_regions():
+    """Get list of Brazilian regions with terrain classification and optimal datasets"""
+    if not OPTIMAL_ELEVATION_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Optimal elevation service not available")
+    
+    try:
+        regions = {}
+        for region_key, region_info in optimal_elevation_downloader.brazilian_regions.items():
+            optimal_dataset = optimal_elevation_downloader.get_optimal_dataset(region_key)
+            dataset_info = optimal_elevation_downloader.datasets[optimal_dataset]
+            
+            regions[region_key] = {
+                "name": region_info["name"],
+                "state": region_info["state"],
+                "coordinates": {
+                    "lat": region_info["lat"],
+                    "lng": region_info["lng"]
+                },
+                "terrain": region_info["terrain"].value,
+                "optimal_dataset": {
+                    "type": optimal_dataset.value,
+                    "name": dataset_info.name,
+                    "resolution": dataset_info.resolution,
+                    "priority": dataset_info.priority,
+                    "requires_auth": dataset_info.requires_auth
+                }
+            }
+        
+        return {
+            "success": True,
+            "regions": regions,
+            "total_regions": len(regions)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/elevation/datasets")
+async def get_elevation_datasets():
+    """Get information about available elevation datasets"""
+    if not OPTIMAL_ELEVATION_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Optimal elevation service not available")
+    
+    try:
+        datasets = {}
+        for dataset_type, dataset_info in optimal_elevation_downloader.datasets.items():
+            datasets[dataset_type.value] = {
+                "name": dataset_info.name,
+                "opentopo_name": dataset_info.opentopo_name,
+                "resolution": dataset_info.resolution,
+                "coverage": dataset_info.coverage,
+                "priority": dataset_info.priority,
+                "requires_auth": dataset_info.requires_auth,
+                "best_for": [terrain.value for terrain in dataset_info.best_for]
+            }
+        
+        return {
+            "success": True,
+            "datasets": datasets,
+            "total_datasets": len(datasets)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/elevation/terrain-recommendations")
+async def get_terrain_recommendations():
+    """Get terrain-based dataset recommendations"""
+    if not OPTIMAL_ELEVATION_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Optimal elevation service not available")
+    
+    try:
+        recommendations = optimal_elevation_downloader.get_terrain_recommendations()
+        return {
+            "success": True,
+            "recommendations": recommendations
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/elevation/status")
+async def get_elevation_status():
+    """Get optimal elevation system status and configuration"""
+    if not OPTIMAL_ELEVATION_AVAILABLE:
+        return {
+            "success": False,
+            "available": False,
+            "error": "Optimal elevation downloader not available"
+        }
+    
+    try:
+        # Check authentication status
+        api_key = optimal_elevation_downloader.config.get('opentopography', 'api_key', fallback='')
+        username = optimal_elevation_downloader.config.get('opentopography', 'username', fallback='')
+        password = optimal_elevation_downloader.config.get('opentopography', 'password', fallback='')
+        
+        auth_configured = bool(api_key or (username and password))
+        
+        return {
+            "success": True,
+            "available": True,
+            "configuration": {
+                "auth_configured": auth_configured,
+                "regions_configured": len(optimal_elevation_downloader.brazilian_regions),
+                "datasets_available": len(optimal_elevation_downloader.datasets),
+                "terrain_types_supported": len(TerrainType),
+                "config_file": str(optimal_elevation_downloader.base_path / "elevation_config.ini")
+            },
+            "auth_status": "configured" if auth_configured else "not_configured",
+            "setup_url": "https://portal.opentopography.org/"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/elevation/download")
+async def download_elevation_data(request: ElevationRequest):
+    """Download optimal elevation data for a Brazilian region"""
+    if not OPTIMAL_ELEVATION_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Optimal elevation service not available")
+    
+    try:
+        # Validate region
+        if request.region_key not in optimal_elevation_downloader.brazilian_regions:
+            available_regions = list(optimal_elevation_downloader.brazilian_regions.keys())
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Unknown region: {request.region_key}. Available regions: {available_regions}"
+            )
+        
+        # Parse force_dataset if provided
+        force_dataset = None
+        if request.force_dataset:
+            try:
+                force_dataset = DatasetType(request.force_dataset)
+            except ValueError:
+                valid_datasets = [dt.value for dt in DatasetType]
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid dataset: {request.force_dataset}. Valid datasets: {valid_datasets}"
+                )
+        
+        # Download elevation data
+        result = optimal_elevation_downloader.download_elevation_data(
+            request.region_key, 
+            force_dataset=force_dataset
+        )
+        
+        if result["success"]:
+            return {
+                "success": True,
+                "region": request.region_key,
+                "dataset": result.get("dataset"),
+                "file_path": result.get("file_path"),
+                "file_size_mb": result.get("file_size_mb"),
+                "resolution": result.get("resolution"),
+                "source": result.get("source"),
+                "bbox": result.get("bbox")
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=result.get("error", "Download failed")
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/elevation/download-all")
+async def download_all_elevation_data():
+    """Download optimal elevation data for all Brazilian regions"""
+    if not OPTIMAL_ELEVATION_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Optimal elevation service not available")
+    
+    try:
+        results = optimal_elevation_downloader.download_all_regions()
+        
+        return {
+            "success": True,
+            "results": results,
+            "summary": results["summary"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# END OPTIMAL ELEVATION DATA API ENDPOINTS  
+# ============================================================================
+
+# ============================================================================
+# RASTER GENERATION API ENDPOINTS
+# ============================================================================
+
+@app.post("/api/generate-rasters")
+async def generate_rasters(request: RasterGenerationRequest):
+    """Generate raster products from elevation TIFF files in a region"""
+    try:
+        print(f"\n🎨 API CALL: /api/generate-rasters")
+        print(f"🏷️ Region: {request.region_name}")
+        
+        # Import the raster generation service
+        from .api_raster_generation import generate_rasters_for_region
+        
+        # Create progress callback that sends updates via WebSocket
+        async def progress_callback(update):
+            await manager.send_progress_update({
+                "source": "raster_generation",
+                "region_name": request.region_name,
+                **update
+            })
+        
+        # Send initial progress update
+        await progress_callback({
+            "type": "raster_generation_started",
+            "message": f"Starting raster generation for region: {request.region_name}",
+            "progress": 0
+        })
+        
+        # Generate raster products
+        result = await generate_rasters_for_region(request.region_name)
+        
+        if result['success']:
+            # Send completion update
+            await progress_callback({
+                "type": "raster_generation_completed",
+                "message": f"Raster generation completed successfully for {request.region_name}",
+                "progress": 100,
+                "products_generated": result['products_generated'],
+                "total_products": result['total_products']
+            })
+            
+            return {
+                "success": True,
+                "region_name": request.region_name,
+                "products_generated": result['products_generated'],
+                "png_outputs": result['png_outputs'],
+                "total_products": result['total_products'],
+                "processing_time": result['processing_time'],
+                "message": f"Generated {result['total_products']} raster products for region {request.region_name}",
+                "errors": result.get('errors', [])
+            }
+        else:
+            # Send error update
+            error_messages = result.get('errors', ['Unknown error'])
+            error_text = '; '.join(error_messages)
+            await progress_callback({
+                "type": "raster_generation_error",
+                "message": f"Raster generation failed: {error_text}",
+                "progress": 0
+            })
+            
+            raise HTTPException(
+                status_code=400,
+                detail=error_text
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Send error update via WebSocket if possible
+        try:
+            await manager.send_progress_update({
+                "source": "raster_generation",
+                "region_name": request.region_name,
+                "type": "raster_generation_error",
+                "message": f"Raster generation error: {str(e)}"
+            })
+        except:
+            pass
+        
+        print(f"❌ Error in generate_rasters: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Raster generation failed: {str(e)}")
+
+# ============================================================================
+# END RASTER GENERATION API ENDPOINTS
+# ============================================================================
+
+@app.post("/api/elevation/download-coordinates")
+async def download_elevation_coordinates(request: CoordinateRequest):
+    """Download elevation data (GeoTIFF) for specific coordinates using optimal source"""
+    try:
+        # Validate coordinates
+        if not (-90 <= request.lat <= 90):
+            raise HTTPException(status_code=400, detail=f"Invalid latitude: {request.lat}. Must be between -90 and 90.")
+        if not (-180 <= request.lng <= 180):
+            raise HTTPException(status_code=400, detail=f"Invalid longitude: {request.lng}. Must be between -180 and 180.")
+        
+        # Import required modules
+        import uuid
+        from .data_acquisition.sources.opentopography import OpenTopographySource
+        from .data_acquisition.sources.brazilian_elevation import BrazilianElevationSource
+        from .data_acquisition.sources.base import DownloadRequest, DataType, DataResolution
+        from .data_acquisition.utils.coordinates import BoundingBox
+        
+        # Generate unique download ID
+        download_id = str(uuid.uuid4())
+        
+        # Create bounding box with buffer
+        buffer_deg = request.buffer_km / 111  # Rough conversion: 1 degree ≈ 111 km
+        bbox = BoundingBox(
+            west=request.lng - buffer_deg,
+            south=request.lat - buffer_deg,
+            east=request.lng + buffer_deg,
+            north=request.lat + buffer_deg
+        )
+        
+        print(f"🌍 Downloading elevation data for coordinates: {request.lat:.4f}, {request.lng:.4f}")
+        print(f"🔲 BBox: West={bbox.west:.4f}, South={bbox.south:.4f}, East={bbox.east:.4f}, North={bbox.north:.4f}")
+        print(f"📐 Size: {(bbox.east-bbox.west)*111:.2f}km x {(bbox.north-bbox.south)*111:.2f}km")
+        
+        # Create download request for elevation data
+        download_request = DownloadRequest(
+            bbox=bbox,
+            data_type=DataType.ELEVATION,  # Request elevation instead of LAZ
+            resolution=DataResolution.HIGH,
+            max_file_size_mb=100.0,
+            output_format="GeoTIFF",
+            region_name=request.region_name
+        )
+        
+        # Choose optimal source based on coordinates
+        brazilian_source = BrazilianElevationSource()
+        is_brazilian_coords = brazilian_source.is_in_brazil(request.lat, request.lng)
+        
+        if is_brazilian_coords:
+            # Use Brazilian elevation source for Brazilian coordinates
+            elevation_source = brazilian_source
+            source_name = "Brazilian Elevation"
+            terrain_type = elevation_source.classify_terrain(request.lat, request.lng)
+            optimal_dataset = elevation_source.get_optimal_dataset(request.lat, request.lng)
+            print(f"🇧🇷 Using Brazilian elevation source - Terrain: {terrain_type.value}, Dataset: {optimal_dataset.value}")
+        else:
+            # Use OpenTopography for US/other coordinates
+            elevation_source = OpenTopographySource()
+            source_name = "OpenTopography 3DEP"
+            print(f"🇺🇸 Using OpenTopography source for non-Brazilian coordinates")
+        
+        # Create progress callback that sends updates via WebSocket
+        async def progress_callback(update):
+            await manager.send_progress_update({
+                "source": "elevation_data",
+                "coordinates": {"lat": request.lat, "lng": request.lng},
+                "download_id": download_id,
+                "data_source": source_name,
+                **update
+            })
+        
+        # Register download task for potential cancellation
+        manager.add_download_task(download_id, elevation_source)
+        
+        # Check availability first
+        available = await elevation_source.check_availability(download_request)
+        if not available:
+            # Clean up download registration
+            manager.cancel_download(download_id)
+            
+            if is_brazilian_coords:
+                error_msg = f"No Brazilian elevation data available for coordinates {request.lat:.4f}, {request.lng:.4f}"
+            else:
+                error_msg = f"No elevation data available for coordinates {request.lat:.4f}, {request.lng:.4f}"
+            
+            raise HTTPException(status_code=404, detail=error_msg)
+        
+        # Send initial progress
+        await progress_callback({
+            "type": "download_started",
+            "message": f"Starting {source_name} elevation data download...",
+            "progress": 0
+        })
+        
+        # Download elevation data
+        result = await elevation_source.download(download_request, progress_callback)
+        
+        # Clean up download registration
+        manager.cancel_download(download_id)
+        
+        if result.success:
+            # Send final success message
+            await progress_callback({
+                "type": "download_completed",
+                "message": f"Elevation data downloaded successfully ({result.file_size_mb:.1f} MB)",
+                "progress": 100,
+                "file_path": result.file_path
+            })
+            
+            # Prepare response with source-specific information
+            response_data = {
+                "success": True,
+                "coordinates": {"lat": request.lat, "lng": request.lng},
+                "file_path": result.file_path,
+                "file_size_mb": round(result.file_size_mb, 2),
+                "resolution_m": result.resolution_m or 30.0,
+                "data_type": "elevation",
+                "format": "GeoTIFF",
+                "source": source_name,
+                "download_id": download_id,
+                "region_name": request.region_name
+            }
+            
+            # Add Brazilian-specific metadata if applicable
+            if is_brazilian_coords and result.metadata:
+                response_data.update({
+                    "terrain_type": result.metadata.get("terrain_type"),
+                    "dataset": result.metadata.get("dataset"),
+                    "dataset_name": result.metadata.get("dataset_name")
+                })
+            
+            return response_data
+        else:
+            await progress_callback({
+                "type": "download_error",
+                "message": f"Elevation download failed: {result.error_message}",
+                "progress": 0
+            })
+            raise HTTPException(status_code=500, detail=result.error_message)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Send error message via WebSocket if possible
+        try:
+            await manager.send_progress_update({
+                "source": "elevation_data", 
+                "coordinates": {"lat": request.lat, "lng": request.lng},
+                "download_id": download_id,
+                "type": "download_error",
+                "message": f"Elevation download error: {str(e)}"
+            })
+        except:
+            pass
+        
+        # Clean up download registration
+        try:
+            manager.cancel_download(download_id)
+        except:
+            pass
+            
+        raise HTTPException(status_code=500, detail=f"Elevation download failed: {str(e)}")
+
 @app.post("/api/download-sentinel2")
 async def download_sentinel2(request: Sentinel2Request):
     """Download Sentinel-2 red and NIR bands for given coordinates using Copernicus CDSE"""
@@ -1270,7 +2288,12 @@ async def convert_sentinel2_images(region_name: str = Form(...)):
         from pathlib import Path
         
         # Find the data directory for this region - now reading from input folder
-        data_dir = Path("input") / region_name
+        # If region_name ends with _elevation, remove it for Sentinel-2 processing
+        processed_region_name = region_name
+        if region_name.endswith("_elevation"):
+            processed_region_name = region_name[:-len("_elevation")]
+
+        data_dir = Path("input") / processed_region_name
         
         if not data_dir.exists():
             return {
@@ -1279,9 +2302,16 @@ async def convert_sentinel2_images(region_name: str = Form(...)):
                 "files": [],
                 "errors": []
             }
+            
+        # Check if sentinel2 subfolder exists
+        sentinel2_subfolder = data_dir / "sentinel2"
+        if sentinel2_subfolder.exists():
+            print(f"✅ Found Sentinel-2 subfolder: {sentinel2_subfolder}")
+        else:
+            print(f"⚠️ Sentinel-2 subfolder not found, will check directly in input folder")
         
         # Convert TIF files to PNG
-        conversion_result = convert_sentinel2_to_png(str(data_dir), region_name)
+        conversion_result = convert_sentinel2_to_png(str(data_dir), processed_region_name)
         
         if conversion_result['success']:
             # Generate base64 encoded images for immediate display
@@ -1344,7 +2374,7 @@ async def list_regions():
             
             # Attempt to find metadata for center coordinates
             # Check for Sentinel-2 metadata first (more likely to have it from recent downloads)
-            sentinel_metadata_path = os.path.join(output_dir, region_name, "sentinel-2", "metadata.json")
+            sentinel_metadata_path = os.path.join(output_dir, region_name, "sentinel2", "metadata.json")
             lidar_metadata_path_ot = os.path.join(output_dir, region_name, "lidar", f"metadata_{region_name}.txt") # OpenTopography
             lidar_metadata_path_usgs = os.path.join(output_dir, region_name, "lidar", f"info_{region_name}.json") # USGS
 
@@ -1475,6 +2505,47 @@ async def list_regions():
         
     regions_with_metadata.sort(key=lambda x: x["name"])
     return {"regions": regions_with_metadata}
+
+@app.delete("/api/delete-region/{region_name}")
+async def delete_region(region_name: str):
+    """Delete a region by removing its input and output folders"""
+    try:
+        import shutil
+        from pathlib import Path
+        
+        # Define the paths to the region folders
+        input_folder = Path("input") / region_name
+        output_folder = Path("output") / region_name
+        
+        deleted_folders = []
+        
+        # Delete input folder if it exists
+        if input_folder.exists() and input_folder.is_dir():
+            shutil.rmtree(input_folder)
+            deleted_folders.append(str(input_folder))
+        
+        # Delete output folder if it exists
+        if output_folder.exists() and output_folder.is_dir():
+            shutil.rmtree(output_folder)
+            deleted_folders.append(str(output_folder))
+        
+        if deleted_folders:
+            return {
+                "success": True,
+                "message": f"Region '{region_name}' deleted successfully",
+                "deleted_folders": deleted_folders
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"Region '{region_name}' not found",
+                "deleted_folders": []
+            }
+    except Exception as e:
+        import traceback
+        print(f"Error deleting region {region_name}: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to delete region: {str(e)}")
 
 async def progress_callback_wrapper(progress_data: dict, region_name: Optional[str] = None):
     """Wraps the progress callback to include region_name if available."""

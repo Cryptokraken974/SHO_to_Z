@@ -109,6 +109,10 @@ window.FileManager = {
     // Check if Sentinel-2 data exists for this region and display it
     // This requires a new function or modification to an existing one
     UIManager.displaySentinel2ImagesForRegion(regionName);
+
+    //Potentially trigger display of LIDAR raster images for this region if available
+    UIManager.displayLidarRasterForRegion(regionName);
+    
   },
 
   /**
@@ -214,5 +218,54 @@ window.FileManager = {
     // Clear satellite image gallery when selection is cleared
     $('#satellite-gallery').empty().html('<div class="no-files">Select a region to see satellite images.</div>');
     Utils.log('info', 'Region selection cleared');
+  },
+
+  /**
+   * Delete a region from the system
+   * @param {string} regionName - Name of the region to delete
+   * @returns {Promise<Object>} - Result of the deletion operation
+   */
+  async deleteRegion(regionName) {
+    try {
+      Utils.log('info', `Deleting region: ${regionName}`);
+      
+      const response = await fetch(`/api/delete-region/${regionName}`, {
+        method: 'DELETE',
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        Utils.log('info', `Successfully deleted region: ${regionName}`, data);
+        
+        // If this was the selected region, clear the selection
+        if (this.selectedRegion === regionName) {
+          this.selectedRegion = null;
+        }
+        
+        // Clear map markers if necessary
+        this.clearRegionMarkers();
+        
+        // Reload file list
+        await this.loadFiles();
+        
+        return {
+          success: true,
+          message: data.message
+        };
+      } else {
+        Utils.log('error', `Failed to delete region: ${regionName}`, data);
+        return {
+          success: false,
+          message: data.message || 'Failed to delete region'
+        };
+      }
+    } catch (error) {
+      Utils.log('error', `Error deleting region: ${regionName}`, error);
+      return {
+        success: false,
+        message: error.message || 'An error occurred while deleting the region'
+      };
+    }
   },
 };

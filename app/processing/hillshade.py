@@ -3,6 +3,7 @@ import time
 import os
 import logging
 import subprocess
+from pathlib import Path
 from typing import Dict, Any
 from osgeo import gdal
 from .dtm import dtm
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 async def process_hillshade(laz_file_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Process Hillshade from LAZ file
+    Process hillshade from LAZ file with comprehensive logging.
     
     Args:
         laz_file_path: Path to the input LAZ file
@@ -23,14 +24,12 @@ async def process_hillshade(laz_file_path: str, output_dir: str, parameters: Dic
     """
     start_time = time.time()
     
-    # Enhanced logging
-    print(f"\n{'='*50}")
-    print(f"🚀 STARTING HILLSHADE PROCESSING")
-    print(f"{'='*50}")
-    print(f"📁 Input LAZ file: {laz_file_path}")
-    print(f"📂 Output directory: {output_dir}")
+    print(f"{'='*60}")
+    print(f"🏔️ HILLSHADE PROCESSING STARTING")
+    print(f"{'='*60}")
+    print(f"📂 Input file: {laz_file_path}")
+    print(f"📁 Output directory: {output_dir}")
     print(f"⚙️ Parameters: {parameters}")
-    print(f"🕐 Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))}")
     
     logger.info(f"Starting Hillshade processing for {laz_file_path}")
     logger.info(f"Output directory: {output_dir}")
@@ -38,69 +37,88 @@ async def process_hillshade(laz_file_path: str, output_dir: str, parameters: Dic
     
     try:
         # Create output directory if it doesn't exist
-        print(f"📁 Creating output directory if needed...")
+        print(f"📁 [FOLDER CREATION] Creating output directory if needed...")
+        print(f"   🔍 Checking if directory exists: {output_dir}")
+        
+        if os.path.exists(output_dir):
+            print(f"   ✅ Directory already exists: {output_dir}")
+        else:
+            print(f"   🆕 Directory doesn't exist, creating: {output_dir}")
+            
         os.makedirs(output_dir, exist_ok=True)
-        print(f"✅ Output directory ready: {output_dir}")
+        print(f"   ✅ [FOLDER CREATED] Output directory ready: {output_dir}")
         logger.info(f"Output directory created/verified: {output_dir}")
         
+        # Extract region name from file path for consistent naming
+        print(f"🔍 [REGION EXTRACTION] Extracting region name from file path...")
+        input_path = Path(laz_file_path)
+        print(f"   📂 Full input path: {input_path}")
+        print(f"   🧩 Path parts: {input_path.parts}")
+        
+        if "lidar" in input_path.parts:
+            region_name = input_path.parts[input_path.parts.index("input") + 1]
+            print(f"   🎯 Found 'lidar' in path, extracted region: {region_name}")
+        else:
+            region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(laz_file_path))[0]
+            print(f"   🎯 No 'lidar' in path, extracted region: {region_name}")
+            
+        print(f"   ✅ [REGION IDENTIFIED] Using region name: {region_name}")
+        
+        # Generate output filename using new naming convention
+        output_filename = f"{region_name}_Hillshade.tif"
+        output_file = os.path.join(output_dir, output_filename)
+        print(f"📄 [FILE CREATION] Creating output file: {output_file}")
+        print(f"   📝 Filename pattern: <region_name>_Hillshade.tif")
+        print(f"   🏷️ Generated filename: {output_filename}")
+
         # Check if input file exists
-        print(f"🔍 Validating input file...")
+        print(f"🔍 [FILE VALIDATION] Validating input file...")
         if not os.path.exists(laz_file_path):
             error_msg = f"LAZ file not found: {laz_file_path}"
-            print(f"❌ {error_msg}")
+            print(f"❌ [VALIDATION ERROR] {error_msg}")
             logger.error(error_msg)
             raise FileNotFoundError(error_msg)
         
         file_size = os.path.getsize(laz_file_path)
-        print(f"✅ Input file validated: {laz_file_path}")
-        print(f"📊 File size: {file_size:,} bytes ({file_size / (1024**2):.2f} MB)")
+        print(f"✅ [FILE VALIDATED] Input file exists: {laz_file_path}")
+        print(f"📊 [FILE INFO] File size: {file_size:,} bytes ({file_size / (1024**2):.2f} MB)")
         logger.info(f"Input file validated - Size: {file_size} bytes")
         
         # Get parameters with defaults
         azimuth = parameters.get("azimuth", 315)
         altitude = parameters.get("altitude", 45)
         
-        print(f"⚙️ Hillshade parameters:")
+        print(f"⚙️ [PROCESSING CONFIG] Hillshade parameters:")
         print(f"   🧭 Azimuth: {azimuth}°")
         print(f"   📐 Altitude: {altitude}°")
         
         logger.info(f"Processing with azimuth={azimuth}, altitude={altitude}")
         
-        print(f"🔄 Processing Hillshade (simulated)...")
+        print(f"🔄 [PROCESSING] Processing Hillshade (simulated)...")
         print(f"   🌄 Calculating terrain relief...")
         print(f"   ☀️ Applying lighting model...")
         print(f"   🎨 Generating shaded relief...")
         
         # Simulate processing time
-        await asyncio.sleep(2.5)
-        print(f"⏳ Hillshade processing simulation completed")
-        
-        # TODO: Implement actual hillshade processing
-        # This would typically involve:
-        # 1. Reading LAZ file and creating DEM
-        # 2. Calculating slope and aspect
-        # 3. Applying hillshade algorithm with lighting parameters
-        # 4. Saving as GeoTIFF
-        
-        # Generate output filename using new naming convention: <laz_filename_without_ext>_<processing_step>
-        laz_basename = os.path.splitext(os.path.basename(laz_file_path))[0]
-        output_filename = f"{laz_basename}_Hillshade.tif"
-        output_file = os.path.join(output_dir, output_filename)
-        print(f"📄 Creating output file: {output_file}")
+        await asyncio.sleep(2)
         
         # Simulate creating output file
+        print(f"💾 [FILE WRITING] Creating output file...")
+        print(f"   📂 Writing to: {output_file}")
+        
         with open(output_file, 'w') as f:
             f.write("Hillshade placeholder file")
         
         output_size = os.path.getsize(output_file)
-        print(f"✅ Output file created successfully")
-        print(f"📊 Output file size: {output_size} bytes")
+        print(f"✅ [FILE CREATED] Output file created successfully")
+        print(f"   📂 File location: {output_file}")
+        print(f"   📊 File size: {output_size} bytes")
         
         processing_time = time.time() - start_time
         
-        print(f"⏱️ Processing completed in {processing_time:.2f} seconds")
-        print(f"✅ HILLSHADE PROCESSING SUCCESSFUL")
-        print(f"{'='*50}\n")
+        print(f"⏱️ [TIMING] Processing completed in {processing_time:.2f} seconds")
+        print(f"✅ [SUCCESS] HILLSHADE PROCESSING SUCCESSFUL")
+        print(f"{'='*60}\n")
         
         logger.info(f"Hillshade processing completed in {processing_time:.2f} seconds")
         logger.info(f"Output file created: {output_file}")
@@ -127,7 +145,7 @@ async def process_hillshade(laz_file_path: str, output_dir: str, parameters: Dic
         
         print(f"❌ FILE NOT FOUND ERROR after {processing_time:.2f}s")
         print(f"❌ Error: {error_msg}")
-        print(f"{'='*50}\n")
+        print(f"{'='*60}\n")
         
         logger.error(f"File not found error in Hillshade processing: {error_msg}")
         
@@ -146,7 +164,7 @@ async def process_hillshade(laz_file_path: str, output_dir: str, parameters: Dic
         print(f"❌ UNEXPECTED ERROR after {processing_time:.2f}s")
         print(f"❌ Error type: {type(e).__name__}")
         print(f"❌ Error message: {error_msg}")
-        print(f"{'='*50}\n")
+        print(f"{'='*60}\n")
         
         logger.error(f"Unexpected error in Hillshade processing: {error_msg}", exc_info=True)
         
@@ -160,66 +178,109 @@ async def process_hillshade(laz_file_path: str, output_dir: str, parameters: Dic
 
 def generate_hillshade_with_params(input_file: str, azimuth: float, altitude: float, z_factor: float, suffix: str = "") -> str:
     """
-    Generate hillshade from LAZ file with specific parameters
-    
-    Args:
-        input_file: Path to the input LAZ file
-        azimuth: Light source azimuth in degrees
-        altitude: Light source altitude in degrees  
-        z_factor: Vertical exaggeration factor
-        suffix: Optional suffix for the output filename
-        
-    Returns:
-        Path to the generated hillshade TIF file
+    Generate hillshade with comprehensive logging of all file/folder operations.
     """
-    print(f"\n🌄 HILLSHADE: Starting generation for {input_file}")
-    print(f"⚙️ Parameters: Azimuth={azimuth}°, Altitude={altitude}°, Z-factor={z_factor}")
     start_time = time.time()
     
-    # Extract the base name without path and extension
-    laz_basename = os.path.splitext(os.path.basename(input_file))[0]
+    print(f"\n{'='*70}")
+    print(f"🏔️ HILLSHADE GENERATION WITH PARAMETERS")
+    print(f"{'='*70}")
+    print(f"📂 Input file: {input_file}")
+    print(f"⚙️ Parameters: azimuth={azimuth}°, altitude={altitude}°, z_factor={z_factor}")
+    print(f"🏷️ Suffix: '{suffix}' (empty = default naming)")
     
-    # Create output directory structure: output/<laz_basename>/Hillshade/
-    output_dir = os.path.join("output", laz_basename, "Hillshade")
-    os.makedirs(output_dir, exist_ok=True)
+    # Extract region name from file path for consistent naming
+    print(f"\n🔍 [REGION EXTRACTION] Analyzing file path structure...")
+    input_path = Path(input_file)
+    print(f"   📂 Full input path: {input_path}")
+    print(f"   🧩 Path parts: {input_path.parts}")
     
-    # Generate output filename with suffix if provided
-    if suffix:
-        output_filename = f"{laz_basename}_hillshade_{suffix}.tif"
+    if "lidar" in input_path.parts:
+        # File is in lidar subfolder: extract parent's parent as region name
+        region_name = input_path.parts[input_path.parts.index("input") + 1]
+        print(f"   🎯 Found 'lidar' subfolder structure")
+        print(f"   📍 Region name from parent directory: {region_name}")
     else:
-        output_filename = f"{laz_basename}_hillshade.tif"
+        # File is directly in input folder: extract parent as region name
+        region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
+        print(f"   🎯 Direct input folder structure")
+        print(f"   📍 Region name extracted: {region_name}")
+        
+    print(f"   ✅ [REGION IDENTIFIED] Final region name: {region_name}")
+
+    # Create output directory structure: output/<region_name>/Hillshade/
+    print(f"\n📁 [FOLDER CREATION] Setting up output directory structure...")
+    output_dir = os.path.join("output", region_name, "Hillshade")
+    print(f"   🏗️ Target directory: {output_dir}")
+    print(f"   🔍 Checking if directory exists...")
+    
+    if os.path.exists(output_dir):
+        print(f"   ✅ Directory already exists: {output_dir}")
+    else:
+        print(f"   🆕 Directory doesn't exist, creating...")
+        print(f"   📂 Creating path: {output_dir}")
+    
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"   ✅ [FOLDER CREATED] Output directory ready: {output_dir}")
+
+    # Generate output filename with suffix if provided
+    print(f"\n📄 [FILE NAMING] Generating output filename...")
+    if suffix:
+        output_filename = f"{region_name}_hillshade_{suffix}.tif"
+        print(f"   🏷️ Using suffix pattern: <region>_hillshade_<suffix>.tif")
+    else:
+        output_filename = f"{region_name}_hillshade.tif"
+        print(f"   🏷️ Using default pattern: <region>_hillshade.tif")
+        
     output_path = os.path.join(output_dir, output_filename)
+    print(f"   📄 Generated filename: {output_filename}")
+    print(f"   📂 Full output path: {output_path}")
     
-    print(f"📂 Output directory: {output_dir}")
-    print(f"📄 Output file: {output_path}")
-    
+    print(f"\n📊 [FILE ANALYSIS] Analyzing input and output files...")
+    print(f"   📂 Input file location: {input_file}")
+    print(f"   📂 Output directory: {output_dir}")
+    print(f"   📄 Output file: {output_path}")
+
     # Check if hillshade already exists and is up-to-date (caching optimization)
+    print(f"\n🗄️ [CACHE CHECK] Checking for existing hillshade file...")
     if os.path.exists(output_path) and os.path.exists(input_file):
+        print(f"   📄 Found existing file: {output_path}")
         try:
             # Compare modification times
             hillshade_mtime = os.path.getmtime(output_path)
             laz_mtime = os.path.getmtime(input_file)
             
+            print(f"   ⏰ Hillshade modified: {time.ctime(hillshade_mtime)}")
+            print(f"   ⏰ LAZ file modified: {time.ctime(laz_mtime)}")
+            
             if hillshade_mtime > laz_mtime:
                 processing_time = time.time() - start_time
-                print(f"🚀 Hillshade cache hit! Using existing file (created {time.ctime(hillshade_mtime)})")
-                print(f"✅ Hillshade ready in {processing_time:.3f} seconds (cached)")
+                print(f"   🚀 [CACHE HIT] Using existing file (newer than source)")
+                print(f"   ✅ Cache validation successful in {processing_time:.3f} seconds")
+                print(f"{'='*70}\n")
                 return output_path
             else:
-                print(f"⏰ Hillshade exists but is outdated. LAZ modified: {time.ctime(laz_mtime)}, Hillshade created: {time.ctime(hillshade_mtime)}")
+                print(f"   ⚠️ [CACHE MISS] Hillshade is outdated")
+                print(f"   🔄 LAZ modified: {time.ctime(laz_mtime)}")
+                print(f"   🔄 Hillshade created: {time.ctime(hillshade_mtime)}")
+                print(f"   ♻️ Will regenerate hillshade...")
         except OSError as e:
-            print(f"⚠️ Error checking file timestamps: {e}")
+            print(f"   ⚠️ Error checking file timestamps: {e}")
+            print(f"   🔄 Proceeding with regeneration...")
     elif os.path.exists(output_path):
-        print(f"⚠️ Hillshade exists but input LAZ file not found, regenerating hillshade")
+        print(f"   ⚠️ Hillshade exists but input LAZ file not found")
+        print(f"   🔄 Will regenerate hillshade")
     else:
-        print(f"📝 No existing hillshade found, generating new hillshade")
-    
+        print(f"   📝 No existing hillshade found")
+        print(f"   🆕 Will generate new hillshade")
+
     try:
         # Step 1: Generate or locate DTM
-        print(f"\n🏔️ Step 1: Generating DTM as source for hillshade...")
+        print(f"\n🏔️ [STEP 1] DTM Generation/Location...")
+        print(f"   🔍 Checking for DTM as source for hillshade...")
         dtm_path = dtm(input_file)
-        print(f"✅ DTM ready: {dtm_path}")
-        
+        print(f"   ✅ [DTM READY] DTM available at: {dtm_path}")
+
         # Step 2: Generate hillshade using GDAL DEMProcessing
         print(f"\n🌄 Step 2: Generating hillshade using GDAL DEMProcessing...")
         print(f"📁 Source DTM: {dtm_path}")

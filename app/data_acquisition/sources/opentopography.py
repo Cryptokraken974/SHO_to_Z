@@ -393,33 +393,86 @@ class OpenTopographySource(BaseDataSource):
             input_folder = self._create_input_folder(request)
             input_file_path = self._copy_to_input_folder(cache_path, input_folder, request)
             
-            # Send completion
+            # Send completion notification for download
             if progress_callback:
                 await progress_callback({
                     "type": "download_completed",
-                    "message": f"Elevation data downloaded ({file_size:.1f} MB)",
+                    "message": f"Elevation data downloaded ({file_size:.1f} MB). Starting raster processing...",
                     "progress": 100
                 })
+            
+            # Automatically process all raster products from the downloaded elevation TIFF
+            processing_results = None
+            try:
+                print(f"\n🚀 Starting automatic raster processing for: {input_file_path}")
+                
+                # Import and run the automatic processing
+                from ...processing.tiff_processing import process_all_raster_products
+                
+                # Create a progress callback wrapper for processing
+                async def processing_progress_callback(update):
+                    if progress_callback:
+                        # Transform processing progress to continue from 100
+                        processing_update = {
+                            "type": "raster_processing",
+                            "message": update.get("message", "Processing raster products..."),
+                            "progress": update.get("progress", 0),
+                            "stage": "raster_processing"
+                        }
+                        await progress_callback(processing_update)
+                
+                processing_results = await process_all_raster_products(
+                    str(input_file_path), 
+                    processing_progress_callback
+                )
+                
+                if progress_callback:
+                    successful = processing_results.get("successful", 0)
+                    total = processing_results.get("total_tasks", 0)
+                    await progress_callback({
+                        "type": "raster_processing_completed",
+                        "message": f"Raster processing completed: {successful}/{total} products generated",
+                        "progress": 100,
+                        "stage": "completed"
+                    })
+                
+                print(f"✅ Automatic raster processing completed successfully")
+                
+            except Exception as e:
+                print(f"⚠️ Automatic raster processing failed: {str(e)}")
+                if progress_callback:
+                    await progress_callback({
+                        "type": "raster_processing_error",
+                        "message": f"Raster processing failed: {str(e)}",
+                        "progress": 100,
+                        "stage": "error"
+                    })
+                # Don't fail the entire download if processing fails
+                processing_results = {"error": str(e)}
+            
+            # Add processing results to metadata
+            metadata = {
+                'datasets': dataset_names,
+                'source': 'OpenTopography 3DEP',
+                'data_type': 'elevation',
+                'dem_type': dem_type,
+                'format': 'GeoTIFF',
+                'execution_time': execution_time,
+                'processing_results': processing_results,
+                'bbox': {
+                    'west': request.bbox.west,
+                    'south': request.bbox.south,
+                    'east': request.bbox.east,
+                    'north': request.bbox.north
+                }
+            }
             
             return DownloadResult(
                 success=True,
                 file_path=str(input_file_path),
                 file_size_mb=file_size,
                 resolution_m=dem_resolution,
-                metadata={
-                    'datasets': dataset_names,
-                    'source': 'OpenTopography 3DEP',
-                    'data_type': 'elevation',
-                    'dem_type': dem_type,
-                    'format': 'GeoTIFF',
-                    'execution_time': execution_time,
-                    'bbox': {
-                        'west': request.bbox.west,
-                        'south': request.bbox.south,
-                        'east': request.bbox.east,
-                        'north': request.bbox.north
-                    }
-                }
+                metadata=metadata
             )
             
         except Exception as e:
@@ -568,7 +621,17 @@ class OpenTopographySource(BaseDataSource):
 
     def _execute_pipeline_sync(self, pipeline: Dict):
         """Execute PDAL pipeline synchronously."""
-        p = pdal.Pipeline(json.dumps(pipeline))
+        # Ensure output directories exist before execution
+        pipeline_json = json.dumps(pipeline)
+        
+        # Extract output paths from the pipeline to ensure directories exist
+        if 'pipeline' in pipeline:
+            for stage in pipeline['pipeline']:
+                if isinstance(stage, dict) and 'filename' in stage:
+                    output_path = Path(stage['filename'])
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        p = pdal.Pipeline(pipeline_json)
         try:
             # Try to validate, but don't fail if validation method doesn't exist
             if hasattr(p, 'validate'):
@@ -592,20 +655,24 @@ class OpenTopographySource(BaseDataSource):
     def _create_input_folder(self, request: DownloadRequest) -> Path:
         """Create descriptive folder in input directory."""
         if request.region_name:
-            base_folder_name = request.region_name
+            folder_name = request.region_name
         else:
             center_lat = (request.bbox.north + request.bbox.south) / 2
             center_lng = (request.bbox.east + request.bbox.west) / 2
-            base_folder_name = f"{center_lat:.2f}S_{abs(center_lng):.2f}W"
-
-        if request.data_type == DataType.LAZ:
-            folder_name = f"lidar_{base_folder_name}"
-        else:
-            folder_name = f"elevation_{base_folder_name}"
+            lat_dir = 'S' if center_lat < 0 else 'N'
+            lng_dir = 'W' if center_lng < 0 else 'E'
+            folder_name = f"{abs(center_lat):.2f}{lat_dir}_{abs(center_lng):.2f}{lng_dir}"
         
+        # Create main region folder
         input_folder = Path("input") / folder_name
         input_folder.mkdir(parents=True, exist_ok=True)
-        return input_folder
+        
+        # Create lidar subfolder and return it
+        lidar_folder = input_folder / "lidar"
+        lidar_folder.mkdir(parents=True, exist_ok=True)
+        print(f"CREATED FOLDER (opentopography): {lidar_folder}")
+        
+        return lidar_folder
     
     def _copy_to_input_folder(self, cache_path: Path, input_folder: Path, request: DownloadRequest) -> Path:
         """Copy file from cache to input folder with descriptive name."""
@@ -616,32 +683,35 @@ class OpenTopographySource(BaseDataSource):
         else:
             center_lat = (request.bbox.north + request.bbox.south) / 2
             center_lng = (request.bbox.east + request.bbox.west) / 2
-            base_file_name = f"{center_lat:.2f}S_{abs(center_lng):.2f}W"
+            lat_dir = 'S' if center_lat < 0 else 'N'
+            lng_dir = 'W' if center_lng < 0 else 'E'
+            base_file_name = f"{abs(center_lat):.2f}{lat_dir}_{abs(center_lng):.2f}{lng_dir}"
 
+        # input_folder is already the lidar subfolder
         if request.data_type == DataType.LAZ:
-            filename = f"lidar_{base_file_name}_lidar.laz"
+            filename = f"{base_file_name}_lidar.laz"
         else:
-            filename = f"elevation_{base_file_name}_dtm.tif"
+            filename = f"{base_file_name}_elevation.tiff"
         
         input_file_path = input_folder / filename
         shutil.copy2(cache_path, input_file_path)
         
-        # Create metadata file
+        # Create metadata file in the lidar subfolder
         metadata_filename = f"metadata_{base_file_name}.txt"
         metadata_path = input_folder / metadata_filename
         with open(metadata_path, 'w') as f:
-            f.write(f"# OpenTopography 3DEP Data\\n")
-            f.write(f"# Region Name: {request.region_name if request.region_name else 'N/A'}\\n")
-            f.write(f"# Data Type: {'LIDAR Point Cloud' if request.data_type == DataType.LAZ else 'Elevation DTM'}\\n")
-            f.write(f"# Resolution: {self._get_resolution_meters(request.resolution)}m\\n")
-            f.write(f"# Source: USGS 3DEP via OpenTopography/PDAL\\n")
-            f.write(f"# Downloaded: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\\n")
-            f.write(f"# Bounds: {request.bbox.west}, {request.bbox.south}, {request.bbox.east}, {request.bbox.north}\\n")
+            f.write(f"# OpenTopography 3DEP Data\n")
+            f.write(f"# Region Name: {request.region_name if request.region_name else 'N/A'}\n")
+            f.write(f"# Data Type: {'LIDAR Point Cloud' if request.data_type == DataType.LAZ else 'Elevation DTM'}\n")
+            f.write(f"# Resolution: {self._get_resolution_meters(request.resolution)}m\n")
+            f.write(f"# Source: USGS 3DEP via OpenTopography/PDAL\n")
+            f.write(f"# Downloaded: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"# Bounds: {request.bbox.west}, {request.bbox.south}, {request.bbox.east}, {request.bbox.north}\n")
             if not request.region_name: # Only write center if region_name is not used for naming
                 center_lat = (request.bbox.north + request.bbox.south) / 2
                 center_lng = (request.bbox.east + request.bbox.west) / 2
-                f.write(f"# Center: {center_lat:.6f}, {center_lng:.6f}\\n")
-            f.write(f"# File: {filename}\\n")
+                f.write(f"# Center: {center_lat:.6f}, {center_lng:.6f}\n")
+            f.write(f"# File: {filename}\n")
         
         return input_file_path
     

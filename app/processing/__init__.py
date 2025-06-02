@@ -12,6 +12,7 @@ from .color_relief import color_relief
 from .tri import tri
 from .tpi import tpi
 from .roughness import roughness
+from .raster_generation import RasterGenerator
 
 __all__ = [
     'laz_to_dem',
@@ -26,5 +27,6 @@ __all__ = [
     'color_relief',
     'tri',
     'tpi',
-    'roughness'
+    'roughness',
+    'RasterGenerator'
 ]

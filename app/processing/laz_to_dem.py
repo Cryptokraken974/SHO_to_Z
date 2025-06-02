@@ -3,6 +3,7 @@ import pdal
 import json
 import os
 import time
+from pathlib import Path
 from typing import Tuple, Dict, Any
 
 def create_dem_fallback_pipeline(input_file: str, output_file: str, resolution: float = 1.0) -> Dict[str, Any]:
@@ -38,15 +39,22 @@ def laz_to_dem(input_file: str) -> str:
     print(f"\n�� LAZ_TO_DEM: Starting conversion for {input_file}")
     start_time = time.time()
     
-    # Extract the base name without path and extension
-    laz_basename = os.path.splitext(os.path.basename(input_file))[0]
+    # Extract region name from the file path structure
+    # Path structure: input/<region_name>/lidar/<filename> or input/<region_name>/<filename>
+    input_path = Path(input_file)
+    if "lidar" in input_path.parts:
+        # File is in lidar subfolder: extract parent's parent as region name
+        region_name = input_path.parts[input_path.parts.index("input") + 1]
+    else:
+        # File is directly in input folder: extract parent as region name
+        region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
     
-    # Create output directory structure: output/<laz_basename>/DEM/
-    output_dir = os.path.join("output", laz_basename, "DEM")
+    # Create output directory structure: output/<region_name>/DEM/
+    output_dir = os.path.join("output", region_name, "DEM")
     os.makedirs(output_dir, exist_ok=True)
     
-    # Generate output filename: <laz_basename>_DEM.tif
-    output_filename = f"{laz_basename}_DEM.tif"
+    # Generate output filename: <region_name>_DEM.tif
+    output_filename = f"{region_name}_DEM.tif"
     output_path = os.path.join(output_dir, output_filename)
     
     print(f"📂 Output directory: {output_dir}")

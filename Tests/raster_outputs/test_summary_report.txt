@@ -1,0 +1,36 @@
+====================================================================================================
+RASTER GENERATION TEST - COMPREHENSIVE SUMMARY
+====================================================================================================
+
+Test Date: 2025-06-02 15:40:34
+Test Duration: 0.25 seconds (0.0 minutes)
+Input Directory: input
+Output Directory: Tests/raster_outputs
+
+PROCESSING RESULTS:
+--------------------------------------------------
+Files Processed: 1
+Successful: 1
+Failed: 0
+Success Rate: 100.0%
+
+DETAILED FILE RESULTS:
+--------------------------------------------------
+File: 17.476S_39.836W_elevation.tiff
+  Status: ✅ SUCCESS
+  Processing Time: 0.25 seconds
+  Products Generated: 8 TIFF
+  PNG Outputs: 8 PNG
+  Output Folder: Tests/raster_outputs/17.476S_39.836W_elevation
+
+PERFORMANCE ANALYSIS:
+--------------------------------------------------
+Average Processing Times by Type:
+  39.836W_elevation_hillshade_standard:   0.00s (avg of 1 runs)
+  39.836W_elevation_hillshade_315_45_08:   0.00s (avg of 1 runs)
+  39.836W_elevation_hillshade_225_45_08:   0.00s (avg of 1 runs)
+  39.836W_elevation_slope:   0.00s (avg of 1 runs)
+  39.836W_elevation_aspect:   0.00s (avg of 1 runs)
+  39.836W_elevation_tri:   0.21s (avg of 1 runs)
+  39.836W_elevation_tpi:   0.00s (avg of 1 runs)
+  39.836W_elevation_color_relief:   0.00s (avg of 1 runs)

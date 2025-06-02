@@ -164,27 +164,25 @@ class USGS3DEPSource(BaseDataSource):
     def _create_input_folder(self, request: DownloadRequest) -> Path:
         """Create descriptive folder in input directory."""
         if request.region_name:
-            base_folder_name = request.region_name
+            folder_name = request.region_name
         else:
             center_lat = (request.bbox.north + request.bbox.south) / 2
             center_lng = (request.bbox.east + request.bbox.west) / 2
-            # Determine location name based on coordinates
-            if -125 < center_lng < -120 and 45 < center_lat < 49:
-                region_prefix = "PacificNorthwest"
-            elif -125 < center_lng < -110 and 30 < center_lat < 50:
-                region_prefix = "USA_West"
-            elif -100 < center_lng < -80 and 30 < center_lat < 50:
-                region_prefix = "USA_East"
-            else:
-                region_prefix = "USA"
-            base_folder_name = f"{region_prefix}_{center_lat:.3f}_{center_lng:.3f}"
+            lat_dir = 'S' if center_lat < 0 else 'N'
+            lng_dir = 'W' if center_lng < 0 else 'E'
+            region_name = f"{abs(center_lat):.2f}{lat_dir}_{abs(center_lng):.2f}{lng_dir}"
+            folder_name = region_name
         
-        data_type_suffix = "laz" if request.data_type == DataType.LAZ else "elevation"
-        folder_name = f"USGS_3DEP_{base_folder_name}_{data_type_suffix}"
-        
+        # Create main region folder
         input_folder = Path("input") / folder_name
         input_folder.mkdir(parents=True, exist_ok=True)
-        return input_folder
+        
+        # Create lidar subfolder and return it
+        lidar_folder = input_folder / "lidar"
+        lidar_folder.mkdir(parents=True, exist_ok=True)
+        print(f"CREATED FOLDER (usgs_3dep): {lidar_folder}")
+        
+        return lidar_folder
     
     def _create_info_file(self, input_folder: Path, request: DownloadRequest) -> Path:
         """Create information file with download instructions."""
@@ -192,6 +190,7 @@ class USGS3DEPSource(BaseDataSource):
         if request.region_name:
             info_file_name = f"{request.region_name}_USGS_3DEP_download_instructions.txt"
             
+        # input_folder is already the lidar subfolder
         info_file = input_folder / info_file_name
         
         with open(info_file, 'w') as f:
@@ -246,6 +245,20 @@ class USGS3DEPSource(BaseDataSource):
             f.write("- Most urban and forested areas have good coverage\n")
             f.write("- Check multiple sources if data is not available from one\n")
             f.write(f"- Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        
+        # Also create a metadata file in the lidar subfolder
+        lat_dir = 'S' if center_lat < 0 else 'N'
+        lng_dir = 'W' if center_lng < 0 else 'E'
+        region_name = f"{abs(center_lat):.2f}{lat_dir}_{abs(center_lng):.2f}{lng_dir}"
+        metadata_path = input_folder / f"metadata_{region_name}.txt"
+        
+        with open(metadata_path, 'w') as f:
+            f.write(f"# USGS 3DEP Elevation Data\n")
+            f.write(f"# Region: {region_name}\n")
+            f.write(f"# Data Type: Instructions for {request.data_type.value}\n")
+            f.write(f"# Instructions File: {info_file_name}\n")
+            f.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"# Center: {center_lat:.6f}, {center_lng:.6f}\n")
         
         return info_file
     

@@ -17,6 +17,18 @@ class Settings(BaseSettings):
     
     # API Keys (optional)
     opentopography_api_key: Optional[str] = None
+    
+    # OpenTopography credentials for elevation data
+    opentopo_username: Optional[str] = None
+    opentopo_password: Optional[str] = None
+    opentopo_api_key: Optional[str] = None
+    opentopo_key: Optional[str] = None  # Alternative field name for API key
+    
+    # Elevation download settings
+    elevation_bbox_buffer: float = 0.01
+    elevation_timeout: int = 300
+    elevation_max_retries: int = 3
+    
     copernicus_username: Optional[str] = None
     copernicus_password: Optional[str] = None
     cdse_token: Optional[str] = None  # Copernicus Data Space Ecosystem access token (legacy)

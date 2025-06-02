@@ -4,6 +4,7 @@ import os
 import logging
 import subprocess
 import json
+from pathlib import Path
 from typing import Dict, Any
 import pdal
 
@@ -49,15 +50,22 @@ def dtm(input_file: str) -> str:
     print(f"\n🏔️ DTM: Starting conversion for {input_file}")
     start_time = time.time()
     
-    # Extract the base name without path and extension
-    laz_basename = os.path.splitext(os.path.basename(input_file))[0]
+    # Extract region name from the file path structure
+    # Path structure: input/<region_name>/lidar/<filename> or input/<region_name>/<filename>
+    input_path = Path(input_file)
+    if "lidar" in input_path.parts:
+        # File is in lidar subfolder: extract parent's parent as region name
+        region_name = input_path.parts[input_path.parts.index("input") + 1]
+    else:
+        # File is directly in input folder: extract parent as region name
+        region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
     
-    # Create output directory structure: output/<laz_basename>/DTM/
-    output_dir = os.path.join("output", laz_basename, "DTM")
+    # Create output directory structure: output/<region_name>/DTM/
+    output_dir = os.path.join("output", region_name, "DTM")
     os.makedirs(output_dir, exist_ok=True)
     
-    # Generate output filename: <laz_basename>_DTM.tif
-    output_filename = f"{laz_basename}_DTM.tif"
+    # Generate output filename: <region_name>_DTM.tif
+    output_filename = f"{region_name}_DTM.tif"
     output_path = os.path.join(output_dir, output_filename)
     
     print(f"📂 Output directory: {output_dir}")
@@ -265,17 +273,22 @@ def clear_dtm_cache(input_file: str = None) -> None:
     """
     if input_file:
         # Clear cache for specific file
-        laz_basename = os.path.splitext(os.path.basename(input_file))[0]
-        dtm_path = os.path.join("output", laz_basename, "DTM", f"{laz_basename}_DTM.tif")
+        input_path = Path(input_file)
+        if "lidar" in input_path.parts:
+            region_name = input_path.parts[input_path.parts.index("input") + 1]
+        else:
+            region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
+        
+        dtm_path = os.path.join("output", region_name, "DTM", f"{region_name}_DTM.tif")
         
         if os.path.exists(dtm_path):
             try:
                 os.remove(dtm_path)
-                print(f"🗑️ Cleared DTM cache for {laz_basename}")
+                print(f"🗑️ Cleared DTM cache for {region_name}")
             except OSError as e:
                 print(f"⚠️ Failed to clear DTM cache: {e}")
         else:
-            print(f"📭 No DTM cache found for {laz_basename}")
+            print(f"📭 No DTM cache found for {region_name}")
     else:
         # Clear all DTM caches
         import glob
@@ -416,3 +429,144 @@ def get_cache_statistics() -> str:
         report.append(f"🚀 Performance improvement: ~{cache_info['total_cached_dtms']}x faster for repeated operations")
     
     return "\n".join(report)
+
+
+async def process_dtm(laz_file_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Process DTM (Digital Terrain Model) from LAZ file with comprehensive logging
+    
+    Args:
+        laz_file_path: Path to the input LAZ file
+        output_dir: Directory to save output files
+        parameters: Processing parameters
+    
+    Returns:
+        Dict containing processing results
+    """
+    start_time = time.time()
+    
+    # Enhanced logging
+    print(f"\n{'='*60}")
+    print(f"🏔️ DTM PROCESSING STARTING")
+    print(f"{'='*60}")
+    print(f"📁 Input LAZ file: {laz_file_path}")
+    print(f"📂 Output directory: {output_dir}")
+    print(f"⚙️ Parameters: {parameters}")
+    print(f"🕐 Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))}")
+    
+    logger.info(f"Starting DTM processing for {laz_file_path}")
+    logger.info(f"Output directory: {output_dir}")
+    logger.info(f"Parameters: {parameters}")
+    
+    try:
+        # Create output directory if it doesn't exist
+        print(f"📁 [FOLDER CREATION] Creating output directory if needed...")
+        print(f"   🔍 Checking if directory exists: {output_dir}")
+        
+        if os.path.exists(output_dir):
+            print(f"   ✅ Directory already exists: {output_dir}")
+        else:
+            print(f"   🆕 Directory doesn't exist, creating: {output_dir}")
+            
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"   ✅ [FOLDER CREATED] Output directory ready: {output_dir}")
+        
+        # Extract region name from the LAZ file path
+        input_path = Path(laz_file_path)
+        if "lidar" in input_path.parts:
+            region_name = input_path.parts[input_path.parts.index("input") + 1]
+        else:
+            region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(laz_file_path))[0]
+        
+        print(f"🗺️ [REGION DETECTION] Extracted region name: {region_name}")
+        
+        # Generate DTM using the synchronous function
+        print(f"🔄 [DTM GENERATION] Calling DTM conversion...")
+        dtm_start_time = time.time()
+        
+        try:
+            # Run the DTM generation in a thread pool to keep it async
+            loop = asyncio.get_event_loop()
+            dtm_output_path = await loop.run_in_executor(None, dtm, laz_file_path)
+            
+            dtm_processing_time = time.time() - dtm_start_time
+            print(f"✅ [DTM GENERATED] DTM conversion completed in {dtm_processing_time:.2f} seconds")
+            print(f"   📄 DTM output file: {dtm_output_path}")
+            
+            # Verify the output file exists
+            if not os.path.exists(dtm_output_path):
+                raise FileNotFoundError(f"DTM output file not found: {dtm_output_path}")
+            
+            # Get file size
+            file_size = os.path.getsize(dtm_output_path)
+            file_size_mb = file_size / (1024 * 1024)
+            print(f"   📊 File size: {file_size_mb:.2f} MB")
+            
+            # Copy to specified output directory if different
+            output_filename = f"{region_name}_DTM.tif"
+            final_output_path = os.path.join(output_dir, output_filename)
+            
+            if dtm_output_path != final_output_path:
+                print(f"📋 [FILE COPY] Copying DTM to specified output directory...")
+                print(f"   📁 From: {dtm_output_path}")
+                print(f"   📁 To: {final_output_path}")
+                
+                import shutil
+                shutil.copy2(dtm_output_path, final_output_path)
+                
+                if os.path.exists(final_output_path):
+                    print(f"   ✅ DTM copied successfully")
+                else:
+                    raise FileNotFoundError(f"Failed to copy DTM to {final_output_path}")
+            else:
+                final_output_path = dtm_output_path
+                print(f"   ℹ️ DTM already in correct location")
+            
+            # Calculate total processing time
+            total_time = time.time() - start_time
+            
+            # Log completion
+            print(f"\n{'='*60}")
+            print(f"✅ DTM PROCESSING COMPLETED")
+            print(f"{'='*60}")
+            print(f"⏱️ Total processing time: {total_time:.2f} seconds")
+            print(f"📄 Final output: {final_output_path}")
+            print(f"🕐 End time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            logger.info(f"DTM processing completed successfully in {total_time:.2f} seconds")
+            logger.info(f"Output file: {final_output_path}")
+            
+            return {
+                "success": True,
+                "output_file": final_output_path,
+                "processing_time": total_time,
+                "dtm_time": dtm_processing_time,
+                "region_name": region_name,
+                "file_size_mb": file_size_mb,
+                "message": f"DTM processed successfully in {total_time:.2f} seconds"
+            }
+            
+        except Exception as e:
+            print(f"❌ [DTM ERROR] DTM generation failed: {str(e)}")
+            logger.error(f"DTM generation failed: {str(e)}")
+            raise
+            
+    except Exception as e:
+        total_time = time.time() - start_time
+        error_msg = f"DTM processing failed: {str(e)}"
+        
+        print(f"\n{'='*60}")
+        print(f"❌ DTM PROCESSING FAILED")
+        print(f"{'='*60}")
+        print(f"⏱️ Time before failure: {total_time:.2f} seconds")
+        print(f"❌ Error: {error_msg}")
+        print(f"🕐 Failure time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        logger.error(f"DTM processing failed after {total_time:.2f} seconds: {str(e)}")
+        
+        return {
+            "success": False,
+            "error": error_msg,
+            "processing_time": total_time,
+            "message": f"DTM processing failed after {total_time:.2f} seconds"
+        }
