@@ -93,18 +93,6 @@ window.UIManager = {
       ProcessingManager.processAspect();
     });
 
-    $('#process-roughness').on('click', () => {
-      ProcessingManager.processRoughness();
-    });
-
-    $('#process-tri').on('click', () => {
-      ProcessingManager.processTRI();
-    });
-
-    $('#process-tpi').on('click', () => {
-      ProcessingManager.processTPI();
-    });
-
     $('#process-color-relief').on('click', () => {
       ProcessingManager.processColorRelief();
     });
@@ -607,6 +595,9 @@ window.UIManager = {
       } else if (band.includes('RED_B04')) {
         bandType = 'Red (B04)';
         bandColor = '#DC143C'; // Crimson for Red
+      } else if (band === 'NDVI') {
+        bandType = 'NDVI';
+        bandColor = '#228B22'; // Forest green for NDVI (vegetation index)
       }
       
       // Extract filename from png_path for display
@@ -694,7 +685,7 @@ window.UIManager = {
     
     try {
       // Processing types that might have LIDAR raster results
-      const processingTypes = ['hillshade', 'slope', 'aspect', 'color_relief', 'tri', 'tpi', 'roughness'];
+      const processingTypes = ['hillshade', 'slope', 'aspect', 'color_relief'];
       const availableRasters = [];
 
       // Check each processing type for available raster data
@@ -752,10 +743,7 @@ window.UIManager = {
       'hillshade': 'Hillshade',
       'slope': 'Slope',
       'aspect': 'Aspect',
-      'color_relief': 'Color Relief',
-      'tri': 'TRI',
-      'tpi': 'TPI',
-      'roughness': 'Roughness'
+      'color_relief': 'Color Relief'
     };
     return displayNames[processingType] || processingType;
   },
@@ -770,10 +758,7 @@ window.UIManager = {
       'hillshade': '#8B4513',
       'slope': '#FF6347',
       'aspect': '#4169E1',
-      'color_relief': '#32CD32',
-      'tri': '#FFD700',
-      'tpi': '#FF69B4',
-      'roughness': '#DDA0DD'
+      'color_relief': '#32CD32'
     };
     return colors[processingType] || '#666666';
   },
@@ -1075,8 +1060,8 @@ window.UIManager = {
       Utils.log('info', `Using API region name: ${apiRegionName} (original: ${regionName})`);
       
       // Try to get available Sentinel-2 images for the region
-      // We'll check for the most common bands: RED (B04) and NIR (B08)
-      const bands = ['RED_B04', 'NIR_B08'];
+      // We'll check for bands: RED (B04), NIR (B08), and NDVI
+      const bands = ['RED_B04', 'NIR_B08', 'NDVI'];
       const availableImages = [];
 
       for (const band of bands) {
@@ -1087,9 +1072,18 @@ window.UIManager = {
           if (response.ok) {
             const overlayData = await response.json();
             if (overlayData && overlayData.image_data) {
+              let bandDisplay;
+              if (band === 'RED_B04') {
+                bandDisplay = 'Red (B04)';
+              } else if (band === 'NIR_B08') {
+                bandDisplay = 'NIR (B08)';
+              } else if (band === 'NDVI') {
+                bandDisplay = 'NDVI';
+              }
+              
               availableImages.push({
                 band: band,
-                bandDisplay: band === 'RED_B04' ? 'Red (B04)' : 'NIR (B08)',
+                bandDisplay: bandDisplay,
                 overlayData: overlayData,
                 timestamp: this.extractTimestampFromFilename(overlayData.filename || ''),
                 regionName: regionName
@@ -1569,7 +1563,7 @@ window.UIManager = {
     Utils.log('info', 'Resetting processing gallery to show processing buttons');
     
     // List of processing types that have gallery cells
-    const processingTypes = ['hillshade', 'slope', 'aspect', 'color_relief', 'tri', 'tpi', 'roughness'];
+    const processingTypes = ['hillshade', 'slope', 'aspect', 'color_relief'];
     
     processingTypes.forEach(processingType => {
       const cellId = `cell-${processingType}`;

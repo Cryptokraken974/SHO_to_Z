@@ -322,7 +322,7 @@ def get_sentinel2_overlay_data_util(region_name: str, band_name: str) -> Optiona
     
     Args:
         region_name: The region name (e.g., 'region_13_96S_48_33W')
-        band_name: The band name (e.g., 'RED_B04', 'NIR_B08')
+        band_name: The band name (e.g., 'RED_B04', 'NIR_B08', 'NDVI')
     """
     try:
         print(f"\n🛰️ Getting Sentinel-2 overlay data for {region_name}/{band_name}")
@@ -350,9 +350,15 @@ def get_sentinel2_overlay_data_util(region_name: str, band_name: str) -> Optiona
         # Find actual files matching the pattern since they include timestamps
         import glob
         
-        # Pattern: {folder_region_name}_*_sentinel2_{band_name}.png
-        png_pattern = f"{output_dir}/{folder_region_name}_*_sentinel2_{band_name}.png"
-        tiff_pattern = f"{output_dir}/{folder_region_name}_*_sentinel2_{band_name}.tif"
+        # Pattern: {folder_region_name}_*_sentinel2_{band_name}.png OR {folder_region_name}_*_{band_name}.png (for NDVI)
+        if band_name == 'NDVI':
+            # NDVI files have pattern: {folder_region_name}_*_NDVI.png
+            png_pattern = f"{output_dir}/{folder_region_name}_*_{band_name}.png"
+            tiff_pattern = f"{output_dir}/{folder_region_name}_*_{band_name}.tif"
+        else:
+            # Regular bands have pattern: {folder_region_name}_*_sentinel2_{band_name}.png
+            png_pattern = f"{output_dir}/{folder_region_name}_*_sentinel2_{band_name}.png"
+            tiff_pattern = f"{output_dir}/{folder_region_name}_*_sentinel2_{band_name}.tif"
         
         print(f"📂 Output directory: {output_dir}")
         print(f"🔍 PNG pattern: {png_pattern}")
@@ -387,14 +393,17 @@ def get_sentinel2_overlay_data_util(region_name: str, band_name: str) -> Optiona
                 files = os.listdir(output_dir)
                 print(f"🔍 Files in directory: {files}")
                 # Suggest available bands if any sentinel-2 files exist
-                s2_files = [f for f in files if 'sentinel2' in f and f.endswith('.png')]
+                s2_files = [f for f in files if ('sentinel2' in f or 'NDVI' in f) and f.endswith('.png')]
                 if s2_files:
                     available_bands = set()
                     for f in s2_files:
-                        parts = f.split('_')
-                        if len(parts) >= 2:
-                            band = '_'.join(parts[-2:]).replace('.png', '')
-                            available_bands.add(band)
+                        if 'NDVI' in f:
+                            available_bands.add('NDVI')
+                        else:
+                            parts = f.split('_')
+                            if len(parts) >= 2:
+                                band = '_'.join(parts[-2:]).replace('.png', '')
+                                available_bands.add(band)
                     print(f"💡 Available Sentinel-2 bands: {list(available_bands)}")
             else:
                 print(f"📂 Directory doesn't exist: {output_dir}")
@@ -404,7 +413,7 @@ def get_sentinel2_overlay_data_util(region_name: str, band_name: str) -> Optiona
         print(f"🗺️  TIFF path: {tiff_path}")
         print(f"🌍 World file path: {world_path}")
         
-        return _process_overlay_files(png_path, tiff_path, world_path, "sentinel-2", folder_region_name)
+        return _process_overlay_files(png_path, tiff_path, world_path, "sentinel-2", folder_region_name, band_name, region_name)
         
     except Exception as e:
         print(f"❌ Error getting Sentinel-2 overlay data for {region_name}/{band_name}: {e}")
@@ -432,7 +441,7 @@ def parse_coordinate_folder_name(folder_name: str) -> Tuple[float, float]:
     else:
         raise ValueError(f"Cannot parse coordinates from folder name: {folder_name}")
 
-def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, processing_type: str, base_filename: str) -> Optional[Dict]:
+def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, processing_type: str, base_filename: str, band_name: str = None, region_name: str = None) -> Optional[Dict]:
     """
     Common function to process overlay files and extract bounds and image data.
     """
@@ -500,12 +509,20 @@ def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, proce
             image_data = base64.b64encode(f.read()).decode('utf-8')
             
         print(f"✅ Successfully prepared overlay data")
-        return {
+        result = {
             'bounds': bounds,
             'image_data': image_data,
             'processing_type': processing_type,
             'filename': base_filename
         }
+        
+        # Add band and region info if available
+        if band_name:
+            result['band'] = band_name
+        if region_name:
+            result['region'] = region_name
+            
+        return result
         
     except Exception as e:
         print(f"❌ Error processing overlay files: {e}")

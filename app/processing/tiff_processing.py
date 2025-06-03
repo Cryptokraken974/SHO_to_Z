@@ -622,8 +622,6 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
         ("hillshade_225", process_hillshade_tiff, {"azimuth": 225, "altitude": 45}), 
         ("slope", process_slope_tiff, {}),
         ("aspect", process_aspect_tiff, {}),
-        ("tri", process_tri_tiff, {}),
-        ("tpi", process_tpi_tiff, {"radius": 3}),
         ("color_relief", process_color_relief_tiff, {})
     ]
     
@@ -666,7 +664,7 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                     from convert import convert_geotiff_to_png
                     
                     # Create PNG output directory under the main lidar output folder
-                    png_output_dir = os.path.join(base_output_dir, "PNG_Outputs")
+                    png_output_dir = os.path.join(base_output_dir, "png_outputs")
                     os.makedirs(png_output_dir, exist_ok=True)
                     
                     # Generate PNG filename and path

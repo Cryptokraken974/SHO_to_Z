@@ -113,7 +113,7 @@ class RasterTestGenerator:
             'Hillshade',
             'Terrain_Analysis', 
             'Visualization',
-            'PNG_Outputs'
+            'png_outputs'
         ]
         
         for subdir in subdirs:
@@ -218,7 +218,7 @@ class RasterTestGenerator:
         print(f"\n🎨 Converting products to PNG for visualization...")
         
         png_outputs = {}
-        png_dir = output_folder / 'PNG_Outputs'
+        png_dir = output_folder / 'png_outputs'
         
         conversion_start = time.time()
         

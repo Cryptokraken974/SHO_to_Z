@@ -247,6 +247,57 @@ def convert_sentinel2_to_png(data_dir: str, region_name: str) -> dict:
                             'size_mb': os.path.getsize(actual_nir_png) / (1024 * 1024)
                         })
                         print(f"✅ Successfully converted NIR band")
+                        
+                        # Check if we have both RED and NIR bands for NDVI calculation
+                        red_band_extracted = any(f['band'] == 'RED_B04' for f in results['files'] if f.get('tif_path') and base_name in f['tif_path'])
+                        nir_band_extracted = True  # We just successfully extracted NIR
+                        
+                        if red_band_extracted and nir_band_extracted:
+                            try:
+                                print(f"\n🌱 BOTH RED AND NIR BANDS AVAILABLE - GENERATING NDVI")
+                                
+                                # Import NDVI processor
+                                from .processing.ndvi_processing import NDVIProcessor
+                                
+                                # Generate NDVI
+                                ndvi_processor = NDVIProcessor()
+                                
+                                # Create NDVI output path
+                                ndvi_tif_path = output_dir / f"{base_name}_NDVI.tif"
+                                
+                                # Calculate NDVI using the extracted band files
+                                ndvi_success = ndvi_processor.calculate_ndvi(
+                                    str(red_tif_path), 
+                                    str(nir_tif_path), 
+                                    str(ndvi_tif_path)
+                                )
+                                
+                                if ndvi_success and os.path.exists(ndvi_tif_path):
+                                    # Convert NDVI TIF to PNG
+                                    ndvi_png_path = output_dir / f"{base_name}_NDVI.png"
+                                    print(f"🎨 Converting NDVI to PNG: {ndvi_tif_path} -> {ndvi_png_path}")
+                                    actual_ndvi_png = convert_geotiff_to_png(str(ndvi_tif_path), str(ndvi_png_path))
+                                    
+                                    if os.path.exists(actual_ndvi_png):
+                                        results['files'].append({
+                                            'band': 'NDVI',
+                                            'tif_path': str(ndvi_tif_path),
+                                            'png_path': actual_ndvi_png,
+                                            'size_mb': os.path.getsize(actual_ndvi_png) / (1024 * 1024)
+                                        })
+                                        print(f"✅ Successfully generated and converted NDVI")
+                                    else:
+                                        results['errors'].append(f"Failed to create PNG for NDVI")
+                                        print(f"❌ Failed to create NDVI PNG")
+                                else:
+                                    results['errors'].append(f"Failed to calculate NDVI from {base_name}")
+                                    print(f"❌ Failed to calculate NDVI")
+                                    
+                            except Exception as ndvi_e:
+                                error_msg = f"Error generating NDVI for {base_name}: {str(ndvi_e)}"
+                                print(f"❌ {error_msg}")
+                                results['errors'].append(error_msg)
+                        
                     else:
                         results['errors'].append(f"Failed to create PNG for NIR band")
                 else:

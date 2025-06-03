@@ -1,0 +1,10 @@
+# Brazilian Elevation Data
+# Terrain Type: coastal_plains
+# Data Type: Elevation Raster (DEM)
+# Resolution: 30m
+# Source: Brazilian Elevation Service
+# Downloaded: 2025-06-03 19:53:05
+# 
+# Bounds: -38.55805701801802, -9.651264018018018, -38.52202098198198, -9.615227981981981
+# Center: -9.633246, -38.540039
+# File: 9.633S_38.540W_elevation.tiff

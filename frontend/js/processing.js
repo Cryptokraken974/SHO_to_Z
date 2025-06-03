@@ -227,10 +227,7 @@ window.ProcessingManager = {
       'hillshade_225_45_08': 'Hillshade 225°',
       'slope': 'Slope',
       'aspect': 'Aspect',
-      'color_relief': 'Color Relief',
-      'tri': 'TRI',
-      'tpi': 'TPI',
-      'roughness': 'Roughness'
+      'color_relief': 'Color Relief'
     };
     
     return displayNames[processingType] || processingType.charAt(0).toUpperCase() + processingType.slice(1);

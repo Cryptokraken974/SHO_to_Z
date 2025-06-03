@@ -20,9 +20,8 @@ from app.processing.tiff_processing import (
     process_hillshade_tiff,
     process_slope_tiff,
     process_aspect_tiff,
-    process_tri_tiff,
-    process_tpi_tiff,
-    process_color_relief_tiff
+    process_color_relief_tiff,
+    process_all_raster_products
 )
 from app.convert import convert_geotiff_to_png
 from app.image_utils import colorize_dem
@@ -42,8 +41,6 @@ class RasterGenerator:
             'hillshade_225_45_08': process_hillshade_tiff,
             'slope': process_slope_tiff,
             'aspect': process_aspect_tiff,
-            'tri': process_tri_tiff,
-            'tpi': process_tpi_tiff,
             'color_relief': process_color_relief_tiff
         }
         
@@ -68,7 +65,7 @@ class RasterGenerator:
             'Hillshade',
             'Terrain_Analysis', 
             'Visualization',
-            'PNG_Outputs'
+            'png_outputs'  # Changed to lowercase to match what the API is looking for
         ]
         
         for subdir in subdirs:
@@ -110,8 +107,6 @@ class RasterGenerator:
             'hillshade_225_45_08': {'azimuth': 225, 'altitude': 45, 'z_factor': 0.8},
             'slope': {},
             'aspect': {},
-            'tri': {},
-            'tpi': {'radius': 3},
             'color_relief': {}
         }
         
@@ -122,8 +117,6 @@ class RasterGenerator:
             'hillshade_225_45_08': output_folder / 'Hillshade',
             'slope': output_folder / 'Terrain_Analysis',
             'aspect': output_folder / 'Terrain_Analysis', 
-            'tri': output_folder / 'Terrain_Analysis',
-            'tpi': output_folder / 'Terrain_Analysis',
             'color_relief': output_folder / 'Visualization'
         }
         
@@ -206,7 +199,7 @@ class RasterGenerator:
             }))
         
         png_outputs = {}
-        png_dir = output_folder / 'PNG_Outputs'
+        png_dir = output_folder / 'png_outputs'
         
         conversion_start = time.time()
         
@@ -325,8 +318,6 @@ class RasterGenerator:
             'hillshade_225_45_08': 'Hillshade',
             'slope': 'Terrain_Analysis',
             'aspect': 'Terrain_Analysis',
-            'tri': 'Terrain_Analysis',
-            'tpi': 'Terrain_Analysis',
             'color_relief': 'Visualization'
         }
         
@@ -364,7 +355,8 @@ class RasterGenerator:
             copied_tiff = self.copy_original_tiff(tiff_file, output_folder)
             
             # 3. Generate raster products (async)
-            products = await self.generate_raster_products(tiff_file, output_folder, progress_callback)
+            # Use the new unified processor instead of the original method
+            products = await self.generate_all_raster_products(tiff_file, output_folder, progress_callback)
             
             if not products:
                 if progress_callback:
@@ -521,3 +513,40 @@ class RasterGenerator:
             "failed_count": len(unique_tiffs) - len(successful),
             "results": results
         }
+
+    async def generate_all_raster_products(self, tiff_file: Path, output_folder: Path, 
+                                  progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
+        """
+        Process all raster products using the unified process_all_raster_products function.
+        This method is an alternative to the manual processing and uses the updated function
+        that excludes TRI and TPI processing.
+        """
+        if progress_callback:
+            await progress_callback({
+                "type": "raster_generation_started",
+                "message": f"Generating raster products for: {tiff_file.name} using unified processor"
+            })
+        
+        from app.processing.tiff_processing import process_all_raster_products
+        
+        # Convert Path to string
+        tiff_str = str(tiff_file)
+        
+        # Process all raster products
+        result = await process_all_raster_products(tiff_str, progress_callback)
+        
+        if progress_callback:
+            await progress_callback({
+                "type": "raster_generation_progress",
+                "message": f"Generated {result.get('successful', 0)}/{result.get('total_tasks', 0)} products",
+                "success_count": result.get('successful', 0),
+                "total_count": result.get('total_tasks', 0)
+            })
+        
+        # Convert the result format to match the expected output of generate_raster_products
+        products = {}
+        for product_name, product_result in result.get('results', {}).items():
+            if product_result.get('status') == 'success':
+                products[product_name] = product_result.get('output_file', '')
+        
+        return products

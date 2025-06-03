@@ -877,19 +877,29 @@ async def get_sentinel2_overlay_data(region_band: str):
     print(f"\n🛰️ API CALL: /api/overlay/sentinel2/{region_band}")
     
     try:
-        # Parse region_band format: "region_xxx_BAND_BXX" 
-        # Examples: "region_10_12S_42_23W_RED_B04", "region_3_13S_58_29W_NIR_B08"
-        # Strategy: Always split on last 2 parts for band (RED_B04, NIR_B08)
+        # Parse region_band format: "region_xxx_BAND_BXX" or "region_xxx_NDVI"
+        # Examples: "region_10_12S_42_23W_RED_B04", "region_3_13S_58_29W_NIR_B08", "3.10S_57.70W_NDVI"
+        # Strategy: Handle NDVI as special case (single part), otherwise split on last 2 parts for band
         parts = region_band.split('_')
-        if len(parts) < 3:
+        if len(parts) < 2:
             return JSONResponse(
                 status_code=400,
-                content={"error": "Invalid region_band format. Expected: region_xxx_BAND_BXX"}
+                content={"error": "Invalid region_band format. Expected: region_xxx_BAND_BXX or region_xxx_NDVI"}
             )
         
-        # Always take last 2 parts as band_info, everything else as region_name
-        band_info = '_'.join(parts[-2:])  # RED_B04 or NIR_B08
-        region_name = '_'.join(parts[:-2])  # region_10_12S_42_23W
+        # Check if last part is NDVI (special case)
+        if parts[-1] == 'NDVI':
+            band_info = 'NDVI'
+            region_name = '_'.join(parts[:-1])  # Everything except NDVI
+        else:
+            # Standard case: take last 2 parts as band_info (RED_B04, NIR_B08)
+            if len(parts) < 3:
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "Invalid region_band format. Expected: region_xxx_BAND_BXX or region_xxx_NDVI"}
+                )
+            band_info = '_'.join(parts[-2:])  # RED_B04 or NIR_B08
+            region_name = '_'.join(parts[:-2])  # region_10_12S_42_23W
         
         print(f"🏷️ Region: {region_name}")
         print(f"📻 Band Info: {band_info}")
@@ -906,16 +916,19 @@ async def get_sentinel2_overlay_data(region_band: str):
             from pathlib import Path
             s2_dir = Path("output") / region_name / "sentinel2"
             if s2_dir.exists():
-                files = list(s2_dir.glob("*sentinel2*.png"))
+                files = list(s2_dir.glob("*sentinel2*.png")) + list(s2_dir.glob("*NDVI*.png"))
                 print(f"🔍 PNG files in Sentinel-2 directory: {[f.name for f in files]}")
                 
                 # Extract available bands for user guidance
                 available_bands = set()
                 for f in files:
-                    parts = f.name.split('_')
-                    if len(parts) >= 2:
-                        band = '_'.join(parts[-2:]).replace('.png', '')
-                        available_bands.add(band)
+                    if 'NDVI' in f.name:
+                        available_bands.add('NDVI')
+                    else:
+                        parts = f.name.split('_')
+                        if len(parts) >= 2:
+                            band = '_'.join(parts[-2:]).replace('.png', '')
+                            available_bands.add(band)
                 
                 error_msg = f"Sentinel2 {band_info} overlay data not found for region {region_name}"
                 if available_bands:
@@ -2110,6 +2123,47 @@ async def download_elevation_coordinates(request: CoordinateRequest):
                 "progress": 100,
                 "file_path": result.file_path
             })
+            
+            # Generate raster products automatically
+            if result.success and result.file_path:
+                try:
+                    from .processing.raster_generation import RasterGenerator
+                    from pathlib import Path
+                    
+                    # Initialize raster generator
+                    output_dir = Path(result.file_path).parent.parent
+                    raster_generator = RasterGenerator(output_base_dir=str(output_dir))
+                    
+                    # Send raster generation started message
+                    await progress_callback({
+                        "type": "raster_generation_started",
+                        "message": "Generating raster products automatically...",
+                        "progress": 0
+                    })
+                    
+                    # Process the elevation TIFF file
+                    raster_result = await raster_generator.process_single_tiff(
+                        Path(result.file_path),
+                        progress_callback=progress_callback
+                    )
+                    
+                    if raster_result and raster_result.get("success", False):
+                        await progress_callback({
+                            "type": "raster_generation_completed",
+                            "message": f"Raster products generated successfully",
+                            "progress": 100,
+                            "products": raster_result.get("products", []),
+                            "png_outputs": raster_result.get("png_outputs", [])
+                        })
+                    
+                except Exception as e:
+                    print(f"⚠️ Automatic raster generation failed: {str(e)}")
+                    # Log the error but don't fail the overall request
+                    await progress_callback({
+                        "type": "raster_generation_error",
+                        "message": f"Automatic raster generation failed: {str(e)}",
+                        "error": str(e)
+                    })
             
             # Prepare response with source-specific information
             response_data = {

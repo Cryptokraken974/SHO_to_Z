@@ -4,7 +4,7 @@ Test script for end-to-end LiDAR acquisition and automatic raster generation.
 
 This script tests the complete workflow:
 1. Download LiDAR elevation data from OpenTopography
-2. Automatically generate raster products (hillshade, slope, aspect, TRI, TPI, color relief)
+2. Automatically generate raster products (hillshade, slope, aspect, color relief)
 3. Verify all outputs are created successfully
 
 Run this script to verify the complete integration works properly.
@@ -15,13 +15,29 @@ import sys
 import os
 from pathlib import Path
 
-# Add the app directory to the Python path
-app_dir = Path(__file__).parent.parent / "app"
-sys.path.insert(0, str(app_dir))
+# Add the parent directory to the Python path
+root_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(root_dir))
 
-from lidar_acquisition.manager import LidarAcquisitionManager
-from data_acquisition.models import BoundingBox, DataRequest, DataType, Resolution
-from config.settings import Settings
+from app.lidar_acquisition.manager import LidarAcquisitionManager
+from app.data_acquisition.utils.coordinates import BoundingBox
+from app.config import Settings
+
+# Define enums and classes that couldn't be imported
+from enum import Enum
+
+class DataType(Enum):
+    ELEVATION = "elevation"
+
+class Resolution(Enum):
+    ONE_METER = "1m"
+
+class DataRequest:
+    def __init__(self, bounding_box, data_type, resolution, output_format):
+        self.bounding_box = bounding_box
+        self.data_type = data_type
+        self.resolution = resolution
+        self.output_format = output_format
 
 async def test_end_to_end_integration():
     """Test the complete LiDAR acquisition and raster generation workflow."""
@@ -38,9 +54,9 @@ async def test_end_to_end_integration():
     
     # Create LiDAR acquisition manager with raster generation enabled
     manager = LidarAcquisitionManager(
-        settings=settings,
+        output_dir=str(test_output_dir),
         generate_rasters=True,  # Enable automatic raster generation
-        raster_dir=test_output_dir / "raster_products"
+        raster_dir=str(test_output_dir / "raster_products")
     )
     
     # Define a small test area (Boulder, Colorado - known to have good LiDAR coverage)
