@@ -9,6 +9,7 @@ import logging
 import numpy as np
 from osgeo import gdal, gdalconst
 from typing import Dict, Any, Tuple, Optional
+from pathlib import Path
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -562,26 +563,58 @@ def save_color_raster(rgb_array: np.ndarray, output_path: str, metadata: Dict[st
     
     print(f"✅ Color raster saved successfully")
 
-async def process_all_raster_products(tiff_path: str, progress_callback=None) -> Dict[str, Any]:
+async def process_all_raster_products(tiff_path: str, progress_callback=None, request=None) -> Dict[str, Any]:
     """
     Automatically process all raster products from a downloaded elevation TIFF
     
     Args:
         tiff_path: Path to the elevation TIFF file
         progress_callback: Optional callback for progress updates
+        request: Optional DownloadRequest to get coordinate information for proper output structure
         
     Returns:
         Dictionary with processing results for all products
     """
+    from pathlib import Path
+    
     start_time = time.time()
     
     print(f"\n🚀 AUTOMATIC RASTER PROCESSING")
     print(f"📁 Input TIFF: {os.path.basename(tiff_path)}")
     print(f"{'='*60}")
     
-    # Create output directory structure
-    base_name = os.path.splitext(os.path.basename(tiff_path))[0]
-    base_output_dir = os.path.join("output", base_name)
+    # Create output directory structure matching the input folder structure
+    # First, try to extract region name from the input file path
+    # Expected path format: input/<region>/lidar/<filename>.tiff
+    tiff_path_parts = Path(tiff_path).parts
+    region_folder = None
+    
+    if len(tiff_path_parts) >= 3 and tiff_path_parts[0] == 'input':
+        # Extract region name from path: input/<region>/lidar/file.tiff
+        region_folder = tiff_path_parts[1]
+        print(f"📍 Extracted region from path: {region_folder}")
+    elif request and hasattr(request, 'region_name') and request.region_name:
+        # Use region name if provided in request
+        region_folder = request.region_name
+        print(f"📍 Using region from request: {region_folder}")
+    elif request and hasattr(request, 'bbox'):
+        # Create coordinate-based folder name from bounding box
+        center_lat = (request.bbox.north + request.bbox.south) / 2
+        center_lng = (request.bbox.east + request.bbox.west) / 2
+        lat_dir = 'S' if center_lat < 0 else 'N'
+        lng_dir = 'W' if center_lng < 0 else 'E'
+        region_folder = f"{abs(center_lat):.2f}{lat_dir}_{abs(center_lng):.2f}{lng_dir}"
+        print(f"📍 Generated region from coordinates: {region_folder}")
+    else:
+        # Fallback to filename-based folder (should be avoided)
+        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
+        region_folder = base_name
+        print(f"⚠️ Fallback to filename-based region: {region_folder}")
+    
+    # Create output structure: output/<region coordinates>/lidar
+    base_output_dir = os.path.join("output", region_folder, "lidar")
+    
+    print(f"📂 Output directory: {base_output_dir}")
     
     # Define all processing tasks
     processing_tasks = [
@@ -621,10 +654,36 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None) ->
                 
                 # Convert to PNG for visualization
                 try:
-                    from ..convert import convert_geotiff_to_png
-                    png_path = convert_geotiff_to_png(result["output_file"])
-                    result["png_file"] = png_path
-                    print(f"🖼️ PNG created: {os.path.basename(png_path)}")
+                    # Import the conversion function with proper path handling
+                    import sys
+                    from pathlib import Path
+                    
+                    # Add the app directory to sys.path if not already there
+                    app_dir = Path(__file__).parent.parent
+                    if str(app_dir) not in sys.path:
+                        sys.path.insert(0, str(app_dir))
+                    
+                    from convert import convert_geotiff_to_png
+                    
+                    # Create PNG output directory under the main lidar output folder
+                    png_output_dir = os.path.join(base_output_dir, "PNG_Outputs")
+                    os.makedirs(png_output_dir, exist_ok=True)
+                    
+                    # Generate PNG filename and path
+                    tiff_basename = os.path.splitext(os.path.basename(result["output_file"]))[0]
+                    png_filename = f"{tiff_basename}.png"
+                    png_path = os.path.join(png_output_dir, png_filename)
+                    
+                    # Convert TIFF to PNG
+                    converted_png = convert_geotiff_to_png(result["output_file"], png_path)
+                    
+                    if converted_png and os.path.exists(converted_png):
+                        result["png_file"] = converted_png
+                        png_size = os.path.getsize(converted_png) / (1024 * 1024)  # MB
+                        print(f"🖼️ PNG created: {os.path.basename(converted_png)} ({png_size:.1f} MB)")
+                    else:
+                        print(f"⚠️ PNG conversion failed for {task_name}: No output file created")
+                        
                 except Exception as e:
                     print(f"⚠️ PNG conversion failed for {task_name}: {e}")
             else:

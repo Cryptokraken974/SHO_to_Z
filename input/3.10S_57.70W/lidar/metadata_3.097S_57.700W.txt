@@ -1,0 +1,10 @@
+# Brazilian Elevation Data
+# Terrain Type: amazon
+# Data Type: Elevation Raster (DEM)
+# Resolution: 30m
+# Source: Brazilian Elevation Service
+# Downloaded: 2025-06-03 18:34:40
+# 
+# Bounds: -57.71821301801802, -3.114654018018018, -57.68217698198198, -3.0786179819819823
+# Center: -3.096636, -57.700195
+# File: 3.097S_57.700W_elevation.tiff

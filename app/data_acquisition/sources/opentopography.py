@@ -423,7 +423,8 @@ class OpenTopographySource(BaseDataSource):
                 
                 processing_results = await process_all_raster_products(
                     str(input_file_path), 
-                    processing_progress_callback
+                    processing_progress_callback,
+                    request  # Pass the request object for coordinate information
                 )
                 
                 if progress_callback:

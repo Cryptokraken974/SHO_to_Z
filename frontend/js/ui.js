@@ -1663,6 +1663,272 @@ window.UIManager = {
 
     modal.fadeIn(300);
     Utils.log('info', `Image modal shown: ${title}`);
+  },
+
+  /**
+   * Acquire elevation data for the specified coordinates
+   */
+  async acquireElevationData() {
+    Utils.log('info', 'Acquire Elevation Data button clicked');
+
+    // Get coordinates from input fields
+    let lat = $('#lat-input').val();
+    let lng = $('#lng-input').val();
+    const regionName = $('#region-name-input').val();
+
+    // If no coordinates are set, use Portland, Oregon as default (good coverage area)
+    if (!lat || !lng || lat === '' || lng === '') {
+      lat = 45.5152;  // Portland, Oregon
+      lng = -122.6784;
+
+      // Update the input fields
+      $('#lat-input').val(lat);
+      $('#lng-input').val(lng);
+
+      // Center map on the location
+      MapManager.setView(lat, lng, 12);
+
+      Utils.showNotification('Using Portland, Oregon coordinates for elevation data acquisition', 'info');
+    }
+
+    // Validate coordinates
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+
+    if (!Utils.isValidCoordinate(latNum, lngNum)) {
+      Utils.showNotification('Invalid coordinates. Please enter valid latitude and longitude values.', 'error');
+      return;
+    }
+
+    try {
+      this.showProgress('🏔️ Acquiring elevation data...');
+
+      // Start WebSocket connection for progress updates if available
+      if (window.WebSocketManager) {
+        WebSocketManager.connect();
+      }
+
+      const requestBody = {
+        lat: latNum,
+        lng: lngNum,
+        buffer_km: 2.0  // 2km radius for 4km x 4km area
+      };
+
+      // Add region name if provided
+      if (regionName && regionName.trim() !== '') {
+        requestBody.region_name = regionName.trim();
+      }
+
+      const response = await fetch('/api/elevation/download-coordinates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        Utils.log('info', 'Elevation data acquisition successful:', result);
+
+        const fileCount = result.files ? result.files.length : 0;
+        const fileSize = result.file_size_mb || result.metadata?.file_size_mb || 0;
+
+        Utils.showNotification(
+          `Successfully acquired elevation data! ${fileCount} files (${fileSize.toFixed(2)} MB)`,
+          'success'
+        );
+
+        // Refresh the file list to show the new elevation data
+        if (window.FileManager && window.FileManager.loadFiles) {
+          setTimeout(() => {
+            FileManager.loadFiles();
+          }, 1000);
+        }
+
+      } else {
+        throw new Error(result.error || 'Unknown error during elevation data acquisition');
+      }
+
+    } catch (error) {
+      Utils.log('error', 'Error acquiring elevation data:', error);
+      Utils.showNotification(`Error acquiring elevation data: ${error.message}`, 'error');
+    } finally {
+      this.hideProgress();
+    }
+  },
+
+  /**
+   * Get combined data (both elevation and satellite data)
+   */
+  async getCombinedData() {
+    Utils.log('info', 'Get Combined Data button clicked');
+
+    // Get coordinates from input fields
+    let lat = $('#lat-input').val();
+    let lng = $('#lng-input').val();
+    const regionName = $('#region-name-input').val();
+
+    // If no coordinates are set, use Portland, Oregon as default
+    if (!lat || !lng || lat === '' || lng === '') {
+      lat = 45.5152;  // Portland, Oregon
+      lng = -122.6784;
+
+      // Update the input fields
+      $('#lat-input').val(lat);
+      $('#lng-input').val(lng);
+
+      // Center map on the location
+      MapManager.setView(lat, lng, 12);
+
+      Utils.showNotification('Using Portland, Oregon coordinates for combined data acquisition', 'info');
+    }
+
+    // Validate coordinates
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+
+    if (!Utils.isValidCoordinate(latNum, lngNum)) {
+      Utils.showNotification('Invalid coordinates. Please enter valid latitude and longitude values.', 'error');
+      return;
+    }
+
+    try {
+      this.showProgress('📊 Acquiring combined elevation and satellite data...');
+
+      // Start WebSocket connection for progress updates
+      if (window.WebSocketManager) {
+        WebSocketManager.connect();
+      }
+
+      // Prepare region name for both acquisitions
+      const effectiveRegionName = regionName && regionName.trim() !== '' ? regionName.trim() : null;
+
+      // Step 1: Acquire elevation data
+      this.updateProgress(25, 'Acquiring elevation data...');
+      
+      const elevationRequest = {
+        lat: latNum,
+        lng: lngNum,
+        buffer_km: 2.0
+      };
+
+      if (effectiveRegionName) {
+        elevationRequest.region_name = effectiveRegionName;
+      }
+
+      const elevationResponse = await fetch('/api/elevation/download-coordinates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(elevationRequest)
+      });
+
+      let elevationResult = null;
+      if (elevationResponse.ok) {
+        elevationResult = await elevationResponse.json();
+        if (elevationResult.success) {
+          Utils.log('info', 'Elevation data acquisition completed');
+          this.updateProgress(50, 'Elevation data acquired. Starting satellite data download...');
+        } else {
+          Utils.log('warn', 'Elevation data acquisition failed:', elevationResult.error);
+        }
+      } else {
+        Utils.log('warn', 'Elevation data acquisition request failed:', elevationResponse.status);
+      }
+
+      // Step 2: Acquire Sentinel-2 satellite data
+      const sentinelRequest = {
+        lat: latNum,
+        lng: lngNum,
+        buffer_km: 5.0,  // Larger buffer for satellite data
+        bands: ['B04', 'B08']  // Red and NIR bands
+      };
+
+      if (effectiveRegionName) {
+        sentinelRequest.region_name = effectiveRegionName;
+      }
+
+      this.updateProgress(75, 'Downloading Sentinel-2 satellite data...');
+
+      const sentinelResponse = await fetch('/api/download-sentinel2', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(sentinelRequest)
+      });
+
+      let sentinelResult = null;
+      if (sentinelResponse.ok) {
+        sentinelResult = await sentinelResponse.json();
+        if (sentinelResult.success) {
+          Utils.log('info', 'Sentinel-2 data download completed');
+          this.updateProgress(90, 'Converting satellite images...');
+
+          // Auto-convert Sentinel-2 images if we have a region name
+          const sentinelRegionName = sentinelResult.metadata?.region_name || effectiveRegionName;
+          if (sentinelRegionName) {
+            await this.convertAndDisplaySentinel2(sentinelRegionName);
+          }
+        } else {
+          Utils.log('warn', 'Sentinel-2 data download failed:', sentinelResult.error);
+        }
+      } else {
+        Utils.log('warn', 'Sentinel-2 data download request failed:', sentinelResponse.status);
+      }
+
+      // Step 3: Summarize results
+      this.updateProgress(100, 'Combined data acquisition completed!');
+
+      const elevationSuccess = elevationResult?.success || false;
+      const sentinelSuccess = sentinelResult?.success || false;
+
+      if (elevationSuccess && sentinelSuccess) {
+        Utils.showNotification(
+          'Successfully acquired both elevation and satellite data!',
+          'success'
+        );
+      } else if (elevationSuccess || sentinelSuccess) {
+        const acquiredData = elevationSuccess ? 'elevation' : 'satellite';
+        const failedData = elevationSuccess ? 'satellite' : 'elevation';
+        Utils.showNotification(
+          `Partially successful: ${acquiredData} data acquired, ${failedData} data failed`,
+          'warning'
+        );
+      } else {
+        throw new Error('Both elevation and satellite data acquisition failed');
+      }
+
+      // Refresh file list and region data
+      if (window.FileManager && window.FileManager.loadFiles) {
+        setTimeout(() => {
+          FileManager.loadFiles();
+        }, 1000);
+      }
+
+      // If we have a region name, try to display both elevation and satellite data
+      if (effectiveRegionName || sentinelResult?.metadata?.region_name) {
+        const displayRegionName = effectiveRegionName || sentinelResult.metadata.region_name;
+        setTimeout(() => {
+          this.displayLidarRasterForRegion(displayRegionName);
+          this.displaySentinel2ImagesForRegion(displayRegionName);
+        }, 1500);
+      }
+
+    } catch (error) {
+      Utils.log('error', 'Error in combined data acquisition:', error);
+      Utils.showNotification(`Error acquiring combined data: ${error.message}`, 'error');
+    } finally {
+      this.hideProgress();
+    }
   }
 
 };
