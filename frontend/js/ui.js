@@ -7,31 +7,141 @@ window.UIManager = {
    * Initialize UI components
    */
   init() {
+    this.initializeTabs();
     this.initializeAccordions();
     this.initializeEventHandlers();
     this.initializeTooltips();
     this.initializeModals();
+    this.initializeGlobalRegionSelector();
+    this.initializeResizablePanels();
     
     Utils.log('info', 'UI Manager initialized');
+  },
+
+  /**
+   * Initialize tab functionality
+   */
+  initializeTabs() {
+    // Tab switching event handlers
+    $('.tab-btn').on('click', (e) => {
+      const targetTab = $(e.target).data('tab');
+      this.switchTab(targetTab);
+    });
+
+    Utils.log('info', 'Tabs initialized');
+  },
+
+  /**
+   * Switch to a specific tab
+   * @param {string} tabName - Name of the tab to switch to ('map' or 'analysis')
+   */
+  switchTab(tabName) {
+    // Update tab buttons
+    $('.tab-btn').removeClass('active').addClass('text-[#ababab]').removeClass('text-white').removeClass('border-[#00bfff]').addClass('border-transparent');
+    $(`.tab-btn[data-tab="${tabName}"]`).addClass('active').removeClass('text-[#ababab]').addClass('text-white').removeClass('border-transparent').addClass('border-[#00bfff]');
+
+    // Update tab content
+    $('.tab-content').addClass('hidden');
+    $(`#${tabName}-tab`).removeClass('hidden');
+
+    // Initialize Analysis tab if switching to it for the first time
+    if (tabName === 'analysis') {
+      this.initializeAnalysisTab();
+      
+      // Sync region selection if one is selected globally
+      const currentRegion = this.globalSelectedRegion || FileManager.getSelectedRegion();
+      if (currentRegion) {
+        // Load analysis images for the current region
+        this.loadAnalysisImages(currentRegion);
+      }
+    }
+
+    Utils.log('info', `Switched to ${tabName} tab`);
+  },
+
+  /**
+   * Initialize global region selector
+   */
+  initializeGlobalRegionSelector() {
+    // Store reference to the currently selected region
+    this.globalSelectedRegion = null;
+    
+    Utils.log('info', 'Global region selector initialized');
+  },
+
+  /**
+   * Update global region selector display
+   * @param {string} regionName - Name of the selected region
+   */
+  updateGlobalRegionSelector(regionName) {
+    this.globalSelectedRegion = regionName;
+    
+    if (regionName) {
+      $('#global-selected-region-name')
+        .text(regionName)
+        .removeClass('text-[#666]')
+        .addClass('text-[#00bfff]');
+    } else {
+      $('#global-selected-region-name')
+        .text('No region selected')
+        .removeClass('text-[#00bfff]')
+        .addClass('text-[#666]');
+    }
+    
+    Utils.log('info', `Global region selector updated: ${regionName}`);
+  },
+
+  /**
+   * Handle global region selection
+   * @param {string} regionName - Name of the selected region
+   * @param {Object} coords - Coordinates object with lat/lng
+   */
+  handleGlobalRegionSelection(regionName, coords = null) {
+    // Update global selector
+    this.updateGlobalRegionSelector(regionName);
+    
+    // Update FileManager's selected region
+    FileManager.selectedRegion = regionName;
+    
+    // Switch to Map tab
+    this.switchTab('map');
+    
+    // Set map view and pin if coordinates are available
+    if (coords && Utils.isValidCoordinate(coords.lat, coords.lng)) {
+      MapManager.setView(coords.lat, coords.lng, 13);
+      FileManager.updateLocationPin(coords.lat, coords.lng, regionName);
+    }
+    
+    // Load satellite images and LIDAR data for the region
+    this.displaySentinel2ImagesForRegion(regionName);
+    this.displayLidarRasterForRegion(regionName);
+    
+    // Show success notification
+    Utils.showNotification(`Selected Region: ${regionName}`, 'success', 2000);
+    
+    Utils.log('info', `Global region selection completed: ${regionName}`, { coords });
   },
 
   /**
    * Initialize accordion functionality
    */
   initializeAccordions() {
-    // Region selection accordion
-    $('#region-accordion').on('click', () => {
-      this.toggleAccordion('region');
-    });
-
     // Test accordion
     $('#test-accordion').on('click', () => {
       this.toggleAccordion('test');
     });
 
-    // Processing accordion
-    $('#processing-accordion').on('click', () => {
-      this.toggleAccordion('processing');
+    // Analysis tab accordions
+    $('#analysis-images-accordion').on('click', () => {
+      this.toggleAccordion('analysis-images');
+    });
+
+    $('#analysis-tools-accordion').on('click', () => {
+      this.toggleAccordion('analysis-tools');
+    });
+
+    $('#data-sources-accordion').on('click', () => {
+      this.toggleAccordion('data-sources');
     });
 
     Utils.log('info', 'Accordions initialized');
@@ -60,10 +170,12 @@ window.UIManager = {
    * Initialize event handlers
    */
   initializeEventHandlers() {
-    // Browse regions button
-    $('#browse-regions-btn').on('click', () => {
+    // Global region selector button
+    $('#global-browse-regions-btn').on('click', () => {
       FileManager.loadFiles();
       $('#file-modal').fadeIn();
+      // Set a flag to indicate this is for global region selection
+      $('#file-modal').data('for-global', true);
       // Hide the delete button when modal is first opened
       $('#delete-region-btn').addClass('hidden').prop('disabled', false).text('Delete Region');
     });
@@ -245,8 +357,24 @@ window.UIManager = {
         coords = { lat: parseFloat(latText[1]), lng: parseFloat(lngText[1]) };
       }
 
-      // Select the region using FileManager
-      FileManager.selectRegion(regionName, coords); // Changed from selectFile
+      // Check which type of selection this is
+      const isForGlobal = $('#file-modal').data('for-global');
+      const isForAnalysis = $('#file-modal').data('for-analysis');
+      
+      if (isForGlobal) {
+        // Handle global region selection
+        UIManager.handleGlobalRegionSelection(regionName, coords);
+        // Clear the flag
+        $('#file-modal').removeData('for-global');
+      } else if (isForAnalysis) {
+        // Update Analysis tab
+        UIManager.updateAnalysisSelectedRegion(regionName);
+        // Clear the flag
+        $('#file-modal').removeData('for-analysis');
+      } else {
+        // Select the region using FileManager for Map tab
+        FileManager.selectRegion(regionName, coords); // Changed from selectFile
+      }
       
       // Close the modal
       $('#file-modal').fadeOut();
@@ -326,6 +454,74 @@ window.UIManager = {
     });
 
     Utils.log('info', 'Modals initialized');
+  },
+
+  /**
+   * Initialize resizable panels
+   */
+  initializeResizablePanels() {
+    let isResizing = false;
+    let currentPanel = null;
+    let startX = 0;
+    let startWidth = 0;
+
+    // Handle mousedown on resize handles
+    $('.resize-handle').on('mousedown', function(e) {
+      e.preventDefault();
+      isResizing = true;
+      currentPanel = $(this).parent();
+      startX = e.pageX;
+      startWidth = currentPanel.outerWidth();
+      
+      $(this).addClass('dragging');
+      $('body').addClass('resize-active');
+      
+      Utils.log('debug', 'Started resizing panel');
+    });
+
+    // Handle mousemove for resizing
+    $(document).on('mousemove', function(e) {
+      if (!isResizing || !currentPanel) return;
+      
+      e.preventDefault();
+      const deltaX = e.pageX - startX;
+      const newWidth = Math.max(200, Math.min(600, startWidth + deltaX));
+      
+      currentPanel.css('width', newWidth + 'px');
+    });
+
+    // Handle mouseup to stop resizing
+    $(document).on('mouseup', function(e) {
+      if (!isResizing) return;
+      
+      isResizing = false;
+      $('.resize-handle').removeClass('dragging');
+      $('body').removeClass('resize-active');
+      
+      if (currentPanel) {
+        const finalWidth = currentPanel.outerWidth();
+        Utils.log('info', `Panel resized to ${finalWidth}px`);
+        
+        // Save panel width preference
+        const panelId = currentPanel.attr('id');
+        localStorage.setItem(`panel-width-${panelId}`, finalWidth);
+      }
+      
+      currentPanel = null;
+      startX = 0;
+      startWidth = 0;
+    });
+
+    // Load saved panel widths
+    $('.resizable-panel').each(function() {
+      const panelId = $(this).attr('id');
+      const savedWidth = localStorage.getItem(`panel-width-${panelId}`);
+      if (savedWidth) {
+        $(this).css('width', savedWidth + 'px');
+      }
+    });
+
+    Utils.log('info', 'Resizable panels initialized');
   },
 
   /**
@@ -578,8 +774,8 @@ window.UIManager = {
     }
     gallery.empty(); // Clear previous images
 
-    // Expecting files to be objects with band, png_path, image, size_mb properties
-    files.forEach(fileObj => {
+    // Create image items with the same styling as Analysis tab
+    const imageItems = files.map(fileObj => {
       Utils.log('info', `Processing satellite image file: ${JSON.stringify(fileObj)} for region: ${regionName}`);
       
       const band = fileObj.band; // e.g., 'RED_B04', 'NIR_B08'
@@ -604,70 +800,294 @@ window.UIManager = {
       const fileName = pngPath.split('/').pop();
       Utils.log('info', `Image file: ${fileName}, Band: ${bandType}`);
 
-      const imageItem = $(`
-        <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg overflow-hidden hover:border-[#404040] transition-colors">
-          <div class="flex-1 relative">
-            <img src="data:image/png;base64,${imageB64}" alt="${bandType} - ${regionName}" class="w-full h-full object-cover">
+      return `
+        <div class="gallery-item w-64 bg-[#1a1a1a] border border-[#303030] rounded-lg overflow-hidden hover:border-[#404040] transition-colors">
+          <div class="relative h-48">
+            <img src="data:image/png;base64,${imageB64}" 
+                 alt="${bandType} - ${regionName}" 
+                 class="w-full h-full object-cover cursor-pointer"
+                 title="Click to view larger image">
+            <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+              ${bandType}
+            </div>
             <div class="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-              ${bandType} - ${regionName}
+              ${(sizeMb || 0).toFixed(1)} MB
+            </div>
+            <div class="absolute top-2 right-2 bg-blue-600 bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+              Sentinel-2
             </div>
           </div>
-          <button class="add-to-map-btn w-full bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 text-sm font-medium transition-colors" 
-                  data-image-file="${fileName}" data-region-name="${regionName}" data-band-type="${bandType}">Add to Map</button>
+          <div class="p-3">
+            <div class="text-white text-sm font-medium mb-2">${regionName}</div>
+            <button class="add-to-map-btn w-full bg-[#28a745] hover:bg-[#218838] text-white px-3 py-2 text-sm font-medium rounded transition-colors" 
+                    data-image-file="${fileName}" 
+                    data-region-name="${regionName}" 
+                    data-band-type="${band}"
+                    data-band="${band}">
+              Add ${bandType} to Map
+            </button>
+          </div>
         </div>
-      `);
+      `;
+    }).join('');
 
-      // Handle add to map click for satellite images
-      imageItem.find('.add-to-map-btn').on('click', function() {
-        const $button = $(this);
-        const imgFile = $button.data('image-file');
-        const rName = $button.data('region-name');
-        const bType = $button.data('band-type');
-        
-        // Ensure proper API region name format for overlay calls
-        let apiRegionName = rName;
-        if (!rName.startsWith('region_')) {
-          apiRegionName = `region_${rName.replace(/\./g, '_')}`;
-        }
-        
-        // Create overlay key to check if it's already active
-        const regionBand = `${apiRegionName}_${band}`;
-        const overlayKey = `SENTINEL2_${regionBand}`;
-        
-        // Check if overlay is already active
-        const isActive = OverlayManager.mapOverlays[overlayKey] !== undefined;
-        
-        if (isActive) {
-          // Remove overlay
-          Utils.log('info', `Removing ${bType} overlay from map for region ${rName}`);
-          OverlayManager.removeOverlay(overlayKey);
-          
-          // Update button state to "Add to Map"
-          $button.text('Add to Map')
-                 .removeClass('bg-[#dc3545] hover:bg-[#c82333]')
-                 .addClass('bg-[#28a745] hover:bg-[#218838]');
-          
-          Utils.showNotification(`Removed ${bType} overlay from map`, 'success');
-        } else {
-          // Add overlay
-          Utils.log('info', `Adding ${bType} overlay to map for region ${rName}`);
-          
-          // Use the Sentinel-2 overlay API to get the image with proper bounds
-          UIManager.addSentinel2OverlayToMap(regionBand, bType).then((success) => {
-            if (success) {
-              // Update button state to "Remove from Map"
-              $button.text('Remove from Map')
-                     .removeClass('bg-[#28a745] hover:bg-[#218838]')
-                     .addClass('bg-[#dc3545] hover:bg-[#c82333]');
-            }
-          });
-        }
-      });
+    // Display in a responsive grid layout like Analysis tab
+    gallery.html(`
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        ${imageItems}
+      </div>
+    `);
 
-      gallery.append(imageItem);
+    // Add event handlers after rendering
+    gallery.find('.gallery-item img').on('click', function() {
+      const imageSrc = $(this).attr('src');
+      const imageAlt = $(this).attr('alt');
+      UIManager.showImageModal(imageSrc, imageAlt);
+    });
+
+    // Handle add to map click for satellite images
+    gallery.find('.add-to-map-btn').on('click', function() {
+      const $button = $(this);
+      const imgFile = $button.data('image-file');
+      const rName = $button.data('region-name');
+      const bType = $button.data('band-type');
+      const band = $button.data('band');
+      
+      // Ensure proper API region name format for overlay calls
+      let apiRegionName = rName;
+      if (!rName.startsWith('region_')) {
+        apiRegionName = `region_${rName.replace(/\./g, '_')}`;
+      }
+      
+      // Create overlay key to check if it's already active
+      const regionBand = `${apiRegionName}_${band}`;
+      const overlayKey = `SENTINEL2_${regionBand}`;
+      
+      // Check if overlay is already active
+      const isActive = OverlayManager.mapOverlays[overlayKey] !== undefined;
+      
+      if (isActive) {
+        // Remove overlay
+        Utils.log('info', `Removing ${bType} overlay from map for region ${rName}`);
+        OverlayManager.removeOverlay(overlayKey);
+        
+        // Update button state to "Add to Map"
+        $button.text(`Add ${bType} to Map`)
+               .removeClass('bg-[#dc3545] hover:bg-[#c82333]')
+               .addClass('bg-[#28a745] hover:bg-[#218838]');
+        
+        Utils.showNotification(`Removed ${bType} overlay from map`, 'success');
+      } else {
+        // Add overlay
+        Utils.log('info', `Adding ${bType} overlay to map for region ${rName}`);
+        
+        // Use the Sentinel-2 overlay API to get the image with proper bounds
+        UIManager.addSentinel2OverlayToMap(regionBand, bType).then((success) => {
+          if (success) {
+            // Update button state to "Remove from Map"
+            $button.text(`Remove ${bType} from Map`)
+                   .removeClass('bg-[#28a745] hover:bg-[#218838]')
+                   .addClass('bg-[#dc3545] hover:bg-[#c82333]');
+          }
+        });
+      }
     });
 
     Utils.log('info', `Displayed ${files.length} Sentinel-2 images in gallery for region ${regionName}`);
+  },
+
+  /**
+   * Fetches and displays Sentinel-2 images for a given region.
+   * Checks for available Sentinel-2 processing results and displays them in the satellite gallery.
+   * @param {string} regionName - The name of the region.
+   */
+  async displaySentinel2ImagesForRegion(regionName) {
+    Utils.log('info', `Checking for Sentinel-2 images for region: ${regionName}`);
+
+    try {
+      // Check for available Sentinel-2 bands (RED, NIR, NDVI)
+      const availableBands = [];
+      const sentinel2Bands = ['RED_B04', 'NIR_B08', 'NDVI'];
+
+      for (const band of sentinel2Bands) {
+        try {
+          // Use the overlay API to check if the band data exists
+          let apiRegionName = regionName;
+          if (!regionName.startsWith('region_')) {
+            apiRegionName = `region_${regionName.replace(/\./g, '_')}`;
+          }
+
+          const regionBand = `${apiRegionName}_${band}`;
+          const response = await fetch(`/api/overlay/sentinel2/${regionBand}`);
+
+          if (response.ok) {
+            const overlayData = await response.json();
+            if (overlayData && overlayData.image_data) {
+              availableBands.push({
+                band: band,
+                bandType: this.getSentinel2BandDisplayName(band),
+                overlayData: overlayData,
+                regionName: regionName,
+                filename: overlayData.filename || `${regionName}_${band}`
+              });
+              Utils.log('info', `Found ${band} data for region ${regionName}`);
+            }
+          } else {
+            // This is expected - not all bands may be available
+            Utils.log('debug', `No ${band} data available for region ${regionName}`);
+          }
+        } catch (error) {
+          Utils.log('debug', `Error checking ${band} for region ${regionName}:`, error);
+        }
+      }
+
+      if (availableBands.length === 0) {
+        Utils.log('info', `No Sentinel-2 images found for region ${regionName}`);
+        // Don't show anything in the satellite gallery if no data exists
+        return;
+      }
+
+      // Display available Sentinel-2 images in the satellite gallery
+      this.displaySentinel2BandsGallery(availableBands);
+      Utils.log('info', `Displayed ${availableBands.length} Sentinel-2 images for region ${regionName}`);
+
+    } catch (error) {
+      Utils.log('error', `Error fetching Sentinel-2 images for region ${regionName}:`, error);
+    }
+  },
+
+  /**
+   * Display Sentinel-2 band images in the satellite gallery
+   * @param {Array} availableBands - Array of available band data
+   */
+  displaySentinel2BandsGallery(availableBands) {
+    const gallery = $('#satellite-gallery');
+    if (!gallery.length) {
+      Utils.log('error', 'Satellite gallery not found');
+      return;
+    }
+    gallery.empty(); // Clear previous images
+
+    // Create image items with the same styling as the converted images
+    const imageItems = availableBands.map(bandData => {
+      const { band, bandType, overlayData, regionName } = bandData;
+      const imageB64 = overlayData.image_data;
+      
+      // Get band color for styling
+      let bandColor = '#666';
+      if (band.includes('NIR')) {
+        bandColor = '#8B4513'; // Brown for NIR
+      } else if (band.includes('RED')) {
+        bandColor = '#DC143C'; // Crimson for Red
+      } else if (band === 'NDVI') {
+        bandColor = '#228B22'; // Forest green for NDVI
+      }
+
+      return `
+        <div class="gallery-item w-64 bg-[#1a1a1a] border border-[#303030] rounded-lg overflow-hidden hover:border-[#404040] transition-colors">
+          <div class="relative h-48">
+            <img src="data:image/png;base64,${imageB64}" 
+                 alt="${bandType} - ${regionName}" 
+                 class="w-full h-full object-cover cursor-pointer"
+                 title="Click to view larger image">
+            <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+              ${bandType}
+            </div>
+            <div class="absolute top-2 right-2 bg-blue-600 bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+              Sentinel-2
+            </div>
+          </div>
+          <div class="p-3">
+            <div class="text-white text-sm font-medium mb-2">${regionName}</div>
+            <button class="add-to-map-btn w-full bg-[#28a745] hover:bg-[#218838] text-white px-3 py-2 text-sm font-medium rounded transition-colors" 
+                    data-region-name="${regionName}" 
+                    data-band-type="${bandType}"
+                    data-band="${band}">
+              Add ${bandType} to Map
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Display in a responsive grid layout
+    gallery.html(`
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        ${imageItems}
+      </div>
+    `);
+
+    // Add event handlers after rendering
+    gallery.find('.gallery-item img').on('click', function() {
+      const imageSrc = $(this).attr('src');
+      const imageAlt = $(this).attr('alt');
+      UIManager.showImageModal(imageSrc, imageAlt);
+    });
+
+    // Handle add to map click for satellite images
+    gallery.find('.add-to-map-btn').on('click', function() {
+      const $button = $(this);
+      const rName = $button.data('region-name');
+      const bType = $button.data('band-type');
+      const band = $button.data('band');
+      
+      // Ensure proper API region name format for overlay calls
+      let apiRegionName = rName;
+      if (!rName.startsWith('region_')) {
+        apiRegionName = `region_${rName.replace(/\./g, '_')}`;
+      }
+      
+      // Create overlay key to check if it's already active
+      const regionBand = `${apiRegionName}_${band}`;
+      const overlayKey = `SENTINEL2_${regionBand}`;
+      
+      // Check if overlay is already active
+      const isActive = OverlayManager.mapOverlays[overlayKey] !== undefined;
+      
+      if (isActive) {
+        // Remove overlay
+        Utils.log('info', `Removing ${bType} overlay from map for region ${rName}`);
+        OverlayManager.removeOverlay(overlayKey);
+        
+        // Update button state to "Add to Map"
+        $button.text(`Add ${bType} to Map`)
+               .removeClass('bg-[#dc3545] hover:bg-[#c82333]')
+               .addClass('bg-[#28a745] hover:bg-[#218838]');
+        
+        Utils.showNotification(`Removed ${bType} overlay from map`, 'success');
+      } else {
+        // Add overlay
+        Utils.log('info', `Adding ${bType} overlay to map for region ${rName}`);
+        
+        // Use the Sentinel-2 overlay API to get the image with proper bounds
+        UIManager.addSentinel2OverlayToMap(regionBand, bType).then((success) => {
+          if (success) {
+            // Update button state to "Remove from Map"
+            $button.text(`Remove ${bType} from Map`)
+                   .removeClass('bg-[#28a745] hover:bg-[#218838]')
+                   .addClass('bg-[#dc3545] hover:bg-[#c82333]');
+          }
+        });
+      }
+    });
+
+    Utils.log('info', `Displayed ${availableBands.length} Sentinel-2 bands in gallery`);
+  },
+
+  /**
+   * Get display name for Sentinel-2 bands
+   * @param {string} band - Band identifier (e.g., 'RED_B04', 'NIR_B08', 'NDVI')
+   * @returns {string} Display-friendly name
+   */
+  getSentinel2BandDisplayName(band) {
+    if (band.includes('NIR_B08')) {
+      return 'NIR (B08)';
+    } else if (band.includes('RED_B04')) {
+      return 'Red (B04)';
+    } else if (band === 'NDVI') {
+      return 'NDVI';
+    }
+    return band;
   },
 
   /**
@@ -718,7 +1138,7 @@ window.UIManager = {
       if (availableRasters.length === 0) {
         Utils.log('info', `No LIDAR raster images found for region ${regionName}`);
         // Reset gallery to show processing buttons instead
-        this.resetProcessingGalleryToButtons();
+        this.resetProcessingGalleryToLabels();
         return;
       }
 
@@ -728,1200 +1148,677 @@ window.UIManager = {
 
     } catch (error) {
       Utils.log('error', `Error fetching LIDAR raster images for ${regionName}:`, error);
-      // Reset to buttons on error
-      this.resetProcessingGalleryToButtons();
+      // Reset to labels on error
+      this.resetProcessingGalleryToLabels();
     }
+  },
+
+  /**
+   * Display LIDAR raster images in the Processing Results gallery
+   * @param {Array} availableRasters - Array of available raster data
+   */
+  displayLidarRasterGallery(availableRasters) {
+    const gallery = $('#gallery');
+    
+    if (!availableRasters || availableRasters.length === 0) {
+      this.resetProcessingGalleryToLabels();
+      return;
+    }
+
+    // Create image items for each available raster
+    const imageItems = availableRasters.map(raster => {
+      const { processingType, display, overlayData, regionName } = raster;
+      const imageDataUrl = `data:image/png;base64,${overlayData.image_data}`;
+      
+      return `
+        <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-${processingType}">
+          <div class="flex-1 flex items-center justify-center relative">
+            <img src="${imageDataUrl}" 
+                 alt="${display}" 
+                 class="processing-result-image cursor-pointer"
+                 title="Click to view larger image">
+            <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+              ${display}
+            </div>
+            <div class="absolute top-2 right-2 bg-green-600 bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+              ✓ Ready
+            </div>
+          </div>
+          <button class="add-to-map-btn bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" 
+                  data-target="${processingType}"
+                  data-region-name="${regionName}">
+            Add to Map
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    // Update the gallery with the image items
+    gallery.html(`
+      <div class="flex gap-4 overflow-x-auto pb-4">
+        ${imageItems}
+      </div>
+    `);
+
+    // Add click handlers for image modal view
+    gallery.find('.processing-result-image').on('click', function() {
+      const imageSrc = $(this).attr('src');
+      const imageAlt = $(this).attr('alt');
+      UIManager.showImageModal(imageSrc, imageAlt);
+    });
+
+    // Add click handlers for Add to Map buttons
+    gallery.find('.add-to-map-btn').on('click', function(e) {
+      e.preventDefault();
+      const $button = $(this);
+      const processingType = $button.data('target');
+      
+      if (!processingType) {
+        Utils.log('warn', 'No processing type found in data-target attribute');
+        return;
+      }
+      
+      Utils.log('info', `LIDAR Raster gallery: Add to Map clicked for ${processingType}`);
+      
+      // Handle the add to map functionality for LIDAR raster images
+      UIManager.handleProcessingResultsAddToMap(processingType, $button);
+    });
+
+    Utils.log('info', `Displayed ${availableRasters.length} LIDAR raster images in Processing Results gallery`);
+  },
+
+  /**
+   * Reset the Processing Results gallery to show processing labels (text only)
+   */
+  resetProcessingGalleryToLabels() {
+    const gallery = $('#gallery');
+    
+    // Reset to the original text-based gallery structure (no buttons)
+    const labelItems = [
+      { id: 'hillshade', label: 'Hillshade' },
+      { id: 'slope', label: 'Slope' },
+      { id: 'aspect', label: 'Aspect' },
+      { id: 'color_relief', label: 'Color Relief' }
+    ];
+
+    const galleryHTML = labelItems.map(item => `
+      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-${item.id}">
+        <div class="flex-1 flex items-center justify-center">
+          <div class="text-white text-lg font-medium">${item.label}</div>
+        </div>
+      </div>
+    `).join('');
+
+    gallery.html(`
+      <div class="flex gap-4 overflow-x-auto pb-4">
+        ${galleryHTML}
+      </div>
+    `);
+
+    Utils.log('info', 'Reset Processing Results gallery to text labels');
+  },
+
+  /**
+   * Handle Add to Map button clicks in the Processing Results gallery
+   * @param {string} processingType - Processing type (hillshade, slope, etc.)
+   * @param {jQuery} $button - The clicked button element
+   */
+  handleProcessingResultsAddToMap(processingType, $button) {
+    const regionName = $button.data('region-name');
+    
+    if (!regionName) {
+      Utils.showNotification('No region selected for overlay', 'warning');
+      return;
+    }
+
+    const displayName = this.getProcessingDisplayName(processingType);
+    
+    // Check if the overlay is already active
+    const overlayKey = `LIDAR_RASTER_${regionName}_${processingType}`;
+    const isActive = OverlayManager.mapOverlays[overlayKey] !== undefined;
+    
+    if (isActive) {
+      // Remove overlay
+      OverlayManager.removeOverlay(overlayKey);
+      $button.text('Add to Map')
+             .removeClass('bg-[#dc3545] hover:bg-[#c82333]')
+             .addClass('bg-[#28a745] hover:bg-[#218838]');
+      Utils.showNotification(`Removed ${displayName} overlay from map`, 'success');
+    } else {
+      // Add overlay
+      $button.text('Remove from Map')
+             .removeClass('bg-[#28a745] hover:bg-[#218838]')
+             .addClass('bg-[#dc3545] hover:bg-[#c82333]');
+      
+      this.addLidarRasterOverlayToMap(regionName, processingType, displayName).then((success) => {
+        if (!success) {
+          // Revert button state if overlay failed
+          $button.text('Add to Map')
+                 .removeClass('bg-[#dc3545] hover:bg-[#c82333]')
+                 .addClass('bg-[#28a745] hover:bg-[#218838]');
+        }
+      });
+    }
+  },
+
+  /**
+   * Initialize the Analysis tab when first activated
+   */
+  initializeAnalysisTab() {
+    // Initialize analysis images array if not exists
+    if (!this.analysisImages) {
+      this.analysisImages = [];
+    }
+    
+    // Update the main area to show initial state
+    this.updateAnalysisMainArea();
+    
+    Utils.log('info', 'Analysis tab initialized');
+  },
+
+  /**
+   * Update the selected region display for Analysis tab
+   * @param {string} regionName - Name of the selected region
+   */
+  updateAnalysisSelectedRegion(regionName) {
+    $('#analysis-selected-region-name').text(regionName);
+    
+    // Update global region selector if not already updated
+    if (this.globalSelectedRegion !== regionName) {
+      this.updateGlobalRegionSelector(regionName);
+    }
+    
+    // Load images for the selected region
+    this.loadAnalysisImages(regionName);
+    
+    Utils.log('info', `Analysis tab region updated: ${regionName}`);
+  },
+
+  /**
+   * Load available images for a region in the Analysis tab
+   * @param {string} regionName - Name of the region
+   */
+  async loadAnalysisImages(regionName) {
+    try {
+      const response = await fetch(`/api/regions/${encodeURIComponent(regionName)}/images`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load images: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      // The API returns {images: [...], region_name: "...", total_images: 3}
+      // so we need to access the images array
+      const images = data.images || [];
+      this.displayAnalysisImages(images);
+      
+    } catch (error) {
+      Utils.log('error', 'Error loading analysis images:', error);
+      $('#analysis-images-list').html(`
+        <div class="text-[#dc3545] text-sm text-center py-4">
+          Error loading images: ${error.message}
+        </div>
+      `);
+    }
+  },
+
+  /**
+   * Display images in the Analysis tab
+   * @param {Array} images - Array of image objects
+   */
+  displayAnalysisImages(images) {
+    const imagesList = $('#analysis-images-list');
+    
+    if (!images || images.length === 0) {
+      imagesList.html(`
+        <div class="text-[#666] text-sm text-center py-8">
+          <div class="mb-2">No images available for this region</div>
+          <div class="text-xs">Select a region with processed data to view available images</div>
+        </div>
+      `);
+      return;
+    }
+
+    // Create image gallery using similar style to satellite images
+    const imageItems = images.map(image => {
+      // Determine image type and color
+      let imageType = 'Unknown';
+      let typeColor = '#666';
+      let typeIcon = '📄';
+      
+      if (image.type === 'lidar') {
+        imageType = 'LiDAR';
+        typeColor = '#28a745';
+        typeIcon = '🏔️';
+      } else if (image.type === 'sentinel2') {
+        imageType = 'Sentinel-2';
+        typeColor = '#007bff';
+        typeIcon = '🛰️';
+      }
+      
+      // Get processing type display
+      const processingType = image.processing_type || 'Unknown';
+      
+      return `
+        <div class="gallery-item bg-[#1a1a1a] border border-[#303030] rounded-lg overflow-hidden hover:border-[#404040] transition-colors">
+          <div class="relative w-full h-48">
+            <img src="/${image.path}" 
+                 alt="${this.getImageDisplayName(image.name)}" 
+                 class="w-full h-full object-cover cursor-pointer"
+                 title="Click to view larger image">
+            <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+              ${typeIcon} ${imageType}
+            </div>
+            <div class="absolute top-2 right-2 bg-opacity-75 text-white text-xs px-2 py-1 rounded"
+                 style="background-color: ${typeColor};">
+              ${processingType}
+            </div>
+            <div class="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+              ${image.size || 'Unknown size'}
+            </div>
+          </div>
+          <div class="p-3">
+            <button class="add-to-analysis-btn w-full bg-[#28a745] hover:bg-[#218838] text-white px-3 py-2 text-sm font-medium rounded transition-colors" 
+                    data-image-path="${image.path}" 
+                    data-image-name="${image.name}"
+                    data-image-type="${imageType}"
+                    data-processing-type="${processingType}">
+              Add to Analysis
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Display in a responsive grid layout like the Map tab gallery
+    imagesList.html(`
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        ${imageItems}
+      </div>
+    `);
+
+    // Add event handlers for "Add to Analysis" buttons
+    $('.add-to-analysis-btn').on('click', (e) => {
+      const $button = $(e.target);
+      const imagePath = $button.data('image-path');
+      const imageName = $button.data('image-name');
+      const imageType = $button.data('image-type');
+      const processingType = $button.data('processing-type');
+      
+      this.addImageToAnalysis(imagePath, imageName, imageType, processingType);
+    });
+
+    // Add event handlers for image click to show larger view
+    $('.gallery-item img').on('click', function() {
+      const imageSrc = $(this).attr('src');
+      const imageAlt = $(this).attr('alt');
+      UIManager.showImageModal(imageSrc, imageAlt);
+    });
+  },
+
+  /**
+   * Get display name for an image
+   * @param {string} imageName - Original image name
+   * @returns {string} Display-friendly name
+   */
+  getImageDisplayName(imageName) {
+    // Remove file extension and format the name
+    const nameWithoutExt = imageName.replace(/\.(png|jpg|jpeg|tif|tiff)$/i, '');
+    
+    // Convert underscores to spaces and capitalize
+    return nameWithoutExt
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, l => l.toUpperCase());
+  },
+
+  /**
+   * Add an image to the analysis
+   * @param {string} imagePath - Path to the image
+   * @param {string} imageName - Name of the image
+   * @param {string} imageType - Type of image (LiDAR, Sentinel-2, etc.)
+   * @param {string} processingType - Processing type (Hillshade, NDVI, etc.)
+   */
+  addImageToAnalysis(imagePath, imageName, imageType = 'Unknown', processingType = 'Unknown') {
+    Utils.log('info', `Adding image to analysis: ${imageName} (${imageType} - ${processingType})`);
+    
+    try {
+      // Initialize analysis images array if not exists
+      if (!this.analysisImages) {
+        this.analysisImages = [];
+      }
+      
+      // Check if image is already in analysis
+      const existingIndex = this.analysisImages.findIndex(img => img.path === imagePath);
+      if (existingIndex !== -1) {
+        Utils.showNotification(`${this.getImageDisplayName(imageName)} is already in analysis`, 'warning');
+        return;
+      }
+      
+      // Add image to analysis
+      const imageData = {
+        name: imageName,
+        path: imagePath,
+        displayName: this.getImageDisplayName(imageName),
+        imageType: imageType,
+        processingType: processingType,
+        addedAt: new Date().toISOString()
+      };
+      
+      this.analysisImages.push(imageData);
+      
+      // Update the analysis main area
+      this.updateAnalysisMainArea();
+      
+      // Update the button state
+      const button = $(`.add-to-analysis-btn[data-image-path="${imagePath}"]`);
+      button.text('Added ✓')
+            .removeClass('bg-[#28a745] hover:bg-[#218838]')
+            .addClass('bg-[#6c757d] hover:bg-[#5a6268]')
+            .prop('disabled', true);
+      
+      Utils.showNotification(`Added ${this.getImageDisplayName(imageName)} to analysis`, 'success');
+      
+    } catch (error) {
+      Utils.log('error', 'Error adding image to analysis:', error);
+      Utils.showNotification('Failed to add image to analysis', 'error');
+    }
+  },
+
+  /**
+   * Update the analysis main area with selected images
+   */
+  updateAnalysisMainArea() {
+    const mainArea = $('#analysis-main-canvas');
+    
+    if (!this.analysisImages || this.analysisImages.length === 0) {
+      mainArea.html(`
+        <div class="flex items-center justify-center h-full text-[#666]">
+          <div class="text-center">
+            <div class="text-xl mb-2">No images selected for analysis</div>
+            <div class="text-sm">Select images from the left panel to begin analysis</div>
+          </div>
+        </div>
+      `);
+      return;
+    }
+    
+    // Create image gallery for analysis
+    const imageItems = this.analysisImages.map((image, index) => {
+      // Determine type icon and color
+      let typeIcon = '📄';
+      let typeColor = '#666';
+      
+      if (image.imageType === 'LiDAR') {
+        typeIcon = '🏔️';
+        typeColor = '#28a745';
+      } else if (image.imageType === 'Sentinel-2') {
+        typeIcon = '🛰️';
+        typeColor = '#007bff';
+      }
+      
+      return `
+        <div class="analysis-image-card bg-[#1a1a1a] border border-[#404040] rounded-lg overflow-hidden hover:border-[#00bfff] transition-colors">
+          <div class="flex">
+            <div class="relative w-64 h-40 flex-shrink-0">
+              <img src="/${image.path}" 
+                   alt="${image.displayName}" 
+                   class="w-full h-full object-cover cursor-pointer"
+                   title="Click to view larger image">
+              <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+                ${typeIcon} ${image.imageType || 'Unknown'}
+              </div>
+              <div class="absolute top-2 right-8 bg-opacity-75 text-white text-xs px-2 py-1 rounded"
+                   style="background-color: ${typeColor};">
+                ${image.processingType || 'Unknown'}
+              </div>
+              <button class="remove-from-analysis absolute top-2 right-2 bg-[#dc3545] hover:bg-[#c82333] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs" 
+                      data-index="${index}" title="Remove from analysis">
+                ×
+              </button>
+            </div>
+            <div class="flex-1 p-4 flex flex-col justify-center">
+              <div class="text-white text-lg font-medium mb-2">${image.displayName}</div>
+              <div class="text-[#ababab] text-sm mb-2">${image.imageType || 'Unknown'} • ${image.processingType || 'Unknown'}</div>
+              <div class="text-[#ababab] text-sm">Added: ${new Date(image.addedAt).toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    const analysisContent = `
+      <div class="h-full flex flex-col">
+        <div class="flex items-center justify-between mb-4 p-4 bg-[#1a1a1a] border border-[#404040] rounded-lg">
+          <h3 class="text-white text-lg font-medium">Analysis Images (${this.analysisImages.length})</h3>
+          <button id="clear-analysis" class="bg-[#dc3545] hover:bg-[#c82333] text-white px-3 py-1 rounded text-sm font-medium transition-colors">
+            Clear All
+          </button>
+        </div>
+        <div class="flex-1 overflow-auto">
+          <div class="space-y-4 p-4">
+            ${imageItems}
+          </div>
+        </div>
+      </div>
+    `;
+    
+    mainArea.html(analysisContent);
+    
+    // Add event handlers
+    $('.remove-from-analysis').on('click', (e) => {
+      const index = parseInt($(e.target).data('index'));
+      this.removeImageFromAnalysis(index);
+    });
+    
+    $('#clear-analysis').on('click', () => {
+      this.clearAnalysis();
+    });
+  },
+
+  /**
+   * Remove an image from analysis
+   * @param {number} index - Index of the image to remove
+   */
+  removeImageFromAnalysis(index) {
+    if (!this.analysisImages || index < 0 || index >= this.analysisImages.length) {
+      return;
+    }
+    
+    const removedImage = this.analysisImages.splice(index, 1)[0];
+    
+    // Re-enable the "Add to Analysis" button
+    const button = $(`.add-to-analysis-btn[data-image-path="${removedImage.path}"]`);
+    button.text('Add to Analysis')
+          .removeClass('bg-[#6c757d] hover:bg-[#5a6268]')
+          .addClass('bg-[#28a745] hover:bg-[#218838]')
+          .prop('disabled', false);
+    
+    // Update the main area
+    this.updateAnalysisMainArea();
+    
+    Utils.showNotification(`Removed ${removedImage.displayName} from analysis`, 'info');
+  },
+
+  /**
+   * Clear all images from analysis
+   */
+  clearAnalysis() {
+    if (!this.analysisImages || this.analysisImages.length === 0) {
+      return;
+    }
+    
+    // Re-enable all "Add to Analysis" buttons
+    this.analysisImages.forEach(image => {
+      const button = $(`.add-to-analysis-btn[data-image-path="${image.path}"]`);
+      button.text('Add to Analysis')
+            .removeClass('bg-[#6c757d] hover:bg-[#5a6268]')
+            .addClass('bg-[#28a745] hover:bg-[#218838]')
+            .prop('disabled', false);
+    });
+    
+    // Clear the analysis images array
+    this.analysisImages = [];
+    
+    // Update the main area
+    this.updateAnalysisMainArea();
+    
+    Utils.showNotification('Analysis cleared', 'info');
   },
 
   /**
    * Get display name for processing type
-   * @param {string} processingType - The processing type
+   * @param {string} processingType - Processing type
    * @returns {string} Display name
    */
   getProcessingDisplayName(processingType) {
     const displayNames = {
+      'laz_to_dem': 'DEM',
+      'dtm': 'DTM',
+      'dsm': 'DSM',
+      'chm': 'CHM',
       'hillshade': 'Hillshade',
+      'hillshade_315_45_08': 'Hillshade 315°',
+      'hillshade_225_45_08': 'Hillshade 225°',
       'slope': 'Slope',
       'aspect': 'Aspect',
       'color_relief': 'Color Relief'
     };
-    return displayNames[processingType] || processingType;
+    
+    return displayNames[processingType] || processingType.charAt(0).toUpperCase() + processingType.slice(1);
   },
 
   /**
-   * Get color for processing type
-   * @param {string} processingType - The processing type
-   * @returns {string} Color code
+   * Get color scheme for processing type
+   * @param {string} processingType - Processing type
+   * @returns {string} Color code for the processing type
    */
   getProcessingColor(processingType) {
-    const colors = {
-      'hillshade': '#8B4513',
-      'slope': '#FF6347',
-      'aspect': '#4169E1',
-      'color_relief': '#32CD32'
+    const colorSchemes = {
+      'laz_to_dem': '#8B4513',        // Brown for DEM
+      'dtm': '#8B4513',               // Brown for DTM
+      'dsm': '#228B22',               // Forest Green for DSM
+      'chm': '#32CD32',               // Lime Green for CHM
+      'hillshade': '#696969',         // Dim Gray for Hillshade
+      'hillshade_315_45_08': '#808080', // Gray for Hillshade 315°
+      'hillshade_225_45_08': '#A9A9A9', // Dark Gray for Hillshade 225°
+      'slope': '#FF6347',             // Tomato for Slope
+      'aspect': '#4169E1',            // Royal Blue for Aspect
+      'color_relief': '#FF8C00'       // Dark Orange for Color Relief
     };
-    return colors[processingType] || '#666666';
+    
+    return colorSchemes[processingType] || '#6c757d'; // Default gray
   },
 
   /**
-   * Add LIDAR raster overlay to map using the raster overlay API
-   * @param {string} regionName - Region name
+   * Add LIDAR raster overlay to map
+   * @param {string} regionName - Name of the region
    * @param {string} processingType - Processing type (hillshade, slope, etc.)
-   * @param {string} displayName - Display name for the overlay
-   * @returns {Promise<boolean>} Success status
+   * @param {string} displayName - Display name for notifications
+   * @returns {Promise<boolean>} Promise resolving to success status
    */
   async addLidarRasterOverlayToMap(regionName, processingType, displayName) {
-    Utils.log('info', `Adding LIDAR ${processingType} overlay to map for region: ${regionName}`);
-    
     try {
-      this.showProgress(`Adding ${displayName} overlay to map...`);
-      
-      // Call the LIDAR raster overlay API
+      Utils.log('info', `Adding ${displayName} overlay for region ${regionName}`);
+
+      // Fetch overlay data from the raster API
       const response = await fetch(`/api/overlay/raster/${regionName}/${processingType}`);
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        throw new Error(`Failed to fetch overlay data: ${response.status}`);
       }
-      
+
       const overlayData = await response.json();
       
-      if (!overlayData.bounds || !overlayData.image_data) {
-        throw new Error('Invalid overlay data received');
+      if (!overlayData.success || !overlayData.image_data || !overlayData.bounds) {
+        throw new Error('Invalid overlay data received from server');
       }
-      
-      // Create image bounds for Leaflet
+
+      // Convert bounds to Leaflet format [[south, west], [north, east]]
       const bounds = [
         [overlayData.bounds.south, overlayData.bounds.west],
         [overlayData.bounds.north, overlayData.bounds.east]
       ];
-      
-      const imageUrl = `data:image/png;base64,${overlayData.image_data}`;
+
+      // Create the overlay key
       const overlayKey = `LIDAR_RASTER_${regionName}_${processingType}`;
       
-      // Use OverlayManager to add the overlay
-      const success = OverlayManager.addImageOverlay(
-        overlayKey,
-        imageUrl,
-        bounds,
-        {
-          opacity: 0.8,
-          attribution: 'LIDAR Processing'
-        }
-      );
-      
-      if (success) {
-        Utils.showNotification(`Added ${displayName} overlay to map`, 'success');
-        return true;
-      } else {
-        throw new Error('Failed to add overlay to map');
-      }
-      
-    } catch (error) {
-      Utils.log('error', `Error adding LIDAR raster overlay:`, error);
-      Utils.showNotification(`Error adding ${displayName} overlay: ${error.message}`, 'error');
-      return false;
-    } finally {
-      this.hideProgress();
-    }
-  },
-
-  /**
-   * UI theme management
-   */
-
-  /**
-   * Update UI theme
-   * @param {string} theme - Theme name (light, dark)
-   */
-  updateTheme(theme) {
-    $('body').removeClass('light-theme dark-theme')
-             .addClass(`${theme}-theme`);
-    
-    localStorage.setItem('ui-theme', theme);
-    Utils.log('info', `Theme updated to: ${theme}`);
-  },
-
-  /**
-   * Load saved UI preferences
-   */
-  loadPreferences() {
-    // Load theme preference
-    const savedTheme = localStorage.getItem('ui-theme') || 'light';
-    this.updateTheme(savedTheme);
-
-    // Load accordion states
-    const accordionStates = JSON.parse(localStorage.getItem('accordion-states') || '{}');
-    Object.keys(accordionStates).forEach(accordion => {
-      if (accordionStates[accordion]) {
-        this.toggleAccordion(accordion);
-      }
-    });
-
-    Utils.log('info', 'UI preferences loaded');
-  },
-
-  /**
-   * Save UI preferences
-   */
-  savePreferences() {
-    // Save accordion states
-    const accordionStates = {
-      region: !$('#region-content').hasClass('collapsed'),
-      test: !$('#test-content').hasClass('collapsed'),
-      processing: !$('#processing-content').hasClass('collapsed')
-    };
-    
-    localStorage.setItem('accordion-states', JSON.stringify(accordionStates));
-    Utils.log('info', 'UI preferences saved');
-  },
-
-  /**
-   * Callback for when Sentinel-2 download completes via WebSocket
-   * @param {Object} data - Download completion data, expected to include region_name
-   */
-  onSentinel2DownloadComplete(data) {
-    Utils.log('info', 'Sentinel-2 download completed via WebSocket', data);
-    
-    const regionName = data.region_name; // Expect region_name directly from WebSocket
-    
-    if (regionName) {
-      Utils.showNotification(`Sentinel-2 data ready for region: ${regionName}`, 'success');
-      // If this region is currently selected, or to auto-select and display:
-      // FileManager.selectRegion(regionName, data.coords); // Assuming coords might also come via WebSocket
-      // Then call displaySentinel2ImagesForRegion or convertAndDisplaySentinel2
-      setTimeout(async () => {
-        try {
-          await this.convertAndDisplaySentinel2(regionName);
-          // If the downloaded region is the currently selected one, refresh its view
-          if (FileManager.getSelectedRegion() === regionName) {
-            this.displaySentinel2ImagesForRegion(regionName);
-          }
-        } catch (error) {
-          Utils.log('error', 'Error in automatic Sentinel-2 conversion after download:', error);
-          Utils.showNotification('Download completed but conversion/display failed: ' + error.message, 'error');
-        }
-      }, 1000); 
-    } else {
-      Utils.log('warn', 'Could not determine region name from WebSocket download completion data');
-      Utils.showNotification('Sentinel-2 download completed! Please select the region to see images.', 'info');
-    }
-  },
-
-  /**
-   * Update processing button states
-   * @param {boolean} hasSelectedRegion - Whether a region is selected
-   */
-  updateProcessingButtons(hasSelectedRegion) { // Changed parameter name
-    const processingButtons = $('.processing-btn');
-    
-    if (hasSelectedRegion) { // Changed variable name
-      processingButtons.prop('disabled', false)
-                     .removeClass('disabled')
-                     .attr('title', 'Click to process selected region'); // Changed message
-    } else {
-      processingButtons.prop('disabled', true)
-                     .addClass('disabled')
-                     .attr('title', 'Please select a region first'); // Changed message
-    }
-  },
-
-  /**
-   * Show file info panel - This might need to be re-evaluated for regions
-   * For now, it will show region name and coordinates if available.
-   * @param {Object} regionInfo - Information about the selected region {name, coords}
-   */
-  showFileInfo(regionInfo) { // Parameter changed to regionInfo
-    const panel = $('#file-info-panel');
-    if (panel.length) {
-      panel.find('.file-name').text(regionInfo.name || 'Unknown Region');
-      // These might not be applicable or need different sources for regions
-      panel.find('.file-size').text('N/A'); // Size isn't directly applicable to a region folder in this context
-      panel.find('.file-path').text(`output/${regionInfo.name}`); // Example path
-      panel.find('.file-coords').text(
-        regionInfo.coords ? 
-        `${regionInfo.coords.lat.toFixed(6)}, ${regionInfo.coords.lng.toFixed(6)}` : 
-        'No coordinates for region'
-      );
-      panel.fadeIn();
-    }
-  },
-
-  /**
-   * Hide file info panel
-   */
-  hideFileInfo() {
-    $('#file-info-panel').fadeOut();
-  },
-
-  /**
-   * Update connection status indicator
-   * @param {string} status - Connection status (connected, disconnected, error)
-   */
-  updateConnectionStatus(status) {
-    const indicator = $('#connection-status');
-    if (indicator.length) {
-      indicator.removeClass('connected disconnected error')
-               .addClass(status);
-      
-      const statusText = {
-        connected: 'Connected',
-        disconnected: 'Disconnected',
-        error: 'Connection Error'
-      };
-      
-      indicator.attr('title', statusText[status] || 'Unknown Status');
-    }
-  },
-
-  /**
-   * Show confirmation dialog
-   * @param {string} message - Confirmation message
-   * @param {Function} onConfirm - Callback for confirmation
-   * @param {Function} onCancel - Callback for cancellation
-   */
-  showConfirmation(message, onConfirm, onCancel) {
-    const modal = $(`
-      <div class="modal confirmation-modal">
-        <div class="modal-content">
-          <h3>Confirmation</h3>
-          <p>${message}</p>
-          <div class="modal-buttons">
-            <button class="btn btn-primary confirm-btn">Confirm</button>
-            <button class="btn btn-secondary cancel-btn">Cancel</button>
-          </div>
-        </div>
-      </div>
-    `);
-
-    $('body').append(modal);
-
-    modal.find('.confirm-btn').on('click', () => {
-      modal.remove();
-      if (onConfirm) onConfirm();
-    });
-
-    modal.find('.cancel-btn').on('click', () => {
-      modal.remove();
-      if (onCancel) onCancel();
-    });
-
-    modal.fadeIn();
-  },
-
-  /**
-   * Update region name based on current coordinate input values
-   */
-  updateRegionNameFromCoordinates() {
-    const latInput = document.getElementById('lat-input');
-    const lngInput = document.getElementById('lng-input');
-    const regionNameInput = document.getElementById('region-name-input');
-
-    if (!latInput || !lngInput || !regionNameInput) {
-      return;
-    }
-
-    const lat = parseFloat(latInput.value);
-    const lng = parseFloat(lngInput.value);
-
-    if (Utils.isValidCoordinate(lat, lng)) {
-      const regionName = Utils.generateRegionName(lat, lng);
-      regionNameInput.value = regionName;
-      Utils.log('info', `Region name updated to: ${regionName}`);
-    } else {
-      regionNameInput.value = '';
-    }
-  },
-
-  /**
-   * Fetches and displays Sentinel-2 images for a given region.
-   * Checks for available Sentinel-2 images and displays them with proper metadata.
-   * @param {string} regionName - The name of the region.
-   */
-  async displaySentinel2ImagesForRegion(regionName) {
-    if (!regionName) {
-      $('#satellite-gallery').empty().html('<div class="no-files">No region selected.</div>');
-      return;
-    }
-
-    const gallery = $('#satellite-gallery');
-    gallery.empty().html('<div class="loading text-center py-8 text-[#ababab]">Loading satellite images...</div>');
-
-    Utils.log('info', `Fetching Sentinel-2 images for selected region: ${regionName}`);
-    
-    try {
-      // Ensure the region name has the correct format for API calls
-      // Backend expects: region_5_99S_36_15W format
-      // Frontend might pass: 5.99S_36.15W or region_5_99S_36_15W
-      let apiRegionName = regionName;
-      
- 
-      
-      Utils.log('info', `Using API region name: ${apiRegionName} (original: ${regionName})`);
-      
-      // Try to get available Sentinel-2 images for the region
-      // We'll check for bands: RED (B04), NIR (B08), and NDVI
-      const bands = ['RED_B04', 'NIR_B08', 'NDVI'];
-      const availableImages = [];
-
-      for (const band of bands) {
-        try {
-          // Use the Sentinel-2 overlay API to check if the band is available
-          const response = await fetch(`/api/overlay/sentinel2/${apiRegionName}_${band}`);
-          
-          if (response.ok) {
-            const overlayData = await response.json();
-            if (overlayData && overlayData.image_data) {
-              let bandDisplay;
-              if (band === 'RED_B04') {
-                bandDisplay = 'Red (B04)';
-              } else if (band === 'NIR_B08') {
-                bandDisplay = 'NIR (B08)';
-              } else if (band === 'NDVI') {
-                bandDisplay = 'NDVI';
-              }
-              
-              availableImages.push({
-                band: band,
-                bandDisplay: bandDisplay,
-                overlayData: overlayData,
-                timestamp: this.extractTimestampFromFilename(overlayData.filename || ''),
-                regionName: regionName
-              });
-              Utils.log('info', `Found ${band} band data for region ${regionName}`);
-            }
-          } else {
-            Utils.log('info', `No ${band} band data available for region ${regionName}`);
-          }
-        } catch (error) {
-          Utils.log('warn', `Error checking ${band} band for region ${regionName}:`, error);
-        }
-      }
-
-      if (availableImages.length === 0) {
-        gallery.html(`
-          <div class="no-files text-center py-8">
-            <div class="text-[#ababab] mb-4">No Sentinel-2 satellite images found for region: ${regionName}</div>
-            <div class="text-sm text-[#666]">
-              Images may need to be downloaded and processed first.<br>
-              Use the region coordinates to download Sentinel-2 data.
-            </div>
-          </div>
-        `);
-        return;
-      }
-
-      // Display available images
-      this.displaySentinel2ImageGallery(availableImages);
-      Utils.log('info', `Displayed ${availableImages.length} Sentinel-2 images for region ${regionName}`);
-
-    } catch (error) {
-      Utils.log('error', `Error fetching Sentinel-2 images for ${regionName}:`, error);
-      gallery.html(`
-        <div class="error text-center py-8">
-          <div class="text-red-400 mb-2">Error loading satellite images</div>
-          <div class="text-sm text-[#666]">${error.message}</div>
-        </div>
-      `);
-      Utils.showNotification(`Could not load satellite images for ${regionName}`, 'error');
-    }
-  },
-
-  /**
-   * Extract timestamp from filename for sorting/display
-   * @param {string} filename - The filename to parse
-   * @returns {string} Extracted timestamp or empty string
-   */
-  extractTimestampFromFilename(filename) {
-    const match = filename.match(/(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})/);
-    return match ? match[1] : '';
-  },
-
-  /**
-   * Display Sentinel-2 images in a gallery format
-   * @param {Array} images - Array of image data objects
-   */
-  displaySentinel2ImageGallery(images) {
-    const gallery = $('#satellite-gallery');
-    gallery.empty();
-
-    // Sort images by timestamp (newest first) and then by band type
-    images.sort((a, b) => {
-      if (a.timestamp !== b.timestamp) {
-        return b.timestamp.localeCompare(a.timestamp);
-      }
-      return a.band.localeCompare(b.band);
-    });
-
-    images.forEach(imageData => {
-      const { band, bandDisplay, overlayData, timestamp, regionName } = imageData;
-      
-      // Create base64 data URL for the image
+      // Create image data URL
       const imageDataUrl = `data:image/png;base64,${overlayData.image_data}`;
       
-      // Format timestamp for display
-      const displayTimestamp = timestamp ? 
-        new Date(timestamp.replace(/T/, ' ').replace(/-/g, ':')).toLocaleDateString() : 
-        'Unknown date';
-
-      const imageItem = $(`
-        <div class="gallery-item flex-shrink-0 w-64 bg-[#1a1a1a] border border-[#303030] rounded-lg overflow-hidden hover:border-[#404040] transition-colors">
-          <div class="relative h-48">
-            <img src="${imageDataUrl}" 
-                 alt="${bandDisplay} - ${regionName}" 
-                 class="w-full h-full object-cover cursor-pointer"
-                 title="Click to view larger image">
-            <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-              ${bandDisplay}
-            </div>
-            <div class="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-              ${displayTimestamp}
-            </div>
-            <div class="absolute top-2 right-2 bg-blue-600 bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-              Sentinel-2
-            </div>
-          </div>
-          <div class="p-3">
-            <div class="text-white text-sm font-medium mb-2">${regionName}</div>
-            <button class="add-to-map-btn w-full bg-[#28a745] hover:bg-[#218838] text-white px-3 py-2 text-sm font-medium rounded transition-colors" 
-                    data-band="${band}" 
-                    data-region-name="${regionName}" 
-                    data-band-display="${bandDisplay}">
-              Add ${bandDisplay} to Map
-            </button>
-          </div>
-        </div>
-      `);
-
-      // Handle image click to show larger view
-      imageItem.find('img').on('click', function() {
-        UIManager.showImageModal(imageDataUrl, `${bandDisplay} - ${regionName} (${displayTimestamp})`);
+      // Add the overlay using OverlayManager
+      const success = OverlayManager.addImageOverlay(overlayKey, imageDataUrl, bounds, {
+        opacity: 0.7,
+        interactive: false
       });
 
-      // Handle add to map click
-      imageItem.find('.add-to-map-btn').on('click', function() {
-        const $button = $(this);
-        const selectedBand = $button.data('band');
-        const selectedRegion = $button.data('region-name');
-        const selectedBandDisplay = $button.data('band-display');
-        
-        // Ensure proper API region name format for overlay calls
-        let apiRegionName = selectedRegion;
-        if (!selectedRegion.startsWith('region_')) {
-          apiRegionName = `region_${selectedRegion.replace(/\./g, '_')}`;
-        }
-        
-        // Create overlay key to check if it's already active
-        const regionBand = `${apiRegionName}_${selectedBand}`;
-        const overlayKey = `SENTINEL2_${regionBand}`;
-        
-        // Check if overlay is already active
-        const isActive = OverlayManager.mapOverlays[overlayKey] !== undefined;
-        
-        if (isActive) {
-          // Remove overlay
-          Utils.log('info', `Removing ${selectedBandDisplay} overlay from map for region ${selectedRegion}`);
-          OverlayManager.removeOverlay(overlayKey);
-          
-          // Update button state to "Add to Map"
-          $button.text(`Add ${selectedBandDisplay} to Map`)
-                 .removeClass('bg-[#dc3545] hover:bg-[#c82333]')
-                 .addClass('bg-[#28a745] hover:bg-[#218838]');
-          
-          Utils.showNotification(`Removed ${selectedBandDisplay} overlay from map`, 'success');
-        } else {
-          // Add overlay
-          Utils.log('info', `Adding ${selectedBandDisplay} overlay to map for region ${selectedRegion}`);
-          
-          // Use the Sentinel-2 overlay API to get the image with proper bounds
-          UIManager.addSentinel2OverlayToMap(regionBand, selectedBandDisplay).then((success) => {
-            if (success) {
-              // Update button state to "Remove from Map"
-              $button.text(`Remove ${selectedBandDisplay} from Map`)
-                     .removeClass('bg-[#28a745] hover:bg-[#218838]')
-                     .addClass('bg-[#dc3545] hover:bg-[#c82333]');
-            }
-          });
-        }
-      });
-
-      gallery.append(imageItem);
-    });
-  },
-
-  /**
-   * Show settings modal
-   */
-  showSettingsModal() {
-    $('#settings-modal').fadeIn();
-  },
-
-  /**
-   * Show help modal
-   */
-  showHelpModal() {
-    $('#help-modal').fadeIn();
-  },
-
-  /**
-   * Show progress indicator
-   * @param {string} message - Progress message
-   */
-  showProgress(message = 'Processing...') {
-    $('#progress-title').text('Processing');
-    $('#progress-status').text(message);
-    $('#progress-bar').css('width', '0%');
-    $('#progress-details').text('');
-    $('#progress-modal').fadeIn();
-    
-    Utils.log('info', `Progress shown: ${message}`);
-  },
-
-  /**
-   * Update progress
-   * @param {number} percentage - Progress percentage (0-100)
-   * @param {string} status - Status message
-   * @param {string} details - Additional details
-   */
-  updateProgress(percentage, status = '', details = '') {
-    if (status) $('#progress-status').text(status);
-    if (details) $('#progress-details').text(details);
-    $('#progress-bar').css('width', `${percentage}%`);
-    
-    Utils.log('info', `Progress updated: ${percentage}% - ${status}`);
-  },
-
-  /**
-   * Hide progress indicator
-   */
-  hideProgress() {
-    $('#progress-modal').fadeOut();
-    Utils.log('info', 'Progress hidden');
-  },
-
-  /**
-   * Handle Add to Map functionality for Processing Results gallery
-   * @param {string} processingType - Type of processing (hillshade, slope, etc.)
-   * @param {jQuery} $button - The button element that was clicked
-   */
-  async handleProcessingResultsAddToMap(processingType, $button) {
-    try {
-      // Get the selected region or file
-      const selectedRegion = FileManager.getSelectedRegion();
-      const selectedFile = typeof FileManager.getSelectedFile === 'function' ? FileManager.getSelectedFile() : null;
-      
-      if (!selectedRegion && !selectedFile) {
-        Utils.showNotification('Please select a region or file first', 'warning');
-        return;
-      }
-
-      // Create overlay key
-      let overlayKey, displayIdentifier;
-      if (selectedRegion) {
-        overlayKey = `PROCESSING_${selectedRegion}_${processingType}`;
-        displayIdentifier = selectedRegion;
-      } else {
-        const baseName = selectedFile.replace(/\.[^/.]+$/, "");
-        overlayKey = `PROCESSING_${baseName}_${processingType}`;
-        displayIdentifier = baseName;
-      }
-
-      // Check if overlay is already active
-      const isActive = OverlayManager.mapOverlays[overlayKey] !== undefined;
-      
-      if (isActive) {
-        // Remove the overlay
-        OverlayManager.removeOverlay(overlayKey);
-        $button.text('Add to Map')
-               .removeClass('bg-[#dc3545] hover:bg-[#c82333]')
-               .addClass('bg-[#28a745] hover:bg-[#218838]');
-        
-        const displayName = ProcessingManager.getProcessingDisplayName(processingType);
-        Utils.showNotification(`Removed ${displayName} overlay from map`, 'info');
-      } else {
-        // Add the overlay
-        const success = await this.addProcessingResultOverlayToMap(processingType, displayIdentifier);
-        if (success) {
-          $button.text('Remove from Map')
-                 .removeClass('bg-[#28a745] hover:bg-[#218838]')
-                 .addClass('bg-[#dc3545] hover:bg-[#c82333]');
-          
-          const displayName = ProcessingManager.getProcessingDisplayName(processingType);
-          Utils.showNotification(`Added ${displayName} overlay to map`, 'success');
-        } else {
-          Utils.showNotification('Failed to add overlay to map', 'error');
-        }
-      }
-    } catch (error) {
-      Utils.log('error', 'Error in handleProcessingResultsAddToMap:', error);
-      Utils.showNotification('Error managing overlay', 'error');
-    }
-  },
-
-  /**
-   * Add processing result overlay to map
-   * @param {string} processingType - Type of processing result
-   * @param {string} identifier - Region or file identifier
-   * @returns {Promise<boolean>} Success status
-   */
-  async addProcessingResultOverlayToMap(processingType, identifier) {
-    try {
-      Utils.log('info', `Adding processing result overlay to map: ${processingType} for ${identifier}`);
-      
-      // Determine if this is a region-based or file-based overlay
-      const selectedRegion = FileManager.getSelectedRegion();
-      let apiEndpoint;
-      
-      if (selectedRegion) {
-        // Region-based overlay
-        apiEndpoint = `/api/overlay/raster/${selectedRegion}/${processingType}`;
-      } else {
-        // File-based overlay
-        apiEndpoint = `/api/overlay/${processingType}/${identifier}`;
-      }
-
-      this.showProgress(`Adding ${ProcessingManager.getProcessingDisplayName(processingType)} overlay to map...`);
-
-      // Call the overlay API
-      const response = await fetch(apiEndpoint);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
-      }
-
-      const overlayData = await response.json();
-      
-      if (!overlayData.bounds || !overlayData.image_data) {
-        throw new Error('Invalid overlay data received');
-      }
-
-      // Create image bounds for Leaflet
-      const bounds = [
-        [overlayData.bounds.south, overlayData.bounds.west],
-        [overlayData.bounds.north, overlayData.bounds.east]
-      ];
-
-      const imageUrl = `data:image/png;base64,${overlayData.image_data}`;
-      const overlayKey = selectedRegion ? 
-        `PROCESSING_${selectedRegion}_${processingType}` : 
-        `PROCESSING_${identifier}_${processingType}`;
-      
-      // Use OverlayManager to add the overlay
-      const success = OverlayManager.addImageOverlay(
-        overlayKey,
-        imageUrl,
-        bounds,
-        {
-          opacity: 0.8,
-          attribution: `${ProcessingManager.getProcessingDisplayName(processingType)} - Generated by SHO to Z`
-        }
-      );
-      
       if (success) {
-        Utils.log('info', `Successfully added ${processingType} overlay to map`);
+        Utils.showNotification(`Added ${displayName} overlay to map`, 'success');
+        Utils.log('info', `Successfully added ${displayName} overlay for region ${regionName}`);
         return true;
       } else {
         throw new Error('Failed to add overlay to map');
       }
-      
+
     } catch (error) {
-      Utils.log('error', 'Error adding processing result overlay:', error);
-      Utils.showNotification(`Error adding ${ProcessingManager.getProcessingDisplayName(processingType)} overlay: ${error.message}`, 'error');
+      Utils.log('error', `Failed to add ${displayName} overlay for region ${regionName}:`, error);
+      Utils.showNotification(`Failed to add ${displayName} overlay: ${error.message}`, 'error');
       return false;
-    } finally {
-      this.hideProgress();
     }
   },
 
   /**
-   * Add Sentinel-2 overlay to map using the overlay API
-   * @param {string} regionBand - Region and band identifier (e.g., "region_18_83S_45_00W_RED_B04")
-   * @param {string} bandType - Display name for the band (e.g., "Red (B04)")
+   * Add Sentinel-2 overlay to map
+   * @param {string} regionBand - Region and band identifier (e.g., "region_xxx_RED_B04")
+   * @param {string} bType - Band type for display (e.g., "Red", "NIR", "NDVI")
+   * @returns {Promise<boolean>} Promise resolving to success status
    */
-  async addSentinel2OverlayToMap(regionBand, bandType) {
-    Utils.log('info', `Adding Sentinel-2 overlay to map: ${regionBand}`);
-    
+  async addSentinel2OverlayToMap(regionBand, bType) {
     try {
-      this.showProgress(`Adding ${bandType} overlay to map...`);
-      
-      // Call the Sentinel-2 overlay API
+      Utils.log('info', `Adding ${bType} Sentinel-2 overlay for ${regionBand}`);
+
+      // Fetch overlay data from the Sentinel-2 API
       const response = await fetch(`/api/overlay/sentinel2/${regionBand}`);
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        throw new Error(`Failed to fetch Sentinel-2 overlay data: ${response.status}`);
       }
-      
+
       const overlayData = await response.json();
       
       if (!overlayData.bounds || !overlayData.image_data) {
-        throw new Error('Invalid overlay data received');
+        throw new Error('Invalid Sentinel-2 overlay data received from server');
       }
-      
-      // Create image bounds for Leaflet
+
+      // Convert bounds to Leaflet format [[south, west], [north, east]]
       const bounds = [
         [overlayData.bounds.south, overlayData.bounds.west],
         [overlayData.bounds.north, overlayData.bounds.east]
       ];
-      
-      const imageUrl = `data:image/png;base64,${overlayData.image_data}`;
+
+      // Create the overlay key
       const overlayKey = `SENTINEL2_${regionBand}`;
       
-      // Use OverlayManager to add the overlay
-      const success = OverlayManager.addImageOverlay(
-        overlayKey,
-        imageUrl,
-        bounds,
-        {
-          opacity: 0.8,
-          attribution: 'Sentinel-2 © Copernicus'
-        }
-      );
-      
-      if (success) {
-        Utils.showNotification(`Added ${bandType} overlay to map`, 'success');
-        return true;
-      } else {
-        throw new Error('Failed to add overlay to map');
-      }
-      
-    } catch (error) {
-      Utils.log('error', `Error adding Sentinel-2 overlay:`, error);
-      Utils.showNotification(`Error adding ${bandType} overlay: ${error.message}`, 'error');
-      return false;
-    } finally {
-      this.hideProgress();
-    }
-  },
-
-  /**
-   * Display LIDAR raster images in the processing gallery
-   * @param {Array} rasters - Array of available raster data objects
-   */
-  displayLidarRasterGallery(rasters) {
-    Utils.log('info', `Displaying ${rasters.length} LIDAR raster images in processing gallery`);
-    
-    // Process each available raster
-    rasters.forEach(rasterData => {
-      const { processingType, display, color, overlayData, regionName, filename } = rasterData;
-      
-      // Find the corresponding gallery cell
-      const cellId = `cell-${processingType}`;
-      const cell = $(`#${cellId}`);
-      
-      if (!cell.length) {
-        Utils.log('warn', `Gallery cell not found: ${cellId}`);
-        return;
-      }
-      
-      // Create base64 data URL for the image
+      // Create image data URL
       const imageDataUrl = `data:image/png;base64,${overlayData.image_data}`;
       
-      // Update the cell content to show the LIDAR raster image
-      const cellContent = cell.find('.flex-1');
-      cellContent.html(`
-        <div class="relative w-full h-full">
-          <img src="${imageDataUrl}" 
-               alt="${display} - ${regionName}" 
-               class="processing-result-image cursor-pointer"
-               title="Click to view larger image"
-               style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px 8px 0 0;">
-          <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-            ${display}
-          </div>
-          <div class="absolute top-2 right-2 bg-green-600 bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-            ✓ Available
-          </div>
-          <div class="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded"
-               style="background-color: ${color};">
-            ${regionName}
-          </div>
-        </div>
-      `);
-      
-      // Add click handler to show larger image
-      cellContent.find('img').on('click', () => {
-        this.showImageModal(imageDataUrl, `${display} - ${regionName}`);
-      });
-      
-      // Show the "Add to Map" button for this processing type
-      const addToMapBtn = cell.find('.add-to-map-btn');
-      if (addToMapBtn.length) {
-        addToMapBtn.removeClass('hidden').show();
-        Utils.log('info', `Showing Add to Map button for ${processingType}`);
-      }
-      
-      Utils.log('info', `Successfully displayed ${processingType} LIDAR raster for region ${regionName}`);
-    });
-  },
-
-  /**
-   * Reset processing gallery to show processing buttons instead of images
-   */
-  resetProcessingGalleryToButtons() {
-    Utils.log('info', 'Resetting processing gallery to show processing buttons');
-    
-    // List of processing types that have gallery cells
-    const processingTypes = ['hillshade', 'slope', 'aspect', 'color_relief'];
-    
-    processingTypes.forEach(processingType => {
-      const cellId = `cell-${processingType}`;
-      const cell = $(`#${cellId}`);
-      
-      if (!cell.length) {
-        Utils.log('debug', `Gallery cell not found: ${cellId}`);
-        return;
-      }
-      
-      // Get the display name for the processing type
-      const displayName = this.getProcessingDisplayName(processingType);
-      
-      // Reset the cell content to show the processing button
-      const cellContent = cell.find('.flex-1');
-      cellContent.html(`
-        <div class="flex items-center justify-center">
-          <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" 
-                  data-target="${processingType}">
-            ${displayName}
-          </button>
-        </div>
-      `);
-      
-      // Hide the "Add to Map" button
-      const addToMapBtn = cell.find('.add-to-map-btn');
-      if (addToMapBtn.length) {
-        addToMapBtn.addClass('hidden').hide();
-      }
-      
-      Utils.log('debug', `Reset ${processingType} cell to button state`);
-    });
-    
-    Utils.log('info', 'Processing gallery reset to button state completed');
-  },
-
-  /**
-   * Show image modal for enlarged view
-   * @param {string} imageSrc - Image source (data URL or path)
-   * @param {string} title - Image title/caption
-   */
-  showImageModal(imageSrc, title = 'Image View') {
-    // Remove any existing image modal
-    $('#image-modal').remove();
-    
-    const modal = $(`
-      <div id="image-modal" class="modal fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[9999]">
-        <div class="modal-content bg-[#1a1a1a] border border-[#303030] rounded-lg w-[90%] h-[90%] max-w-5xl max-h-[90vh] flex flex-col">
-          <div class="modal-header flex justify-between items-center p-4 border-b border-[#303030]">
-            <h3 class="text-white text-lg font-semibold truncate">${title}</h3>
-            <button class="modal-close text-[#ababab] hover:text-white text-2xl font-bold w-8 h-8 flex items-center justify-center">&times;</button>
-          </div>
-          <div class="modal-body flex-1 p-4 flex items-center justify-center overflow-hidden">
-            <img src="${imageSrc}" 
-                 alt="${title}" 
-                 class="max-w-full max-h-full object-contain rounded"
-                 style="box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);">
-          </div>
-          <div class="modal-footer p-4 border-t border-[#303030] text-center">
-            <button class="modal-close bg-[#404040] hover:bg-[#505050] text-white px-6 py-2 rounded-lg font-medium transition-colors">
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    `);
-
-    $('body').append(modal);
-
-    // Close modal handlers
-    modal.find('.modal-close').on('click', () => {
-      modal.fadeOut(300, () => modal.remove());
-    });
-
-    // Close on background click
-    modal.on('click', function(e) {
-      if (e.target === this) {
-        modal.fadeOut(300, () => modal.remove());
-      }
-    });
-
-    // Close on Escape key
-    $(document).on('keydown.imageModal', function(e) {
-      if (e.key === 'Escape') {
-        modal.fadeOut(300, () => {
-          modal.remove();
-          $(document).off('keydown.imageModal');
-        });
-      }
-    });
-
-    modal.fadeIn(300);
-    Utils.log('info', `Image modal shown: ${title}`);
-  },
-
-  /**
-   * Acquire elevation data for the specified coordinates
-   */
-  async acquireElevationData() {
-    Utils.log('info', 'Acquire Elevation Data button clicked');
-
-    // Get coordinates from input fields
-    let lat = $('#lat-input').val();
-    let lng = $('#lng-input').val();
-    const regionName = $('#region-name-input').val();
-
-    // If no coordinates are set, use Portland, Oregon as default (good coverage area)
-    if (!lat || !lng || lat === '' || lng === '') {
-      lat = 45.5152;  // Portland, Oregon
-      lng = -122.6784;
-
-      // Update the input fields
-      $('#lat-input').val(lat);
-      $('#lng-input').val(lng);
-
-      // Center map on the location
-      MapManager.setView(lat, lng, 12);
-
-      Utils.showNotification('Using Portland, Oregon coordinates for elevation data acquisition', 'info');
-    }
-
-    // Validate coordinates
-    const latNum = parseFloat(lat);
-    const lngNum = parseFloat(lng);
-
-    if (!Utils.isValidCoordinate(latNum, lngNum)) {
-      Utils.showNotification('Invalid coordinates. Please enter valid latitude and longitude values.', 'error');
-      return;
-    }
-
-    try {
-      this.showProgress('🏔️ Acquiring elevation data...');
-
-      // Start WebSocket connection for progress updates if available
-      if (window.WebSocketManager) {
-        WebSocketManager.connect();
-      }
-
-      const requestBody = {
-        lat: latNum,
-        lng: lngNum,
-        buffer_km: 2.0  // 2km radius for 4km x 4km area
-      };
-
-      // Add region name if provided
-      if (regionName && regionName.trim() !== '') {
-        requestBody.region_name = regionName.trim();
-      }
-
-      const response = await fetch('/api/elevation/download-coordinates', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
+      // Add the overlay using OverlayManager
+      const success = OverlayManager.addImageOverlay(overlayKey, imageDataUrl, bounds, {
+        opacity: 0.7,
+        interactive: false
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        Utils.log('info', 'Elevation data acquisition successful:', result);
-
-        const fileCount = result.files ? result.files.length : 0;
-        const fileSize = result.file_size_mb || result.metadata?.file_size_mb || 0;
-
-        Utils.showNotification(
-          `Successfully acquired elevation data! ${fileCount} files (${fileSize.toFixed(2)} MB)`,
-          'success'
-        );
-
-        // Refresh the file list to show the new elevation data
-        if (window.FileManager && window.FileManager.loadFiles) {
-          setTimeout(() => {
-            FileManager.loadFiles();
-          }, 1000);
-        }
-
+      if (success) {
+        Utils.showNotification(`Added ${bType} Sentinel-2 overlay to map`, 'success');
+        Utils.log('info', `Successfully added ${bType} Sentinel-2 overlay for ${regionBand}`);
+        return true;
       } else {
-        throw new Error(result.error || 'Unknown error during elevation data acquisition');
+        throw new Error('Failed to add Sentinel-2 overlay to map');
       }
 
     } catch (error) {
-      Utils.log('error', 'Error acquiring elevation data:', error);
-      Utils.showNotification(`Error acquiring elevation data: ${error.message}`, 'error');
-    } finally {
-      this.hideProgress();
-    }
-  },
-
-  /**
-   * Get combined data (both elevation and satellite data)
-   */
-  async getCombinedData() {
-    Utils.log('info', 'Get Combined Data button clicked');
-
-    // Get coordinates from input fields
-    let lat = $('#lat-input').val();
-    let lng = $('#lng-input').val();
-    const regionName = $('#region-name-input').val();
-
-    // If no coordinates are set, use Portland, Oregon as default
-    if (!lat || !lng || lat === '' || lng === '') {
-      lat = 45.5152;  // Portland, Oregon
-      lng = -122.6784;
-
-      // Update the input fields
-      $('#lat-input').val(lat);
-      $('#lng-input').val(lng);
-
-      // Center map on the location
-      MapManager.setView(lat, lng, 12);
-
-      Utils.showNotification('Using Portland, Oregon coordinates for combined data acquisition', 'info');
-    }
-
-    // Validate coordinates
-    const latNum = parseFloat(lat);
-    const lngNum = parseFloat(lng);
-
-    if (!Utils.isValidCoordinate(latNum, lngNum)) {
-      Utils.showNotification('Invalid coordinates. Please enter valid latitude and longitude values.', 'error');
-      return;
-    }
-
-    try {
-      this.showProgress('📊 Acquiring combined elevation and satellite data...');
-
-      // Start WebSocket connection for progress updates
-      if (window.WebSocketManager) {
-        WebSocketManager.connect();
-      }
-
-      // Prepare region name for both acquisitions
-      const effectiveRegionName = regionName && regionName.trim() !== '' ? regionName.trim() : null;
-
-      // Step 1: Acquire elevation data
-      this.updateProgress(25, 'Acquiring elevation data...');
-      
-      const elevationRequest = {
-        lat: latNum,
-        lng: lngNum,
-        buffer_km: 2.0
-      };
-
-      if (effectiveRegionName) {
-        elevationRequest.region_name = effectiveRegionName;
-      }
-
-      const elevationResponse = await fetch('/api/elevation/download-coordinates', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(elevationRequest)
-      });
-
-      let elevationResult = null;
-      if (elevationResponse.ok) {
-        elevationResult = await elevationResponse.json();
-        if (elevationResult.success) {
-          Utils.log('info', 'Elevation data acquisition completed');
-          this.updateProgress(50, 'Elevation data acquired. Starting satellite data download...');
-        } else {
-          Utils.log('warn', 'Elevation data acquisition failed:', elevationResult.error);
-        }
-      } else {
-        Utils.log('warn', 'Elevation data acquisition request failed:', elevationResponse.status);
-      }
-
-      // Step 2: Acquire Sentinel-2 satellite data
-      const sentinelRequest = {
-        lat: latNum,
-        lng: lngNum,
-        buffer_km: 5.0,  // Larger buffer for satellite data
-        bands: ['B04', 'B08']  // Red and NIR bands
-      };
-
-      if (effectiveRegionName) {
-        sentinelRequest.region_name = effectiveRegionName;
-      }
-
-      this.updateProgress(75, 'Downloading Sentinel-2 satellite data...');
-
-      const sentinelResponse = await fetch('/api/download-sentinel2', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(sentinelRequest)
-      });
-
-      let sentinelResult = null;
-      if (sentinelResponse.ok) {
-        sentinelResult = await sentinelResponse.json();
-        if (sentinelResult.success) {
-          Utils.log('info', 'Sentinel-2 data download completed');
-          this.updateProgress(90, 'Converting satellite images...');
-
-          // Auto-convert Sentinel-2 images if we have a region name
-          const sentinelRegionName = sentinelResult.metadata?.region_name || effectiveRegionName;
-          if (sentinelRegionName) {
-            await this.convertAndDisplaySentinel2(sentinelRegionName);
-          }
-        } else {
-          Utils.log('warn', 'Sentinel-2 data download failed:', sentinelResult.error);
-        }
-      } else {
-        Utils.log('warn', 'Sentinel-2 data download request failed:', sentinelResponse.status);
-      }
-
-      // Step 3: Summarize results
-      this.updateProgress(100, 'Combined data acquisition completed!');
-
-      const elevationSuccess = elevationResult?.success || false;
-      const sentinelSuccess = sentinelResult?.success || false;
-
-      if (elevationSuccess && sentinelSuccess) {
-        Utils.showNotification(
-          'Successfully acquired both elevation and satellite data!',
-          'success'
-        );
-      } else if (elevationSuccess || sentinelSuccess) {
-        const acquiredData = elevationSuccess ? 'elevation' : 'satellite';
-        const failedData = elevationSuccess ? 'satellite' : 'elevation';
-        Utils.showNotification(
-          `Partially successful: ${acquiredData} data acquired, ${failedData} data failed`,
-          'warning'
-        );
-      } else {
-        throw new Error('Both elevation and satellite data acquisition failed');
-      }
-
-      // Refresh file list and region data
-      if (window.FileManager && window.FileManager.loadFiles) {
-        setTimeout(() => {
-          FileManager.loadFiles();
-        }, 1000);
-      }
-
-      // If we have a region name, try to display both elevation and satellite data
-      if (effectiveRegionName || sentinelResult?.metadata?.region_name) {
-        const displayRegionName = effectiveRegionName || sentinelResult.metadata.region_name;
-        setTimeout(() => {
-          this.displayLidarRasterForRegion(displayRegionName);
-          this.displaySentinel2ImagesForRegion(displayRegionName);
-        }, 1500);
-      }
-
-    } catch (error) {
-      Utils.log('error', 'Error in combined data acquisition:', error);
-      Utils.showNotification(`Error acquiring combined data: ${error.message}`, 'error');
-    } finally {
-      this.hideProgress();
+      Utils.log('error', `Failed to add ${bType} Sentinel-2 overlay for ${regionBand}:`, error);
+      Utils.showNotification(`Failed to add ${bType} Sentinel-2 overlay: ${error.message}`, 'error');
+      return false;
     }
   }
 

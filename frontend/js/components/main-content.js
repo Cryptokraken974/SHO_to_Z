@@ -4,7 +4,7 @@
 window.componentManager.register('main-content', (props = {}) => {
     const { 
         title = 'Terrain Analysis Results',
-        subtitle = 'Select processing steps from the sidebar to generate terrain analysis outputs'
+        subtitle = 'Select a region and click on a processing button to generate terrain analysis'
     } = props;
     
     return `

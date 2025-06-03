@@ -52,9 +52,8 @@ function generateGalleryItem(item) {
     return `
         <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-${item.id}">
             <div class="flex-1 flex items-center justify-center">
-                <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="${item.target}">${item.label}</button>
+                <div class="text-white text-lg font-medium">${item.label}</div>
             </div>
-            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="${item.target}">Add to Map</button>
         </div>
     `;
 }

@@ -1063,7 +1063,7 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
             print(f"❌ PNG outputs directory not found: {png_outputs_dir}")
             return JSONResponse(
                 status_code=404,
-                content={"error": f"PNG outputs directory not found for region {region_name}"}
+                content={"success": False, "error": f"PNG outputs directory not found for region {region_name}"}
             )
         
         # Map processing type to the actual filename pattern
@@ -1097,7 +1097,7 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
             
             return JSONResponse(
                 status_code=404,
-                content={"error": f"No PNG files found for {processing_type} in region {region_name}"}
+                content={"success": False, "error": f"No PNG files found for {processing_type} in region {region_name}"}
             )
         
         # Use the most recent file if multiple exist
@@ -1121,7 +1121,7 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
         if not os.path.exists(png_path):
             return JSONResponse(
                 status_code=404,
-                content={"error": f"PNG file not found: {png_path}"}
+                content={"success": False, "error": f"PNG file not found: {png_path}"}
             )
         
         # Try to get bounds from GeoTIFF first, then world file
@@ -1153,7 +1153,7 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
             print("❌ No coordinate information found")
             return JSONResponse(
                 status_code=500,
-                content={"error": "Could not extract coordinate information from files"}
+                content={"success": False, "error": "Could not extract coordinate information from files"}
             )
         
         # Read and encode PNG image
@@ -1163,6 +1163,7 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
         
         print(f"✅ Successfully prepared raster overlay data")
         overlay_data = {
+            'success': True,
             'bounds': bounds,
             'image_data': image_data,
             'processing_type': processing_type,
@@ -1178,7 +1179,7 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
         traceback.print_exc()
         return JSONResponse(
             status_code=500,
-            content={"error": f"Failed to get raster overlay data: {str(e)}"}
+            content={"success": False, "error": f"Failed to get raster overlay data: {str(e)}"}
         )
 
 @app.get("/api/test-overlay/{filename}")
@@ -2606,5 +2607,89 @@ async def progress_callback_wrapper(progress_data: dict, region_name: Optional[s
     if region_name:
         progress_data['region_name'] = region_name
     await manager.send_progress_update(progress_data)
+
+# ============================================================================
+# REGION IMAGES API ENDPOINT
+# ============================================================================
+
+@app.get("/api/regions/{region_name}/images")
+async def get_region_images(region_name: str):
+    """Get list of available PNG images for a region"""
+    print(f"\n🖼️ API CALL: /api/regions/{region_name}/images")
+    
+    try:
+        images = []
+        
+        # Check LiDAR raster products directory
+        lidar_png_dir = f"output/{region_name}/lidar/png_outputs"
+        if os.path.exists(lidar_png_dir):
+            print(f"📂 Checking LiDAR PNG directory: {lidar_png_dir}")
+            
+            for png_file in glob.glob(f"{lidar_png_dir}/*.png"):
+                file_name = os.path.basename(png_file)
+                file_size = os.path.getsize(png_file)
+                
+                # Extract processing type from filename
+                # Pattern: region_name_elevation_processing_type.png
+                processing_type = "Unknown"
+                if "_elevation_" in file_name:
+                    parts = file_name.split("_elevation_")
+                    if len(parts) > 1:
+                        processing_type = parts[1].replace(".png", "")
+                        processing_type = processing_type.replace("_", " ").title()
+                
+                images.append({
+                    "name": file_name,
+                    "path": png_file,
+                    "type": "lidar",
+                    "processing_type": processing_type,
+                    "size": f"{file_size / (1024*1024):.1f} MB" if file_size > 1024*1024 else f"{file_size / 1024:.1f} KB"
+                })
+        
+        # Check Sentinel-2 directory
+        sentinel2_dir = f"output/{region_name}/sentinel2"
+        if os.path.exists(sentinel2_dir):
+            print(f"📂 Checking Sentinel-2 directory: {sentinel2_dir}")
+            
+            for png_file in glob.glob(f"{sentinel2_dir}/*.png"):
+                file_name = os.path.basename(png_file)
+                file_size = os.path.getsize(png_file)
+                
+                # Extract band type from filename
+                # Pattern: region_name_timestamp_sentinel2_BAND.png or region_name_timestamp_NDVI.png
+                band_type = "Unknown"
+                if "_sentinel2_" in file_name:
+                    parts = file_name.split("_sentinel2_")
+                    if len(parts) > 1:
+                        band_type = parts[1].replace(".png", "")
+                elif "_NDVI.png" in file_name:
+                    band_type = "NDVI"
+                
+                images.append({
+                    "name": file_name,
+                    "path": png_file,
+                    "type": "sentinel2",
+                    "processing_type": band_type,
+                    "size": f"{file_size / (1024*1024):.1f} MB" if file_size > 1024*1024 else f"{file_size / 1024:.1f} KB"
+                })
+        
+        # Sort images by type and name
+        images.sort(key=lambda x: (x["type"], x["name"]))
+        
+        print(f"✅ Found {len(images)} images for region {region_name}")
+        return {"images": images, "region_name": region_name, "total_images": len(images)}
+        
+    except Exception as e:
+        print(f"❌ Error getting region images: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to get region images: {str(e)}"}
+        )
+
+# ============================================================================
+# END REGION IMAGES API ENDPOINT
+# ============================================================================
 
 

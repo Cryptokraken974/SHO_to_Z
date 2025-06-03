@@ -13,6 +13,40 @@
   <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
   <link rel="stylesheet" href="/static/styles.css" />
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  
+  <!-- Add custom styles for resizable panels -->
+  <style>
+    .resizable-panel {
+      position: relative;
+      min-width: 200px;
+      max-width: 600px;
+    }
+    
+    .resize-handle {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 4px;
+      height: 100%;
+      background: #404040;
+      cursor: col-resize;
+      transition: background-color 0.2s ease;
+      z-index: 10;
+    }
+    
+    .resize-handle:hover {
+      background: #00bfff;
+    }
+    
+    .resize-handle.dragging {
+      background: #00bfff;
+    }
+    
+    .resize-active {
+      user-select: none;
+    }
+  </style>
+  
   <!-- Modular JavaScript files - load in dependency order -->
   <script src="/static/js/utils.js"></script>
   <script src="/static/js/websocket.js"></script>
@@ -46,28 +80,38 @@
     </div>
   </header>
 
+  <!-- Global Region Selector -->
+  <div class="bg-[#1a1a1a] border-b border-[#303030] px-10 py-4">
+    <div class="flex items-center gap-4">
+      <h3 class="text-white font-semibold text-sm">Region:</h3>
+      <div class="flex items-center gap-3 flex-1">
+        <div id="global-selected-region-name" class="text-[#666] text-sm min-w-0 flex-1">No region selected</div>
+        <button id="global-browse-regions-btn" class="bg-[#007bff] hover:bg-[#0056b3] text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-150 ease-in-out text-sm">
+          Select Region
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="bg-[#1a1a1a] border-b border-[#303030]">
+    <div class="flex">
+      <button class="tab-btn active px-6 py-3 text-white font-medium border-b-2 border-[#00bfff] hover:bg-[#262626] transition-colors" data-tab="map">
+        Map
+      </button>
+      <button class="tab-btn px-6 py-3 text-[#ababab] font-medium border-b-2 border-transparent hover:bg-[#262626] hover:text-white transition-colors" data-tab="analysis">
+        Analysis
+      </button>
+    </div>
+  </div>
+
   <!-- Main content area with modern layout -->
   <div class="flex flex-1 overflow-hidden">
-    <!-- Sidebar -->
-    <div id="sidebar" class="bg-[#1a1a1a] border-r border-[#303030] w-64 p-6 flex flex-col overflow-y-auto">
-      <!-- LAZ File Selection Section -->
-      <div class="accordion-section mb-6">
-        <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="region-accordion">
-          <h3 class="text-white font-semibold flex justify-between items-center m-0">
-            Select Region
-            <span class="accordion-arrow text-sm transition-transform">▼</span>
-          </h3>
-        </div>
-        <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="region-content">
-          <div class="selected-file space-y-2">
-            <div id="selected-region-name" class="text-[#666] text-sm">No region selected</div>
-            <button id="browse-regions-btn" class="bg-[#007bff] hover:bg-[#0056b3] text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-150 ease-in-out w-full text-sm tooltip" data-tooltip="Browse and select a region to process or visualize">
-              Select Region
-            </button>
-          </div>
-        </div>
-      </div>
-
+    <!-- Map Tab Content -->
+    <div id="map-tab" class="tab-content flex flex-1 overflow-hidden">
+      <!-- Sidebar -->
+      <div id="sidebar" class="bg-[#1a1a1a] border-r border-[#303030] w-64 p-6 flex flex-col overflow-y-auto resizable-panel">
+        <div class="resize-handle"></div>
       <!-- Test Section -->
       <div class="accordion-section mb-6">
         <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="test-accordion">
@@ -110,67 +154,13 @@
           </div>
         </div>
       </div>
-
-      <!-- Processing Steps -->
-      <div class="accordion-section flex-1">
-        <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="processing-accordion">
-          <h3 class="text-white font-semibold flex justify-between items-center m-0">
-            Processing Steps
-            <span class="accordion-arrow text-sm transition-transform">▼</span>
-          </h3>
-        </div>
-        <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="processing-content">
-          <div class="space-y-2" id="processing-steps-container">
-            <div>
-              <input type="checkbox" id="dem-checkbox" data-target="laz_to_dem" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-              <label for="dem-checkbox" class="ml-2 text-white">DEM</label>
-            </div>
-            <div>
-              <input type="checkbox" id="dsm-checkbox" data-target="dsm" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-              <label for="dsm-checkbox" class="ml-2 text-white">DSM</label>
-            </div>
-            <div>
-              <input type="checkbox" id="chm-checkbox" data-target="chm" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-              <label for="chm-checkbox" class="ml-2 text-white">CHM</label>
-            </div>
-            <div>
-              <input type="checkbox" id="dtm-checkbox" data-target="dtm" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
-              <label for="dtm-checkbox" class="ml-2 text-white">DTM</label>
-            </div>
-            <div>
-              <input type="checkbox" id="hillshade-checkbox" data-target="hillshade" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
-              <label for="hillshade-checkbox" class="ml-2 text-white">Hillshade (Standard)</label>
-            </div>
-            <div>
-              <input type="checkbox" id="hillshade315-checkbox" data-target="hillshade_315_45_08" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-              <label for="hillshade315-checkbox" class="ml-2 text-white">Hillshade 315° (0.8z)</label>
-            </div>
-            <div>
-              <input type="checkbox" id="hillshade225-checkbox" data-target="hillshade_225_45_08" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-              <label for="hillshade225-checkbox" class="ml-2 text-white">Hillshade 225° (0.8z)</label>
-            </div>
-            <div>
-              <input type="checkbox" id="slope-checkbox" data-target="slope" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
-              <label for="slope-checkbox" class="ml-2 text-white">Slope</label>
-            </div>
-            <div>
-              <input type="checkbox" id="aspect-checkbox" data-target="aspect" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500">
-              <label for="aspect-checkbox" class="ml-2 text-white">Aspect</label>
-            </div>
-            <div>
-              <input type="checkbox" id="color_relief-checkbox" data-target="color_relief" class="form-checkbox h-5 w-5 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500" checked>
-              <label for="color_relief-checkbox" class="ml-2 text-white">Color Relief</label>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Main processing area with map and gallery -->
     <div id="main" class="flex-1 p-6 bg-[#141414] overflow-y-auto">
       <div class="mb-6">
         <h1 class="text-white text-2xl font-bold">Terrain Analysis Results</h1>
-        <p class="text-[#ababab] text-sm mt-2">Select processing steps from the sidebar to generate terrain analysis outputs</p>
+        <p class="text-[#ababab] text-sm mt-2">Select a region and click on a processing button to generate terrain analysis</p>
       </div>
       
       <!-- World Map Canvas -->
@@ -188,27 +178,23 @@
         <div id="gallery" class="flex gap-4 overflow-x-auto pb-4">
           <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-hillshade">
             <div class="flex-1 flex items-center justify-center">
-              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="hillshade">Hillshade</button>
+              <div class="text-white text-lg font-medium">Hillshade</div>
             </div>
-            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="hillshade">Add to Map</button>
           </div>
           <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-slope">
             <div class="flex-1 flex items-center justify-center">
-              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="slope">Slope</button>
+              <div class="text-white text-lg font-medium">Slope</div>
             </div>
-            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="slope">Add to Map</button>
           </div>
           <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-aspect">
             <div class="flex-1 flex items-center justify-center">
-              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="aspect">Aspect</button>
+              <div class="text-white text-lg font-medium">Aspect</div>
             </div>
-            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="aspect">Add to Map</button>
           </div>
           <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-color_relief">
             <div class="flex-1 flex items-center justify-center">
-              <button class="proc-btn bg-[#00bfff] hover:bg-[#0099cc] text-white px-4 py-2 rounded font-medium transition-colors" data-target="color_relief">Color Relief</button>
+              <div class="text-white text-lg font-medium">Color Relief</div>
             </div>
-            <button class="add-to-map-btn hidden bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" data-target="color_relief">Add to Map</button>
           </div>
         </div>
       </div>
@@ -220,19 +206,143 @@
           <!-- Downloaded satellite images will be displayed here -->
         </div>
       </div>
+      </div>
     </div>
-  </div>
 
-  <!-- Chat interface with modern styling -->
-  <div id="chatbar" class="bg-[#1a1a1a] border-t border-[#303030] p-4">
-    <div id="chat-log" class="max-h-[150px] overflow-y-auto mb-3 space-y-2"></div>
-    <div id="chat-controls" class="flex gap-3">
-      <textarea id="chat-input" placeholder="Type a prompt..." class="flex-1 bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-[#ababab] resize-none focus:outline-none focus:border-[#00bfff]"></textarea>
-      <select id="chat-model" class="bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#00bfff]">
-        <option value="o3">o3</option>
-        <option value="4o">4o</option>
-      </select>
-      <button id="chat-send" class="bg-[#00bfff] hover:bg-[#0099cc] text-white px-6 py-2 rounded-lg font-medium transition-colors">Send</button>
+    <!-- Analysis Tab Content -->
+    <div id="analysis-tab" class="tab-content hidden flex flex-1 overflow-hidden">
+      <!-- Analysis Left Panel -->
+      <div id="analysis-sidebar" class="bg-[#1a1a1a] border-r border-[#303030] w-80 p-6 flex flex-col overflow-y-auto resizable-panel">
+        <div class="resize-handle"></div>
+        <!-- Select Images Section -->
+        <div class="accordion-section mb-6">
+          <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="analysis-images-accordion">
+            <h3 class="text-white font-semibold flex justify-between items-center m-0">
+              Select Images
+              <span class="accordion-arrow text-sm transition-transform">▼</span>
+            </h3>
+          </div>
+          <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="analysis-images-content">
+            <div id="analysis-images-list" class="space-y-2">
+              <div class="text-[#666] text-sm text-center py-4">
+                Select a region to view available images
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analysis Tools Section -->
+        <div class="accordion-section mb-6">
+          <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="analysis-tools-accordion">
+            <h3 class="text-white font-semibold flex justify-between items-center m-0">
+              Analysis Tools
+              <span class="accordion-arrow text-sm transition-transform">▼</span>
+            </h3>
+          </div>
+          <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="analysis-tools-content">
+            <div class="space-y-3">
+              <button class="w-full bg-[#6c5ce7] hover:bg-[#5a4fcf] text-white px-4 py-3 rounded-lg font-medium transition-colors">📊 Statistical Analysis</button>
+              <button class="w-full bg-[#00cec9] hover:bg-[#00b3b0] text-white px-4 py-3 rounded-lg font-medium transition-colors">📈 Elevation Profiles</button>
+              <button class="w-full bg-[#e17055] hover:bg-[#d63447] text-white px-4 py-3 rounded-lg font-medium transition-colors">🗺️ Comparative Analysis</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Data Sources Section -->
+        <div class="accordion-section mb-6">
+          <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="data-sources-accordion">
+            <h3 class="text-white font-semibold flex justify-between items-center m-0">
+              Data Sources
+              <span class="accordion-arrow text-sm transition-transform">▼</span>
+            </h3>
+          </div>
+          <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="data-sources-content">
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between text-[#ababab]">
+                <span>Elevation Data:</span>
+                <span class="text-white">None</span>
+              </div>
+              <div class="flex justify-between text-[#ababab]">
+                <span>Region:</span>
+                <span class="text-white">None</span>
+              </div>
+              <div class="flex justify-between text-[#ababab]">
+                <span>Products:</span>
+                <span class="text-white">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analysis Main Content -->
+      <div class="flex-1 flex flex-col bg-[#141414] overflow-hidden">
+        <!-- Main Analysis Area -->
+        <div class="flex-1 p-6 overflow-y-auto">
+        <div class="mb-6">
+          <h1 class="text-white text-2xl font-bold">Analysis Dashboard</h1>
+          <p class="text-[#ababab] text-sm mt-2">Advanced analysis tools and visualizations</p>
+        </div>
+        
+        <!-- Analysis Content Area -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Statistics Panel -->
+          <div class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-6">
+            <h3 class="text-white text-lg font-semibold mb-4">📊 Terrain Statistics</h3>
+            <div class="space-y-3 text-sm">
+              <div class="flex justify-between text-[#ababab]">
+                <span>Min Elevation:</span>
+                <span class="text-white">-- m</span>
+              </div>
+              <div class="flex justify-between text-[#ababab]">
+                <span>Max Elevation:</span>
+                <span class="text-white">-- m</span>
+              </div>
+              <div class="flex justify-between text-[#ababab]">
+                <span>Mean Slope:</span>
+                <span class="text-white">-- °</span>
+              </div>
+              <div class="flex justify-between text-[#ababab]">
+                <span>Area:</span>
+                <span class="text-white">-- km²</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Visualization Panel -->
+          <div class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-6">
+            <h3 class="text-white text-lg font-semibold mb-4">📈 Elevation Profile</h3>
+            <div class="h-48 bg-[#262626] rounded-lg flex items-center justify-center">
+              <span class="text-[#666]">Elevation profile chart will appear here</span>
+            </div>
+          </div>
+
+          <!-- Analysis Results -->
+          <div id="analysis-main-canvas" class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-6 lg:col-span-2">
+            <h3 class="text-white text-lg font-semibold mb-4">🔍 Analysis Results</h3>
+            <div class="text-[#ababab] text-center py-8">
+              <p>Analysis results will be displayed here after running analysis tools</p>
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <!-- LLM Chat Interface at bottom of main area -->
+        <div class="bg-[#1a1a1a] border-t border-[#303030] p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-white text-sm font-semibold">🤖 AI Assistant</h3>
+            <div class="flex gap-2">
+              <select id="chat-model" class="bg-[#262626] border border-[#404040] rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-[#00bfff]">
+                <option value="o3">o3</option>
+                <option value="4o">4o</option>
+              </select>
+              <button id="chat-send" class="bg-[#00bfff] hover:bg-[#0099cc] text-white px-3 py-1 rounded text-xs font-medium transition-colors">Send</button>
+            </div>
+          </div>
+          <div id="chat-log" class="max-h-[120px] overflow-y-auto mb-3 space-y-2 bg-[#262626] rounded-lg p-3"></div>
+          <textarea id="chat-input" placeholder="Ask questions about your terrain analysis..." class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-[#ababab] resize-none focus:outline-none focus:border-[#00bfff] text-sm" rows="2"></textarea>
+        </div>
+      </div>
     </div>
   </div>
 

@@ -96,6 +96,11 @@ window.FileManager = {
       .removeClass('text-[#666]')
       .addClass('text-[#00bfff]');
     
+    // Update global region selector
+    if (UIManager && UIManager.updateGlobalRegionSelector) {
+      UIManager.updateGlobalRegionSelector(regionName);
+    }
+    
     // Center map on region location if coordinates are available
     if (coords && Utils.isValidCoordinate(coords.lat, coords.lng)) {
       MapManager.setView(coords.lat, coords.lng, 13);
@@ -208,6 +213,13 @@ window.FileManager = {
   clearSelection() {
     this.selectedRegion = null; // MODIFIED to selectedRegion
     $('#selected-region-name').text('No region selected').removeClass('text-[#00bfff]').addClass('text-[#666]'); // MODIFIED message
+    $('#analysis-selected-region-name').text('No region selected'); // Clear Analysis tab too
+    
+    // Update global region selector
+    if (UIManager && UIManager.updateGlobalRegionSelector) {
+      UIManager.updateGlobalRegionSelector(null);
+    }
+    
     if (this.currentLocationPin) {
       MapManager.removeMarker(this.currentLocationPin);
       this.currentLocationPin = null;
