@@ -21,19 +21,16 @@ window.componentManager.register('sidebar', (props = {}) => {
                 </div>
             </div>
 
-            <!-- Test Section -->
+            <!-- Get Data Section -->
             <div class="accordion-section mb-6">
-                <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="test-accordion">
+                <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="get-data-accordion">
                     <h3 class="text-white font-semibold flex justify-between items-center m-0">
-                        Test
+                        Get Data
                         <span class="accordion-arrow text-sm transition-transform">▼</span>
                     </h3>
                 </div>
-                <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="test-content">
+                <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="get-data-content">
                     <div class="space-y-3">
-                        <!-- Test Overlay Button -->
-                        <button id="test-overlay-btn" class="w-full bg-[#ff6b35] hover:bg-[#e55a2e] text-white px-4 py-3 rounded-lg font-medium transition-colors">🧪 Test Overlay</button>
-                        
                         <!-- Coordinate Input Fields -->
                         <div class="grid grid-cols-2 gap-2">
                             <div>
@@ -57,6 +54,48 @@ window.componentManager.register('sidebar', (props = {}) => {
                         
                         <!-- Get Elevation Data Button -->
                         <button id="get-lidar-btn" class="w-full bg-[#6c5ce7] hover:bg-[#5a4fcf] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2">🏔️ Get Elevation Data</button>
+                        
+                        <!-- Get Data Button (Combined) -->
+                        <button id="get-data-btn" class="w-full bg-[#28a745] hover:bg-[#218838] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2">📊 Get Data (Elevation + Satellite)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Go to Section -->
+            <div class="accordion-section mb-6">
+                <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="go-to-accordion">
+                    <h3 class="text-white font-semibold flex justify-between items-center m-0">
+                        Go to
+                        <span class="accordion-arrow text-sm transition-transform">▼</span>
+                    </h3>
+                </div>
+                <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="go-to-content">
+                    <div class="space-y-3">
+                        <!-- Coordinate Go-to Fields -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label for="goto-lat-input" class="block text-xs text-[#ababab] mb-1">Latitude</label>
+                                <input type="number" id="goto-lat-input" placeholder="Enter latitude" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm placeholder-[#666] focus:outline-none focus:border-[#00bfff] font-mono" step="any">
+                            </div>
+                            <div>
+                                <label for="goto-lng-input" class="block text-xs text-[#ababab] mb-1">Longitude</label>
+                                <input type="number" id="goto-lng-input" placeholder="Enter longitude" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm placeholder-[#666] focus:outline-none focus:border-[#00bfff] font-mono" step="any">
+                            </div>
+                        </div>
+                        
+                        <!-- Go Button -->
+                        <button id="go-to-coordinates-btn" class="w-full bg-[#17a2b8] hover:bg-[#138496] text-white px-4 py-3 rounded-lg font-medium transition-colors">🎯 Go to Coordinates</button>
+                        
+                        <!-- Preset Locations -->
+                        <div class="mt-4">
+                            <label class="block text-xs text-[#ababab] mb-2">Quick Locations</label>
+                            <div class="space-y-2">
+                                <button class="preset-location w-full bg-[#495057] hover:bg-[#6c757d] text-white px-3 py-2 rounded text-sm transition-colors" data-lat="40.7128" data-lng="-74.0060">📍 New York City</button>
+                                <button class="preset-location w-full bg-[#495057] hover:bg-[#6c757d] text-white px-3 py-2 rounded text-sm transition-colors" data-lat="34.0522" data-lng="-118.2437">📍 Los Angeles</button>
+                                <button class="preset-location w-full bg-[#495057] hover:bg-[#6c757d] text-white px-3 py-2 rounded text-sm transition-colors" data-lat="51.5074" data-lng="-0.1278">📍 London</button>
+                                <button class="preset-location w-full bg-[#495057] hover:bg-[#6c757d] text-white px-3 py-2 rounded text-sm transition-colors" data-lat="35.6762" data-lng="139.6503">📍 Tokyo</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

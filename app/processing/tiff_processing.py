@@ -57,26 +57,41 @@ def read_elevation_tiff(tiff_path: str) -> Tuple[np.ndarray, Dict[str, Any]]:
     
     return elevation_array, metadata
 
-def save_raster(array: np.ndarray, output_path: str, metadata: Dict[str, Any], dtype=gdal.GDT_Float32):
+def save_raster(array: np.ndarray, output_path: str, metadata: Dict[str, Any], dtype=gdal.GDT_Float32, enhanced_quality: bool = True):
     """
-    Save numpy array as GeoTIFF with spatial reference
+    Save numpy array as GeoTIFF with spatial reference and enhanced quality options
     
     Args:
         array: Numpy array to save
         output_path: Output file path
         metadata: Spatial metadata from original raster
         dtype: GDAL data type for output
+        enhanced_quality: If True, use enhanced compression and quality settings
     """
-    print(f"💾 Saving raster: {os.path.basename(output_path)}")
+    print(f"💾 Saving {'ENHANCED QUALITY' if enhanced_quality else 'standard'} raster: {os.path.basename(output_path)}")
     
     # Create output directory if needed
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
-    # Create the output raster
+    # Create the output raster with enhanced options
     driver = gdal.GetDriverByName('GTiff')
     height, width = array.shape
     
-    dataset = driver.Create(output_path, width, height, 1, dtype)
+    # Enhanced creation options for better quality
+    if enhanced_quality:
+        creation_options = [
+            'COMPRESS=LZW',           # Lossless compression
+            'PREDICTOR=2',            # Horizontal differencing predictor
+            'TILED=YES',              # Tiled format for better performance
+            'BLOCKXSIZE=512',         # Optimal tile size
+            'BLOCKYSIZE=512',
+            'BIGTIFF=IF_SAFER',       # Handle large files
+            'NUM_THREADS=ALL_CPUS'    # Use all available CPUs
+        ]
+        dataset = driver.Create(output_path, width, height, 1, dtype, options=creation_options)
+        print(f"🔧 Using enhanced TIFF options: LZW compression, tiled format, multi-threading")
+    else:
+        dataset = driver.Create(output_path, width, height, 1, dtype)
     
     # Set geospatial information
     dataset.SetGeoTransform(metadata['geotransform'])
@@ -90,11 +105,20 @@ def save_raster(array: np.ndarray, output_path: str, metadata: Dict[str, Any], d
     if metadata.get('nodata_value') is not None:
         band.SetNoDataValue(metadata['nodata_value'])
     
+    # Enhanced: Calculate and set statistics for better visualization
+    if enhanced_quality:
+        band.ComputeStatistics(False)
+        min_val, max_val, mean_val, std_val = band.GetStatistics(True, True)
+        print(f"📊 Statistics computed: Min={min_val:.2f}, Max={max_val:.2f}, Mean={mean_val:.2f}, StdDev={std_val:.2f}")
+    
     # Ensure data is written to disk
     dataset.FlushCache()
     dataset = None
     
-    print(f"✅ Raster saved successfully")
+    if enhanced_quality:
+        print(f"✅ Enhanced quality raster saved successfully")
+    else:
+        print(f"✅ Raster saved successfully")
 
 async def process_hillshade_tiff(tiff_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -134,8 +158,8 @@ async def process_hillshade_tiff(tiff_path: str, output_dir: str, parameters: Di
         print(f"🔄 Calculating hillshade...")
         hillshade_array = calculate_hillshade(elevation_array, azimuth, altitude, z_factor, metadata)
         
-        # Save result
-        save_raster(hillshade_array, output_path, metadata, gdal.GDT_Byte)
+        # Save result with enhanced quality
+        save_raster(hillshade_array, output_path, metadata, gdal.GDT_Byte, enhanced_quality=True)
         
         processing_time = time.time() - start_time
         
@@ -224,8 +248,8 @@ async def process_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[s
         output_filename = f"{base_name}_slope.tif"
         output_path = os.path.join(output_dir, output_filename)
         
-        # Save result
-        save_raster(slope_array, output_path, metadata)
+        # Save result with enhanced quality
+        save_raster(slope_array, output_path, metadata, enhanced_quality=True)
         
         processing_time = time.time() - start_time
         
@@ -284,8 +308,8 @@ async def process_aspect_tiff(tiff_path: str, output_dir: str, parameters: Dict[
         output_filename = f"{base_name}_aspect.tif"
         output_path = os.path.join(output_dir, output_filename)
         
-        # Save result
-        save_raster(aspect_array, output_path, metadata)
+        # Save result with enhanced quality
+        save_raster(aspect_array, output_path, metadata, enhanced_quality=True)
         
         processing_time = time.time() - start_time
         
@@ -347,8 +371,8 @@ async def process_tri_tiff(tiff_path: str, output_dir: str, parameters: Dict[str
         output_filename = f"{base_name}_TRI.tif"
         output_path = os.path.join(output_dir, output_filename)
         
-        # Save result
-        save_raster(tri_array, output_path, metadata)
+        # Save result with enhanced quality
+        save_raster(tri_array, output_path, metadata, enhanced_quality=True)
         
         processing_time = time.time() - start_time
         
@@ -415,8 +439,8 @@ async def process_tpi_tiff(tiff_path: str, output_dir: str, parameters: Dict[str
         output_filename = f"{base_name}_TPI.tif"
         output_path = os.path.join(output_dir, output_filename)
         
-        # Save result
-        save_raster(tpi_array, output_path, metadata)
+        # Save result with enhanced quality
+        save_raster(tpi_array, output_path, metadata, enhanced_quality=True)
         
         processing_time = time.time() - start_time
         
@@ -485,8 +509,8 @@ async def process_color_relief_tiff(tiff_path: str, output_dir: str, parameters:
         output_filename = f"{base_name}_color_relief.tif"
         output_path = os.path.join(output_dir, output_filename)
         
-        # Save result (3-band RGB)
-        save_color_raster(color_array, output_path, metadata)
+        # Save result (3-band RGB) with enhanced quality
+        save_color_raster(color_array, output_path, metadata, enhanced_quality=True)
         
         processing_time = time.time() - start_time
         
@@ -533,11 +557,11 @@ def apply_color_relief(elevation: np.ndarray) -> np.ndarray:
     
     return rgb_array
 
-def save_color_raster(rgb_array: np.ndarray, output_path: str, metadata: Dict[str, Any]):
+def save_color_raster(rgb_array: np.ndarray, output_path: str, metadata: Dict[str, Any], enhanced_quality: bool = True):
     """
-    Save RGB array as 3-band GeoTIFF
+    Save RGB array as 3-band GeoTIFF with enhanced quality options
     """
-    print(f"💾 Saving color raster: {os.path.basename(output_path)}")
+    print(f"💾 Saving {'ENHANCED QUALITY' if enhanced_quality else 'standard'} color raster: {os.path.basename(output_path)}")
     
     # Create output directory if needed
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -546,22 +570,49 @@ def save_color_raster(rgb_array: np.ndarray, output_path: str, metadata: Dict[st
     driver = gdal.GetDriverByName('GTiff')
     height, width, bands = rgb_array.shape
     
-    dataset = driver.Create(output_path, width, height, bands, gdal.GDT_Byte)
+    # Enhanced creation options for better quality
+    if enhanced_quality:
+        creation_options = [
+            'COMPRESS=LZW',           # Lossless compression
+            'PREDICTOR=2',            # Horizontal differencing predictor
+            'TILED=YES',              # Tiled format for better performance
+            'BLOCKXSIZE=512',         # Optimal tile size
+            'BLOCKYSIZE=512',
+            'BIGTIFF=IF_SAFER',       # Handle large files
+            'NUM_THREADS=ALL_CPUS',   # Use all available CPUs
+            'PHOTOMETRIC=RGB'         # Specify RGB photometric interpretation
+        ]
+        dataset = driver.Create(output_path, width, height, bands, gdal.GDT_Byte, options=creation_options)
+        print(f"🔧 Using enhanced color TIFF options: LZW compression, RGB photometric, tiled format")
+    else:
+        dataset = driver.Create(output_path, width, height, bands, gdal.GDT_Byte)
     
     # Set geospatial information
     dataset.SetGeoTransform(metadata['geotransform'])
     dataset.SetProjection(metadata['projection'])
     
-    # Write each band
+    # Write each band with enhanced statistics
     for i in range(bands):
         band = dataset.GetRasterBand(i + 1)
         band.WriteArray(rgb_array[:, :, i])
+        
+        # Enhanced: Set color interpretation for RGB bands
+        if enhanced_quality:
+            if i == 0:
+                band.SetColorInterpretation(gdal.GCI_RedBand)
+            elif i == 1:
+                band.SetColorInterpretation(gdal.GCI_GreenBand)
+            elif i == 2:
+                band.SetColorInterpretation(gdal.GCI_BlueBand)
     
     # Ensure data is written to disk
     dataset.FlushCache()
     dataset = None
     
-    print(f"✅ Color raster saved successfully")
+    if enhanced_quality:
+        print(f"✅ Enhanced quality color raster saved successfully")
+    else:
+        print(f"✅ Color raster saved successfully")
 
 async def process_all_raster_products(tiff_path: str, progress_callback=None, request=None) -> Dict[str, Any]:
     """

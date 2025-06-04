@@ -2029,8 +2029,7 @@ async def download_elevation_coordinates(request: CoordinateRequest):
         
         # Import required modules
         import uuid
-        from .data_acquisition.sources.opentopography import OpenTopographySource
-        from .data_acquisition.sources.brazilian_elevation import BrazilianElevationSource
+        from .data_acquisition.geographic_router import GeographicRouter
         from .data_acquisition.sources.base import DownloadRequest, DataType, DataResolution
         from .data_acquisition.utils.coordinates import BoundingBox
         
@@ -2060,22 +2059,13 @@ async def download_elevation_coordinates(request: CoordinateRequest):
             region_name=request.region_name
         )
         
-        # Choose optimal source based on coordinates
-        brazilian_source = BrazilianElevationSource()
-        is_brazilian_coords = brazilian_source.is_in_brazil(request.lat, request.lng)
+        # Initialize geographic router with automatic source selection
+        router = GeographicRouter()
+        region_info = router.get_region_info(bbox)
         
-        if is_brazilian_coords:
-            # Use Brazilian elevation source for Brazilian coordinates
-            elevation_source = brazilian_source
-            source_name = "Brazilian Elevation"
-            terrain_type = elevation_source.classify_terrain(request.lat, request.lng)
-            optimal_dataset = elevation_source.get_optimal_dataset(request.lat, request.lng)
-            print(f"🇧🇷 Using Brazilian elevation source - Terrain: {terrain_type.value}, Dataset: {optimal_dataset.value}")
-        else:
-            # Use OpenTopography for US/other coordinates
-            elevation_source = OpenTopographySource()
-            source_name = "OpenTopography 3DEP"
-            print(f"🇺🇸 Using OpenTopography source for non-Brazilian coordinates")
+        print(f"🗺️  Geographic routing: Region = {region_info['region']} ({region_info['region_name']})")
+        print(f"🎯 Optimal sources: {' → '.join(region_info['optimal_sources'])}")
+        print(f"📍 Center: {region_info['center_lat']:.4f}, {region_info['center_lng']:.4f}")
         
         # Create progress callback that sends updates via WebSocket
         async def progress_callback(update):
@@ -2083,38 +2073,18 @@ async def download_elevation_coordinates(request: CoordinateRequest):
                 "source": "elevation_data",
                 "coordinates": {"lat": request.lat, "lng": request.lng},
                 "download_id": download_id,
-                "data_source": source_name,
+                "region": region_info['region'],
                 **update
             })
         
-        # Register download task for potential cancellation
-        manager.add_download_task(download_id, elevation_source)
-        
-        # Check availability first
-        available = await elevation_source.check_availability(download_request)
-        if not available:
-            # Clean up download registration
-            manager.cancel_download(download_id)
-            
-            if is_brazilian_coords:
-                error_msg = f"No Brazilian elevation data available for coordinates {request.lat:.4f}, {request.lng:.4f}"
-            else:
-                error_msg = f"No elevation data available for coordinates {request.lat:.4f}, {request.lng:.4f}"
-            
-            raise HTTPException(status_code=404, detail=error_msg)
-        
-        # Send initial progress
-        await progress_callback({
-            "type": "download_started",
-            "message": f"Starting {source_name} elevation data download...",
-            "progress": 0
-        })
-        
-        # Download elevation data
-        result = await elevation_source.download(download_request, progress_callback)
+        # Download using geographic routing
+        result = await router.download_with_routing(download_request, progress_callback)
         
         # Clean up download registration
-        manager.cancel_download(download_id)
+        try:
+            manager.cancel_download(download_id)
+        except:
+            pass
         
         if result.success:
             # Send final success message
@@ -2166,7 +2136,7 @@ async def download_elevation_coordinates(request: CoordinateRequest):
                         "error": str(e)
                     })
             
-            # Prepare response with source-specific information
+            # Prepare response with routing information
             response_data = {
                 "success": True,
                 "coordinates": {"lat": request.lat, "lng": request.lng},
@@ -2175,17 +2145,25 @@ async def download_elevation_coordinates(request: CoordinateRequest):
                 "resolution_m": result.resolution_m or 30.0,
                 "data_type": "elevation",
                 "format": "GeoTIFF",
-                "source": source_name,
                 "download_id": download_id,
-                "region_name": request.region_name
+                "region_name": request.region_name,
+                "routing_info": {
+                    "region": region_info['region'],
+                    "region_name": region_info['region_name'],
+                    "selected_source": result.metadata.get('selected_source', 'unknown') if result.metadata else 'unknown',
+                    "source_priority": result.metadata.get('source_priority', 1) if result.metadata else 1
+                }
             }
             
-            # Add Brazilian-specific metadata if applicable
-            if is_brazilian_coords and result.metadata:
+            # Add source-specific metadata if available
+            if result.metadata:
                 response_data.update({
-                    "terrain_type": result.metadata.get("terrain_type"),
-                    "dataset": result.metadata.get("dataset"),
-                    "dataset_name": result.metadata.get("dataset_name")
+                    "source_metadata": {
+                        "provider": result.metadata.get("provider"),
+                        "source": result.metadata.get("source"),
+                        "tile": result.metadata.get("tile"),
+                        "resolution": result.metadata.get("resolution")
+                    }
                 })
             
             return response_data

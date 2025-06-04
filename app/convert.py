@@ -5,18 +5,20 @@ from typing import Optional
 import base64
 import subprocess
 
-def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None) -> str:
+def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None, enhanced_resolution: bool = True) -> str:
     """
     Convert GeoTIFF file to PNG file with proper scaling and worldfile preservation
+    Enhanced version preserves high-resolution detail for better visualization
     
     Args:
         tif_path: Path to the input TIF file
         png_path: Optional path for output PNG file. If None, will be generated from tif_path
+        enhanced_resolution: If True, use enhanced settings for better quality
         
     Returns:
         Path to the generated PNG file
     """
-    print(f"\n🎨 GEOTIFF TO PNG: Starting conversion with proper scaling")
+    print(f"\n🎨 GEOTIFF TO PNG: Starting {'ENHANCED RESOLUTION' if enhanced_resolution else 'standard'} conversion")
     print(f"📁 Input TIF: {tif_path}")
     
     start_time = time.time()
@@ -36,12 +38,21 @@ def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None) -> str
             print(f"CREATED FOLDER (convert_geotiff_to_png): {output_dir}") # LOGGING ADDED
             print(f"📁 Created output directory: {output_dir}")
         
-        # Open GeoTIFF with GDAL to get statistics
+        # Open GeoTIFF with GDAL to get statistics and information
         ds = gdal.Open(tif_path)
         if ds is None:
             error_msg = f"GDAL failed to open TIF file: {tif_path}"
             print(f"❌ {error_msg}")
             raise Exception(error_msg)
+        
+        # Get raster information
+        width = ds.RasterXSize
+        height = ds.RasterYSize
+        pixel_size_x = ds.GetGeoTransform()[1]
+        pixel_size_y = abs(ds.GetGeoTransform()[5])
+        
+        print(f"📏 Raster dimensions: {width}x{height} pixels")
+        print(f"📐 Pixel size: {pixel_size_x:.6f} x {pixel_size_y:.6f} degrees")
         
         # Get band statistics for proper scaling
         band = ds.GetRasterBand(1)
@@ -51,43 +62,83 @@ def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None) -> str
         min_val, max_val, mean_val, std_val = band.GetStatistics(True, True)
         print(f"📊 Data range: Min={min_val:.0f}, Max={max_val:.0f}, Mean={mean_val:.1f}, StdDev={std_val:.1f}")
         
-        # Use 2% linear stretch to improve contrast and avoid outliers
-        # This is a common technique in remote sensing visualization
-        histogram = band.GetHistogram(min_val, max_val, 1000, False, False)
-        if histogram:
-            # Calculate 2% and 98% percentiles for better contrast
-            total_pixels = sum(histogram)
-            low_percentile = total_pixels * 0.02
-            high_percentile = total_pixels * 0.98
-            
-            cumulative = 0
-            stretch_min = min_val
-            stretch_max = max_val
-            
-            for i, count in enumerate(histogram):
-                cumulative += count
-                if cumulative >= low_percentile and stretch_min == min_val:
-                    stretch_min = min_val + (max_val - min_val) * i / len(histogram)
-                if cumulative >= high_percentile:
-                    stretch_max = min_val + (max_val - min_val) * i / len(histogram)
-                    break
-            
-            print(f"📈 Using 2-98% stretch: {stretch_min:.0f} to {stretch_max:.0f}")
+        # Enhanced histogram analysis for better contrast
+        if enhanced_resolution:
+            # Use finer histogram bins for enhanced processing
+            histogram = band.GetHistogram(min_val, max_val, 2000, False, False)  # 2x more bins
+            if histogram:
+                # Calculate 1% and 99% percentiles for enhanced contrast
+                total_pixels = sum(histogram)
+                low_percentile = total_pixels * 0.01  # More aggressive outlier removal
+                high_percentile = total_pixels * 0.99
+                
+                cumulative = 0
+                stretch_min = min_val
+                stretch_max = max_val
+                
+                for i, count in enumerate(histogram):
+                    cumulative += count
+                    if cumulative >= low_percentile and stretch_min == min_val:
+                        stretch_min = min_val + (max_val - min_val) * i / len(histogram)
+                    if cumulative >= high_percentile:
+                        stretch_max = min_val + (max_val - min_val) * i / len(histogram)
+                        break
+                
+                print(f"📈 Enhanced 1-99% stretch: {stretch_min:.0f} to {stretch_max:.0f}")
+            else:
+                # Enhanced fallback with standard deviation stretch
+                stretch_min = max(min_val, mean_val - 2.5 * std_val)
+                stretch_max = min(max_val, mean_val + 2.5 * std_val)
+                print(f"📈 Enhanced stddev stretch: {stretch_min:.0f} to {stretch_max:.0f}")
         else:
-            # Fallback to min/max if histogram fails
-            stretch_min = min_val
-            stretch_max = max_val
-            print(f"📈 Using full range stretch: {stretch_min:.0f} to {stretch_max:.0f}")
+            # Standard 2% linear stretch
+            histogram = band.GetHistogram(min_val, max_val, 1000, False, False)
+            if histogram:
+                # Calculate 2% and 98% percentiles for better contrast
+                total_pixels = sum(histogram)
+                low_percentile = total_pixels * 0.02
+                high_percentile = total_pixels * 0.98
+                
+                cumulative = 0
+                stretch_min = min_val
+                stretch_max = max_val
+                
+                for i, count in enumerate(histogram):
+                    cumulative += count
+                    if cumulative >= low_percentile and stretch_min == min_val:
+                        stretch_min = min_val + (max_val - min_val) * i / len(histogram)
+                    if cumulative >= high_percentile:
+                        stretch_max = min_val + (max_val - min_val) * i / len(histogram)
+                        break
+                
+                print(f"📈 Standard 2-98% stretch: {stretch_min:.0f} to {stretch_max:.0f}")
+            else:
+                # Fallback to min/max if histogram fails
+                stretch_min = min_val
+                stretch_max = max_val
+                print(f"📈 Full range stretch: {stretch_min:.0f} to {stretch_max:.0f}")
         
-        # Convert to PNG with proper scaling using gdal_translate
-        # Use -scale to map input range to 0-255 for PNG
-        scale_options = [
-            "-scale", str(stretch_min), str(stretch_max), "0", "255",
-            "-ot", "Byte",  # Output as 8-bit for PNG
-            "-co", "WORLDFILE=YES"
-        ]
+        # Enhanced PNG conversion options
+        if enhanced_resolution:
+            # High-quality PNG conversion with enhanced options
+            scale_options = [
+                "-scale", str(stretch_min), str(stretch_max), "0", "255",
+                "-ot", "Byte",  # Output as 8-bit for PNG
+                "-co", "WORLDFILE=YES",
+                "-co", "COMPRESS=NONE",  # No compression for best quality
+                "-r", "cubic",  # Cubic resampling for smoother results
+                "-a_nodata", "0"  # Set nodata value for transparency
+            ]
+            print(f"🎨 Enhanced PNG conversion: {stretch_min:.0f}-{stretch_max:.0f} → 0-255 (cubic resampling)")
+        else:
+            # Standard conversion options
+            scale_options = [
+                "-scale", str(stretch_min), str(stretch_max), "0", "255",
+                "-ot", "Byte",  # Output as 8-bit for PNG
+                "-co", "WORLDFILE=YES"
+            ]
+            print(f"🎨 Standard PNG conversion: {stretch_min:.0f}-{stretch_max:.0f} → 0-255...")
         
-        print(f"🎨 Converting with GDAL scaling: {stretch_min:.0f}-{stretch_max:.0f} → 0-255...")
         gdal.Translate(png_path, ds, format="PNG", options=scale_options)
         
         # Close dataset
@@ -95,7 +146,10 @@ def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None) -> str
         
         processing_time = time.time() - start_time
         
-        print(f"✅ GeoTIFF to PNG conversion completed in {processing_time:.2f} seconds")
+        if enhanced_resolution:
+            print(f"✅ ENHANCED GeoTIFF to PNG conversion completed in {processing_time:.2f} seconds")
+        else:
+            print(f"✅ GeoTIFF to PNG conversion completed in {processing_time:.2f} seconds")
         print(f"📄 PNG saved: {png_path}")
         
         # Check for worldfile

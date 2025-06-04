@@ -279,7 +279,7 @@ class OpenTopographySource(BaseDataSource):
             
             # Build PDAL pipeline for DEM
             pc_resolution = self._get_resolution_meters(request.resolution)
-            dem_resolution = pc_resolution * 0.5  # DEM resolution slightly finer than point cloud
+            dem_resolution = pc_resolution * 0.25  # Enhanced: Much finer DEM resolution for higher quality (was 0.5)
             
             # Determine DEM type based on request (default to DTM)
             dem_type = 'dtm'  # Could be extended to support DSM based on request parameters
@@ -439,11 +439,11 @@ class OpenTopographySource(BaseDataSource):
     def _get_resolution_meters(self, resolution: DataResolution) -> float:
         """Get resolution in meters."""
         if resolution == DataResolution.HIGH:
-            return 1.0
+            return 0.2  # Enhanced resolution: 5x finer than original (was 1.0)
         elif resolution == DataResolution.MEDIUM:
-            return 5.0
+            return 1.0  # Enhanced resolution: 5x finer than original (was 5.0)
         else:
-            return 10.0
+            return 2.5  # Enhanced resolution: 4x finer than original (was 10.0)
     
     def _create_input_folder(self, request: DownloadRequest) -> Path:
         """Create descriptive folder in input directory."""

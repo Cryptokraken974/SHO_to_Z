@@ -1,0 +1,97 @@
+  /**
+   * Add LIDAR raster overlay to map using the raster overlay API
+   * @param {string} regionName - Region nameAdd commentMore actions
+   * @param {string} processingType - Processing type (hillshade, slope, etc.)
+   * @param {string} displayName - Display name for the overlay
+   * @returns {Promise<boolean>} Success status
+   * Display LIDAR raster images in the Processing Results gallery
+   * @param {Array} availableRasters - Array of available raster data
+   */
+  async addLidarRasterOverlayToMap(regionName, processingType, displayName) {
+    Utils.log('info', `Adding LIDAR ${processingType} overlay to map for region: ${regionName}`);
+  displayLidarRasterGallery(availableRasters) {
+    const gallery = $('#gallery');
+
+    try {
+      this.showProgress(`Adding ${displayName} overlay to map...`);      this.showProgress(`Adding ${displayName} overlay to map...`);
+      
+      // Call the LIDAR raster overlay API
+      const response = await fetch(`/api/overlay/raster/${regionName}/${processingType}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+      
+      const overlayData = await response.json();
+    if (!availableRasters || availableRasters.length === 0) {
+      this.resetProcessingGalleryToLabels();
+      return;
+    }
+
+    // Create image items for each available raster
+    const imageItems = availableRasters.map(raster => {
+      const { processingType, display, overlayData, regionName } = raster;
+      const imageDataUrl = `data:image/png;base64,${overlayData.image_data}`;
+
+      if (!overlayData.bounds || !overlayData.image_data) {
+        throw new Error('Invalid overlay data received');
+      }
+      
+      // Create image bounds for Leaflet
+      const bounds = [
+        [overlayData.bounds.south, overlayData.bounds.west],
+        [overlayData.bounds.north, overlayData.bounds.east]
+      ];
+      
+      const imageUrl = `data:image/png;base64,${overlayData.image_data}`;
+      const overlayKey = `LIDAR_RASTER_${regionName}_${processingType}`;
+      
+      // Use OverlayManager to add the overlay
+      const success = OverlayManager.addImageOverlay(
+        overlayKey,
+        imageUrl,
+        bounds,
+        {
+          opacity: 0.8,
+          attribution: 'LIDAR Processing'
+        }
+      );
+      
+      if (success) {
+        Utils.showNotification(`Added ${displayName} overlay to map`, 'success');
+        return true;
+      } else {
+        throw new Error('Failed to add overlay to map');
+      }
+      
+    } catch (error) {
+      Utils.log('error', `Error adding LIDAR raster overlay:`, error);
+      Utils.showNotification(`Error adding ${displayName} overlay: ${error.message}`, 'error');
+      return false;
+    } finally {
+      this.hideProgress();
+    }
+  },
+      return `
+        <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-${processingType}">
+          <div class="flex-1 flex items-center justify-center relative">
+            <img src="${imageDataUrl}" 
+                 alt="${display}" 
+                 class="processing-result-image cursor-pointer"
+                 title="Click to view larger image">
+            <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+              ${display}
+            </div>
+            <div class="absolute top-2 right-2 bg-green-600 bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+              ✓ Ready
+            </div>
+          </div>
+          <button class="add-to-map-btn bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" 
+                  data-target="${processingType}"
+                  data-region-name="${regionName}">
+            Add to Map
+          </button>
+        </div>
+      `;
+    }).join('');

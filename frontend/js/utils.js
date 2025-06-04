@@ -155,4 +155,112 @@ window.Utils = {
 
     return `${formattedLat}${latDir}_${formattedLng}${lngDir}`;
   },
+
+  /**
+   * Parse coordinates from various string formats
+   * @param {string} coordString - Coordinate string in various formats
+   * @returns {Object|null} Object with lat/lng as decimal degrees or null if invalid
+   */
+  parseCoordinateString(coordString) {
+    if (!coordString || typeof coordString !== 'string') {
+      return null;
+    }
+
+    // Clean the input string
+    const cleaned = coordString.trim().replace(/\s+/g, ' ');
+
+    try {
+      // Pattern 1: Degrees, Minutes, Seconds format "10°42′05″S, 67°52′36″W"
+      const dmsPattern = /(\d+)\s*°\s*(\d+)\s*[′']\s*(\d+(?:\.\d+)?)\s*[″"]\s*([NSEW])\s*,?\s*(\d+)\s*°\s*(\d+)\s*[′']\s*(\d+(?:\.\d+)?)\s*[″"]\s*([NSEW])/i;
+      const dmsMatch = cleaned.match(dmsPattern);
+      
+      if (dmsMatch) {
+        const [, deg1, min1, sec1, dir1, deg2, min2, sec2, dir2] = dmsMatch;
+        
+        // Convert DMS to decimal degrees
+        const decimal1 = parseFloat(deg1) + parseFloat(min1) / 60 + parseFloat(sec1) / 3600;
+        const decimal2 = parseFloat(deg2) + parseFloat(min2) / 60 + parseFloat(sec2) / 3600;
+        
+        // Determine which values are lat/lng based on direction indicators
+        let lat, lng;
+        if (['N', 'S'].includes(dir1.toUpperCase()) && ['E', 'W'].includes(dir2.toUpperCase())) {
+          lat = decimal1;
+          lng = decimal2;
+          
+          // Apply sign based on direction
+          if (dir1.toUpperCase() === 'S') lat = -lat;
+          if (dir2.toUpperCase() === 'W') lng = -lng;
+        } else if (['E', 'W'].includes(dir1.toUpperCase()) && ['N', 'S'].includes(dir2.toUpperCase())) {
+          // Swapped order: lng first, lat second
+          lng = decimal1;
+          lat = decimal2;
+          
+          // Apply sign based on direction
+          if (dir1.toUpperCase() === 'W') lng = -lng;
+          if (dir2.toUpperCase() === 'S') lat = -lat;
+        } else {
+          return null;
+        }
+        
+        return this.isValidCoordinate(lat, lng) ? { lat, lng } : null;
+      }
+
+      // Pattern 2: "8.845°S, 67.255°W" format (decimal degrees with direction)
+      const degreePattern = /(\d+(?:\.\d+)?)\s*°?\s*([NSEW])\s*,?\s*(\d+(?:\.\d+)?)\s*°?\s*([NSEW])/i;
+      const degreeMatch = cleaned.match(degreePattern);
+      
+      if (degreeMatch) {
+        const [, lat1, dir1, lng1, dir2] = degreeMatch;
+        
+        // Determine which values are lat/lng based on direction indicators
+        let lat, lng;
+        if (['N', 'S'].includes(dir1.toUpperCase()) && ['E', 'W'].includes(dir2.toUpperCase())) {
+          lat = parseFloat(lat1);
+          lng = parseFloat(lng1);
+          
+          // Apply sign based on direction
+          if (dir1.toUpperCase() === 'S') lat = -lat;
+          if (dir2.toUpperCase() === 'W') lng = -lng;
+        } else if (['E', 'W'].includes(dir1.toUpperCase()) && ['N', 'S'].includes(dir2.toUpperCase())) {
+          // Swapped order: lng first, lat second
+          lng = parseFloat(lat1);
+          lat = parseFloat(lng1);
+          
+          // Apply sign based on direction
+          if (dir1.toUpperCase() === 'W') lng = -lng;
+          if (dir2.toUpperCase() === 'S') lat = -lat;
+        } else {
+          return null;
+        }
+        
+        return this.isValidCoordinate(lat, lng) ? { lat, lng } : null;
+      }
+
+      // Pattern 3: "-8.845, -67.255" or "8.845, -67.255" format (decimal degrees)
+      const decimalPattern = /^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/;
+      const decimalMatch = cleaned.match(decimalPattern);
+      
+      if (decimalMatch) {
+        const lat = parseFloat(decimalMatch[1]);
+        const lng = parseFloat(decimalMatch[2]);
+        
+        return this.isValidCoordinate(lat, lng) ? { lat, lng } : null;
+      }
+
+      // Pattern 4: Single coordinate with direction (try to parse what we can)
+      const singlePattern = /(\d+(?:\.\d+)?)\s*°?\s*([NSEW])/i;
+      const singleMatch = cleaned.match(singlePattern);
+      
+      if (singleMatch) {
+        // This is incomplete, but we can at least validate the format
+        return null; // Don't process incomplete coordinates
+      }
+
+    } catch (error) {
+      console.error('Error parsing coordinate string:', error);
+      return null;
+    }
+
+    return null;
+  },
 };

@@ -145,6 +145,14 @@ class OptimalElevationDownloader:
                 "terrain": TerrainType.DENSE_FOREST,
                 "preferred_dataset": DatasetType.NASADEM
             },
+            "existing_region_4": {
+                "name": "Existing Region 9.52S_58.11W",
+                "lat": -9.525,
+                "lng": -58.107,
+                "state": "AM",
+                "terrain": TerrainType.DENSE_FOREST,
+                "preferred_dataset": DatasetType.NASADEM
+            },
             "pantanal": {
                 "name": "Pantanal",
                 "lat": -16.0,

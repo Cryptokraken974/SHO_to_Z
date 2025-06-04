@@ -126,9 +126,14 @@ window.UIManager = {
    * Initialize accordion functionality
    */
   initializeAccordions() {
-    // Test accordion
-    $('#test-accordion').on('click', () => {
-      this.toggleAccordion('test');
+    // Get Data accordion (renamed from Test)
+    $('#get-data-accordion').on('click', () => {
+      this.toggleAccordion('get-data');
+    });
+
+    // Go to accordion
+    $('#go-to-accordion').on('click', () => {
+      this.toggleAccordion('go-to');
     });
 
     // Analysis tab accordions
@@ -237,11 +242,6 @@ window.UIManager = {
       this.testCoordinateAcquisition();
     });
 
-    // Test overlay button
-    $('#test-overlay-btn').on('click', () => {
-      this.testOverlay();
-    });
-
     // Test Sentinel-2 button
     $('#test-sentinel2-btn').on('click', () => {
       this.testSentinel2();
@@ -255,6 +255,23 @@ window.UIManager = {
     // Get Data button (Combined: Elevation + Satellite)
     $('#get-data-btn').on('click', () => {
       this.getCombinedData();
+    });
+
+    // Go to coordinates button
+    $('#go-to-coordinates-btn').on('click', () => {
+      this.goToCoordinates();
+    });
+
+    // Coordinate input parser
+    $('#goto-coordinates-input').on('input', Utils.debounce(() => {
+      this.parseAndDisplayCoordinates();
+    }, 300));
+
+    // Preset location buttons
+    $(document).on('click', '.preset-location', function() {
+      const lat = parseFloat($(this).data('lat'));
+      const lng = parseFloat($(this).data('lng'));
+      UIManager.goToPresetLocation(lat, lng, $(this).text().replace('📍 ', ''));
     });
 
     // Clear selection button
@@ -1820,6 +1837,357 @@ window.UIManager = {
       Utils.showNotification(`Failed to add ${bType} Sentinel-2 overlay: ${error.message}`, 'error');
       return false;
     }
-  }
+  },
 
+  /**
+   * Get combined data (both elevation and satellite data)
+   */
+  async getCombinedData() {
+    Utils.log('info', 'Get Combined Data button clicked');
+
+    // Get coordinates from input fields
+    let lat = $('#lat-input').val();
+    let lng = $('#lng-input').val();
+    const regionName = $('#region-name-input').val();
+
+    // If no coordinates are set, use Portland, Oregon as default
+    if (!lat || !lng || lat === '' || lng === '') {
+      lat = 45.5152;  // Portland, Oregon
+      lng = -122.6784;
+
+      // Update the input fields
+      $('#lat-input').val(lat);
+      $('#lng-input').val(lng);
+
+      // Center map on the location
+      MapManager.setView(lat, lng, 12);
+
+      Utils.showNotification('Using Portland, Oregon coordinates for combined data acquisition', 'info');
+    }
+
+    // Validate coordinates
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+
+    if (!Utils.isValidCoordinate(latNum, lngNum)) {
+      Utils.showNotification('Invalid coordinates. Please enter valid latitude and longitude values.', 'error');
+      return;
+    }
+
+    try {
+      this.showProgress('📊 Acquiring combined elevation and satellite data...');
+
+      // Start WebSocket connection for progress updates
+      if (window.WebSocketManager) {
+        WebSocketManager.connect();
+      }
+
+      // Prepare region name for both acquisitions
+      const effectiveRegionName = regionName && regionName.trim() !== '' ? regionName.trim() : null;
+
+      // Step 1: Acquire elevation data
+      this.updateProgress(25, 'Acquiring elevation data...');
+      
+      const elevationRequest = {
+        lat: latNum,
+        lng: lngNum,
+        buffer_km: 2.0
+      };
+
+      if (effectiveRegionName) {
+        elevationRequest.region_name = effectiveRegionName;
+      }
+
+      const elevationResponse = await fetch('/api/elevation/download-coordinates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(elevationRequest)
+      });
+
+      let elevationResult = null;
+      if (elevationResponse.ok) {
+        elevationResult = await elevationResponse.json();
+        if (elevationResult.success) {
+          Utils.log('info', 'Elevation data acquisition completed');
+          this.updateProgress(50, 'Elevation data acquired. Starting satellite data download...');
+        } else {
+          Utils.log('warn', 'Elevation data acquisition failed:', elevationResult.error);
+        }
+      } else {
+        Utils.log('warn', 'Elevation data acquisition request failed:', elevationResponse.status);
+      }
+
+      // Step 2: Acquire Sentinel-2 satellite data
+      const sentinelRequest = {
+        lat: latNum,
+        lng: lngNum,
+        buffer_km: 5.0,  // Larger buffer for satellite data
+        bands: ['B04', 'B08']  // Red and NIR bands
+      };
+
+      if (effectiveRegionName) {
+        sentinelRequest.region_name = effectiveRegionName;
+      }
+
+      this.updateProgress(75, 'Downloading Sentinel-2 satellite data...');
+
+      const sentinelResponse = await fetch('/api/download-sentinel2', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(sentinelRequest)
+      });
+
+      let sentinelResult = null;
+      if (sentinelResponse.ok) {
+        sentinelResult = await sentinelResponse.json();
+        if (sentinelResult.success) {
+          Utils.log('info', 'Sentinel-2 data download completed');
+          this.updateProgress(90, 'Converting satellite images...');
+
+          // Auto-convert Sentinel-2 images if we have a region name
+          const sentinelRegionName = sentinelResult.metadata?.region_name || effectiveRegionName;
+          if (sentinelRegionName) {
+            await this.convertAndDisplaySentinel2(sentinelRegionName);
+          }
+        } else {
+          Utils.log('warn', 'Sentinel-2 data download failed:', sentinelResult.error);
+        }
+      } else {
+        Utils.log('warn', 'Sentinel-2 data download request failed:', sentinelResponse.status);
+      }
+
+      // Step 3: Summarize results
+      this.updateProgress(100, 'Combined data acquisition completed!');
+
+      const elevationSuccess = elevationResult?.success || false;
+      const sentinelSuccess = sentinelResult?.success || false;
+
+      if (elevationSuccess && sentinelSuccess) {
+        Utils.showNotification(
+          'Successfully acquired both elevation and satellite data!',
+          'success'
+        );
+      } else if (elevationSuccess || sentinelSuccess) {
+        const acquiredData = elevationSuccess ? 'elevation' : 'satellite';
+        const failedData = elevationSuccess ? 'satellite' : 'elevation';
+        Utils.showNotification(
+          `Partially successful: ${acquiredData} data acquired, ${failedData} data failed`,
+          'warning'
+        );
+      } else {
+        throw new Error('Both elevation and satellite data acquisition failed');
+      }
+
+      // Refresh file list and region data
+      if (window.FileManager && window.FileManager.loadFiles) {
+        setTimeout(() => {
+          FileManager.loadFiles();
+        }, 1000);
+      }
+
+      // If we have a region name, try to display both elevation and satellite data
+      if (effectiveRegionName || sentinelResult?.metadata?.region_name) {
+        const displayRegionName = effectiveRegionName || sentinelResult.metadata.region_name;
+        setTimeout(() => {
+          this.displayLidarRasterForRegion(displayRegionName);
+          this.displaySentinel2ImagesForRegion(displayRegionName);
+        }, 1500);
+      }
+
+    } catch (error) {
+      Utils.log('error', 'Error in combined data acquisition:', error);
+      Utils.showNotification(`Error acquiring combined data: ${error.message}`, 'error');
+    } finally {
+      this.hideProgress();
+    }
+  },
+
+  /**
+   * Parse and display coordinates from the coordinate input field
+   */
+  parseAndDisplayCoordinates() {
+    const coordString = $('#goto-coordinates-input').val().trim();
+    
+    if (!coordString) {
+      // Clear all fields if input is empty
+      $('#goto-lat-input').val('');
+      $('#goto-lng-input').val('');
+      $('#goto-region-name').val('');
+      return;
+    }
+
+    const parsed = Utils.parseCoordinateString(coordString);
+    
+    if (parsed) {
+      // Update the latitude and longitude fields
+      $('#goto-lat-input').val(parsed.lat.toFixed(6));
+      $('#goto-lng-input').val(parsed.lng.toFixed(6));
+      
+      // Generate and display region name
+      const regionName = Utils.generateRegionName(parsed.lat, parsed.lng);
+      $('#goto-region-name').val(regionName);
+      
+      // Visual feedback - green border for valid input
+      $('#goto-coordinates-input').removeClass('border-red-500').addClass('border-green-500');
+      
+      Utils.log('info', `Parsed coordinates: ${parsed.lat}, ${parsed.lng} -> Region: ${regionName}`);
+    } else {
+      // Clear parsed fields for invalid input
+      $('#goto-lat-input').val('');
+      $('#goto-lng-input').val('');
+      $('#goto-region-name').val('');
+      
+      // Visual feedback - red border for invalid input
+      $('#goto-coordinates-input').removeClass('border-green-500').addClass('border-red-500');
+    }
+  },
+
+  /**
+   * Go to coordinates from input fields
+   */
+  goToCoordinates() {
+    // First try to parse from the coordinate string input
+    const coordString = $('#goto-coordinates-input').val().trim();
+    let lat, lng;
+    
+    if (coordString) {
+      const parsed = Utils.parseCoordinateString(coordString);
+      if (parsed) {
+        lat = parsed.lat;
+        lng = parsed.lng;
+      } else {
+        Utils.showNotification('Please enter coordinates in a valid format (e.g., "8.845°S, 67.255°W")', 'warning');
+        return;
+      }
+    } else {
+      // Fall back to individual lat/lng inputs
+      lat = parseFloat($('#goto-lat-input').val());
+      lng = parseFloat($('#goto-lng-input').val());
+    }
+
+    if (!Utils.isValidCoordinate(lat, lng)) {
+      Utils.showNotification('Please enter valid latitude and longitude values', 'warning');
+      return;
+    }
+
+    try {
+      // Set map view to the coordinates
+      MapManager.setView(lat, lng, 13);
+      
+      // Update the coordinate display inputs in the Get Data section
+      $('#lat-input').val(lat);
+      $('#lng-input').val(lng);
+      
+      // Generate region name and update Get Data section
+      const regionName = Utils.generateRegionName(lat, lng);
+      $('#region-name-input').val(regionName);
+      
+      // Update the parsed coordinate display fields
+      $('#goto-lat-input').val(lat.toFixed(6));
+      $('#goto-lng-input').val(lng.toFixed(6));
+      $('#goto-region-name').val(regionName);
+      
+      // Add a temporary marker
+      MapManager.addMarker(lat, lng, {
+        popup: `Go to Location<br>Lat: ${lat}<br>Lng: ${lng}<br>Region: ${regionName}`
+      });
+
+      Utils.showNotification(`Map centered on coordinates: ${lat}, ${lng}<br>Region: ${regionName}`, 'success');
+      Utils.log('info', `Map navigated to coordinates: ${lat}, ${lng}, Region: ${regionName}`);
+
+    } catch (error) {
+      Utils.log('error', 'Failed to navigate to coordinates', error);
+      Utils.showNotification('Failed to navigate to coordinates', 'error');
+    }
+  },
+
+  /**
+   * Go to preset location
+   * @param {number} lat - Latitude
+   * @param {number} lng - Longitude
+   * @param {string} locationName - Name of the location
+   */
+  goToPresetLocation(lat, lng, locationName) {
+    try {
+      // Set map view to the preset location
+      MapManager.setView(lat, lng, 10);
+      
+      // Update the coordinate inputs in both sections
+      $('#goto-lat-input').val(lat);
+      $('#goto-lng-input').val(lng);
+      $('#lat-input').val(lat);
+      $('#lng-input').val(lng);
+      
+      // Add a marker for the preset location
+      MapManager.addMarker(lat, lng, {
+        popup: `${locationName}<br>Lat: ${lat}<br>Lng: ${lng}`
+      });
+
+      Utils.showNotification(`Map centered on ${locationName}`, 'success');
+      Utils.log('info', `Map navigated to preset location: ${locationName} (${lat}, ${lng})`);
+
+    } catch (error) {
+      Utils.log('error', `Failed to navigate to ${locationName}`, error);
+      Utils.showNotification(`Failed to navigate to ${locationName}`, 'error');
+    }
+  },
+
+  /**
+   * Show progress modal with a message
+   * @param {string} message - Progress message to display
+   */
+  showProgress(message) {
+    const modal = $('#progress-modal');
+    const title = $('#progress-title');
+    const status = $('#progress-status');
+    const progressBar = $('#progress-bar');
+    const details = $('#progress-details');
+
+    if (title.length) title.text('Processing...');
+    if (status.length) status.text(message || 'Initializing...');
+    if (progressBar.length) progressBar.css('width', '0%');
+    if (details.length) details.text('');
+
+    modal.fadeIn();
+    Utils.log('info', `Progress modal shown: ${message}`);
+  },
+
+  /**
+   * Update progress modal with percentage and status
+   * @param {number} percentage - Progress percentage (0-100)
+   * @param {string} status - Status message
+   * @param {string} details - Optional detailed message
+   */
+  updateProgress(percentage, status, details) {
+    const progressBar = $('#progress-bar');
+    const statusEl = $('#progress-status');
+    const detailsEl = $('#progress-details');
+
+    if (progressBar.length) {
+      progressBar.css('width', `${percentage}%`);
+    }
+    
+    if (status && statusEl.length) {
+      statusEl.text(status);
+    }
+    
+    if (details && detailsEl.length) {
+      detailsEl.text(details);
+    }
+
+    Utils.log('debug', `Progress updated: ${percentage}% - ${status}`);
+  },
+
+  /**
+   * Hide progress modal
+   */
+  hideProgress() {
+    const modal = $('#progress-modal');
+    modal.fadeOut();
+    Utils.log('info', 'Progress modal hidden');
+  }
 };

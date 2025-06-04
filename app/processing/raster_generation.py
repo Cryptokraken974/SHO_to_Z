@@ -191,11 +191,11 @@ class RasterGenerator:
     
     def convert_to_png(self, products: Dict[str, str], output_folder: Path,
                        progress_callback: Optional[Callable] = None) -> Dict[str, str]:
-        """Convert all TIFF products to PNG for visualization"""
+        """Convert all TIFF products to PNG for visualization with enhanced resolution"""
         if progress_callback:
             asyncio.create_task(progress_callback({
                 "type": "png_conversion_started",
-                "message": "Converting products to PNG for visualization"
+                "message": "Converting products to PNG with ENHANCED RESOLUTION for visualization"
             }))
         
         png_outputs = {}
@@ -210,8 +210,8 @@ class RasterGenerator:
                 png_filename = f"{tiff_basename}.png"
                 png_path = png_dir / png_filename
                 
-                # Convert using the existing conversion function
-                result_png = convert_geotiff_to_png(tiff_path, str(png_path))
+                # Convert using the ENHANCED resolution conversion function
+                result_png = convert_geotiff_to_png(tiff_path, str(png_path), enhanced_resolution=True)
                 
                 if result_png and os.path.exists(result_png):
                     png_outputs[product_name] = result_png
@@ -219,7 +219,7 @@ class RasterGenerator:
                     if progress_callback:
                         asyncio.create_task(progress_callback({
                             "type": "png_conversion_progress",
-                            "message": f"Converted {product_name} to PNG",
+                            "message": f"Converted {product_name} to ENHANCED PNG",
                             "product": product_name,
                             "png_file": result_png
                         }))
@@ -250,7 +250,7 @@ class RasterGenerator:
         if progress_callback:
             asyncio.create_task(progress_callback({
                 "type": "png_conversion_completed",
-                "message": f"PNG conversion completed in {conversion_time:.2f}s",
+                "message": f"ENHANCED PNG conversion completed in {conversion_time:.2f}s",
                 "successful": len(png_outputs),
                 "failed": len(products) - len(png_outputs),
                 "total_time": conversion_time
@@ -260,12 +260,12 @@ class RasterGenerator:
     
     def generate_colorized_dem(self, original_tiff: Path, output_folder: Path,
                               progress_callback: Optional[Callable] = None) -> Optional[str]:
-        """Generate a colorized DEM visualization"""
+        """Generate a colorized DEM visualization with enhanced quality"""
         try:
             if progress_callback:
                 asyncio.create_task(progress_callback({
                     "type": "colorized_dem_started",
-                    "message": "Generating colorized DEM visualization"
+                    "message": "Generating ENHANCED colorized DEM visualization"
                 }))
             
             colorize_start = time.time()
@@ -273,8 +273,8 @@ class RasterGenerator:
             viz_dir = output_folder / 'Visualization'
             colorized_path = viz_dir / f"{original_tiff.stem}_colorized_dem.png"
             
-            # Use the colorize_dem function from image_utils
-            result = colorize_dem(str(original_tiff), str(colorized_path), colormap='terrain')
+            # Use the enhanced colorize_dem function from image_utils
+            result = colorize_dem(str(original_tiff), str(colorized_path), colormap='terrain', enhanced_resolution=True)
             
             colorize_time = time.time() - colorize_start
             
@@ -282,7 +282,7 @@ class RasterGenerator:
                 if progress_callback:
                     asyncio.create_task(progress_callback({
                         "type": "colorized_dem_completed",
-                        "message": f"Colorized DEM created in {colorize_time:.2f}s",
+                        "message": f"ENHANCED colorized DEM created in {colorize_time:.2f}s",
                         "output_file": result,
                         "time": colorize_time
                     }))
@@ -291,7 +291,7 @@ class RasterGenerator:
                 if progress_callback:
                     asyncio.create_task(progress_callback({
                         "type": "colorized_dem_error",
-                        "message": "Colorized DEM generation failed"
+                        "message": "Enhanced colorized DEM generation failed"
                     }))
                 return None
                 
