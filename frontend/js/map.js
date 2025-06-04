@@ -131,7 +131,12 @@ window.MapManager = {
       const latInput = document.getElementById('lat-input');
       const lngInput = document.getElementById('lng-input');
       const regionNameInput = document.getElementById('region-name-input');
+      const gotoCoordinatesInput = document.getElementById('goto-coordinates-input');
+      const gotoLatInput = document.getElementById('goto-lat-input');
+      const gotoLngInput = document.getElementById('goto-lng-input');
+      const gotoRegionNameInput = document.getElementById('goto-region-name');
       
+      // Update Get Data section fields
       if (latInput && lngInput) {
         latInput.value = lat;
         lngInput.value = lng;
@@ -141,23 +146,67 @@ window.MapManager = {
           const regionName = Utils.generateRegionName(parseFloat(lat), parseFloat(lng));
           regionNameInput.value = regionName;
           
-          // Visual feedback for region name field too
+          // Visual feedback for region name field
           regionNameInput.style.borderColor = '#00bfff';
           setTimeout(() => {
             regionNameInput.style.borderColor = '';
           }, 1000);
         }
         
-        // Visual feedback
+        // Visual feedback for coordinate fields
         [latInput, lngInput].forEach(input => {
           input.style.borderColor = '#00bfff';
           setTimeout(() => {
             input.style.borderColor = '';
           }, 1000);
         });
-        
-        Utils.log('info', `Coordinates captured: ${lat}, ${lng}`);
       }
+      
+      // Update Go To section fields
+      if (gotoCoordinatesInput) {
+        // Format coordinates in a readable format for the goto-coordinates-input field
+        const latValue = parseFloat(lat);
+        const lngValue = parseFloat(lng);
+        const latDir = latValue >= 0 ? 'N' : 'S';
+        const lngDir = lngValue >= 0 ? 'E' : 'W';
+        const formattedCoords = `${Math.abs(latValue).toFixed(4)}°${latDir}, ${Math.abs(lngValue).toFixed(4)}°${lngDir}`;
+        
+        gotoCoordinatesInput.value = formattedCoords;
+        
+        // Visual feedback for goto coordinates input
+        gotoCoordinatesInput.style.borderColor = '#00bfff';
+        setTimeout(() => {
+          gotoCoordinatesInput.style.borderColor = '';
+        }, 1000);
+      }
+      
+      // Update parsed coordinate fields in Go To section
+      if (gotoLatInput && gotoLngInput) {
+        gotoLatInput.value = lat;
+        gotoLngInput.value = lng;
+        
+        // Visual feedback for parsed coordinate fields
+        [gotoLatInput, gotoLngInput].forEach(input => {
+          input.style.borderColor = '#00bfff';
+          setTimeout(() => {
+            input.style.borderColor = '';
+          }, 1000);
+        });
+      }
+      
+      // Update region name in Go To section
+      if (gotoRegionNameInput) {
+        const regionName = Utils.generateRegionName(parseFloat(lat), parseFloat(lng));
+        gotoRegionNameInput.value = regionName;
+        
+        // Visual feedback for goto region name
+        gotoRegionNameInput.style.borderColor = '#00bfff';
+        setTimeout(() => {
+          gotoRegionNameInput.style.borderColor = '';
+        }, 1000);
+      }
+      
+      Utils.log('info', `Coordinates captured: ${lat}, ${lng} - Updated all coordinate fields`);
     });
   },
 

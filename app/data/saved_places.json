@@ -1,0 +1,22 @@
+{
+  "places": [
+    {
+      "id": "place_1749077572899_hntw92zuy",
+      "name": "test region",
+      "lat": -8.05923,
+      "lng": -56.601563,
+      "regionName": "8.06S_56.60W",
+      "createdAt": "2025-06-04T22:52:52.899Z"
+    },
+    {
+      "id": "place_1749077593253_xw1orfpzz",
+      "name": "macapa",
+      "lat": -0.021973,
+      "lng": -50.877686,
+      "regionName": "0.02S_50.88W",
+      "createdAt": "2025-06-04T22:53:13.253Z"
+    }
+  ],
+  "last_updated": "2025-06-05T00:53:13.255297",
+  "version": "1.0"
+}

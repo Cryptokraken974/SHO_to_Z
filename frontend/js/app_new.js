@@ -70,7 +70,7 @@ async function initializeModules() {
   console.log('*** Initializing Modules ***');
   
   // Check if all required modules are available
-  const requiredModules = ['Utils', 'MapManager', 'FileManager', 'OverlayManager', 'ProcessingManager', 'WebSocketManager', 'UIManager'];
+  const requiredModules = ['Utils', 'MapManager', 'FileManager', 'OverlayManager', 'ProcessingManager', 'WebSocketManager', 'UIManager', 'SavedPlaces'];
   const missingModules = requiredModules.filter(module => !window[module]);
   
   if (missingModules.length > 0) {
@@ -85,7 +85,8 @@ async function initializeModules() {
     overlayManager: OverlayManager,
     processingManager: ProcessingManager,
     webSocket: WebSocketManager,
-    ui: UIManager
+    ui: UIManager,
+    savedPlaces: SavedPlaces
   };
   
   // Initialize modules in dependency order
@@ -105,7 +106,11 @@ async function initializeModules() {
     console.log('*** Initializing WebSocket Manager ***');
     WebSocketManager.init();
     
-    // 4. Load files immediately after map is ready
+    // 4. Initialize Saved Places (after map is ready)
+    console.log('*** Initializing Saved Places ***');
+    SavedPlaces.init();
+    
+    // 5. Load files after all UI components are ready
     console.log('*** Loading LAZ Files ***');
     await FileManager.loadFiles();
     
