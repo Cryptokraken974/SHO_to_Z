@@ -126,6 +126,11 @@ window.UIManager = {
    * Initialize accordion functionality
    */
   initializeAccordions() {
+    // Region accordion
+    $('#region-accordion').on('click', () => {
+      this.toggleAccordion('region');
+    });
+
     // Get Data accordion (renamed from Test)
     $('#get-data-accordion').on('click', () => {
       this.toggleAccordion('get-data');
@@ -177,8 +182,14 @@ window.UIManager = {
   initializeEventHandlers() {
     // Global region selector button
     $('#global-browse-regions-btn').on('click', () => {
-      FileManager.loadFiles();
+      console.log('🔍 Select Region button clicked - Looking up folders:');
+      console.log('📁 Primary folder: input/');
+      console.log('📊 Source filter: input (only input folder will be searched)');
+      
+      FileManager.loadFiles('input'); // Only load from input folder
       $('#file-modal').fadeIn();
+      // Update modal title to indicate input-only selection
+      $('#file-modal h4').text('Select Region (Input Folder)');
       // Set a flag to indicate this is for global region selection
       $('#file-modal').data('for-global', true);
       // Hide the delete button when modal is first opened
@@ -297,6 +308,8 @@ window.UIManager = {
     // File modal close buttons
     $('.close, #cancel-select').on('click', function() {
       $('#file-modal').fadeOut();
+      // Reset modal title to default
+      $('#file-modal h4').text('Select Region');
       // Hide the delete button when modal is closed
       $('#delete-region-btn').addClass('hidden').prop('disabled', false).text('Delete Region');
     });
@@ -395,6 +408,8 @@ window.UIManager = {
       
       // Close the modal
       $('#file-modal').fadeOut();
+      // Reset modal title to default
+      $('#file-modal h4').text('Select Region');
     });
 
     // Progress modal close buttons

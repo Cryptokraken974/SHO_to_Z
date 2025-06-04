@@ -24,6 +24,7 @@ from .base import (
     DownloadRequest, DownloadResult
 )
 from ..utils.coordinates import BoundingBox
+from ...config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +40,11 @@ class Sentinel2Source(BaseDataSource):
     
     def __init__(self, progress_callback: Optional[Callable] = None):
         """Initialize Sentinel-2 data source."""
-        # Use a dummy cache dir since we save directly to data/acquired/
+        # Use a dummy cache dir since we save directly to configured output directory
         super().__init__(None, "data/cache/sentinel2_temp")
         self._client = None
         self.progress_callback = progress_callback
+        self.settings = get_settings()
     
     @property
     def capabilities(self) -> DataSourceCapability:
@@ -155,7 +157,7 @@ class Sentinel2Source(BaseDataSource):
             # Create output directory using item ID and date for unique identification
             acquisition_date_folder = item.datetime.strftime("%Y%m%d") if item.datetime else "unknown_date"
             region_name = f"{item.id}_{acquisition_date_folder}"
-            output_dir = Path("data/acquired") / region_name / "sentinel-2"
+            output_dir = Path(self.settings.output_dir) / region_name / "sentinel-2"
             
             print(f"\n📁 Creating output directory: {output_dir}")
             output_dir.mkdir(parents=True, exist_ok=True)

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     
     # Base directories
     cache_dir: str = "data/cache"
-    output_dir: str = "data/acquired"
+    output_dir: str = "output"
     processed_dir: str = "data/processed"
     
     # API Keys (optional)

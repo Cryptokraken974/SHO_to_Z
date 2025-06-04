@@ -9,26 +9,49 @@ window.FileManager = {
 
   /**
    * Load available regions from server (previously LAZ files)
+   * @param {string} source - Optional filter: 'input', 'output', or null for both
    */
-  async loadFiles() {
-    Utils.log('info', 'Loading available regions from server');
+  async loadFiles(source = null) {
+    console.log('📂 FileManager.loadFiles() called with source:', source || 'all');
+    console.log('🔍 Folders being searched:');
+    
+    if (source === 'input') {
+      console.log('  📁 input/ (LAZ files for processing)');
+    } else if (source === 'output') {
+      console.log('  📁 output/ (processed results)');
+    } else {
+      console.log('  📁 input/ (LAZ files for processing)');
+      console.log('  📁 output/ (processed results)');
+    }
+    
+    Utils.log('info', `Loading available regions from server (source: ${source || 'all'})`);
     
     try {
       $('#file-list').html('<div class="loading">Loading regions...</div>');
       
-      // Modify API endpoint if necessary, e.g., /api/list-regions
-      // For now, assume /api/list-laz-files returns region-like data or adapt parsing
-      const response = await fetch('/api/list-regions'); // MODIFIED to list-regions
+      // Build API endpoint with optional source filter
+      let url = '/api/list-regions';
+      if (source) {
+        url += `?source=${source}`;
+      }
+      
+      console.log('🌐 API call to:', url);
+      
+      const response = await fetch(url);
       const data = await response.json();
       
       if (data.error) {
         throw new Error(data.error);
       }
       
+      console.log('✅ API response received:', data);
+      console.log(`📊 Found ${(data.regions || []).length} regions in ${source || 'all'} folder(s)`);
+      
       this.displayRegions(data.regions || []); // MODIFIED to displayRegions and data.regions
       this.createRegionMarkers(data.regions || []); // MODIFIED to createRegionMarkers and data.regions
       
     } catch (error) {
+      console.error('❌ Error loading regions:', error);
       Utils.log('error', 'Failed to load regions', error);
       $('#file-list').html(`<div class="error">Error loading regions: ${error.message}</div>`);
       Utils.showNotification('Failed to load regions', 'error');
@@ -44,7 +67,7 @@ window.FileManager = {
     fileList.empty();
     
     if (regions.length === 0) {
-      fileList.html('<div class="no-files">No regions found in output folder.</div>'); // MODIFIED message
+      fileList.html('<div class="no-files">No regions found in input folder.</div>');
       return;
     }
     
@@ -258,8 +281,11 @@ window.FileManager = {
         // Clear map markers if necessary
         this.clearRegionMarkers();
         
-        // Reload file list
-        await this.loadFiles();
+        // Reload file list with the same source filter as currently displayed
+        const modal = $('#file-modal');
+        const isForGlobal = modal.data('for-global');
+        const source = isForGlobal ? 'input' : null; // Only reload input regions for global modal
+        await this.loadFiles(source);
         
         return {
           success: true,

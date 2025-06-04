@@ -2535,63 +2535,27 @@ async def convert_sentinel2_images(region_name: str = Form(...)):
         }
 
 @app.get("/api/list-regions")
-async def list_regions():
-    """List all region subdirectories in the output directory and LAZ files from the input directory with coordinate metadata"""
-    output_dir = settings.output_dir  # Use output_dir from settings
+async def list_regions(source: str = None):
+    """List all region subdirectories in the output directory and LAZ files from the input directory with coordinate metadata
+    
+    Args:
+        source: Optional filter - 'input' for input folder only, 'output' for output folder only, None for both
+    """
+    print(f"\n🔍 API CALL: GET /api/list-regions?source={source or 'all'}")
+    print("📂 Backend folder scanning started:")
+    
     input_dir = "input"
+    
+    print(f"  📁 Input directory: {input_dir}")
+    print(f"  🎯 Source filter: {source or 'all folders'}")
     
     regions_with_metadata = []
     
-    # First, check output directory for processed regions
-    if os.path.exists(output_dir):
-        region_folders = [d for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d))]
-        
-        for region_name in region_folders:
-            region_info = {"name": region_name, "source": "output"}
-            
-            # Attempt to find metadata for center coordinates
-            # Check for Sentinel-2 metadata first (more likely to have it from recent downloads)
-            sentinel_metadata_path = os.path.join(output_dir, region_name, "sentinel2", "metadata.json")
-            lidar_metadata_path_ot = os.path.join(output_dir, region_name, "lidar", f"metadata_{region_name}.txt") # OpenTopography
-            lidar_metadata_path_usgs = os.path.join(output_dir, region_name, "lidar", f"info_{region_name}.json") # USGS
-
-            try:
-                if os.path.exists(sentinel_metadata_path):
-                    with open(sentinel_metadata_path, 'r') as f:
-                        metadata = json.load(f)
-                        if "bbox" in metadata and len(metadata["bbox"]) == 4:
-                            # Calculate center from bbox [west, south, east, north]
-                            west, south, east, north = metadata["bbox"]
-                            region_info["center_lat"] = (south + north) / 2
-                            region_info["center_lng"] = (west + east) / 2
-                elif os.path.exists(lidar_metadata_path_ot):
-                    with open(lidar_metadata_path_ot, 'r') as f:
-                        content = f.read()
-                        for line in content.split('\\n'):
-                            if line.startswith('# Center:'):
-                                coords_str = line.split('# Center:')[1].strip()
-                                lat, lng = coords_str.split(', ')
-                                region_info["center_lat"] = float(lat)
-                                region_info["center_lng"] = float(lng)
-                                break
-                elif os.path.exists(lidar_metadata_path_usgs):
-                     with open(lidar_metadata_path_usgs, 'r') as f:
-                        metadata = json.load(f)
-                        if "center_lat" in metadata and "center_lon" in metadata:
-                            region_info["center_lat"] = metadata["center_lat"]
-                            region_info["center_lng"] = metadata["center_lon"]
-                        elif "bbox" in metadata and len(metadata["bbox"]) == 4: # Assuming [minx, miny, maxx, maxy]
-                            minx, miny, maxx, maxy = metadata["bbox"]
-                            region_info["center_lat"] = (miny + maxy) / 2
-                            region_info["center_lng"] = (minx + maxx) / 2
-
-            except Exception as e:
-                print(f"Error reading metadata for region {region_name}: {e}")
-
-            regions_with_metadata.append(region_info)
+ 
     
-    # Second, check input directory for LAZ files and Sentinel-2 folders
-    if os.path.exists(input_dir):
+    # Second, check input directory for LAZ files and Sentinel-2 folders (only if source allows)
+    if (source is None or source == "input") and os.path.exists(input_dir):
+        print(f"  🔍 Scanning input folder: {input_dir}")
         # First, find Sentinel-2 download folders (folders with coordinate patterns in their names)
         import re
         coord_folder_pattern = r'(\d+\.\d+)([ns])_(\d+\.\d+)([ew])'
@@ -2617,6 +2581,7 @@ async def list_regions():
                     print(f"Found Sentinel-2 folder '{item}' with coordinates: {lat}, {lng}")
         
         # Then, find all LAZ files (including .laz and .copc.laz)
+        print(f"  🔍 Searching for LAZ files in: {input_dir}")
         laz_patterns = [
             os.path.join(input_dir, "**/*.laz"),
             os.path.join(input_dir, "**/*.LAZ"),
@@ -2630,6 +2595,8 @@ async def list_regions():
         # Convert to relative paths and remove duplicates
         relative_files = list(set([os.path.relpath(f) for f in files]))
         relative_files.sort()
+        
+        print(f"  📊 Found {len(relative_files)} LAZ files: {relative_files}")
         
         # Extract coordinate metadata for each file
         for file_path in relative_files:
@@ -2679,8 +2646,17 @@ async def list_regions():
                     print(f"No coordinate match found for filename: '{filename}'")
             
             regions_with_metadata.append(region_info)
+    else:
+        print(f"  ⏭️ Skipping input folder scan (source={source}, exists={os.path.exists(input_dir)})")
         
     regions_with_metadata.sort(key=lambda x: x["name"])
+    
+    print(f"\n✅ Backend scan complete:")
+    print(f"  📊 Total regions found: {len(regions_with_metadata)}")
+    for region in regions_with_metadata:
+        coords = f"({region.get('center_lat', 'N/A')}, {region.get('center_lng', 'N/A')})" if region.get('center_lat') else "(no coords)"
+        print(f"    📁 {region['name']} [{region['source']}] {coords}")
+    
     return {"regions": regions_with_metadata}
 
 @app.delete("/api/delete-region/{region_name}")

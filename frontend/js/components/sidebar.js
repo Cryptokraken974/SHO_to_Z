@@ -8,28 +8,28 @@ window.componentManager.register('sidebar', (props = {}) => {
         <div id="sidebar" class="bg-[#1a1a1a] border-r border-[#303030] w-64 p-6 flex flex-col overflow-y-auto">
             <!-- LAZ File Selection Section -->
             <div class="accordion-section mb-6">
-                <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="region-accordion">
+                <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="region-select-accordion">
                     <h3 class="text-white font-semibold flex justify-between items-center m-0">
                         Select Region
                         <span class="accordion-arrow text-sm transition-transform">▼</span>
                     </h3>
                 </div>
-                <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="region-content">
+                <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="region-select-content">
                     <div class="selected-file space-y-2">
                         <div id="selected-region-name" class="text-[#666] text-sm">${selectedRegion}</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Get Data Section -->
+            <!-- Region Section -->
             <div class="accordion-section mb-6">
-                <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="get-data-accordion">
+                <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="region-accordion">
                     <h3 class="text-white font-semibold flex justify-between items-center m-0">
-                        Get Data
+                        Region
                         <span class="accordion-arrow text-sm transition-transform">▼</span>
                     </h3>
                 </div>
-                <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="get-data-content">
+                <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="region-content">
                     <div class="space-y-3">
                         <!-- Coordinate Input Fields -->
                         <div class="grid grid-cols-2 gap-2">
@@ -49,6 +49,21 @@ window.componentManager.register('sidebar', (props = {}) => {
                             <input type="text" id="region-name-input" placeholder="Auto-generated from coordinates" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm placeholder-[#666] focus:outline-none focus:border-[#00bfff] font-mono">
                         </div>
                         
+                        <!-- Save Current Location button will be added here by SavedPlaces system -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Get Data Section -->
+            <div class="accordion-section mb-6">
+                <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="get-data-accordion">
+                    <h3 class="text-white font-semibold flex justify-between items-center m-0">
+                        Get Data
+                        <span class="accordion-arrow text-sm transition-transform">▼</span>
+                    </h3>
+                </div>
+                <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="get-data-content">
+                    <div class="space-y-3">
                         <!-- Sentinel-2 Test Button -->
                         <button id="test-sentinel2-btn" class="w-full bg-[#dc3545] hover:bg-[#c82333] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2">🛰️ Test: Sentinel-2 Images</button>
                         
