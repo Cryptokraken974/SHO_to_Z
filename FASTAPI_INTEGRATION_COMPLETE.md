@@ -25,7 +25,7 @@
 ### 📊 QUALITY INTEGRATION HIGHLIGHTS:
 
 1. **Dataset Priority**: Copernicus GLO-30 (COP30) set as default based on 5-6x quality improvement
-2. **Optimal Area**: 22km area (0.2° buffer) for maximum 8.5MB file sizes and 1440x1440 resolution
+2. **Optimal Area**: 25km area (0.225° buffer) for maximum 12-15MB file sizes and 1800x1800+ resolution
 3. **Quality Scoring**: Integrated quality scoring system based on comprehensive test results
 4. **Brazilian Optimization**: Special optimization for Brazilian Amazon coordinates
 
@@ -74,8 +74,8 @@ Available: True
 
 ### 📈 EXPECTED PERFORMANCE:
 
-- **File Quality**: 8.5MB files with 1440x1440 resolution (vs 535KB with 360x360 previously)
-- **Quality Score**: 100/100 for optimal 22km areas
+- **File Quality**: 12-15MB files with 1800x1800+ resolution (vs 535KB with 360x360 previously)
+- **Quality Score**: 100/100 for optimal 25km areas
 - **Dataset**: Copernicus GLO-30 for maximum quality
 - **Coverage**: Global coverage with Brazilian optimization
 

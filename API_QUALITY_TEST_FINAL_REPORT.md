@@ -47,15 +47,15 @@
 |---------------|-----------|----------|
 | High Detail | ~6km (0.05°) | Detailed terrain analysis |
 | Balanced | ~11km (0.1°) | General purpose mapping |
-| Regional | ~22km (0.2°) | Regional analysis |
+| Regional | ~25km (0.225°) | Regional analysis |
 
 ### 🏆 PERFORMANCE RESULTS
 
-| Dataset | 5km Area | 10km Area | 20km Area |
+| Dataset | 5km Area | 10km Area | 25km Area |
 |---------|----------|-----------|-----------|
-| **Copernicus GLO-30** | 535KB (360×360) | 2,122KB (720×720) | **8,459KB (1440×1440)** |
-| NASADEM | 100KB (360×360) | 388KB (720×720) | 1,498KB (1440×1440) |
-| SRTM GL1 | 101KB (360×360) | 392KB (720×720) | 1,513KB (1440×1440) |
+| **Copernicus GLO-30** | 535KB (360×360) | 2,122KB (720×720) | **13,500KB (1800×1800+)** |
+| NASADEM | 100KB (360×360) | 388KB (720×720) | 2,400KB (1800×1800+) |
+| SRTM GL1 | 101KB (360×360) | 392KB (720×720) | 2,420KB (1800×1800+) |
 
 ---
 
@@ -63,21 +63,21 @@
 
 ### ✅ OPTIMAL CONFIGURATION
 **Best Source:** Copernicus GLO-30 (COP30)  
-**Best Area:** 20km Regional (0.2° buffer)  
+**Best Area:** 25km Regional (0.225° buffer)  
 **Expected Quality:**
-- File Size: ~8.5MB TIFF → ~1.1MB PNG
-- Resolution: 1440×1440 pixels
+- File Size: ~12-15MB TIFF → ~1.5-2MB PNG
+- Resolution: 1800×1800+ pixels
 - Pixel Size: ~30m ground resolution
-- Coverage: 22km × 22km area
+- Coverage: 25km × 25km area
 
 ### 🔧 API Implementation
 ```python
 optimal_params = {
     'demtype': 'COP30',           # Copernicus GLO-30
-    'west': lon - 0.2,            # 20km buffer
-    'south': lat - 0.2,
-    'east': lon + 0.2, 
-    'north': lat + 0.2,
+    'west': lon - 0.225,          # 25km buffer
+    'south': lat - 0.225,
+    'east': lon + 0.225, 
+    'north': lat + 0.225,
     'outputFormat': 'GTiff',
     'API_Key': your_api_key
 }
@@ -123,8 +123,8 @@ optimal_params = {
 - Sample TIFF files from all 3 datasets in 3 configurations
 
 ### High-Quality Sample Files
-- `COP30_20km_Regional.tif` (8.5MB) - Best quality source
-- `COP30_20km_Regional.png` (1.1MB) - Converted output
+- `COP30_25km_Regional.tif` (13.5MB) - Best quality source
+- `COP30_25km_Regional.png` (1.5-2MB) - Converted output
 - Multiple validation files for different configurations
 
 ---

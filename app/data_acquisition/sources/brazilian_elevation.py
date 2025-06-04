@@ -75,7 +75,7 @@ class BrazilianElevationSource(BaseDataSource):
                 resolution="30m",
                 best_for=[TerrainType.AMAZON, TerrainType.CERRADO, TerrainType.CAATINGA, 
                          TerrainType.COASTAL_PLAINS, TerrainType.DENSE_FOREST, TerrainType.MIXED_COVER],
-                coverage="Global - OPTIMAL QUALITY (8.5MB files, 1440x1440 resolution)",
+                coverage="Global - OPTIMAL QUALITY (12-15MB files, 1800x1800+ resolution)",
                 priority=1,
                 requires_auth=True
             ),
@@ -151,8 +151,8 @@ class BrazilianElevationSource(BaseDataSource):
         """Determine the optimal dataset for given Brazilian coordinates.
         
         Based on comprehensive API quality testing, Copernicus GLO-30 provides:
-        - 5-6x larger file sizes (8.5MB vs 1.5MB)
-        - Superior resolution (1440x1440 pixels)
+        - 5-6x larger file sizes (12-15MB vs 1.5MB)
+        - Superior resolution (1800x1800+ pixels)
         - Best quality for all Brazilian terrain types
         """
         # Always use Copernicus GLO-30 as primary choice based on testing results
@@ -183,7 +183,8 @@ class BrazilianElevationSource(BaseDataSource):
         Based on comprehensive API quality testing results:
         - 5km area (0.05° buffer): ~535KB for Copernicus GLO-30
         - 10km area (0.1° buffer): ~2.1MB for Copernicus GLO-30  
-        - 20km area (0.2° buffer): ~8.5MB for Copernicus GLO-30
+        - 20km area (legacy): ~8.5MB for Copernicus GLO-30
+        - 25km area (0.225° buffer): ~12-15MB for Copernicus GLO-30 (optimal)
         """
         if not await self.check_availability(request):
             return 0.0
@@ -195,12 +196,14 @@ class BrazilianElevationSource(BaseDataSource):
             estimated_mb = 0.535
         elif bbox_area <= 121:  # ~11km area (0.1° buffer) 
             estimated_mb = 2.1
-        elif bbox_area <= 484:  # ~22km area (0.2° buffer)
+        elif bbox_area <= 484:  # ~22km area (legacy threshold)
             estimated_mb = 8.5
+        elif bbox_area <= 625:  # ~25km area (0.225° buffer) - optimal
+            estimated_mb = 13.5  # 12-15MB range for maximum quality
         else:
-            # For larger areas, scale linearly from 20km baseline
-            scale_factor = bbox_area / 484  # 484 km² = 22km x 22km
-            estimated_mb = 8.5 * scale_factor
+            # For larger areas, scale linearly from 25km baseline
+            scale_factor = bbox_area / 625  # 625 km² = 25km x 25km
+            estimated_mb = 13.5 * scale_factor
         
         return min(estimated_mb, request.max_file_size_mb)
     
@@ -312,18 +315,19 @@ class BrazilianElevationSource(BaseDataSource):
     
     @classmethod
     def create_optimal_request(cls, center_lat: float, center_lng: float, 
-                              buffer_km: float = 22.0) -> DownloadRequest:
+                              buffer_km: float = 25.0) -> DownloadRequest:
         """Create an optimal download request for Brazilian elevation data.
         
         Based on comprehensive API quality testing, this creates a request optimized for:
-        - Maximum file quality (8.5MB vs 535KB for small areas)
-        - Best resolution (1440x1440 pixels)
+        - Maximum file quality (12-15MB vs 535KB for small areas)
+        - Best resolution (1800x1800+ pixels)
         - Copernicus GLO-30 dataset (proven best performer)
+        - 25km area for maximum quality without downsampling
         
         Args:
             center_lat: Center latitude for the region of interest
             center_lng: Center longitude for the region of interest  
-            buffer_km: Buffer size in kilometers (default 22km for optimal quality)
+            buffer_km: Buffer size in kilometers (default 25km for maximum quality)
         
         Returns:
             DownloadRequest configured for optimal Brazilian elevation data
@@ -342,26 +346,26 @@ class BrazilianElevationSource(BaseDataSource):
             bbox=bbox,
             data_type=DataType.ELEVATION,
             resolution=DataResolution.HIGH,
-            max_file_size_mb=20.0,  # Allow for 8.5MB+ optimal files
+            max_file_size_mb=25.0,  # Allow for 12-15MB+ optimal files
             coordinate_system="EPSG:4326"
         )
 
     def _optimize_bbox_for_quality(self, bbox: BoundingBox) -> BoundingBox:
         """Optimize bounding box for maximum quality based on API testing results.
         
-        Testing showed optimal results with 0.2° buffer (20km area) providing:
-        - 8.5MB file size (vs 535KB for 5km area)  
-        - 1440x1440 resolution (vs 360x360 for 5km area)
-        - Best quality-to-download ratio
+        Testing showed optimal results with 0.225° buffer (25km area) providing:
+        - 12-15MB file size (vs 535KB for 5km area)  
+        - 1800x1800+ resolution (vs 360x360 for 5km area)
+        - Maximum quality without downsampling
         """
         center_lat = (bbox.north + bbox.south) / 2
         center_lng = (bbox.east + bbox.west) / 2
         
         current_area = bbox.area_km2()
         
-        # If area is smaller than optimal 20km, expand to optimal size
-        if current_area < 400:  # Less than ~20km x 20km
-            optimal_buffer = 0.2  # 20km buffer for optimal quality
+        # If area is smaller than optimal 25km, expand to optimal size
+        if current_area < 625:  # Less than ~25km x 25km
+            optimal_buffer = 0.225  # 25km buffer for maximum quality without downsampling
             
             optimized_bbox = BoundingBox(
                 west=center_lng - optimal_buffer,
