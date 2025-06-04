@@ -1,0 +1,50 @@
+[
+  {
+    "source": "Copernicus GLO-30",
+    "area_km": "22km",
+    "file_size_kb": 8458.9,
+    "dimensions": "1440\u00d71440",
+    "download_time": 18.4,
+    "filename": "COP30_22km_-9.380_62.670.tif"
+  },
+  {
+    "source": "Copernicus GLO-30",
+    "area_km": "11km",
+    "file_size_kb": 2121.8,
+    "dimensions": "720\u00d7720",
+    "download_time": 12.9,
+    "filename": "COP30_11km_-9.380_62.670.tif"
+  },
+  {
+    "source": "NASADEM",
+    "area_km": "22km",
+    "file_size_kb": 1497.6,
+    "dimensions": "1440\u00d71440",
+    "download_time": 12.4,
+    "filename": "NASADEM_22km_-9.380_62.670.tif"
+  },
+  {
+    "source": "Copernicus GLO-30",
+    "area_km": "6km",
+    "file_size_kb": 534.9,
+    "dimensions": "360\u00d7360",
+    "download_time": 12.8,
+    "filename": "COP30_6km_-9.380_62.670.tif"
+  },
+  {
+    "source": "NASADEM",
+    "area_km": "11km",
+    "file_size_kb": 387.6,
+    "dimensions": "720\u00d7720",
+    "download_time": 11.6,
+    "filename": "NASADEM_11km_-9.380_62.670.tif"
+  },
+  {
+    "source": "NASADEM",
+    "area_km": "6km",
+    "file_size_kb": 100.3,
+    "dimensions": "360\u00d7360",
+    "download_time": 11.4,
+    "filename": "NASADEM_6km_-9.380_62.670.tif"
+  }
+]

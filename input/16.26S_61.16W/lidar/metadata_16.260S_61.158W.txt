@@ -1,0 +1,10 @@
+# Brazilian Elevation Data
+# Terrain Type: mixed_cover
+# Data Type: Elevation Raster (DEM)
+# Resolution: 30m
+# Source: Brazilian Elevation Service
+# Downloaded: 2025-06-04 18:28:45
+# 
+# Bounds: -61.17616001801802, -16.27752201801802, -61.14012398198198, -16.24148598198198
+# Center: -16.259504, -61.158142
+# File: 16.260S_61.158W_elevation.tiff

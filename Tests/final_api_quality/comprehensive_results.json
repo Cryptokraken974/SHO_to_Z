@@ -1,0 +1,101 @@
+[
+  {
+    "dataset": "Copernicus GLO-30",
+    "config": "5km_High_Detail",
+    "area_km": "6km",
+    "file_size_kb": 534.9,
+    "download_time_s": 11.8,
+    "filename": "COP30_5km_High_Detail.tif",
+    "dimensions": "360\u00d7360",
+    "pixel_size": "(0.000277777777778,-0.000277777777778)",
+    "success": true
+  },
+  {
+    "dataset": "NASADEM",
+    "config": "5km_High_Detail",
+    "area_km": "6km",
+    "file_size_kb": 100.3,
+    "download_time_s": 11.3,
+    "filename": "NASADEM_5km_High_Detail.tif",
+    "dimensions": "360\u00d7360",
+    "pixel_size": "(0.000277777777778,-0.000277777777778)",
+    "success": true
+  },
+  {
+    "dataset": "SRTM GL1",
+    "config": "5km_High_Detail",
+    "area_km": "6km",
+    "file_size_kb": 101.4,
+    "download_time_s": 11.3,
+    "filename": "SRTMGL1_5km_High_Detail.tif",
+    "dimensions": "360\u00d7360",
+    "pixel_size": "(0.000277777777778,-0.000277777777778)",
+    "success": true
+  },
+  {
+    "dataset": "Copernicus GLO-30",
+    "config": "10km_Balanced",
+    "area_km": "11km",
+    "file_size_kb": 2121.8,
+    "download_time_s": 12.8,
+    "filename": "COP30_10km_Balanced.tif",
+    "dimensions": "720\u00d7720",
+    "pixel_size": "(0.000277777777778,-0.000277777777778)",
+    "success": true
+  },
+  {
+    "dataset": "NASADEM",
+    "config": "10km_Balanced",
+    "area_km": "11km",
+    "file_size_kb": 387.6,
+    "download_time_s": 11.6,
+    "filename": "NASADEM_10km_Balanced.tif",
+    "dimensions": "720\u00d7720",
+    "pixel_size": "(0.000277777777778,-0.000277777777778)",
+    "success": true
+  },
+  {
+    "dataset": "SRTM GL1",
+    "config": "10km_Balanced",
+    "area_km": "11km",
+    "file_size_kb": 392.2,
+    "download_time_s": 11.7,
+    "filename": "SRTMGL1_10km_Balanced.tif",
+    "dimensions": "720\u00d7720",
+    "pixel_size": "(0.000277777777778,-0.000277777777778)",
+    "success": true
+  },
+  {
+    "dataset": "Copernicus GLO-30",
+    "config": "20km_Regional",
+    "area_km": "22km",
+    "file_size_kb": 8458.9,
+    "download_time_s": 16.7,
+    "filename": "COP30_20km_Regional.tif",
+    "dimensions": "1440\u00d71440",
+    "pixel_size": "(0.000277777777778,-0.000277777777778)",
+    "success": true
+  },
+  {
+    "dataset": "NASADEM",
+    "config": "20km_Regional",
+    "area_km": "22km",
+    "file_size_kb": 1497.6,
+    "download_time_s": 12.4,
+    "filename": "NASADEM_20km_Regional.tif",
+    "dimensions": "1440\u00d71440",
+    "pixel_size": "(0.000277777777778,-0.000277777777778)",
+    "success": true
+  },
+  {
+    "dataset": "SRTM GL1",
+    "config": "20km_Regional",
+    "area_km": "22km",
+    "file_size_kb": 1512.6,
+    "download_time_s": 12.4,
+    "filename": "SRTMGL1_20km_Regional.tif",
+    "dimensions": "1440\u00d71440",
+    "pixel_size": "(0.000277777777778,-0.000277777777778)",
+    "success": true
+  }
+]

@@ -1,0 +1,179 @@
+{
+  "test_summary": {
+    "region": "-9.380\u00b0S, 62.670\u00b0W",
+    "test_date": "2025-06-04T17:38:38.903138",
+    "total_tests": 9,
+    "successful_tests": 5,
+    "average_quality_score": 5.8
+  },
+  "results": [
+    {
+      "timestamp": "2025-06-04T17:38:08.309442",
+      "source": "OpenTopography SRTM 30m",
+      "test_type": "Global DEM",
+      "region": "-9.380\u00b0S, 62.670\u00b0W",
+      "success": false,
+      "quality_score": 0,
+      "file_size_bytes": 0,
+      "file_size_mb": 0,
+      "resolution": "Unknown",
+      "download_time_seconds": 0.72,
+      "error": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><error>Error: SRTM30 is not a valid dataset. Please check the API doc.</error>",
+      "metadata": {}
+    },
+    {
+      "timestamp": "2025-06-04T17:38:19.358397",
+      "source": "OpenTopography Copernicus GLO-30",
+      "test_type": "Global DEM",
+      "region": "-9.380\u00b0S, 62.670\u00b0W",
+      "success": true,
+      "quality_score": 5,
+      "file_size_bytes": 23652,
+      "file_size_mb": 0.02,
+      "resolution": "30m",
+      "download_time_seconds": 11.05,
+      "error": null,
+      "metadata": {
+        "dataset_code": "COP30",
+        "content_type": "application/octet-stream",
+        "api_endpoint": "https://portal.opentopography.org/API/globaldem",
+        "file_path": "Tests/api_quality_tests/opentopo_COP30_-9.380_62.670.tif"
+      }
+    },
+    {
+      "timestamp": "2025-06-04T17:38:30.143991",
+      "source": "OpenTopography NASADEM",
+      "test_type": "Global DEM",
+      "region": "-9.380\u00b0S, 62.670\u00b0W",
+      "success": true,
+      "quality_score": 3,
+      "file_size_bytes": 5489,
+      "file_size_mb": 0.01,
+      "resolution": "30m",
+      "download_time_seconds": 10.78,
+      "error": null,
+      "metadata": {
+        "dataset_code": "NASADEM",
+        "content_type": "application/octet-stream",
+        "api_endpoint": "https://portal.opentopography.org/API/globaldem",
+        "file_path": "Tests/api_quality_tests/opentopo_NASADEM_-9.380_62.670.tif"
+      }
+    },
+    {
+      "timestamp": "2025-06-04T17:38:30.681307",
+      "source": "OpenTopography ALOS World 3D 30m",
+      "test_type": "Global DEM",
+      "region": "-9.380\u00b0S, 62.670\u00b0W",
+      "success": false,
+      "quality_score": 0,
+      "file_size_bytes": 0,
+      "file_size_mb": 0,
+      "resolution": "Unknown",
+      "download_time_seconds": 0.53,
+      "error": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><error>Error: ALOS is not a valid dataset. Please check the API doc.</error>",
+      "metadata": {}
+    },
+    {
+      "timestamp": "2025-06-04T17:38:31.384903",
+      "source": "NASA NASADEM Direct",
+      "test_type": "Direct Access",
+      "region": "-9.380\u00b0S, 62.670\u00b0W",
+      "success": false,
+      "quality_score": 0,
+      "file_size_bytes": 0,
+      "file_size_mb": 0,
+      "resolution": "Unknown",
+      "download_time_seconds": 0.7,
+      "error": "HTTP 404 - Authentication likely required",
+      "metadata": {}
+    },
+    {
+      "timestamp": "2025-06-04T17:38:31.513145",
+      "source": "Copernicus GLO-30 (AWS)",
+      "test_type": "Public S3 Access",
+      "region": "-9.380\u00b0S, 62.670\u00b0W",
+      "success": false,
+      "quality_score": 0,
+      "file_size_bytes": 0,
+      "file_size_mb": 0,
+      "resolution": "Unknown",
+      "download_time_seconds": 0.13,
+      "error": "HTTP 404",
+      "metadata": {}
+    },
+    {
+      "timestamp": "2025-06-04T17:38:33.329941",
+      "source": "IBGE Brazil Municipal",
+      "test_type": "Data Availability",
+      "region": "-9.380\u00b0S, 62.670\u00b0W",
+      "success": true,
+      "quality_score": 6,
+      "file_size_bytes": 2470026,
+      "file_size_mb": 2.36,
+      "resolution": "Municipal level",
+      "download_time_seconds": 1.78,
+      "error": null,
+      "metadata": {
+        "municipalities_count": 5571
+      }
+    },
+    {
+      "timestamp": "2025-06-04T17:38:35.154953",
+      "source": "ALOS World 3D (JAXA)",
+      "test_type": "Portal Availability",
+      "region": "-9.380\u00b0S, 62.670\u00b0W",
+      "success": true,
+      "quality_score": 7,
+      "file_size_bytes": 0,
+      "file_size_mb": 0,
+      "resolution": "30m",
+      "download_time_seconds": 1.82,
+      "error": null,
+      "metadata": {
+        "portal_url": "https://gportal.jaxa.jp/gpr/",
+        "requires_registration": true
+      }
+    },
+    {
+      "timestamp": "2025-06-04T17:38:38.901989",
+      "source": "USGS Global Data Explorer",
+      "test_type": "Portal Availability",
+      "region": "-9.380\u00b0S, 62.670\u00b0W",
+      "success": true,
+      "quality_score": 8,
+      "file_size_bytes": 0,
+      "file_size_mb": 0,
+      "resolution": "Various",
+      "download_time_seconds": 3.75,
+      "error": null,
+      "metadata": {
+        "portal_url": "https://www.usgs.gov/core-science-systems/ngp/tnm-delivery/"
+      }
+    }
+  ],
+  "recommendations": {
+    "primary_source": {
+      "name": "USGS Global Data Explorer",
+      "quality_score": 8,
+      "resolution": "Various",
+      "reasons": [
+        "Highest quality score",
+        "Successful download",
+        "Good file size"
+      ]
+    },
+    "fallback_sources": [
+      {
+        "name": "ALOS World 3D (JAXA)",
+        "quality_score": 7,
+        "resolution": "30m"
+      },
+      {
+        "name": "IBGE Brazil Municipal",
+        "quality_score": 6,
+        "resolution": "Municipal level"
+      }
+    ],
+    "notes": "Primary source achieved 8/10 quality score. 2 fallback sources available."
+  }
+}

@@ -147,6 +147,11 @@ class DataAcquisitionManager:
         
         logger.info(f"DataAcquisitionManager initialized with cache: {cache_dir}, output: {output_dir}")
     
+    def _is_in_brazil(self, lat: float, lng: float) -> bool:
+        """Check if coordinates are within Brazil's bounds for optimal source selection."""
+        # Brazil's approximate bounds
+        return (-35 <= lat <= 5) and (-75 <= lng <= -30)
+
     async def check_availability(self, lat: float, lng: float) -> DataAvailability:
         """
         Check what data is available for a given location
@@ -249,10 +254,18 @@ class DataAcquisitionManager:
             # Check availability
             availability = await self.check_availability(lat, lng)
             
-            # Determine source priority
+            # Determine source priority - optimize for Brazilian coordinates
             if data_sources is None:
-                # Default priority order - prioritize USGS 3DEP for LAZ data
-                data_sources = ['usgs_3dep', 'opentopography', 'sentinel2', 'ornl_daac']
+                # Check if coordinates are in Brazil for optimal source selection
+                is_brazil = self._is_in_brazil(lat, lng)
+                
+                if is_brazil:
+                    # Prioritize Brazilian elevation source with optimal Copernicus GLO-30 configuration
+                    data_sources = ['brazilian_elevation', 'usgs_3dep', 'opentopography', 'sentinel2', 'ornl_daac']
+                    logger.info(f"🇧🇷 Brazilian coordinates detected - using optimal elevation configuration")
+                else:
+                    # Default priority order for non-Brazilian coordinates
+                    data_sources = ['usgs_3dep', 'opentopography', 'sentinel2', 'ornl_daac']
             
             if progress_callback:
                 await progress_callback({
@@ -372,8 +385,14 @@ class DataAcquisitionManager:
             roi.center_lat, roi.center_lng, roi.buffer_km
         )
         
-        # Create download request based on source capabilities
-        if source_name == 'usgs_3dep':
+        # Create download request based on source capabilities and optimal configurations
+        if source_name == 'brazilian_elevation':
+            # Use optimal Brazilian elevation configuration based on API quality testing
+            from .sources.brazilian_elevation import BrazilianElevationSource
+            request = BrazilianElevationSource.create_optimal_request(
+                roi.center_lat, roi.center_lng, roi.buffer_km
+            )
+        elif source_name == 'usgs_3dep':
             # USGS 3DEP can provide LAZ files - prioritize those
             request = DownloadRequest(
                 bbox=bbox,
