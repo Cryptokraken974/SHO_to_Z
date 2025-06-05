@@ -1,12 +1,16 @@
 from fastapi import APIRouter, HTTPException, Form
-from ..main import manager, settings, Sentinel2Request
+from .core import Sentinel2Request
 from fastapi.responses import JSONResponse
+import math
 
 router = APIRouter()
 
 @router.post("/api/download-sentinel2")
 async def download_sentinel2(request: Sentinel2Request):
     """Download Sentinel-2 red and NIR bands for given coordinates using Copernicus CDSE"""
+    # Import here to avoid circular imports
+    from ..main import manager, settings
+    
     try:
         # Validate coordinates
         if not (-90 <= request.lat <= 90):

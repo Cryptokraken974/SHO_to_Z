@@ -1,7 +1,7 @@
 # Sentinel-2 specific overlay endpoint (must come before general overlay endpoint)
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
-from ..main import manager, settings  # noqa: F401
+import os
 
 router = APIRouter()
 
@@ -186,6 +186,7 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
         from ..geo_utils import get_image_bounds_from_geotiff, get_image_bounds_from_world_file
         import base64
         import glob
+        import os
         
         print(f"📂 Region name: {region_name}")
         print(f"🔄 Processing type: {processing_type}")
