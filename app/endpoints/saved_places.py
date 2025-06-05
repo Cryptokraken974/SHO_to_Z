@@ -1,4 +1,11 @@
-@app.get("/api/saved-places")
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
+import os
+import json
+
+router = APIRouter()
+
+@router.get("/api/saved-places")
 async def get_saved_places():
     """Get all saved places from JSON storage"""
     print(f"\n📍 API CALL: GET /api/saved-places")
@@ -28,7 +35,7 @@ async def get_saved_places():
             content={"error": f"Failed to load saved places: {str(e)}"}
         )
 
-@app.post("/api/saved-places")
+@router.post("/api/saved-places")
 async def save_places(request: Request):
     """Save places data to JSON storage"""
     print(f"\n💾 API CALL: POST /api/saved-places")
@@ -79,7 +86,7 @@ async def save_places(request: Request):
             content={"error": f"Failed to save places: {str(e)}"}
         )
 
-@app.delete("/api/saved-places/{place_id}")
+@router.delete("/api/saved-places/{place_id}")
 async def delete_saved_place(place_id: str):
     """Delete a specific saved place"""
     print(f"\n🗑️  API CALL: DELETE /api/saved-places/{place_id}")
@@ -130,7 +137,7 @@ async def delete_saved_place(place_id: str):
             content={"error": f"Failed to delete place: {str(e)}"}
         )
 
-@app.get("/api/saved-places/export")
+@router.get("/api/saved-places/export")
 async def export_saved_places():
     """Export saved places as downloadable JSON file"""
     print(f"\n📤 API CALL: GET /api/saved-places/export")

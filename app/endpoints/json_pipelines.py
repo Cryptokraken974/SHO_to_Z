@@ -1,4 +1,10 @@
-@app.get("/api/pipelines/json")
+from fastapi import APIRouter
+
+from ..main import manager, settings  # noqa: F401
+
+router = APIRouter()
+
+@router.get("/api/pipelines/json")
 async def list_json_pipelines():
     """List all available JSON pipelines"""
     print(f"\n🔧 API CALL: /api/pipelines/json")
@@ -25,7 +31,7 @@ async def list_json_pipelines():
             "pipelines": []
         }
 
-@app.get("/api/pipelines/json/{pipeline_name}")
+@router.get("/api/pipelines/json/{pipeline_name}")
 async def get_json_pipeline_info(pipeline_name: str):
     """Get information about a specific JSON pipeline"""
     print(f"\n🔧 API CALL: /api/pipelines/json/{pipeline_name}")
@@ -57,7 +63,7 @@ async def get_json_pipeline_info(pipeline_name: str):
             "error": str(e)
         }
 
-@app.post("/api/pipelines/toggle-json")
+@router.post("/api/pipelines/toggle-json")
 async def toggle_json_pipelines(data: dict):
     """Toggle JSON pipeline usage on/off"""
     print(f"\n🔧 API CALL: /api/pipelines/toggle-json")

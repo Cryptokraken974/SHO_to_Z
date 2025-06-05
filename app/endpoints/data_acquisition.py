@@ -1,6 +1,12 @@
 # Data Acquisition Endpoints
+from fastapi import APIRouter, HTTPException, Form, Request
+from fastapi.responses import JSONResponse
+from ..main import manager, settings, data_manager
+from ..config import validate_api_keys, get_data_source_config
 
-@app.get("/api/config")
+router = APIRouter()
+
+@router.get("/api/config")
 async def get_configuration():
     """Get current configuration and API key status"""
     try:
@@ -26,7 +32,7 @@ async def get_configuration():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/check-data-availability")
+@router.post("/api/check-data-availability")
 async def check_data_availability(request: CoordinateRequest):
     """Check what data is available for given coordinates"""
     try:
@@ -49,7 +55,7 @@ async def check_data_availability(request: CoordinateRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/api/acquire-data")
+@router.post("/api/acquire-data")
 async def acquire_data(request: DataAcquisitionRequest):
     """Acquire data for given coordinates"""
     try:
@@ -91,7 +97,7 @@ async def acquire_data(request: DataAcquisitionRequest):
         })
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/estimate-download-size")
+@router.post("/api/estimate-download-size")
 async def estimate_download_size(request: CoordinateRequest):
     """Estimate download size for different data types"""
     try:
@@ -113,7 +119,7 @@ async def estimate_download_size(request: CoordinateRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/api/acquisition-history")
+@router.get("/api/acquisition-history")
 async def get_acquisition_history():
     """Get history of data acquisitions"""
     try:
@@ -125,7 +131,7 @@ async def get_acquisition_history():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/cleanup-cache")
+@router.post("/api/cleanup-cache")
 async def cleanup_cache(older_than_days: int = 30):
     """Clean up cached data older than specified days"""
     try:
@@ -137,7 +143,7 @@ async def cleanup_cache(older_than_days: int = 30):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/storage-stats")
+@router.get("/api/storage-stats")
 async def get_storage_stats():
     """Get storage statistics"""
     try:
@@ -146,3 +152,5 @@ async def get_storage_stats():
             "success": True,
             "stats": stats
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

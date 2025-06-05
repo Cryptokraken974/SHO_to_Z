@@ -5,6 +5,11 @@
 # Import optimal elevation API with integrated quality findings
 import sys
 from pathlib import Path
+from fastapi import APIRouter, HTTPException, Form
+from ..main import manager, settings
+from fastapi.responses import JSONResponse
+
+router = APIRouter()
 sys.path.insert(0, str(Path(__file__).parent.parent))
 try:
     from optimal_elevation_api import OptimalElevationAPI, ElevationRequest as OptimalRequest, get_best_elevation, get_brazilian_elevation
@@ -29,7 +34,7 @@ class ElevationRequest(BaseModel):
     area_km: Optional[float] = 25.0  # Optimal 25km from testing
     force_dataset: Optional[str] = None
 
-@app.get("/api/elevation/status")
+@router.get("/api/elevation/status")
 async def get_elevation_status():
     """Get status of optimal elevation system with quality findings"""
     return {
@@ -46,7 +51,7 @@ async def get_elevation_status():
         }
     }
 
-@app.post("/api/elevation/optimal")
+@router.post("/api/elevation/optimal")
 async def get_optimal_elevation_data(request: ElevationRequest):
     """Get optimal elevation data using integrated quality findings"""
     if not OPTIMAL_ELEVATION_AVAILABLE:
@@ -92,7 +97,7 @@ async def get_optimal_elevation_data(request: ElevationRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Elevation request failed: {str(e)}")
 
-@app.post("/api/elevation/brazilian")
+@router.post("/api/elevation/brazilian")
 async def get_brazilian_elevation_data(request: ElevationRequest):
     """Get optimal elevation specifically for Brazilian regions"""
     if not OPTIMAL_ELEVATION_AVAILABLE:
@@ -131,7 +136,7 @@ async def get_brazilian_elevation_data(request: ElevationRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Brazilian elevation request failed: {str(e)}")
 
-@app.get("/api/elevation/datasets")
+@router.get("/api/elevation/datasets")
 async def get_elevation_datasets():
     """Get information about available elevation datasets with quality rankings"""
     if not OPTIMAL_ELEVATION_AVAILABLE:
@@ -164,7 +169,7 @@ async def get_elevation_datasets():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/elevation/terrain-recommendations")
+@router.get("/api/elevation/terrain-recommendations")
 async def get_terrain_recommendations():
     """Get terrain-based dataset recommendations"""
     if not OPTIMAL_ELEVATION_AVAILABLE:
@@ -214,7 +219,7 @@ async def get_terrain_recommendations():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/elevation/status")
+@router.get("/api/elevation/status")
 async def get_elevation_status():
     """Get optimal elevation system status and configuration"""
     if not OPTIMAL_ELEVATION_AVAILABLE:
@@ -251,7 +256,7 @@ async def get_elevation_status():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/elevation/download")
+@router.post("/api/elevation/download")
 async def download_elevation_data(request: ElevationRequest):
     """Download optimal elevation data using the integrated API"""
     if not OPTIMAL_ELEVATION_AVAILABLE:
@@ -292,7 +297,7 @@ async def download_elevation_data(request: ElevationRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/elevation/download-all")
+@router.post("/api/elevation/download-all")
 async def download_all_elevation_data():
     """Download optimal elevation data for multiple Brazilian regions"""
     if not OPTIMAL_ELEVATION_AVAILABLE:
@@ -361,8 +366,8 @@ async def download_all_elevation_data():
 # RASTER GENERATION API ENDPOINTS
 # ============================================================================
 
-@app.post("/api/generate-rasters")
-@app.post("/api/elevation/download-coordinates")
+@router.post("/api/generate-rasters")
+@router.post("/api/elevation/download-coordinates")
 async def download_elevation_coordinates(request: CoordinateRequest):
     """Download elevation data (GeoTIFF) for specific coordinates using optimal source"""
     try:

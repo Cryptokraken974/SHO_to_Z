@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Request, Form, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -15,6 +15,8 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
+
+router = APIRouter()
 
 from .convert import convert_geotiff_to_png_base64
 from .processing import laz_to_dem, dtm, dsm, chm, hillshade, hillshade_315_45_08, hillshade_225_45_08, slope, aspect, color_relief, tri, tpi, roughness
@@ -108,11 +110,8 @@ class Sentinel2Request(BaseModel):
 class RasterGenerationRequest(BaseModel):
     region_name: str
 
-app = FastAPI()
-app.mount("/static", StaticFiles(directory="frontend"), name="static")
-app.mount("/output", StaticFiles(directory="output"), name="output")
 
-@app.websocket("/ws/progress")
+@router.websocket("/ws/progress")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time progress updates and cancellation commands."""
     await manager.connect(websocket)
@@ -149,12 +148,12 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
-@app.get("/", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
 def index():
     with open("frontend/index.html") as f:
         return f.read()
 
-@app.get("/api/list-laz-files")
+@router.get("/api/list-laz-files")
 async def list_laz_files():
     """List all LAZ files in the input directory with coordinate metadata"""
     input_dir = "input"

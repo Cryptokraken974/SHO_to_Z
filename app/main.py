@@ -112,6 +112,33 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
 app.mount("/output", StaticFiles(directory="output"), name="output")
 
+# Include routers from endpoint modules
+from .endpoints.core import router as core_router
+from .endpoints.chat import router as chat_router
+from .endpoints.json_pipelines import router as json_pipelines_router
+from .endpoints.laz_processing import router as laz_router
+from .endpoints.overlays import router as overlays_router
+from .endpoints.lidar_acquisition import router as lidar_router
+from .endpoints.data_acquisition import router as data_router
+from .endpoints.elevation_api import router as elevation_router
+from .endpoints.region_management import router as region_router
+from .endpoints.saved_places import router as saved_places_router
+from .endpoints.sentinel2 import router as sentinel2_router
+
+app.include_router(core_router)
+app.include_router(chat_router)
+app.include_router(json_pipelines_router)
+app.include_router(laz_router)
+app.include_router(overlays_router)
+app.include_router(lidar_router)
+app.include_router(data_router)
+app.include_router(elevation_router)
+app.include_router(region_router)
+app.include_router(saved_places_router)
+app.include_router(sentinel2_router)
+'''
+
+
 @app.websocket("/ws/progress")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time progress updates and cancellation commands."""
@@ -2894,3 +2921,4 @@ async def export_saved_places():
 # ============================================================================
 
 
+'''
