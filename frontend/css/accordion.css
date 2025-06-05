@@ -1,0 +1,14 @@
+/* Accordion styles */
+.accordion-content.collapsed {
+  display: none;
+}
+
+.accordion-arrow {
+  transition: transform 0.3s ease;
+}
+
+/* Ensure processing steps accordion shows all content without height restrictions */
+#processing-content {
+  max-height: none;
+  overflow-y: visible;
+}

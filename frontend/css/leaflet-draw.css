@@ -1,0 +1,33 @@
+/* Leaflet drawing controls dark theme styling */
+.leaflet-draw-toolbar a {
+  background-color: #303030 !important;
+  border-color: #404040 !important;
+  color: white !important;
+}
+.leaflet-draw-toolbar a:hover {
+  background-color: #404040 !important;
+  border-color: #555 !important;
+}
+.leaflet-draw-actions a {
+  background-color: #303030 !important;
+  border-color: #404040 !important;
+  color: white !important;
+}
+.leaflet-draw-actions a:hover {
+  background-color: #404040 !important;
+}
+.leaflet-draw-tooltip {
+  background: #1a1a1a !important;
+  border: 1px solid #404040 !important;
+  color: white !important;
+}
+.leaflet-draw-tooltip:before {
+  border-top-color: #404040 !important;
+}
+
+/* Custom styling for drawn rectangles */
+.leaflet-interactive {
+  stroke: #00bfff !important;
+  stroke-width: 2px !important;
+  fill: rgba(0, 191, 255, 0.2) !important;
+}
