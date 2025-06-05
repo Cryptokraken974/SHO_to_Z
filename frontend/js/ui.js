@@ -33,7 +33,7 @@ window.UIManager = {
 
   /**
    * Switch to a specific tab
-   * @param {string} tabName - Name of the tab to switch to ('map' or 'analysis')
+   * @param {string} tabName - Name of the tab to switch to ('map', 'geotiff-tools', or 'analysis')
    */
   switchTab(tabName) {
     // Update tab buttons
@@ -44,7 +44,7 @@ window.UIManager = {
     $('.tab-content').addClass('hidden');
     $(`#${tabName}-tab`).removeClass('hidden');
 
-    // Initialize Analysis tab if switching to it for the first time
+    // Initialize specific tabs if switching to them for the first time
     if (tabName === 'analysis') {
       this.initializeAnalysisTab();
       
@@ -54,6 +54,8 @@ window.UIManager = {
         // Load analysis images for the current region
         this.loadAnalysisImages(currentRegion);
       }
+    } else if (tabName === 'geotiff-tools') {
+      this.initializeGeoTiffTab();
     }
 
     Utils.log('info', `Switched to ${tabName} tab`);
@@ -154,7 +156,57 @@ window.UIManager = {
       this.toggleAccordion('data-sources');
     });
 
+    // GeoTiff Tools tab accordions
+    $('#geotiff-files-accordion').on('click', () => {
+      this.toggleAccordion('geotiff-files');
+    });
+
+    $('#geotiff-load-files-accordion').on('click', () => {
+      this.toggleAccordion('geotiff-load-files');
+    });
+
+    $('#geotiff-tools-accordion').on('click', () => {
+      this.toggleAccordion('geotiff-tools');
+    });
+
+    $('#geotiff-processing-accordion').on('click', () => {
+      this.toggleAccordion('geotiff-processing');
+    });
+
+    $('#geotiff-info-accordion').on('click', () => {
+      this.toggleAccordion('geotiff-info');
+    });
+
     Utils.log('info', 'Accordions initialized');
+  },
+
+  /**
+   * Initialize GeoTiff tab with proper accordion states
+   */
+  initializeGeoTiffTab() {
+    // Set default accordion states for GeoTiff tab
+    // Load files accordion should be open by default
+    const loadFilesContent = $('#geotiff-load-files-content');
+    const loadFilesArrow = $('#geotiff-load-files-accordion .accordion-arrow');
+    
+    if (loadFilesContent.hasClass('collapsed')) {
+      loadFilesContent.removeClass('collapsed');
+      loadFilesArrow.css('transform', 'rotate(0deg)');
+    }
+
+    // Ensure other accordions are properly initialized
+    const accordionsToCollapse = ['geotiff-files', 'geotiff-tools', 'geotiff-processing', 'geotiff-info'];
+    accordionsToCollapse.forEach(accordionType => {
+      const content = $(`#${accordionType}-content`);
+      const arrow = $(`#${accordionType}-accordion .accordion-arrow`);
+      
+      if (!content.hasClass('collapsed')) {
+        content.addClass('collapsed');
+        arrow.css('transform', 'rotate(-90deg)');
+      }
+    });
+
+    Utils.log('info', 'GeoTiff tab initialized with default accordion states');
   },
 
   /**

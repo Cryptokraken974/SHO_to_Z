@@ -1,0 +1,346 @@
+/* GeoTiff Files Tools Tab Styles */
+
+/* GeoTiff Left Panel */
+.geotiff-sidebar {
+  min-width: 320px;
+  max-width: 500px;
+}
+
+/* File Tree Styles */
+.file-tree {
+  background: #262626;
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.file-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-size: 14px;
+}
+
+.file-tree-item:hover {
+  background: #404040;
+}
+
+.file-tree-item.selected {
+  background: #00bfff;
+  color: white;
+}
+
+.file-tree-item.folder {
+  font-weight: 500;
+}
+
+.file-tree-item.file {
+  color: #ababab;
+  margin-left: 16px;
+}
+
+.file-tree-item .icon {
+  font-size: 16px;
+  min-width: 16px;
+}
+
+/* Tool Actions */
+.tool-action-btn {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.tool-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tool-action-btn .icon {
+  font-size: 16px;
+}
+
+/* GeoTiff Canvas Area */
+.geotiff-canvas {
+  background: #141414;
+  overflow-y: auto;
+}
+
+/* File Info Display */
+.file-info-card {
+  background: #1a1a1a;
+  border: 1px solid #303030;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.file-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #303030;
+}
+
+.info-item:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  color: #ababab;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.info-value {
+  color: white;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+}
+
+/* File Info Panel Styles */
+.file-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 6px 0;
+  border-bottom: 1px solid #404040;
+  font-size: 13px;
+}
+
+.file-info-item:last-child {
+  border-bottom: none;
+}
+
+.file-info-item span:first-child {
+  min-width: 70px;
+  color: #fff;
+}
+
+.file-info-item span:last-child {
+  text-align: right;
+  flex: 1;
+  word-break: break-all;
+}
+
+#detailed-metadata {
+  border-top: 1px solid #404040;
+  padding-top: 8px;
+}
+
+.loading-indicator {
+  text-align: center;
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* Preview Area */
+.preview-container {
+  background: #1a1a1a;
+  border: 1px solid #303030;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 400px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Processing Results */
+.processing-result {
+  background: #1a1a1a;
+  border: 1px solid #303030;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.processing-result.success {
+  border-color: #28a745;
+  background: linear-gradient(135deg, #1a1a1a 0%, rgba(40, 167, 69, 0.1) 100%);
+}
+
+.processing-result.error {
+  border-color: #dc3545;
+  background: linear-gradient(135deg, #1a1a1a 0%, rgba(220, 53, 69, 0.1) 100%);
+}
+
+/* Progress Indicators */
+.processing-progress {
+  background: #262626;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.progress-bar-container {
+  background: #404040;
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.progress-bar-fill {
+  background: linear-gradient(90deg, #00bfff, #007acc);
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* Tool Specific Styles */
+.conversion-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.format-option {
+  background: #262626;
+  border: 2px solid #404040;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.format-option:hover {
+  border-color: #00bfff;
+}
+
+.format-option.selected {
+  border-color: #00bfff;
+  background: rgba(0, 191, 255, 0.1);
+}
+
+.format-option .format-name {
+  font-weight: 600;
+  color: white;
+  margin-bottom: 4px;
+}
+
+.format-option .format-desc {
+  font-size: 12px;
+  color: #ababab;
+}
+
+/* LAZ File Modal Styles */
+#laz-file-modal {
+  backdrop-filter: blur(4px);
+}
+
+#laz-drop-zone {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+#laz-drop-zone:hover {
+  background-color: rgba(0, 191, 255, 0.05);
+}
+
+#laz-drop-zone.border-\[#00bfff\] {
+  background-color: rgba(0, 191, 255, 0.1);
+}
+
+/* Load Files Section Styles */
+#geotiff-load-files-content .space-y-2 > button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  text-align: left;
+}
+
+#geotiff-load-files-content .space-y-2 > button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* LAZ File List Styles */
+.laz-file-item {
+  border: 1px solid #404040;
+  border-radius: 8px;
+  padding: 12px;
+  background: #1a1a1a;
+  transition: all 0.2s ease;
+}
+
+.laz-file-item:hover {
+  border-color: #00bfff;
+  background: #262626;
+}
+
+.remove-laz-file {
+  transition: all 0.2s ease;
+  border-radius: 4px;
+  padding: 4px;
+}
+
+.remove-laz-file:hover {
+  background-color: rgba(220, 53, 69, 0.1);
+  transform: scale(1.1);
+}
+
+/* Modal Progress Bar Animation */
+#laz-progress-bar {
+  transition: width 0.3s ease-in-out;
+}
+
+/* Modal Button States */
+#process-laz-files:disabled {
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+#process-laz-files:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(142, 68, 173, 0.3);
+}
+
+/* File Icons */
+.file-icon {
+  font-size: 1.2em;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .geotiff-sidebar {
+    min-width: 280px;
+  }
+  
+  .file-info-grid {
+    grid-template-columns: 1fr;
+  }
+}

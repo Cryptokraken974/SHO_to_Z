@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="/static/css/file-modal.css" />
   <link rel="stylesheet" href="/static/css/acquisition-dialog.css" />
   <link rel="stylesheet" href="/static/css/scrollbar-focus.css" />
+  <link rel="stylesheet" href="/static/css/geotiff-tools.css" />
   
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   
@@ -69,6 +70,8 @@
   <script src="/static/js/processing.js"></script>
   <script src="/static/js/saved_places.js"></script>
   <script src="/static/js/ui.js"></script>
+  <script src="/static/js/geotiff-left-panel.js"></script>
+  <script src="/static/js/geotiff-main-canvas.js"></script>
   <script src="/static/js/app_new.js"></script>
 </head>
 <body class="bg-[#141414] text-white" style='font-family: Inter, "Noto Sans", sans-serif;'>
@@ -112,6 +115,9 @@
     <div class="flex">
       <button class="tab-btn active px-6 py-3 text-white font-medium border-b-2 border-[#00bfff] hover:bg-[#262626] transition-colors" data-tab="map">
         Map
+      </button>
+      <button class="tab-btn px-6 py-3 text-[#ababab] font-medium border-b-2 border-transparent hover:bg-[#262626] hover:text-white transition-colors" data-tab="geotiff-tools">
+        GeoTiff Files Tools
       </button>
       <button class="tab-btn px-6 py-3 text-[#ababab] font-medium border-b-2 border-transparent hover:bg-[#262626] hover:text-white transition-colors" data-tab="analysis">
         Analysis
@@ -284,6 +290,166 @@
           <!-- Downloaded satellite images will be displayed here -->
         </div>
       </div>
+      </div>
+    </div>
+
+    <!-- GeoTiff Files Tools Tab Content -->
+    <div id="geotiff-tools-tab" class="tab-content hidden flex flex-1 overflow-hidden">
+      <!-- GeoTiff Tools Left Panel -->
+      <div id="geotiff-sidebar" class="bg-[#1a1a1a] border-r border-[#303030] w-80 p-6 flex flex-col overflow-y-auto resizable-panel geotiff-sidebar">
+        <div class="resize-handle"></div>
+        
+        <!-- File Tree Section -->
+        <div class="accordion-section mb-6">
+          <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="geotiff-files-accordion">
+            <h3 class="text-white font-semibold flex justify-between items-center m-0">
+              📁 GeoTiff Files
+              <span class="accordion-arrow text-sm transition-transform">▼</span>
+            </h3>
+          </div>
+          <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="geotiff-files-content">
+            <div class="flex gap-2 mb-3">
+              <button id="refresh-files-btn" class="flex-1 bg-[#007bff] hover:bg-[#0056b3] text-white px-3 py-2 rounded-lg text-sm transition-colors">
+                <i class="fas fa-sync-alt mr-2"></i>Refresh
+              </button>
+              <button id="upload-geotiff-btn" class="flex-1 bg-[#28a745] hover:bg-[#218838] text-white px-3 py-2 rounded-lg text-sm transition-colors">
+                <i class="fas fa-upload mr-2"></i>Upload
+              </button>
+            </div>
+            <div id="geotiff-file-tree" class="file-tree">
+              <div class="text-[#666] text-sm text-center py-4">
+                <i class="fas fa-folder-open text-2xl mb-2"></i>
+                <p>Loading files...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Load Files Section -->
+        <div class="accordion-section mb-6">
+          <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="geotiff-load-files-accordion">
+            <h3 class="text-white font-semibold flex justify-between items-center m-0">
+              📥 Load files
+              <span class="accordion-arrow text-sm transition-transform">▼</span>
+            </h3>
+          </div>
+          <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="geotiff-load-files-content">
+            <div class="space-y-2">
+              <button id="load-laz-btn" class="w-full bg-[#8e44ad] hover:bg-[#7d3c98] text-white px-4 py-3 rounded-lg font-medium transition-colors">
+                🗂️ Load LAZ
+              </button>
+              <button id="load-las-btn" class="w-full bg-[#3498db] hover:bg-[#2980b9] text-white px-4 py-3 rounded-lg font-medium transition-colors">
+                📄 Load LAS
+              </button>
+              <button id="load-tiff-btn" class="w-full bg-[#27ae60] hover:bg-[#229954] text-white px-4 py-3 rounded-lg font-medium transition-colors">
+                🗺️ Load TIFF
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tool Actions Section -->
+        <div class="accordion-section mb-6">
+          <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="geotiff-tools-accordion">
+            <h3 class="text-white font-semibold flex justify-between items-center m-0">
+              🔧 Tool Actions
+              <span class="accordion-arrow text-sm transition-transform">▼</span>
+            </h3>
+          </div>
+          <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="geotiff-tools-content">
+            <div class="space-y-2">
+              <button class="geotiff-tool-btn w-full bg-[#6c5ce7] hover:bg-[#5a4fcf] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-tool="metadata">
+                📋 Extract Metadata
+              </button>
+              <button class="geotiff-tool-btn w-full bg-[#00cec9] hover:bg-[#00b3b0] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-tool="preview">
+                🖼️ Generate Preview
+              </button>
+              <button class="geotiff-tool-btn w-full bg-[#e17055] hover:bg-[#d63447] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-tool="statistics">
+                📊 Calculate Statistics
+              </button>
+              <button class="geotiff-tool-btn w-full bg-[#fd79a8] hover:bg-[#e84393] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-tool="histogram">
+                📈 Generate Histogram
+              </button>
+              <button class="geotiff-tool-btn w-full bg-[#fdcb6e] hover:bg-[#e17055] text-white px-4 py-3 rounded-lg font-medium transition-colors" data-tool="convert">
+                🔄 Convert Format
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Processing Options Section -->
+        <div class="accordion-section mb-6">
+          <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="geotiff-processing-accordion">
+            <h3 class="text-white font-semibold flex justify-between items-center m-0">
+              ⚙️ Processing Options
+              <span class="accordion-arrow text-sm transition-transform">▼</span>
+            </h3>
+          </div>
+          <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="geotiff-processing-content">
+            <div class="space-y-3">
+              <!-- Resampling Method -->
+              <div>
+                <label class="block text-xs text-[#ababab] mb-1">Resampling Method</label>
+                <select id="resampling-method" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#00bfff]">
+                  <option value="nearest">Nearest Neighbor</option>
+                  <option value="bilinear">Bilinear</option>
+                  <option value="cubic">Cubic</option>
+                  <option value="lanczos">Lanczos</option>
+                </select>
+              </div>
+              
+              <!-- Output Format -->
+              <div>
+                <label class="block text-xs text-[#ababab] mb-1">Output Format</label>
+                <select id="output-format" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#00bfff]">
+                  <option value="geotiff">GeoTIFF</option>
+                  <option value="png">PNG</option>
+                  <option value="jpeg">JPEG</option>
+                  <option value="netcdf">NetCDF</option>
+                </select>
+              </div>
+
+              <!-- Compression -->
+              <div>
+                <label class="block text-xs text-[#ababab] mb-1">Compression</label>
+                <select id="compression" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#00bfff]">
+                  <option value="none">None</option>
+                  <option value="lzw">LZW</option>
+                  <option value="deflate">Deflate</option>
+                  <option value="packbits">PackBits</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- File Information Section -->
+        <div class="accordion-section">
+          <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="geotiff-info-accordion">
+            <h3 class="text-white font-semibold flex justify-between items-center m-0">
+              ℹ️ File Information
+              <span class="accordion-arrow text-sm transition-transform">▼</span>
+            </h3>
+          </div>
+          <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="geotiff-info-content">
+            <div id="selected-file-info" class="space-y-2 text-sm">
+              <div class="text-[#666] text-center py-4">
+                <i class="fas fa-info-circle text-xl mb-2"></i>
+                <p>Select a file to view information</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GeoTiff Tools Main Content -->
+      <div class="flex-1 flex flex-col bg-[#141414] overflow-hidden">
+        <!-- Main Canvas Area -->
+        <div class="flex-1 overflow-hidden">
+          <div id="geotiff-main-canvas" class="h-full">
+            <!-- GeoTiff preview and analysis content will be loaded here -->
+          </div>
+        </div>
       </div>
     </div>
 
@@ -463,6 +629,57 @@
       </div>
       <div class="modal-footer flex justify-end gap-3 p-6 border-t border-[#303030]">
         <button id="cancel-progress" class="cancel-btn bg-[#dc3545] hover:bg-[#c82333] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LAZ File Browser Modal -->
+  <div id="laz-file-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="modal-content bg-[#1a1a1a] border border-[#303030] rounded-lg w-[90%] max-w-2xl">
+      <div class="modal-header flex justify-between items-center p-6 border-b border-[#303030]">
+        <h3 class="text-white text-lg font-semibold">Browse for LAZ Files</h3>
+        <button class="close text-[#ababab] hover:text-white text-xl font-bold" id="laz-modal-close">&times;</button>
+      </div>
+      <div class="modal-body p-6">
+        <!-- File Upload Area -->
+        <div class="border-2 border-dashed border-[#404040] rounded-lg p-6 mb-4 text-center hover:border-[#00bfff] transition-colors" id="laz-drop-zone">
+          <div class="text-[#ababab] mb-4">
+            <i class="fas fa-cloud-upload-alt text-4xl mb-2"></i>
+            <p class="text-lg">Drop LAZ files here or click to browse</p>
+            <p class="text-sm mt-2">Supports .laz and .las files</p>
+          </div>
+          <input type="file" id="laz-file-input" accept=".laz,.las" multiple class="hidden">
+          <button id="browse-laz-btn" class="bg-[#8e44ad] hover:bg-[#7d3c98] text-white px-6 py-3 rounded-lg font-medium transition-colors">
+            <i class="fas fa-folder-open mr-2"></i>Browse Files
+          </button>
+        </div>
+
+        <!-- Selected Files List -->
+        <div id="selected-laz-files" class="mb-4">
+          <h4 class="text-white font-medium mb-2">Selected Files:</h4>
+          <div id="laz-files-list" class="space-y-2 max-h-[200px] overflow-y-auto">
+            <div class="text-[#666] text-sm text-center py-4">No files selected</div>
+          </div>
+        </div>
+
+        <!-- Progress Bar (hidden by default) -->
+        <div id="laz-progress-section" class="hidden mb-4">
+          <div class="text-white mb-2" id="laz-progress-status">Loading files...</div>
+          <div class="w-full bg-[#303030] rounded-full h-2">
+            <div class="bg-[#8e44ad] h-2 rounded-full transition-all duration-300" id="laz-progress-bar" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer flex justify-between gap-3 p-6 border-t border-[#303030]">
+        <button id="clear-laz-files" class="bg-[#dc3545] hover:bg-[#c82333] text-white px-4 py-2 rounded-lg font-medium transition-colors">
+          <i class="fas fa-trash mr-2"></i>Clear Files
+        </button>
+        <div class="flex gap-3">
+          <button id="cancel-laz-modal" class="cancel-btn bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
+          <button id="load-laz-files" class="bg-[#8e44ad] hover:bg-[#7d3c98] text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+            <i class="fas fa-download mr-2"></i>Load Files
+          </button>
+        </div>
       </div>
     </div>
   </div>
