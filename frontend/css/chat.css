@@ -1,0 +1,18 @@
+/* Chat log styling */
+#chat-log .user {
+  color: #00bfff;
+  margin: 4px 0;
+  padding: 8px 12px;
+  background: #262626;
+  border-radius: 8px;
+  border-left: 3px solid #00bfff;
+}
+
+#chat-log .llm {
+  color: #ff851b;
+  margin: 4px 0;
+  padding: 8px 12px;
+  background: #262626;
+  border-radius: 8px;
+  border-left: 3px solid #ff851b;
+}

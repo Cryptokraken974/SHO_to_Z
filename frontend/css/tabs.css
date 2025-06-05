@@ -1,0 +1,30 @@
+/* Tab system styling */
+.tab-btn {
+  transition: all 0.2s ease-in-out;
+}
+
+.tab-btn.active {
+  color: white !important;
+  border-bottom-color: #00bfff !important;
+}
+
+.tab-btn:not(.active) {
+  color: #ababab !important;
+  border-bottom-color: transparent !important;
+}
+
+.tab-btn:hover {
+  background-color: #262626 !important;
+}
+
+.tab-btn:hover:not(.active) {
+  color: white !important;
+}
+
+.tab-content {
+  display: flex;
+}
+
+.tab-content.hidden {
+  display: none !important;
+}

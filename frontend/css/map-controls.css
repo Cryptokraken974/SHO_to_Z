@@ -1,0 +1,31 @@
+/* Add to Map button styling */
+.add-to-map-btn {
+  position: relative;
+  width: 100%;
+  margin-top: auto;
+  z-index: 10;
+}
+.add-to-map-btn.hidden {
+  display: none !important;
+}
+
+/* Ensure button stays at bottom */
+.gallery-item {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Map styling */
+#map {
+  z-index: 1;
+  height: 800px !important;
+  width: 100% !important;
+}
+.leaflet-container {
+  background: #1a1a1a !important;
+  height: 800px !important;
+  width: 100% !important;
+}
+.leaflet-tile {
+  filter: brightness(0.6) contrast(1.2) hue-rotate(200deg);
+}
