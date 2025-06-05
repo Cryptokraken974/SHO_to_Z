@@ -68,7 +68,7 @@ async def list_lidar_providers():
     print(f"\n📋 API CALL: /api/lidar/providers")
     
     try:
-        from .lidar_acquisition.providers import get_available_providers, get_provider
+        from ..lidar_acquisition.providers import get_available_providers, get_provider
         
         providers = get_available_providers()
         provider_info = []

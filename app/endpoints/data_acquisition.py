@@ -1,7 +1,7 @@
 # Data Acquisition Endpoints
 from fastapi import APIRouter, HTTPException, Form, Request
 from fastapi.responses import JSONResponse
-from ..main import manager, settings, data_manager
+from ..main import manager, settings, data_manager, CoordinateRequest, DataAcquisitionRequest
 from ..config import validate_api_keys, get_data_source_config
 
 router = APIRouter()

@@ -10,7 +10,7 @@ async def list_json_pipelines():
     print(f"\n🔧 API CALL: /api/pipelines/json")
     
     try:
-        from .processing.json_processor import get_processor
+        from ..processing.json_processor import get_processor
         
         processor = get_processor()
         pipelines = processor.list_available_json_pipelines()
@@ -37,7 +37,7 @@ async def get_json_pipeline_info(pipeline_name: str):
     print(f"\n🔧 API CALL: /api/pipelines/json/{pipeline_name}")
     
     try:
-        from .processing.json_processor import get_processor
+        from ..processing.json_processor import get_processor
         
         processor = get_processor()
         pipeline_info = processor.get_pipeline_info(pipeline_name)
@@ -71,7 +71,7 @@ async def toggle_json_pipelines(data: dict):
     try:
         use_json = data.get("use_json", True)
         
-        from .processing.json_processor import set_use_json_pipelines
+        from ..processing.json_processor import set_use_json_pipelines
         set_use_json_pipelines(use_json)
         
         print(f"✅ JSON pipeline usage set to: {use_json}")

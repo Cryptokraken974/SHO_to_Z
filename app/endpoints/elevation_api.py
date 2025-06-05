@@ -6,7 +6,9 @@
 import sys
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Form
-from ..main import manager, settings
+from pydantic import BaseModel
+from typing import Optional
+from ..main import manager, settings, CoordinateRequest
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
@@ -379,9 +381,9 @@ async def download_elevation_coordinates(request: CoordinateRequest):
         
         # Import required modules
         import uuid
-        from .data_acquisition.geographic_router import GeographicRouter
-        from .data_acquisition.sources.base import DownloadRequest, DataType, DataResolution
-        from .data_acquisition.utils.coordinates import BoundingBox
+        from ..data_acquisition.geographic_router import GeographicRouter
+        from ..data_acquisition.sources.base import DownloadRequest, DataType, DataResolution
+        from ..data_acquisition.utils.coordinates import BoundingBox
         
         # Generate unique download ID
         download_id = str(uuid.uuid4())
@@ -448,7 +450,7 @@ async def download_elevation_coordinates(request: CoordinateRequest):
             # Generate raster products automatically
             if result.success and result.file_path:
                 try:
-                    from .processing.raster_generation import RasterGenerator
+                    from ..processing.raster_generation import RasterGenerator
                     from pathlib import Path
                     
                     # Initialize raster generator

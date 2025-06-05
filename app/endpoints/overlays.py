@@ -39,7 +39,7 @@ async def get_sentinel2_overlay_data(region_band: str):
         print(f"📻 Band Info: {band_info}")
         
         # Use the new Sentinel-2 specific function
-        from .geo_utils import get_sentinel2_overlay_data_util
+        from ..geo_utils import get_sentinel2_overlay_data_util
         
         # Call Sentinel-2 specific function with region_name and band_info
         overlay_data = get_sentinel2_overlay_data_util(region_name, band_info)
@@ -112,7 +112,7 @@ async def get_overlay_data(processing_type: str, filename: str):
     print(f"\n🗺️  API CALL: /api/overlay/{processing_type}/{filename}")
     
     try:
-        from .geo_utils import get_laz_overlay_data
+        from ..geo_utils import get_laz_overlay_data
         
         # Extract base filename (remove path and extension)
         base_filename = os.path.splitext(os.path.basename(filename))[0]
@@ -183,7 +183,7 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
     print(f"\n🗺️  API CALL: /api/overlay/raster/{region_name}/{processing_type}")
     
     try:
-        from .geo_utils import get_image_bounds_from_geotiff, get_image_bounds_from_world_file
+        from ..geo_utils import get_image_bounds_from_geotiff, get_image_bounds_from_world_file
         import base64
         import glob
         

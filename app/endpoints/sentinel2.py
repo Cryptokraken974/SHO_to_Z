@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Form
-from ..main import manager, settings
+from ..main import manager, settings, Sentinel2Request
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
@@ -20,9 +20,9 @@ async def download_sentinel2(request: Sentinel2Request):
             raise HTTPException(status_code=400, detail=f"Coordinates {request.lat}, {request.lng} are in polar regions with limited Sentinel-2 coverage.")
         
         import uuid
-        from .data_acquisition.sources.copernicus_sentinel2 import CopernicusSentinel2Source
-        from .data_acquisition.sources.base import DownloadRequest, DataType, DataResolution
-        from .data_acquisition.utils.coordinates import BoundingBox
+        from ..data_acquisition.sources.copernicus_sentinel2 import CopernicusSentinel2Source
+        from ..data_acquisition.sources.base import DownloadRequest, DataType, DataResolution
+        from ..data_acquisition.utils.coordinates import BoundingBox
         
         # Generate unique download ID
         download_id = str(uuid.uuid4())
@@ -123,7 +123,7 @@ async def convert_sentinel2_images(region_name: str = Form(...)):
     print(f"🏷️ Region name: {region_name}")
     
     try:
-        from .convert import convert_sentinel2_to_png
+        from ..convert import convert_sentinel2_to_png
         from pathlib import Path
         
         # Find the data directory for this region - now reading from input folder
@@ -157,7 +157,7 @@ async def convert_sentinel2_images(region_name: str = Form(...)):
             display_files = []
             for file_info in conversion_result['files']:
                 try:
-                    from .convert import convert_geotiff_to_png_base64
+                    from ..convert import convert_geotiff_to_png_base64
                     # Use the original TIF for base64 conversion to get the best quality
                     image_b64 = convert_geotiff_to_png_base64(file_info['tif_path'])
                     

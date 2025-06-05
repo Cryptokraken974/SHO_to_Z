@@ -5,7 +5,7 @@ async def generate_rasters(request: RasterGenerationRequest):
         print(f"🏷️ Region: {request.region_name}")
         
         # Import the raster generation service
-        from .api_raster_generation import generate_rasters_for_region
+        from ..api_raster_generation import generate_rasters_for_region
         
         # Create progress callback that sends updates via WebSocket
         async def progress_callback(update):

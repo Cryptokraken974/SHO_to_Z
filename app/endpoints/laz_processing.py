@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Form
 from ..main import manager, settings
 from fastapi.responses import JSONResponse
+from ..convert import convert_geotiff_to_png_base64
+from ..processing import dtm, dsm, chm, hillshade, hillshade_315_45_08, hillshade_225_45_08, slope, aspect, color_relief, tri, tpi, roughness
 
 router = APIRouter()
 
@@ -12,7 +14,7 @@ async def api_laz_to_dem(input_file: str = Form(...)):
     
     try:
         # Import the synchronous function
-        from .processing.laz_to_dem import laz_to_dem
+        from ..processing.laz_to_dem import laz_to_dem
         
         # Call the synchronous function directly
         tif_path = laz_to_dem(input_file)
