@@ -208,9 +208,12 @@ def generate_hillshade_with_params(input_file: str, azimuth: float, altitude: fl
         
     print(f"   ✅ [REGION IDENTIFIED] Final region name: {region_name}")
 
-    # Create output directory structure: output/<region_name>/Hillshade/
+    # Extract file stem for consistent directory structure
+    file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
+    
+    # Create output directory structure: output/LAZ/<file_stem>/hillshade/
     print(f"\n📁 [FOLDER CREATION] Setting up output directory structure...")
-    output_dir = os.path.join("output", region_name, "Hillshade")
+    output_dir = os.path.join("output", "LAZ", file_stem, "hillshade")
     print(f"   🏗️ Target directory: {output_dir}")
     print(f"   🔍 Checking if directory exists...")
     
@@ -226,11 +229,11 @@ def generate_hillshade_with_params(input_file: str, azimuth: float, altitude: fl
     # Generate output filename with suffix if provided
     print(f"\n📄 [FILE NAMING] Generating output filename...")
     if suffix:
-        output_filename = f"{region_name}_hillshade_{suffix}.tif"
-        print(f"   🏷️ Using suffix pattern: <region>_hillshade_<suffix>.tif")
+        output_filename = f"{file_stem}_hillshade_{suffix}.tif"
+        print(f"   🏷️ Using suffix pattern: <file_stem>_hillshade_<suffix>.tif")
     else:
-        output_filename = f"{region_name}_hillshade.tif"
-        print(f"   🏷️ Using default pattern: <region>_hillshade.tif")
+        output_filename = f"{file_stem}_hillshade.tif"
+        print(f"   🏷️ Using default pattern: <file_stem>_hillshade.tif")
         
     output_path = os.path.join(output_dir, output_filename)
     print(f"   📄 Generated filename: {output_filename}")

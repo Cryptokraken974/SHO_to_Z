@@ -178,13 +178,16 @@ def aspect(input_file: str) -> str:
         # e.g. input/<region_name>/<filename> or input/<filename>
         region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
     
-    # Create default output directory structure: output/<region_name>/Aspect/
+    # Extract file stem for consistent directory structure
+    file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
+    
+    # Create default output directory structure: output/LAZ/<file_stem>/aspect/
     # This is where the synchronous function will save its output by default.
-    default_output_dir = os.path.join("output", region_name, "Aspect")
+    default_output_dir = os.path.join("output", "LAZ", file_stem, "aspect")
     os.makedirs(default_output_dir, exist_ok=True)
     
-    # Generate default output filename: <region_name>_aspect.tif
-    default_output_filename = f"{region_name}_aspect.tif"
+    # Generate default output filename: <file_stem>_aspect.tif
+    default_output_filename = f"{file_stem}_aspect.tif"
     default_output_path = os.path.join(default_output_dir, default_output_filename)
     
     print(f"📂 Default output directory (sync): {default_output_dir}")

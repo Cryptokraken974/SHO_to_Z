@@ -105,7 +105,7 @@ def roughness(input_file: str) -> str:
     print(f"\n🌊 ROUGHNESS: Starting analysis for {input_file}")
     start_time = time.time()
     
-    # Extract region name from the file path structure
+    # Extract file stem for consistent directory structure
     # Path structure: input/<region_name>/lidar/<filename> or input/<region_name>/<filename>
     input_path = Path(input_file)
     if "lidar" in input_path.parts:
@@ -115,12 +115,14 @@ def roughness(input_file: str) -> str:
         # File is directly in input folder: extract parent as region name
         region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
     
-    # Create output directory structure: output/<region_name>/Roughness/
-    output_dir = os.path.join("output", region_name, "Roughness")
+    file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
+    
+    # Create output directory structure: output/LAZ/<file_stem>/roughness/
+    output_dir = os.path.join("output", "LAZ", file_stem, "roughness")
     os.makedirs(output_dir, exist_ok=True)
     
-    # Generate output filename: <region_name>_roughness.tif
-    output_filename = f"{region_name}_roughness.tif"
+    # Generate output filename: <file_stem>_Roughness.tif
+    output_filename = f"{file_stem}_Roughness.tif"
     output_path = os.path.join(output_dir, output_filename)
     
     print(f"📂 Output directory: {output_dir}")

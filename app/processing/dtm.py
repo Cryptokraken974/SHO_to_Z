@@ -50,22 +50,32 @@ def dtm(input_file: str) -> str:
     print(f"\n🏔️ DTM: Starting conversion for {input_file}")
     start_time = time.time()
     
-    # Extract region name from the file path structure
+    # Check if input file exists
+    if not os.path.exists(input_file):
+        raise FileNotFoundError(f"Input LAZ file not found: {input_file}")
+    
+    # Check if input file is readable
+    if not os.access(input_file, os.R_OK):
+        raise PermissionError(f"Input LAZ file is not readable: {input_file}")
+    
+    # Extract region name and filename from the file path structure
     # Path structure: input/<region_name>/lidar/<filename> or input/<region_name>/<filename>
     input_path = Path(input_file)
+    file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
+    
     if "lidar" in input_path.parts:
         # File is in lidar subfolder: extract parent's parent as region name
         region_name = input_path.parts[input_path.parts.index("input") + 1]
     else:
         # File is directly in input folder: extract parent as region name
-        region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
+        region_name = input_path.parent.name if input_path.parent.name != "input" else file_stem
     
-    # Create output directory structure: output/<region_name>/DTM/
-    output_dir = os.path.join("output", region_name, "DTM")
+    # Create output directory structure: output/<region_name>/<file_stem>/elevation/
+    output_dir = os.path.join("output", region_name, file_stem, "elevation")
     os.makedirs(output_dir, exist_ok=True)
     
-    # Generate output filename: <region_name>_DTM.tif
-    output_filename = f"{region_name}_DTM.tif"
+    # Generate output filename: <file_stem>_DTM.tif
+    output_filename = f"{file_stem}_DTM.tif"
     output_path = os.path.join(output_dir, output_filename)
     
     print(f"📂 Output directory: {output_dir}")
@@ -471,14 +481,17 @@ async def process_dtm(laz_file_path: str, output_dir: str, parameters: Dict[str,
         os.makedirs(output_dir, exist_ok=True)
         print(f"   ✅ [FOLDER CREATED] Output directory ready: {output_dir}")
         
-        # Extract region name from the LAZ file path
+        # Extract region name and filename from the LAZ file path
         input_path = Path(laz_file_path)
+        file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
+        
         if "lidar" in input_path.parts:
             region_name = input_path.parts[input_path.parts.index("input") + 1]
         else:
-            region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(laz_file_path))[0]
+            region_name = input_path.parent.name if input_path.parent.name != "input" else file_stem
         
         print(f"🗺️ [REGION DETECTION] Extracted region name: {region_name}")
+        print(f"📄 [FILE DETECTION] Extracted file stem: {file_stem}")
         
         # Generate DTM using the synchronous function
         print(f"🔄 [DTM GENERATION] Calling DTM conversion...")
@@ -503,7 +516,7 @@ async def process_dtm(laz_file_path: str, output_dir: str, parameters: Dict[str,
             print(f"   📊 File size: {file_size_mb:.2f} MB")
             
             # Copy to specified output directory if different
-            output_filename = f"{region_name}_DTM.tif"
+            output_filename = f"{file_stem}_DTM.tif"
             final_output_path = os.path.join(output_dir, output_filename)
             
             if dtm_output_path != final_output_path:

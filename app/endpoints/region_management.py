@@ -74,8 +74,15 @@ async def list_regions(source: str = None):
         
         # Extract coordinate metadata for each file
         for file_path in relative_files:
-            region_name = os.path.splitext(os.path.basename(file_path))[0]
-            region_info = {"name": region_name, "source": "input", "file_path": file_path}
+            file_name = os.path.splitext(os.path.basename(file_path))[0]
+            # Use the parent directory as the region name for processing
+            parent_dir = os.path.basename(os.path.dirname(file_path))
+            region_info = {
+                "name": file_name,  # Display name (filename without extension)
+                "region_name": parent_dir,  # Actual region name for processing (directory name)
+                "source": "input", 
+                "file_path": file_path
+            }
             
             # Check for OpenTopography metadata file
             file_dir = os.path.dirname(file_path)

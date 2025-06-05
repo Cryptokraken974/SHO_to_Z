@@ -140,3 +140,28 @@ app.include_router(saved_places_router)
 app.include_router(sentinel2_router)
 app.include_router(geotiff_router)
 app.include_router(laz_file_router)
+
+# Global exception handlers to ensure proper JSON responses
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError):
+    """Convert ValueError to proper HTTP 400 response with JSON"""
+    return JSONResponse(
+        status_code=400,
+        content={"detail": str(exc)}
+    )
+
+@app.exception_handler(FileNotFoundError)
+async def file_not_found_handler(request: Request, exc: FileNotFoundError):
+    """Convert FileNotFoundError to proper HTTP 404 response with JSON"""
+    return JSONResponse(
+        status_code=404,
+        content={"detail": f"File not found: {str(exc)}"}
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Convert unhandled exceptions to proper HTTP 500 response with JSON"""
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {str(exc)}"}
+    )

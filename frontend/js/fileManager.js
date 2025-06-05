@@ -4,6 +4,7 @@
 
 window.FileManager = {
   selectedRegion: null, // Changed from selectedLazFile
+  processingRegion: null, // Region name to use for API processing calls
   regionMarkers: [], // Changed from lazFileMarkers
   currentLocationPin: null,
 
@@ -72,8 +73,9 @@ window.FileManager = {
     }
     
     regions.forEach((regionInfo) => {
-      // Assuming regionInfo has: name, center_lat, center_lng
-      const regionName = regionInfo.name;
+      // regionInfo has: name (display), region_name (for processing), center_lat, center_lng
+      const displayName = regionInfo.name;
+      const processingRegion = regionInfo.region_name || regionInfo.name; // Fallback to name if region_name not available
       const coords = (regionInfo.center_lat && regionInfo.center_lng) ? 
                      { lat: parseFloat(regionInfo.center_lat), lng: parseFloat(regionInfo.center_lng) } : null;
       
@@ -81,19 +83,19 @@ window.FileManager = {
         `<small class="file-coords">Lat: ${coords.lat.toFixed(4)}, Lng: ${coords.lng.toFixed(4)}</small>` : 
         '<small class="file-coords">Coordinates not available</small>';
       
-      // Using regionName for data-file-path for now, can be changed to a unique ID if available
+      // Store both display name and processing region name
       const regionItem = $(` 
-        <div class="file-item" data-region-name="${regionName}">
-          <div class="file-name">${regionName}</div>
+        <div class="file-item" data-region-name="${displayName}" data-processing-region="${processingRegion}">
+          <div class="file-name">${displayName}</div>
           <div class="file-info">
             ${coordsDisplay}
           </div>
         </div>
       `);
       
-      // Handle region selection
+      // Handle region selection - pass both names
       regionItem.on('click', () => {
-        this.selectRegion(regionName, coords); // MODIFIED to selectRegion
+        this.selectRegion(displayName, coords, processingRegion);
       });
       
       fileList.append(regionItem);
@@ -104,42 +106,44 @@ window.FileManager = {
 
   /**
    * Select a region (previously LAZ file)
-   * @param {string} regionName - Name of the selected region
+   * @param {string} displayName - Display name of the selected region
    * @param {Object} coords - Coordinates object with lat/lng
+   * @param {string} processingRegion - Region name to use for processing API calls
    */
-  selectRegion(regionName, coords = null) { // MODIFIED to selectRegion
-    this.selectedRegion = regionName;
+  selectRegion(displayName, coords = null, processingRegion = null) { // MODIFIED to selectRegion
+    this.selectedRegion = displayName;
+    this.processingRegion = processingRegion || displayName; // Store the processing region separately
     
     // Update UI to show selected region
     $('.file-item').removeClass('selected');
-    $(`.file-item[data-region-name="${regionName}"]`).addClass('selected');
+    $(`.file-item[data-region-name="${displayName}"]`).addClass('selected');
     
     $('#selected-region-name')
-      .text(regionName)
+      .text(displayName)
       .removeClass('text-[#666]')
       .addClass('text-[#00bfff]');
     
     // Update global region selector
     if (UIManager && UIManager.updateGlobalRegionSelector) {
-      UIManager.updateGlobalRegionSelector(regionName);
+      UIManager.updateGlobalRegionSelector(displayName);
     }
     
     // Center map on region location if coordinates are available
     if (coords && Utils.isValidCoordinate(coords.lat, coords.lng)) {
       MapManager.setView(coords.lat, coords.lng, 13);
-      this.updateLocationPin(coords.lat, coords.lng, regionName); // Pass regionName
+      this.updateLocationPin(coords.lat, coords.lng, displayName); // Pass displayName
     }
     
-    Utils.log('info', `Selected region: ${regionName}`, { coords });
-    Utils.showNotification(`Selected Region: ${regionName}`, 'success', 2000);
+    Utils.log('info', `Selected region: ${displayName} (processing region: ${this.processingRegion})`, { coords });
+    Utils.showNotification(`Selected Region: ${displayName}`, 'success', 2000);
 
     // Potentially trigger display of Sentinel-2 images for this region if available
     // Check if Sentinel-2 data exists for this region and display it
     // This requires a new function or modification to an existing one
-    UIManager.displaySentinel2ImagesForRegion(regionName);
+    UIManager.displaySentinel2ImagesForRegion(displayName);
 
     //Potentially trigger display of LIDAR raster images for this region if available
-    UIManager.displayLidarRasterForRegion(regionName);
+    UIManager.displayLidarRasterForRegion(displayName);
     
   },
 
@@ -223,6 +227,14 @@ window.FileManager = {
   },
 
   /**
+   * Get the processing region name for API calls
+   * @returns {string|null} Processing region name or null
+   */
+  getProcessingRegion() {
+    return this.processingRegion || this.selectedRegion;
+  },
+
+  /**
    * Check if a region is selected (previously file)
    * @returns {boolean} True if a region is selected
    */
@@ -235,6 +247,7 @@ window.FileManager = {
    */
   clearSelection() {
     this.selectedRegion = null; // MODIFIED to selectedRegion
+    this.processingRegion = null; // Clear processing region too
     $('#selected-region-name').text('No region selected').removeClass('text-[#00bfff]').addClass('text-[#666]'); // MODIFIED message
     $('#analysis-selected-region-name').text('No region selected'); // Clear Analysis tab too
     

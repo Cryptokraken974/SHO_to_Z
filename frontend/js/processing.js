@@ -13,6 +13,7 @@ window.ProcessingManager = {
   async sendProcess(processingType, options = {}) {
     // Check for region-based processing first, then fall back to LAZ file processing
     const selectedRegion = FileManager.getSelectedRegion();
+    const processingRegion = FileManager.getProcessingRegion(); // Get the actual region for API calls
     const selectedFile = typeof FileManager.getSelectedFile === 'function' ? FileManager.getSelectedFile() : null;
     
     if (!selectedRegion && !selectedFile) {
@@ -30,39 +31,49 @@ window.ProcessingManager = {
       this.activeProcesses.add(processingType);
       this.updateProcessingUI(processingType, 'processing');
 
-      // Prepare request data based on whether we have a region or individual file
-      let requestData;
+      // Prepare form data based on whether we have a region or individual file
+      const formData = new FormData();
       
-      if (selectedRegion) {
+      if (selectedRegion && processingRegion) {
         // Region-based processing: find the LAZ file(s) within the region
-        // The backend will automatically find LAZ files in input/{region}/lidar/ directory
-        requestData = {
-          region_name: selectedRegion,
-          processing_type: processingType,
-          ...options
-        };
-        Utils.log('info', `Starting ${processingType} processing for region: ${selectedRegion}`, requestData);
+        // The backend will automatically find LAZ files in input/{processingRegion}/lidar/ directory
+        formData.append('region_name', processingRegion); // Use processing region, not display region
+        formData.append('processing_type', processingType);
+        
+        // Add any additional options as form fields
+        for (const [key, value] of Object.entries(options)) {
+          formData.append(key, value);
+        }
+        
+        Utils.log('info', `Starting ${processingType} processing for region: ${selectedRegion} (processing region: ${processingRegion})`, {region_name: processingRegion, processing_type: processingType, ...options});
       } else {
         // Individual LAZ file processing (legacy support)
-        requestData = {
-          input_file: selectedFile,
-          ...options
-        };
-        Utils.log('info', `Starting ${processingType} processing for file: ${selectedFile}`, requestData);
+        formData.append('input_file', selectedFile);
+        
+        // Add any additional options as form fields
+        for (const [key, value] of Object.entries(options)) {
+          formData.append(key, value);
+        }
+        
+        Utils.log('info', `Starting ${processingType} processing for file: ${selectedFile}`, {input_file: selectedFile, ...options});
       }
 
-      // Send processing request
+      // Send processing request with form data
       const response = await fetch(`/api/${processingType}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestData)
+        body: formData  // No need for Content-Type header with FormData
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        this.handleProcessingError(processingType, errorData.detail || `HTTP ${response.status}`);
+        return false;
+      }
 
       const data = await response.json();
 
-      if (data.success) {
+      // Check for successful response - either has success=true OR has image data
+      if (data.success || data.image) {
         this.handleProcessingSuccess(processingType, data);
       } else {
         this.handleProcessingError(processingType, data.error || 'Unknown error');

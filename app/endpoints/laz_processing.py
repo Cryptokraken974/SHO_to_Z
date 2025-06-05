@@ -77,10 +77,21 @@ async def api_dtm(input_file: str = Form(None), region_name: str = Form(None), p
         print(f"✅ Base64 conversion complete")
         
         return {"image": image_b64}
-    except Exception as e:
-        print(f"❌ Error in api_dtm: {str(e)}")
+    except FileNotFoundError as e:
+        error_msg = f"File not found: {str(e)}"
+        print(f"❌ Error in api_dtm: {error_msg}")
         print(f"❌ Error type: {type(e).__name__}")
-        raise
+        raise HTTPException(status_code=404, detail=error_msg)
+    except (ValueError, PermissionError) as e:
+        error_msg = f"Invalid input: {str(e)}"
+        print(f"❌ Error in api_dtm: {error_msg}")
+        print(f"❌ Error type: {type(e).__name__}")
+        raise HTTPException(status_code=400, detail=error_msg)
+    except Exception as e:
+        error_msg = f"DTM processing failed: {str(e)}"
+        print(f"❌ Error in api_dtm: {error_msg}")
+        print(f"❌ Error type: {type(e).__name__}")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 @router.post("/api/dsm")
 async def api_dsm(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
@@ -127,10 +138,21 @@ async def api_dsm(input_file: str = Form(None), region_name: str = Form(None), p
         print(f"✅ Base64 conversion complete")
         
         return {"image": image_b64}
-    except Exception as e:
-        print(f"❌ Error in api_dsm: {str(e)}")
+    except FileNotFoundError as e:
+        error_msg = f"File not found: {str(e)}"
+        print(f"❌ Error in api_dsm: {error_msg}")
         print(f"❌ Error type: {type(e).__name__}")
-        raise
+        raise HTTPException(status_code=404, detail=error_msg)
+    except (ValueError, PermissionError) as e:
+        error_msg = f"Invalid input: {str(e)}"
+        print(f"❌ Error in api_dsm: {error_msg}")
+        print(f"❌ Error type: {type(e).__name__}")
+        raise HTTPException(status_code=400, detail=error_msg)
+    except Exception as e:
+        error_msg = f"DSM processing failed: {str(e)}"
+        print(f"❌ Error in api_dsm: {error_msg}")
+        print(f"❌ Error type: {type(e).__name__}")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 @router.post("/api/chm")
 async def api_chm(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):

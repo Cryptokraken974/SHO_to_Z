@@ -180,8 +180,7 @@ def chm(input_file: str) -> str:
     print(f"\n🌳 CHM: Starting generation for {input_file}")
     start_time = time.time()
     
-    # Extract region name from the file path structure
-    # Path structure: input/<region_name>/lidar/<filename> or input/<region_name>/<filename>
+    # Extract file stem for consistent directory structure
     input_path = Path(input_file)
     if "lidar" in input_path.parts:
         # File is in lidar subfolder: extract parent's parent as region name
@@ -190,12 +189,14 @@ def chm(input_file: str) -> str:
         # File is directly in input folder: extract parent as region name
         region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
     
-    # Create output directory structure: output/<region_name>/CHM/
-    output_dir = os.path.join("output", region_name, "CHM")
+    file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
+    
+    # Create output directory structure: output/LAZ/<file_stem>/chm/
+    output_dir = os.path.join("output", "LAZ", file_stem, "chm")
     os.makedirs(output_dir, exist_ok=True)
     
-    # Generate output filename: <region_name>_CHM.tif
-    output_filename = f"{region_name}_CHM.tif"
+    # Generate output filename: <file_stem>_CHM.tif
+    output_filename = f"{file_stem}_CHM.tif"
     output_path = os.path.join(output_dir, output_filename)
     
     print(f"📂 Output directory: {output_dir}")

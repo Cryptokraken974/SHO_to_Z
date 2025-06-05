@@ -202,7 +202,7 @@ def color_relief(input_file: str) -> str:
     print(f"\n🎨 COLOR_RELIEF: Starting generation for {input_file}")
     start_time = time.time()
     
-    # Extract region name from the file path structure
+    # Extract file stem for consistent directory structure
     # Path structure: input/<region_name>/lidar/<filename> or input/<region_name>/<filename>
     input_path = Path(input_file)
     if "lidar" in input_path.parts:
@@ -212,12 +212,14 @@ def color_relief(input_file: str) -> str:
         # File is directly in input folder: extract parent as region name
         region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
     
-    # Create output directory structure: output/<region_name>/ColorRelief/
-    output_dir = os.path.join("output", region_name, "ColorRelief")
+    file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
+    
+    # Create output directory structure: output/LAZ/<file_stem>/color_relief/
+    output_dir = os.path.join("output", "LAZ", file_stem, "color_relief")
     os.makedirs(output_dir, exist_ok=True)
     
-    # Generate output filename: <region_name>_color_relief.tif
-    output_filename = f"{region_name}_color_relief.tif"
+    # Generate output filename: <file_stem>_ColorRelief.tif
+    output_filename = f"{file_stem}_ColorRelief.tif"
     output_path = os.path.join(output_dir, output_filename)
     
     print(f"📂 Output directory: {output_dir}")
@@ -248,7 +250,7 @@ def color_relief(input_file: str) -> str:
         
         # Step 3: Create color table
         print(f"\n🎨 Step 3: Creating color table...")
-        color_table_path = os.path.join(output_dir, f"{region_name}_color_table.txt")
+        color_table_path = os.path.join(output_dir, f"{file_stem}_color_table.txt")
         create_color_table(color_table_path, min_elevation, max_elevation)
         
         # Step 4: Generate color relief using GDAL DEMProcessing

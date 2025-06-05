@@ -97,13 +97,15 @@ window.UIManager = {
    * Handle global region selection
    * @param {string} regionName - Name of the selected region
    * @param {Object} coords - Coordinates object with lat/lng
+   * @param {string} processingRegion - Region name for processing API calls
    */
-  handleGlobalRegionSelection(regionName, coords = null) {
+  handleGlobalRegionSelection(regionName, coords = null, processingRegion = null) {
     // Update global selector
     this.updateGlobalRegionSelector(regionName);
     
     // Update FileManager's selected region
     FileManager.selectedRegion = regionName;
+    FileManager.processingRegion = processingRegion || regionName;
     
     // Switch to Map tab
     this.switchTab('map');
@@ -121,7 +123,7 @@ window.UIManager = {
     // Show success notification
     Utils.showNotification(`Selected Region: ${regionName}`, 'success', 2000);
     
-    Utils.log('info', `Global region selection completed: ${regionName}`, { coords });
+    Utils.log('info', `Global region selection completed: ${regionName} (processing region: ${processingRegion})`, { coords });
   },
 
   /**
@@ -136,6 +138,11 @@ window.UIManager = {
     // Get Data accordion (renamed from Test)
     $('#get-data-accordion').on('click', () => {
       this.toggleAccordion('get-data');
+    });
+
+    // Generate Rasters accordion
+    $('#generate-rasters-accordion').on('click', () => {
+      this.toggleAccordion('generate-rasters');
     });
 
     // Go to accordion
@@ -320,6 +327,45 @@ window.UIManager = {
       this.getCombinedData();
     });
 
+    // Generate Rasters - DTM (Primary)
+    $('#generate-dtm-btn').on('click', () => {
+      ProcessingManager.processDTM();
+    });
+
+    // Generate Rasters - Secondary Products
+    $('#generate-hillshade-btn').on('click', () => {
+      ProcessingManager.processHillshade();
+    });
+
+    $('#generate-slope-btn').on('click', () => {
+      ProcessingManager.sendProcess('slope');
+    });
+
+    $('#generate-aspect-btn').on('click', () => {
+      ProcessingManager.sendProcess('aspect');
+    });
+
+    $('#generate-contours-btn').on('click', () => {
+      ProcessingManager.sendProcess('contours');
+    });
+
+    // Generate Rasters - Advanced Products
+    $('#generate-tri-btn').on('click', () => {
+      ProcessingManager.sendProcess('tri');
+    });
+
+    $('#generate-tpi-btn').on('click', () => {
+      ProcessingManager.sendProcess('tpi');
+    });
+
+    $('#generate-roughness-btn').on('click', () => {
+      ProcessingManager.sendProcess('roughness');
+    });
+
+    $('#generate-color-relief-btn').on('click', () => {
+      ProcessingManager.sendProcess('color_relief');
+    });
+
     // Go to coordinates button
     $('#go-to-coordinates-btn').on('click', () => {
       this.goToCoordinates();
@@ -427,8 +473,8 @@ window.UIManager = {
         return;
       }
 
-      const regionName = selectedItem.data('region-name'); // Changed from data('file-path')
-      // const fileName = filePath.split('/').pop(); // No longer relevant for regions directly
+      const regionName = selectedItem.data('region-name'); // Display name
+      const processingRegion = selectedItem.data('processing-region'); // Processing region name
       
       // Get coordinates from the region item if available
       // Assuming coordinates are stored on the item if parsed during displayRegions
@@ -445,7 +491,7 @@ window.UIManager = {
       
       if (isForGlobal) {
         // Handle global region selection
-        UIManager.handleGlobalRegionSelection(regionName, coords);
+        UIManager.handleGlobalRegionSelection(regionName, coords, processingRegion);
         // Clear the flag
         $('#file-modal').removeData('for-global');
       } else if (isForAnalysis) {
@@ -455,7 +501,7 @@ window.UIManager = {
         $('#file-modal').removeData('for-analysis');
       } else {
         // Select the region using FileManager for Map tab
-        FileManager.selectRegion(regionName, coords); // Changed from selectFile
+        FileManager.selectRegion(regionName, coords, processingRegion); // Pass processing region
       }
       
       // Close the modal

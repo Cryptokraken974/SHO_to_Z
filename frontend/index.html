@@ -187,6 +187,67 @@
         </div>
       </div>
 
+      <!-- Generate Rasters Section -->
+      <div class="accordion-section mb-6">
+        <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="generate-rasters-accordion">
+          <h3 class="text-white font-semibold flex justify-between items-center m-0">
+            Generate Rasters
+            <span class="accordion-arrow text-sm transition-transform">▼</span>
+          </h3>
+        </div>
+        <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="generate-rasters-content">
+          <div class="space-y-3">
+            <!-- DTM Generation (Primary) -->
+            <button id="generate-dtm-btn" class="w-full bg-[#8e44ad] hover:bg-[#7d3c98] text-white px-4 py-3 rounded-lg font-medium transition-colors">
+              🏔️ Generate DTM (Digital Terrain Model)
+            </button>
+            
+            <!-- Secondary Raster Products -->
+            <div class="grid grid-cols-2 gap-2">
+              <button id="generate-hillshade-btn" class="bg-[#e17055] hover:bg-[#d63447] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
+                🌄 Hillshade
+              </button>
+              <button id="generate-slope-btn" class="bg-[#00cec9] hover:bg-[#00b3b0] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
+                📐 Slope
+              </button>
+              <button id="generate-aspect-btn" class="bg-[#fdcb6e] hover:bg-[#e17055] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
+                🧭 Aspect
+              </button>
+              <button id="generate-contours-btn" class="bg-[#6c5ce7] hover:bg-[#5a4fcf] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
+                📏 Contours
+              </button>
+            </div>
+            
+            <!-- Advanced Raster Products -->
+            <details class="mt-3">
+              <summary class="text-[#ababab] text-sm cursor-pointer hover:text-white transition-colors">Advanced Products</summary>
+              <div class="mt-2 space-y-2">
+                <div class="grid grid-cols-2 gap-2">
+                  <button id="generate-tri-btn" class="bg-[#fd79a8] hover:bg-[#e84393] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
+                    📊 TRI
+                  </button>
+                  <button id="generate-tpi-btn" class="bg-[#a29bfe] hover:bg-[#6c5ce7] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
+                    📈 TPI
+                  </button>
+                  <button id="generate-roughness-btn" class="bg-[#74b9ff] hover:bg-[#0984e3] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
+                    🪨 Roughness
+                  </button>
+                  <button id="generate-color-relief-btn" class="bg-[#55a3ff] hover:bg-[#2d96ff] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
+                    🎨 Color Relief
+                  </button>
+                </div>
+              </div>
+            </details>
+            
+            <!-- Status Indicator -->
+            <div id="raster-generation-status" class="text-xs text-[#666] mt-2 hidden">
+              <i class="fas fa-info-circle mr-1"></i>
+              <span id="raster-status-text">Ready to generate rasters</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Go to Section -->
       <div class="accordion-section mb-6">
         <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="go-to-accordion">
