@@ -1,0 +1,13 @@
+/* Custom styles to complement Tailwind */
+body {
+  margin: 0;
+  font-family: Inter, "Noto Sans", sans-serif;
+  background: #141414;
+  color: white;
+}
+
+/* Ensure full height layout */
+html, body {
+  height: 100vh;
+  overflow: hidden;
+}

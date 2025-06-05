@@ -1,0 +1,52 @@
+/* Grid cell image styling */
+.grid-cell img, .gallery-item img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+/* Gallery styling */
+#gallery {
+  scrollbar-width: thin;
+  scrollbar-color: #404040 #262626;
+}
+#gallery::-webkit-scrollbar {
+  height: 8px;
+}
+#gallery::-webkit-scrollbar-track {
+  background: #262626;
+  border-radius: 4px;
+}
+#gallery::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 4px;
+}
+#gallery::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Processing result image styling */
+.gallery-item .processing-result-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px 8px 0 0;
+  transition: opacity 0.3s ease;
+}
+.gallery-item .processing-result-image:hover {
+  opacity: 0.8;
+}
+
+/* Gallery item styling */
+.gallery-item {
+  position: relative;
+}
+.gallery-item .flex-1 {
+  min-height: 0; /* Allow flex item to shrink */
+}
+.gallery-item img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}

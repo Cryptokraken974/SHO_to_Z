@@ -1,0 +1,18 @@
+/* File item styling for modal */
+.file-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  border-radius: 6px;
+  margin-bottom: 2px;
+  transition: background 0.2s;
+  color: white;
+}
+
+.file-item:hover {
+  background: #404040;
+}
+
+.file-item.selected {
+  background: #00bfff;
+  color: #000;
+}
