@@ -38,7 +38,7 @@ The Sentinel-2 download and processing now follows the standardized folder struc
 ## Data Flow
 
 ```
-1. User clicks "Test: Sentinel2 Images" button
+1. User clicks "Get Sentinel2 Images" button
    ↓
 2. Frontend calls /api/download-sentinel2
    ↓
