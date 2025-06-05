@@ -1,5 +1,11 @@
 # Sentinel-2 specific overlay endpoint (must come before general overlay endpoint)
-@app.get("/api/overlay/sentinel2/{region_band}")
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
+from ..main import manager, settings  # noqa: F401
+
+router = APIRouter()
+
+@router.get("/api/overlay/sentinel2/{region_band}")
 async def get_sentinel2_overlay_data(region_band: str):
     """Get overlay data for a Sentinel-2 image including bounds and base64 encoded image"""
     print(f"\n🛰️ API CALL: /api/overlay/sentinel2/{region_band}")
@@ -100,7 +106,7 @@ async def get_sentinel2_overlay_data(region_band: str):
             content={"error": str(e)}
         )
 
-@app.get("/api/overlay/{processing_type}/{filename}")
+@router.get("/api/overlay/{processing_type}/{filename}")
 async def get_overlay_data(processing_type: str, filename: str):
     """Get overlay data for a processed image including bounds and base64 encoded image"""
     print(f"\n🗺️  API CALL: /api/overlay/{processing_type}/{filename}")
@@ -171,7 +177,7 @@ async def get_overlay_data(processing_type: str, filename: str):
             content={"error": f"Failed to get overlay data: {str(e)}"}
         )
 
-@app.get("/api/overlay/raster/{region_name}/{processing_type}")
+@router.get("/api/overlay/raster/{region_name}/{processing_type}")
 async def get_raster_overlay_data(region_name: str, processing_type: str):
     """Get overlay data for raster-processed images from regions including bounds and base64 encoded image"""
     print(f"\n🗺️  API CALL: /api/overlay/raster/{region_name}/{processing_type}")
@@ -310,7 +316,7 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
             content={"success": False, "error": f"Failed to get raster overlay data: {str(e)}"}
         )
 
-@app.get("/api/test-overlay/{filename}")
+@router.get("/api/test-overlay/{filename}")
 async def get_test_overlay(filename: str):
     """Create a simple black overlay at the LAZ file coordinates for testing"""
     print(f"\n🧪 TEST OVERLAY: /api/test-overlay/{filename}")

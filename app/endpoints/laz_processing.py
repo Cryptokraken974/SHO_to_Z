@@ -1,4 +1,10 @@
-@app.post("/api/laz_to_dem")
+from fastapi import APIRouter, HTTPException, Form
+from ..main import manager, settings
+from fastapi.responses import JSONResponse
+
+router = APIRouter()
+
+@router.post("/api/laz_to_dem")
 async def api_laz_to_dem(input_file: str = Form(...)):
     """Convert LAZ to DEM"""
     print(f"\n🎯 API CALL: /api/laz_to_dem")
@@ -24,7 +30,7 @@ async def api_laz_to_dem(input_file: str = Form(...)):
         print(f"❌ Error type: {type(e).__name__}")
         raise
 
-@app.post("/api/dtm")
+@router.post("/api/dtm")
 async def api_dtm(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
     """Convert LAZ to DTM (ground points only) - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/dtm")
@@ -74,7 +80,7 @@ async def api_dtm(input_file: str = Form(None), region_name: str = Form(None), p
         print(f"❌ Error type: {type(e).__name__}")
         raise
 
-@app.post("/api/dsm")
+@router.post("/api/dsm")
 async def api_dsm(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
     """Convert LAZ to DSM (surface points) - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/dsm")
@@ -124,7 +130,7 @@ async def api_dsm(input_file: str = Form(None), region_name: str = Form(None), p
         print(f"❌ Error type: {type(e).__name__}")
         raise
 
-@app.post("/api/chm")
+@router.post("/api/chm")
 async def api_chm(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
     """Generate CHM (Canopy Height Model) from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/chm")
@@ -174,7 +180,7 @@ async def api_chm(input_file: str = Form(None), region_name: str = Form(None), p
         print(f"❌ Error type: {type(e).__name__}")
         raise
 
-@app.post("/api/hillshade")
+@router.post("/api/hillshade")
 async def api_hillshade(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
     """Generate hillshade from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/hillshade")
@@ -224,7 +230,7 @@ async def api_hillshade(input_file: str = Form(None), region_name: str = Form(No
         print(f"❌ Error type: {type(e).__name__}")
         raise
 
-@app.post("/api/hillshade_315_45_08")
+@router.post("/api/hillshade_315_45_08")
 async def api_hillshade_315_45_08(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
     """Generate hillshade with 315° azimuth, 45° altitude, 0.8 z-factor - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/hillshade_315_45_08")
@@ -274,7 +280,7 @@ async def api_hillshade_315_45_08(input_file: str = Form(None), region_name: str
         print(f"❌ Error type: {type(e).__name__}")
         raise
 
-@app.post("/api/hillshade_225_45_08")
+@router.post("/api/hillshade_225_45_08")
 async def api_hillshade_225_45_08(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
     """Generate hillshade with 225° azimuth, 45° altitude, 0.8 z-factor - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/hillshade_225_45_08")
@@ -324,7 +330,7 @@ async def api_hillshade_225_45_08(input_file: str = Form(None), region_name: str
         print(f"❌ Error type: {type(e).__name__}")
         raise
 
-@app.post("/api/slope")
+@router.post("/api/slope")
 async def api_slope(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
     """Generate slope from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/slope")
@@ -374,7 +380,7 @@ async def api_slope(input_file: str = Form(None), region_name: str = Form(None),
         print(f"❌ Error type: {type(e).__name__}")
         raise
 
-@app.post("/api/aspect")
+@router.post("/api/aspect")
 async def api_aspect(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
     """Generate aspect from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/aspect")
@@ -424,7 +430,7 @@ async def api_aspect(input_file: str = Form(None), region_name: str = Form(None)
         print(f"❌ Error type: {type(e).__name__}")
         raise
 
-@app.post("/api/color_relief")
+@router.post("/api/color_relief")
 async def api_color_relief(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
     """Generate color relief from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/color_relief")
@@ -474,7 +480,7 @@ async def api_color_relief(input_file: str = Form(None), region_name: str = Form
         print(f"❌ Error type: {type(e).__name__}")
         raise
 
-@app.post("/api/tri")
+@router.post("/api/tri")
 async def api_tri(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
     """Generate TRI from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/tri")
@@ -524,7 +530,7 @@ async def api_tri(input_file: str = Form(None), region_name: str = Form(None), p
         print(f"❌ Error type: {type(e).__name__}")
         raise
 
-@app.post("/api/tpi")
+@router.post("/api/tpi")
 async def api_tpi(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
     """Generate TPI from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/tpi")
@@ -574,7 +580,7 @@ async def api_tpi(input_file: str = Form(None), region_name: str = Form(None), p
         print(f"❌ Error type: {type(e).__name__}")
         raise
 
-@app.post("/api/roughness")
+@router.post("/api/roughness")
 async def api_roughness(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
     """Generate roughness from LAZ file - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/roughness")
@@ -614,8 +620,12 @@ async def api_roughness(input_file: str = Form(None), region_name: str = Form(No
     try:
         tif_path = roughness(input_file)
         print(f"✅ TIF generated: {tif_path}")
-        
+
         image_b64 = convert_geotiff_to_png_base64(tif_path)
         print(f"✅ Base64 conversion complete")
-        
+
         return {"image": image_b64}
+    except Exception as e:
+        print(f"❌ Error in api_roughness: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
+        raise

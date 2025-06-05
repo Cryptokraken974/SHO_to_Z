@@ -1,4 +1,10 @@
-@app.post("/api/download-sentinel2")
+from fastapi import APIRouter, HTTPException, Form
+from ..main import manager, settings
+from fastapi.responses import JSONResponse
+
+router = APIRouter()
+
+@router.post("/api/download-sentinel2")
 async def download_sentinel2(request: Sentinel2Request):
     """Download Sentinel-2 red and NIR bands for given coordinates using Copernicus CDSE"""
     try:
@@ -110,7 +116,7 @@ async def download_sentinel2(request: Sentinel2Request):
         print(error_details)  # Log to console for debugging
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/convert-sentinel2")
+@router.post("/api/convert-sentinel2")
 async def convert_sentinel2_images(region_name: str = Form(...)):
     """Convert downloaded Sentinel-2 TIF files to PNG for display"""
     print(f"\n🛰️ API CALL: /api/convert-sentinel2")

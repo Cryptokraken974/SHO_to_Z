@@ -1,6 +1,11 @@
 # LIDAR Data Acquisition Endpoints
+from fastapi import APIRouter, HTTPException, Form
+from fastapi.responses import JSONResponse
+from ..main import manager, settings, lidar_manager
 
-@app.post("/api/acquire-lidar")
+router = APIRouter()
+
+@router.post("/api/acquire-lidar")
 async def acquire_lidar_data(request: dict):
     """Acquire LIDAR data from external providers"""
     print(f"\n📡 API CALL: /api/acquire-lidar")
@@ -57,7 +62,7 @@ async def acquire_lidar_data(request: dict):
             }
         )
 
-@app.get("/api/lidar/providers")
+@router.get("/api/lidar/providers")
 async def list_lidar_providers():
     """List available LIDAR data providers"""
     print(f"\n📋 API CALL: /api/lidar/providers")
@@ -95,7 +100,7 @@ async def list_lidar_providers():
             }
         )
 
-@app.post("/api/process-lidar")
+@router.post("/api/process-lidar")
 async def process_lidar_data(region_name: str = Form(...)):
     """Process acquired LIDAR data into LAZ format"""
     print(f"\n🔄 API CALL: /api/process-lidar")

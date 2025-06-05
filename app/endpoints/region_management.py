@@ -1,4 +1,10 @@
-@app.get("/api/list-regions")
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
+from ..main import manager, settings
+
+router = APIRouter()
+
+@router.get("/api/list-regions")
 async def list_regions(source: str = None):
     """List all region subdirectories in the output directory and LAZ files from the input directory with coordinate metadata
     
@@ -123,7 +129,7 @@ async def list_regions(source: str = None):
     
     return {"regions": regions_with_metadata}
 
-@app.delete("/api/delete-region/{region_name}")
+@router.delete("/api/delete-region/{region_name}")
 async def delete_region(region_name: str):
     """Delete a region by removing its input and output folders"""
     print(f"\n🗑️  API CALL: DELETE /api/delete-region/{region_name}")
