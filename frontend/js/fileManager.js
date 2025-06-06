@@ -93,9 +93,17 @@ window.FileManager = {
         </div>
       `);
       
-      // Handle region selection - pass both names
+      // Handle region highlighting (browsing) - don't trigger selection yet
       regionItem.on('click', () => {
-        this.selectRegion(displayName, coords, processingRegion);
+        // Only highlight the region, don't select it yet
+        $('.file-item').removeClass('selected');
+        regionItem.addClass('selected');
+        
+        // Show the delete button when a region is highlighted
+        $('#delete-region-btn').removeClass('hidden');
+        
+        // Store the region data for later selection
+        regionItem.data('coords', coords);
       });
       
       fileList.append(regionItem);

@@ -327,43 +327,14 @@ window.UIManager = {
       this.getCombinedData();
     });
 
-    // Generate Rasters - DTM (Primary)
-    $('#generate-dtm-btn').on('click', () => {
-      ProcessingManager.processDTM();
+    // Generate Rasters - Single Button for All Processing
+    $('#generate-all-rasters-btn').on('click', () => {
+      ProcessingManager.processAllRasters();
     });
 
-    // Generate Rasters - Secondary Products
-    $('#generate-hillshade-btn').on('click', () => {
-      ProcessingManager.processHillshade();
-    });
-
-    $('#generate-slope-btn').on('click', () => {
-      ProcessingManager.sendProcess('slope');
-    });
-
-    $('#generate-aspect-btn').on('click', () => {
-      ProcessingManager.sendProcess('aspect');
-    });
-
-    $('#generate-contours-btn').on('click', () => {
-      ProcessingManager.sendProcess('contours');
-    });
-
-    // Generate Rasters - Advanced Products
-    $('#generate-tri-btn').on('click', () => {
-      ProcessingManager.sendProcess('tri');
-    });
-
-    $('#generate-tpi-btn').on('click', () => {
-      ProcessingManager.sendProcess('tpi');
-    });
-
-    $('#generate-roughness-btn').on('click', () => {
-      ProcessingManager.sendProcess('roughness');
-    });
-
-    $('#generate-color-relief-btn').on('click', () => {
-      ProcessingManager.sendProcess('color_relief');
+    // Cancel All Rasters Processing
+    $('#cancel-all-rasters-btn').on('click', () => {
+      ProcessingManager.cancelAllRasterProcessing();
     });
 
     // Go to coordinates button
@@ -412,14 +383,7 @@ window.UIManager = {
       $('#delete-region-btn').addClass('hidden').prop('disabled', false).text('Delete Region');
     });
 
-    // File item selection in modal
-    $(document).on('click', '.file-item', function() {
-      $('.file-item').removeClass('selected');
-      $(this).addClass('selected');
-      
-      // Show the delete button when a region is selected
-      $('#delete-region-btn').removeClass('hidden');
-    });
+    // File item selection is now handled in FileManager.displayRegions()
     
     // Delete region button in modal
     $('#delete-region-btn').on('click', function() {
@@ -467,22 +431,22 @@ window.UIManager = {
 
     // Select region button in modal
     $('#confirm-region-selection').on('click', function() {
-      const selectedItem = $('.file-item.selected'); // Changed from selectedFileItem
+      const selectedItem = $('.file-item.selected');
       if (selectedItem.length === 0) {
-        Utils.showNotification('Please select a region first', 'warning'); // Changed message
+        Utils.showNotification('Please select a region first', 'warning');
         return;
       }
 
       const regionName = selectedItem.data('region-name'); // Display name
-      const processingRegion = selectedItem.data('processing-region'); // Processing region name
+      let processingRegion = selectedItem.data('processing-region'); // Processing region name
       
-      // Get coordinates from the region item if available
-      // Assuming coordinates are stored on the item if parsed during displayRegions
-      let coords = null;
-      const latText = selectedItem.find('.file-coords').text().match(/Lat: ([-\d\.]+)/);
-      const lngText = selectedItem.find('.file-coords').text().match(/Lng: ([-\d\.]+)/);
-      if (latText && lngText) {
-        coords = { lat: parseFloat(latText[1]), lng: parseFloat(lngText[1]) };
+      // Get coordinates from the stored data
+      const coords = selectedItem.data('coords');
+      
+      // Make sure processing region is not just "LAZ" (which would cause problems)
+      if (processingRegion === "LAZ") {
+        console.warn("⚠️ Processing region is 'LAZ', which is likely incorrect. Using display name instead.");
+        processingRegion = regionName;
       }
 
       // Check which type of selection this is
@@ -490,7 +454,7 @@ window.UIManager = {
       const isForAnalysis = $('#file-modal').data('for-analysis');
       
       if (isForGlobal) {
-        // Handle global region selection
+        // Handle global region selection - this includes API calls
         UIManager.handleGlobalRegionSelection(regionName, coords, processingRegion);
         // Clear the flag
         $('#file-modal').removeData('for-global');
@@ -500,8 +464,8 @@ window.UIManager = {
         // Clear the flag
         $('#file-modal').removeData('for-analysis');
       } else {
-        // Select the region using FileManager for Map tab
-        FileManager.selectRegion(regionName, coords, processingRegion); // Pass processing region
+        // Select the region using FileManager for Map tab - this includes API calls
+        FileManager.selectRegion(regionName, coords, processingRegion);
       }
       
       // Close the modal
@@ -1235,7 +1199,7 @@ window.UIManager = {
     
     try {
       // Processing types that might have LIDAR raster results
-      const processingTypes = ['hillshade', 'slope', 'aspect', 'color_relief'];
+      const processingTypes = ['hillshade', 'slope', 'aspect'];
       const availableRasters = [];
 
       // Check each processing type for available raster data
@@ -1367,8 +1331,7 @@ window.UIManager = {
     const labelItems = [
       { id: 'hillshade', label: 'Hillshade' },
       { id: 'slope', label: 'Slope' },
-      { id: 'aspect', label: 'Aspect' },
-      { id: 'color_relief', label: 'Color Relief' }
+      { id: 'aspect', label: 'Aspect' }
     ];
 
     const galleryHTML = labelItems.map(item => `
@@ -1810,8 +1773,7 @@ window.UIManager = {
       'hillshade_315_45_08': 'Hillshade 315°',
       'hillshade_225_45_08': 'Hillshade 225°',
       'slope': 'Slope',
-      'aspect': 'Aspect',
-      'color_relief': 'Color Relief'
+      'aspect': 'Aspect'
     };
     
     return displayNames[processingType] || processingType.charAt(0).toUpperCase() + processingType.slice(1);
@@ -1832,8 +1794,7 @@ window.UIManager = {
       'hillshade_315_45_08': '#808080', // Gray for Hillshade 315°
       'hillshade_225_45_08': '#A9A9A9', // Dark Gray for Hillshade 225°
       'slope': '#FF6347',             // Tomato for Slope
-      'aspect': '#4169E1',            // Royal Blue for Aspect
-      'color_relief': '#FF8C00'       // Dark Orange for Color Relief
+      'aspect': '#4169E1'             // Royal Blue for Aspect
     };
     
     return colorSchemes[processingType] || '#6c757d'; // Default gray

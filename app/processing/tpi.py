@@ -145,14 +145,14 @@ async def process_tpi(laz_file_path: str, output_dir: str, parameters: Dict[str,
             }
         }
 
-def tpi(input_file: str) -> str:
+def tpi(input_file: str, region_name: str = None) -> str:
     """
     Generate TPI (Topographic Position Index) from LAZ file using GDAL DEM processing
     
     Args:
         input_file: Path to the input LAZ file
-        
-    Returns:
+        region_name: Optional region name to use for output directory (instead of extracted from filename)
+        Returns:
         Path to the generated TPI TIF file
     """
     print(f"\n📍 TPI: Starting analysis for {input_file}")
@@ -170,8 +170,17 @@ def tpi(input_file: str) -> str:
     
     file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
     
-    # Create output directory structure: output/LAZ/<file_stem>/tpi/
-    output_dir = os.path.join("output", "LAZ", file_stem, "tpi")
+    # Use provided region_name for output directory if available, otherwise use file_stem
+    
+    output_folder_name = region_name if region_name else file_stem
+    
+    print(f"📁 Using output folder name: {output_folder_name} (from region_name: {region_name})")
+    
+    
+    
+    # Create output directory structure: output/<output_folder_name>/lidar/
+    
+    output_dir = os.path.join("output", output_folder_name, "lidar", "TPI")
     os.makedirs(output_dir, exist_ok=True)
     
     # Generate output filename: <file_stem>_TPI.tif
@@ -184,7 +193,7 @@ def tpi(input_file: str) -> str:
     try:
         # Step 1: Generate or locate DTM
         print(f"\n🏔️ Step 1: Generating DTM as source for TPI analysis...")
-        dtm_path = dtm(input_file)
+        dtm_path = dtm(input_file, region_name)
         print(f"✅ DTM ready: {dtm_path}")
         
         # Step 2: Generate TPI using GDAL DEMProcessing

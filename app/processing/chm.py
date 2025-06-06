@@ -166,15 +166,15 @@ async def process_chm(laz_file_path: str, output_dir: str, parameters: Dict[str,
             "input_file": laz_file_path
         }
 
-def chm(input_file: str) -> str:
+def chm(input_file: str, region_name: str = None) -> str:
     """
     Generate CHM (Canopy Height Model) from LAZ file using DSM - DTM calculation
     CHM represents vegetation height by subtracting terrain from surface
     
     Args:
         input_file: Path to the input LAZ file
-        
-    Returns:
+        region_name: Optional region name to use for output directory (instead of extracted from filename)
+        Returns:
         Path to the generated CHM TIF file
     """
     print(f"\n🌳 CHM: Starting generation for {input_file}")
@@ -182,17 +182,28 @@ def chm(input_file: str) -> str:
     
     # Extract file stem for consistent directory structure
     input_path = Path(input_file)
-    if "lidar" in input_path.parts:
-        # File is in lidar subfolder: extract parent's parent as region name
-        region_name = input_path.parts[input_path.parts.index("input") + 1]
-    else:
-        # File is directly in input folder: extract parent as region name
-        region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
-    
     file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
     
-    # Create output directory structure: output/LAZ/<file_stem>/chm/
-    output_dir = os.path.join("output", "LAZ", file_stem, "chm")
+    # Only extract region_name from file path if it wasn't provided as a parameter
+    if region_name is None:
+        if "lidar" in input_path.parts:
+            # File is in lidar subfolder: extract parent's parent as region name
+            region_name = input_path.parts[input_path.parts.index("input") + 1]
+        else:
+            # File is directly in input folder: extract parent as region name
+            region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
+    
+    # Use provided region_name for output directory if available, otherwise use file_stem
+    
+    output_folder_name = region_name if region_name else file_stem
+    
+    print(f"📁 Using output folder name: {output_folder_name} (from region_name: {region_name})")
+    
+    
+    
+    # Create output directory structure: output/<output_folder_name>/lidar/
+    
+    output_dir = os.path.join("output", output_folder_name, "lidar", "CHM")
     os.makedirs(output_dir, exist_ok=True)
     
     # Generate output filename: <file_stem>_CHM.tif
@@ -230,12 +241,12 @@ def chm(input_file: str) -> str:
     try:
         # Step 1: Generate or locate DSM
         print(f"\n🏗️ Step 1: Generating DSM for CHM calculation...")
-        dsm_path = dsm(input_file)
+        dsm_path = dsm(input_file, region_name)
         print(f"✅ DSM ready: {dsm_path}")
         
         # Step 2: Generate or locate DTM
         print(f"\n🏔️ Step 2: Generating DTM for CHM calculation...")
-        dtm_path = dtm(input_file)
+        dtm_path = dtm(input_file, region_name)
         print(f"✅ DTM ready: {dtm_path}")
         
         # Step 3: Calculate CHM using gdal_calc (DSM - DTM)

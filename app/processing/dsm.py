@@ -36,15 +36,15 @@ def create_dsm_fallback_pipeline(input_file: str, output_file: str, resolution: 
     }
 
 
-def dsm(input_file: str) -> str:
+def dsm(input_file: str, region_name: str = None) -> str:
     """
     Convert LAZ file to DSM (Digital Surface Model) - All surface features including vegetation, buildings
     Implements caching to avoid regenerating DSM if it already exists and is up-to-date
     
     Args:
         input_file: Path to the input LAZ file
-        
-    Returns:
+        region_name: Optional region name to use for output directory (instead of extracted from filename)
+        Returns:
         Path to the generated TIF file
     """
     print(f"\n🏗️ DSM: Starting conversion for {input_file}")
@@ -61,17 +61,28 @@ def dsm(input_file: str) -> str:
     # Extract file stem for consistent directory structure
     # Path structure: input/<region_name>/lidar/<filename> or input/<region_name>/<filename>
     input_path = Path(input_file)
-    if "lidar" in input_path.parts:
-        # File is in lidar subfolder: extract parent's parent as region name
-        region_name = input_path.parts[input_path.parts.index("input") + 1]
-    else:
-        # File is directly in input folder: extract parent as region name
-        region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
-    
     file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
     
-    # Create output directory structure: output/LAZ/<file_stem>/dsm/
-    output_dir = os.path.join("output", "LAZ", file_stem, "dsm")
+    # Only extract region_name from file path if it wasn't provided as a parameter
+    if region_name is None:
+        if "lidar" in input_path.parts:
+            # File is in lidar subfolder: extract parent's parent as region name
+            region_name = input_path.parts[input_path.parts.index("input") + 1]
+        else:
+            # File is directly in input folder: extract parent as region name
+            region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
+    
+    # Use provided region_name for output directory if available, otherwise use file_stem
+    
+    output_folder_name = region_name if region_name else file_stem
+    
+    print(f"📁 Using output folder name: {output_folder_name} (from region_name: {region_name})")
+    
+    
+    
+    # Create output directory structure: output/<output_folder_name>/lidar/
+    
+    output_dir = os.path.join("output", output_folder_name, "lidar", "DSM")
     os.makedirs(output_dir, exist_ok=True)
     
     # Generate output filename: <file_stem>_DSM.tif
@@ -130,6 +141,7 @@ def convert_las_to_dsm(input_file: str, output_file: str, resolution: float = 1.
     
     Args:
         input_file: Path to the input LAZ file
+        region_name: Optional region name to use for output directory (instead of extracted from filename)
         output_file: Path to the output TIF file
         resolution: Grid resolution for DSM generation
         

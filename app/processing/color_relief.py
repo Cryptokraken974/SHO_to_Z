@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import Dict, Any
-from osgeo import gdal
+from osgeo import gdal, ogr, osr # Ensure gdal is imported
 from .dtm import dtm
 
 logger = logging.getLogger(__name__)
@@ -165,11 +165,9 @@ def create_color_table(color_table_path: str, min_elevation: float, max_elevatio
         min_elevation: Minimum elevation value
         max_elevation: Maximum elevation value
     """
-    # Create a terrain-like color ramp from blue (low) to red (high)
-    elevation_range = max_elevation - min_elevation
-    
-    # Define color stops as percentages of the elevation range
-    color_stops = [
+    print(f"🎨 Creating color table for elevation range: {min_elevation:.2f} to {max_elevation:.2f}")
+
+    color_stops_config = [
         (0.0, "0 0 139"),      # Dark blue (deep water/low)
         (0.1, "0 100 255"),    # Blue (water)
         (0.2, "0 255 255"),    # Cyan (shallow water)
@@ -179,27 +177,34 @@ def create_color_table(color_table_path: str, min_elevation: float, max_elevatio
         (0.9, "255 69 0"),     # Red-orange (high elevation)
         (1.0, "255 255 255")   # White (peaks)
     ]
+
+    if abs(min_elevation - max_elevation) < 1e-6: # Use a tolerance for float comparison
+        print(f"⚠️ DTM is effectively flat (min_elevation ≈ max_elevation ≈ {min_elevation:.2f}). Creating a simplified color table.")
+        with open(color_table_path, 'w') as f:
+            target_rgb = color_stops_config[0][1] 
+            f.write(f"{min_elevation} {target_rgb}\\n")
+            # Optionally, to ensure GDAL handles it as a "range", add a second distinct point if needed.
+            # For now, trying with a single entry as per some gdaldem behavior for exact values.
+            # If issues persist, a second entry like:
+            # f.write(f"{min_elevation + 1e-3} {color_stops_config[-1][1]}\\n")
+            # could be tested.
+        print(f"📊 Simplified color table created with single entry for flat DTM: {color_table_path}")
+        return
+
+    elevation_range = max_elevation - min_elevation
     
     with open(color_table_path, 'w') as f:
-        for percentage, rgb in color_stops:
+        for percentage, rgb in color_stops_config:
             elevation = min_elevation + (percentage * elevation_range)
-            f.write(f"{elevation} {rgb}\n")
+            f.write(f"{elevation} {rgb}\\n")
     
     print(f"📊 Color table created: {color_table_path}")
-    print(f"   📏 Elevation range: {min_elevation:.2f} to {max_elevation:.2f}")
+    print(f"   📏 Elevation range used for calculation: {min_elevation:.2f} to {max_elevation:.2f}")
 
 
 def color_relief(input_file: str) -> str:
-    """
-    Generate color relief from LAZ file using GDAL DEM processing
-    
-    Args:
-        input_file: Path to the input LAZ file
-        
-    Returns:
-        Path to the generated color relief TIF file
-    """
-    print(f"\n🎨 COLOR_RELIEF: Starting generation for {input_file}")
+    gdal.UseExceptions() # Enable GDAL exceptions
+    print(f"\\n🎨 COLOR_RELIEF: Starting generation for {input_file}")
     start_time = time.time()
     
     # Extract file stem for consistent directory structure
@@ -214,8 +219,8 @@ def color_relief(input_file: str) -> str:
     
     file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
     
-    # Create output directory structure: output/LAZ/<file_stem>/color_relief/
-    output_dir = os.path.join("output", "LAZ", file_stem, "color_relief")
+    # Create output directory structure: output/<file_stem>/lidar/Color_Relief/
+    output_dir = os.path.join("output", file_stem, "lidar", "Color_Relief")
     os.makedirs(output_dir, exist_ok=True)
     
     # Generate output filename: <file_stem>_ColorRelief.tif
@@ -226,35 +231,61 @@ def color_relief(input_file: str) -> str:
     print(f"📄 Output file: {output_path}")
     
     try:
-        # Step 1: Generate or locate DTM
-        print(f"\n🏔️ Step 1: Generating DTM as source for color relief...")
-        dtm_path = dtm(input_file)
+        print(f"\\n🏔️ Step 1: Generating DTM as source for color relief...")
+        dtm_path = dtm(input_file) # Assuming dtm() is robust and validates its own output
         print(f"✅ DTM ready: {dtm_path}")
+
+        # Explicitly validate DTM with gdalinfo before color relief processing
+        print(f"\\n🔍 Validating DTM ({dtm_path}) with gdalinfo before color relief...")
+        try:
+            # Use a short timeout for gdalinfo
+            dtm_info_result = subprocess.run(
+                ['gdalinfo', dtm_path],
+                capture_output=True, text=True, check=True, timeout=15 
+            )
+            print(f"📄 DTM gdalinfo output snippet:\n{dtm_info_result.stdout[:500]}...") # Log a snippet
+        except subprocess.CalledProcessError as e:
+            detailed_error = f"gdalinfo failed for DTM ({dtm_path}). Return code: {e.returncode}. Stderr: {e.stderr.strip()}"
+            print(f"❌ {detailed_error}")
+            raise RuntimeError(detailed_error)
+        except FileNotFoundError:
+            print("❌ gdalinfo command not found. Ensure GDAL is installed and in PATH.")
+            raise RuntimeError("gdalinfo command not found.")
+        except subprocess.TimeoutExpired:
+            print(f"❌ gdalinfo command for DTM {dtm_path} timed out after 15 seconds.")
+            raise RuntimeError(f"gdalinfo for DTM {dtm_path} timed out.")
+        except Exception as e:
+            print(f"❌ An unexpected error occurred during gdalinfo for DTM {dtm_path}: {str(e)}")
+            raise RuntimeError(f"Unexpected error during gdalinfo for DTM {dtm_path}: {str(e)}")
+        print(f"✅ DTM ({dtm_path}) validated successfully with gdalinfo.")
         
-        # Step 2: Get DTM statistics to create appropriate color table
-        print(f"\n📊 Step 2: Analyzing DTM statistics...")
+        print(f"\\n📊 Step 2: Analyzing DTM statistics...")
         dtm_dataset = gdal.Open(dtm_path)
         if dtm_dataset is None:
-            raise RuntimeError(f"Failed to open DTM file: {dtm_path}")
+            raise RuntimeError(f"Failed to open DTM file with GDAL: {dtm_path} (post-gdalinfo check)")
         
         band = dtm_dataset.GetRasterBand(1)
-        stats = band.GetStatistics(False, True)  # Force calculation of stats
+        stats = band.GetStatistics(False, True)
         min_elevation, max_elevation = stats[0], stats[1]
+        dtm_dataset = None # Close dataset
         
-        print(f"📊 DTM Statistics:")
-        print(f"   📏 Min elevation: {min_elevation:.2f}")
-        print(f"   📏 Max elevation: {max_elevation:.2f}")
-        print(f"   📐 Range: {max_elevation - min_elevation:.2f}")
+        print(f"📊 DTM Statistics for color table: Min Elevation={min_elevation:.2f}, Max Elevation={max_elevation:.2f}")
         
-        dtm_dataset = None  # Close dataset
-        
-        # Step 3: Create color table
-        print(f"\n🎨 Step 3: Creating color table...")
+        print(f"\\n🎨 Step 3: Creating color table...")
         color_table_path = os.path.join(output_dir, f"{file_stem}_color_table.txt")
         create_color_table(color_table_path, min_elevation, max_elevation)
         
-        # Step 4: Generate color relief using GDAL DEMProcessing
-        print(f"\n🎨 Step 4: Generating color relief using GDAL DEMProcessing...")
+        print(f"🔍 Verifying color table file: {color_table_path}")
+        if not os.path.exists(color_table_path) or os.path.getsize(color_table_path) == 0:
+            raise RuntimeError(f"Color table file was not created or is empty: {color_table_path}")
+        
+        with open(color_table_path, 'r') as f_ct:
+            color_table_content = f_ct.read()
+            print(f"🎨 Content of color table ({color_table_path}):\\n{color_table_content.strip()}")
+            if not color_table_content.strip():
+                 raise RuntimeError(f"Color table file is effectively empty (contains only whitespace): {color_table_path}")
+
+        print(f"\\n🎨 Step 4: Generating color relief using GDAL DEMProcessing...")
         print(f"📁 Source DTM: {dtm_path}")
         print(f"📁 Color table: {color_table_path}")
         print(f"📁 Target color relief: {output_path}")
@@ -278,9 +309,44 @@ def color_relief(input_file: str) -> str:
         
         processing_time = time.time() - processing_start
         
-        if result is None:
-            raise RuntimeError("GDAL DEMProcessing failed to generate color relief")
+        # Enhanced check for GDAL DEMProcessing success
+        if result is None: 
+            raise RuntimeError(f"GDAL DEMProcessing call returned None, indicating failure for: {output_path}. No file was likely created or it was incomplete.")
+
+        if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+            if os.path.exists(output_path): 
+                try:
+                    os.remove(output_path)
+                    print(f"🗑️ Removed empty output file: {output_path}")
+                except OSError as e_rm:
+                    print(f"⚠️ Error removing empty output file {output_path}: {e_rm}")
+            raise RuntimeError(f"GDAL DEMProcessing failed to create a non-empty output file: {output_path}")
+
+        ds_check = None
+        try:
+            print(f"🔍 Verifying generated TIFF ({output_path}) with gdal.Open()...")
+            ds_check = gdal.Open(output_path)
+            if ds_check is None:
+                if os.path.exists(output_path):
+                    try:
+                        os.remove(output_path)
+                        print(f"🗑️ Removed corrupted TIFF (could not be opened by GDAL): {output_path}")
+                    except OSError as e_rm:
+                        print(f"⚠️ Error removing corrupted TIFF {output_path}: {e_rm}")
+                raise RuntimeError(f"GDAL DEMProcessing produced a corrupted TIFF (could not be opened by GDAL): {output_path}")
+        except Exception as e_gdal_open: 
+            if os.path.exists(output_path):
+                try:
+                    os.remove(output_path)
+                    print(f"🗑️ Removed problematic TIFF (gdal.Open raised {type(e_gdal_open).__name__}): {output_path}")
+                except OSError as re_rm:
+                    print(f"⚠️ Error removing problematic TIFF {output_path}: {re_rm}")
+            raise RuntimeError(f"Error opening generated TIFF with GDAL: {output_path}. Details: {str(e_gdal_open)}")
+        finally:
+            if ds_check is not None:
+                ds_check = None 
         
+        print(f"✅ Color relief TIFF created and verified by gdal.Open: {output_path}")
         print(f"✅ Color relief generation completed in {processing_time:.2f} seconds")
         
         # Step 5: Validate output file
@@ -328,7 +394,12 @@ def color_relief(input_file: str) -> str:
         
     except Exception as e:
         total_time = time.time() - start_time
-        error_msg = f"Color relief generation failed: {str(e)}"
-        print(f"❌ {error_msg}")
+        # Ensure error_msg is specific to this function's failure context
+        current_error_message = f"Color relief generation failed for input '{input_file}'. Details: {str(e)}"
+        print(f"❌ {current_error_message}")
         print(f"❌ Failed after {total_time:.2f} seconds")
-        raise Exception(error_msg)
+        # Re-raise the original exception 'e' if it's already a RuntimeError from our checks,
+        # or wrap it if it's a more generic GDALException or other.
+        if isinstance(e, RuntimeError):
+             raise # Re-raise our specific RuntimeErrors
+        raise Exception(current_error_message) from e # Wrap other exceptions

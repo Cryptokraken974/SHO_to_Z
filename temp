@@ -1,97 +1,57 @@
-  /**
-   * Add LIDAR raster overlay to map using the raster overlay API
-   * @param {string} regionName - Region nameAdd commentMore actions
-   * @param {string} processingType - Processing type (hillshade, slope, etc.)
-   * @param {string} displayName - Display name for the overlay
-   * @returns {Promise<boolean>} Success status
-   * Display LIDAR raster images in the Processing Results gallery
-   * @param {Array} availableRasters - Array of available raster data
-   */
-  async addLidarRasterOverlayToMap(regionName, processingType, displayName) {
-    Utils.log('info', `Adding LIDAR ${processingType} overlay to map for region: ${regionName}`);
-  displayLidarRasterGallery(availableRasters) {
-    const gallery = $('#gallery');
+from osgeo import gdal
 
-    try {
-      this.showProgress(`Adding ${displayName} overlay to map...`);      this.showProgress(`Adding ${displayName} overlay to map...`);
-      
-      // Call the LIDAR raster overlay API
-      const response = await fetch(`/api/overlay/raster/${regionName}/${processingType}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
-      }
-      
-      const overlayData = await response.json();
-    if (!availableRasters || availableRasters.length === 0) {
-      this.resetProcessingGalleryToLabels();
-      return;
-    }
+def fill_nodata(input_path, output_path, max_distance=100, smoothing_iter=2):
+    """
+    Fills NoData gaps in a raster using GDAL's FillNodata method.
+    
+    Args:
+        input_path: Path to input GeoTIFF with NoData areas
+        output_path: Path for output filled GeoTIFF
+        max_distance: Max search distance for interpolation (pixels)
+        smoothing_iter: Number of 3x3 smoothing iterations (0-20)
+    """
+    # Open input dataset
+    input_ds = gdal.Open(input_path)
+    input_band = input_ds.GetRasterBand(1)
+    
+    # Verify NoData value exists
+    nodata = input_band.GetNoDataValue()
+    if nodata is None:
+        raise ValueError("Input raster has no NoData value defined")
 
-    // Create image items for each available raster
-    const imageItems = availableRasters.map(raster => {
-      const { processingType, display, overlayData, regionName } = raster;
-      const imageDataUrl = `data:image/png;base64,${overlayData.image_data}`;
+    # Create output file with same properties
+    driver = gdal.GetDriverByName("GTiff")
+    output_ds = driver.Create(
+        output_path,
+        input_ds.RasterXSize,
+        input_ds.RasterYSize,
+        1,  # Number of bands
+        input_band.DataType
+    )
+    output_ds.SetGeoTransform(input_ds.GetGeoTransform())
+    output_ds.SetProjection(input_ds.GetProjection())
+    
+    # Copy data to output band
+    output_band = output_ds.GetRasterBand(1)
+    output_band.WriteArray(input_band.ReadAsArray())
+    output_band.SetNoDataValue(nodata)
+    
+    # Perform fill with GDAL's FillNodata
+    gdal.FillNodata(
+        targetBand=output_band,
+        maskBand=None,  # Auto-create mask from NoData
+        maxSearchDist=max_distance,
+        smoothingIterations=smoothing_iter
+    )
+    
+    # Cleanup
+    output_ds.FlushCache()
+    output_ds = input_ds = None
 
-      if (!overlayData.bounds || !overlayData.image_data) {
-        throw new Error('Invalid overlay data received');
-      }
-      
-      // Create image bounds for Leaflet
-      const bounds = [
-        [overlayData.bounds.south, overlayData.bounds.west],
-        [overlayData.bounds.north, overlayData.bounds.east]
-      ];
-      
-      const imageUrl = `data:image/png;base64,${overlayData.image_data}`;
-      const overlayKey = `LIDAR_RASTER_${regionName}_${processingType}`;
-      
-      // Use OverlayManager to add the overlay
-      const success = OverlayManager.addImageOverlay(
-        overlayKey,
-        imageUrl,
-        bounds,
-        {
-          opacity: 0.8,
-          attribution: 'LIDAR Processing'
-        }
-      );
-      
-      if (success) {
-        Utils.showNotification(`Added ${displayName} overlay to map`, 'success');
-        return true;
-      } else {
-        throw new Error('Failed to add overlay to map');
-      }
-      
-    } catch (error) {
-      Utils.log('error', `Error adding LIDAR raster overlay:`, error);
-      Utils.showNotification(`Error adding ${displayName} overlay: ${error.message}`, 'error');
-      return false;
-    } finally {
-      this.hideProgress();
-    }
-  },
-      return `
-        <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-${processingType}">
-          <div class="flex-1 flex items-center justify-center relative">
-            <img src="${imageDataUrl}" 
-                 alt="${display}" 
-                 class="processing-result-image cursor-pointer"
-                 title="Click to view larger image">
-            <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-              ${display}
-            </div>
-            <div class="absolute top-2 right-2 bg-green-600 bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-              ✓ Ready
-            </div>
-          </div>
-          <button class="add-to-map-btn bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" 
-                  data-target="${processingType}"
-                  data-region-name="${regionName}">
-            Add to Map
-          </button>
-        </div>
-      `;
-    }).join('');
+# Example usage matching your command:
+fill_nodata(
+    input_path="./data/FoxIsland_DTM.tif",
+    output_path="./data/FoxIsland_DTM_Fill.tif",
+    max_distance=100,  # Default, same as -md 100
+    smoothing_iter=2    # Same as -si 2
+)

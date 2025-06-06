@@ -4,6 +4,8 @@
 
 window.ProcessingManager = {
   activeProcesses: new Set(),
+  // Global flag for cancellation
+  isRasterProcessingCancelled: false,
 
   /**
    * Send processing request to server
@@ -37,7 +39,8 @@ window.ProcessingManager = {
       if (selectedRegion && processingRegion) {
         // Region-based processing: find the LAZ file(s) within the region
         // The backend will automatically find LAZ files in input/{processingRegion}/lidar/ directory
-        formData.append('region_name', processingRegion); // Use processing region, not display region
+        formData.append('region_name', processingRegion); // Use processing region for LAZ file lookup
+        formData.append('display_region_name', selectedRegion); // Pass the actual selected region for output folders
         formData.append('processing_type', processingType);
         
         // Add any additional options as form fields
@@ -45,7 +48,7 @@ window.ProcessingManager = {
           formData.append(key, value);
         }
         
-        Utils.log('info', `Starting ${processingType} processing for region: ${selectedRegion} (processing region: ${processingRegion})`, {region_name: processingRegion, processing_type: processingType, ...options});
+        Utils.log('info', `Starting ${processingType} processing for region: ${selectedRegion} (processing region: ${processingRegion})`, {region_name: processingRegion, display_region_name: selectedRegion, processing_type: processingType, ...options});
       } else {
         // Individual LAZ file processing (legacy support)
         formData.append('input_file', selectedFile);
@@ -75,11 +78,11 @@ window.ProcessingManager = {
       // Check for successful response - either has success=true OR has image data
       if (data.success || data.image) {
         this.handleProcessingSuccess(processingType, data);
+        return true;  // Return true when the condition is met
       } else {
         this.handleProcessingError(processingType, data.error || 'Unknown error');
+        return false;
       }
-
-      return data.success;
 
     } catch (error) {
       Utils.log('error', `${processingType} processing failed`, error);
@@ -237,8 +240,7 @@ window.ProcessingManager = {
       'hillshade_315_45_08': 'Hillshade 315°',
       'hillshade_225_45_08': 'Hillshade 225°',
       'slope': 'Slope',
-      'aspect': 'Aspect',
-      'color_relief': 'Color Relief'
+      'aspect': 'Aspect'
     };
     
     return displayNames[processingType] || processingType.charAt(0).toUpperCase() + processingType.slice(1);
@@ -428,18 +430,6 @@ window.ProcessingManager = {
   },
 
   /**
-   * Process Color Relief
-   * @param {Object} options - Color Relief processing options
-   */
-  async processColorRelief(options = {}) {
-    const defaultOptions = {
-      color_scheme: 'elevation'
-    };
-    
-    return await this.sendProcess('color_relief', { ...defaultOptions, ...options });
-  },
-
-  /**
    * Cancel processing operation
    * @param {string} processingType - Type of processing to cancel
    */
@@ -460,6 +450,24 @@ window.ProcessingManager = {
     }
     
     return false;
+  },
+
+  /**
+   * Cancel all raster processing
+   */
+  async cancelAllRasterProcessing() {
+    this.isRasterProcessingCancelled = true;
+    
+    // Cancel any active individual processes
+    this.activeProcesses.forEach(processType => {
+      this.cancelProcessing(processType);
+    });
+
+    // Update UI
+    this.hideRasterProcessingUI();
+    Utils.showNotification('Raster processing cancelled', 'info');
+    
+    Utils.log('info', 'All raster processing cancelled by user');
   },
 
   /**
@@ -485,5 +493,250 @@ window.ProcessingManager = {
    */
   getActiveProcesses() {
     return Array.from(this.activeProcesses);
-  }
+  },
+
+  /**
+   * Process all rasters sequentially (DTM first, then all terrain analysis products)
+   * This replaces the individual button approach with a single workflow
+   */
+  async processAllRasters() {
+    // Check prerequisites
+    const selectedRegion = FileManager.getSelectedRegion();
+    const processingRegion = FileManager.getProcessingRegion();
+    const selectedFile = typeof FileManager.getSelectedFile === 'function' ? FileManager.getSelectedFile() : null;
+    
+    if (!selectedRegion && !selectedFile) {
+      Utils.showNotification('Please select a region or LAZ file first', 'warning');
+      return false;
+    }
+
+    // Check if any processing is already active
+    if (this.hasActiveProcesses()) {
+      Utils.showNotification('Processing is already in progress. Please wait for completion.', 'info');
+      return false;
+    }
+
+    // Reset cancellation flag
+    this.isRasterProcessingCancelled = false;
+
+    // Define processing queue (DTM first, then all others)
+    const processingQueue = [
+      { type: 'dtm', name: 'DTM', icon: '🏔️' },
+      { type: 'hillshade', name: 'Hillshade', icon: '🌄' },
+      { type: 'slope', name: 'Slope', icon: '📐' },
+      { type: 'aspect', name: 'Aspect', icon: '🧭' },
+      { type: 'tri', name: 'TRI', icon: '📊' },
+      { type: 'tpi', name: 'TPI', icon: '📈' },
+      { type: 'roughness', name: 'Roughness', icon: '🪨' }
+    ];
+
+    try {
+      // Show progress UI
+      this.showRasterProcessingUI(true);
+      this.updateRasterProcessingQueue(processingQueue, -1); // Initialize queue display
+      
+      Utils.showNotification('Starting sequential raster generation...', 'info');
+      
+      let successCount = 0;
+      let failedProcesses = [];
+
+      // Process each item in the queue sequentially
+      for (let i = 0; i < processingQueue.length; i++) {
+        // Check for cancellation
+        if (this.isRasterProcessingCancelled) {
+          Utils.log('info', 'Processing cancelled by user');
+          this.hideRasterProcessingUI();
+          return false;
+        }
+
+        const process = processingQueue[i];
+        
+        try {
+          // Update UI to show current processing step
+          this.updateCurrentProcessingStep(process.name, i, processingQueue.length);
+          this.updateRasterProcessingQueue(processingQueue, i);
+          
+          Utils.log('info', `Processing ${process.name} (${i + 1}/${processingQueue.length})`);
+          
+          // Execute the processing
+          const success = await this.sendProcess(process.type);
+          
+          if (success) {
+            successCount++;
+            this.markQueueItemComplete(process.type, 'success');
+            Utils.log('info', `${process.name} completed successfully`);
+          } else {
+            failedProcesses.push(process.name);
+            this.markQueueItemComplete(process.type, 'error');
+            Utils.log('warn', `${process.name} failed`);
+          }
+          
+          // Small delay between processes to prevent overwhelming the backend
+          if (i < processingQueue.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+          
+          // Check for cancellation
+          if (this.isRasterProcessingCancelled) {
+            Utils.log('info', 'Raster processing cancelled by user');
+            break;
+          }
+        } catch (error) {
+          failedProcesses.push(process.name);
+          this.markQueueItemComplete(process.type, 'error');
+          Utils.log('error', `${process.name} processing failed:`, error);
+        }
+      }
+
+      // Show completion summary
+      this.showRasterProcessingComplete(successCount, failedProcesses);
+      
+      // Final notification
+      if (failedProcesses.length === 0) {
+        Utils.showNotification(`All ${successCount} raster products generated successfully!`, 'success');
+      } else if (successCount > 0) {
+        Utils.showNotification(`${successCount} raster products completed, ${failedProcesses.length} failed`, 'warning');
+      } else {
+        Utils.showNotification('Raster generation failed. Please check your input data.', 'error');
+      }
+
+      return successCount > 0;
+
+    } catch (error) {
+      Utils.log('error', 'Sequential raster processing failed:', error);
+      Utils.showNotification('Sequential raster processing failed', 'error');
+      this.hideRasterProcessingUI();
+      return false;
+    }
+  },
+
+  /**
+   * Show/hide raster processing UI elements
+   */
+  showRasterProcessingUI(show) {
+    const progressEl = document.getElementById('raster-generation-progress');
+    const queueEl = document.getElementById('processing-queue');
+    const statusEl = document.getElementById('raster-generation-status');
+    const buttonEl = document.getElementById('generate-all-rasters-btn');
+    const cancelButtonEl = document.getElementById('cancel-all-rasters-btn');
+
+    if (show) {
+      progressEl?.classList.remove('hidden');
+      queueEl?.classList.remove('hidden');
+      statusEl?.classList.remove('hidden');
+      
+      // Hide main button and show cancel button
+      if (buttonEl) {
+        buttonEl.classList.add('hidden');
+      }
+      if (cancelButtonEl) {
+        cancelButtonEl.classList.remove('hidden');
+      }
+    } else {
+      progressEl?.classList.add('hidden');
+      queueEl?.classList.add('hidden');
+      
+      // Show main button and hide cancel button
+      if (buttonEl) {
+        buttonEl.classList.remove('hidden');
+        buttonEl.disabled = false;
+        buttonEl.textContent = '🏔️ Generate Rasters (DTM + All Terrain Analysis)';
+        buttonEl.classList.remove('opacity-50', 'cursor-not-allowed');
+      }
+      if (cancelButtonEl) {
+        cancelButtonEl.classList.add('hidden');
+      }
+    }
+  },
+
+  /**
+   * Hide raster processing UI
+   */
+  hideRasterProcessingUI() {
+    this.showRasterProcessingUI(false);
+  },
+
+  /**
+   * Update current processing step display
+   */
+  updateCurrentProcessingStep(stepName, currentIndex, totalSteps) {
+    const stepEl = document.getElementById('current-processing-step');
+    const progressTextEl = document.getElementById('processing-progress-text');
+    const progressBarEl = document.getElementById('processing-progress-bar');
+
+    if (stepEl) {
+      stepEl.textContent = `Processing ${stepName}...`;
+    }
+
+    const progressPercent = Math.round(((currentIndex + 1) / totalSteps) * 100);
+    
+    if (progressTextEl) {
+      progressTextEl.textContent = `${progressPercent}%`;
+    }
+
+    if (progressBarEl) {
+      progressBarEl.style.width = `${progressPercent}%`;
+    }
+  },
+
+  /**
+   * Update processing queue visual display
+   */
+  updateRasterProcessingQueue(queue, currentIndex) {
+    queue.forEach((process, index) => {
+      const queueItem = document.getElementById(`queue-${process.type.replace('_', '-')}`);
+      if (queueItem) {
+        // Reset classes
+        queueItem.className = 'p-2 rounded bg-[#1a1a1a] text-center border-l-2';
+        
+        if (index < currentIndex) {
+          // Completed
+          queueItem.classList.add('border-green-500', 'bg-green-900', 'bg-opacity-20');
+        } else if (index === currentIndex) {
+          // Currently processing
+          queueItem.classList.add('border-yellow-500', 'bg-yellow-900', 'bg-opacity-20', 'animate-pulse');
+        } else {
+          // Pending
+          queueItem.classList.add('border-[#666]');
+        }
+      }
+    });
+  },
+
+  /**
+   * Mark a queue item as complete with status
+   */
+  markQueueItemComplete(processType, status) {
+    const queueItem = document.getElementById(`queue-${processType.replace('_', '-')}`);
+    if (queueItem) {
+      queueItem.classList.remove('animate-pulse', 'border-yellow-500', 'bg-yellow-900');
+      
+      if (status === 'success') {
+        queueItem.classList.add('border-green-500', 'bg-green-900', 'bg-opacity-20');
+      } else if (status === 'error') {
+        queueItem.classList.add('border-red-500', 'bg-red-900', 'bg-opacity-20');
+      }
+    }
+  },
+
+  /**
+   * Show processing completion summary
+   */
+  showRasterProcessingComplete(successCount, failedProcesses) {
+    const statusEl = document.getElementById('raster-status-text');
+    if (statusEl) {
+      if (failedProcesses.length === 0) {
+        statusEl.textContent = `All ${successCount} raster products generated successfully`;
+        statusEl.className = 'text-green-400';
+      } else {
+        statusEl.textContent = `${successCount} successful, ${failedProcesses.length} failed: ${failedProcesses.join(', ')}`;
+        statusEl.className = 'text-yellow-400';
+      }
+    }
+
+    // Hide progress UI after a delay
+    setTimeout(() => {
+      this.hideRasterProcessingUI();
+    }, 5000);
+  },
 };

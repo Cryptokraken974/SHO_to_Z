@@ -273,42 +273,176 @@ def get_laz_overlay_data(base_filename: str, processing_type: str, filename_proc
         if filename_processing_type:
             print(f"🔍 Using filename processing type: {filename_processing_type}")
         
-        # Construct paths for LAZ-processed files
-        # Structure: output/{base_filename}/{processing_type}/{base_filename}_{suffix}.png
-        output_dir = f"output/{base_filename}/{processing_type}"
+        # Try multiple possible directory structures and filename patterns
+        possible_paths = []
         
         # Use filename_processing_type for mapping if provided, otherwise use processing_type
         mapping_key = filename_processing_type if filename_processing_type else processing_type
         
-        # Map processing type to filename suffix - based on actual file naming convention
+        # Pattern 1: Unified structure - output/{base_filename}/lidar/{processing_type}/{base_filename}_{suffix}.png
+        output_dir1 = f"output/{base_filename}/lidar/{processing_type}"
+        
+        # Pattern 2: LAZ structure - output/LAZ/{base_filename}/{processing_type_lower}/{base_filename}_{processing_type_lower}_standard.png
+        processing_type_lower = processing_type.lower()
+        output_dir2 = f"output/LAZ/{base_filename}/{processing_type_lower}"
+        
+        # Pattern 3: Region PNG outputs - output/{base_filename}/lidar/png_outputs/{region_coords}_elevation_{processing_type_lower}.png
+        output_dir3 = f"output/{base_filename}/lidar/png_outputs"
+        
+        # Map processing type to filename suffix
         filename_mapping = {
-            'DEM': 'DEM',           # FoxIsland_DEM.png
-            'DTM': 'DTM',           # FoxIsland_DTM.png
-            'DSM': 'DSM',           # FoxIsland_DSM.png
-            'CHM': 'CHM',           # FoxIsland_CHM.png
-            'Hillshade': 'hillshade_standard',   # FoxIsland_hillshade_standard.png
-            'hillshade_315_45_08': 'hillshade_315_45_08',   # FoxIsland_hillshade_315_45_08.png
-            'hillshade_225_45_08': 'hillshade_225_45_08',   # FoxIsland_hillshade_225_45_08.png
-            'Slope': 'slope',           # FoxIsland_slope.png
-            'Aspect': 'aspect',         # FoxIsland_aspect.png
-            'ColorRelief': 'color_relief', # FoxIsland_color_relief.png
-            'TRI': 'tri',               # FoxIsland_tri.png
-            'TPI': 'tpi',               # FoxIsland_tpi.png
-            'Roughness': 'roughness'    # FoxIsland_roughness.png
+            'DEM': 'DEM',
+            'DTM': 'DTM', 
+            'DSM': 'DSM',
+            'CHM': 'CHM',
+            'Hillshade': 'Hillshade',
+            'hillshade_315_45_08': 'Hillshade_315_45_08',
+            'hillshade_225_45_08': 'Hillshade_225_45_08', 
+            'Slope': 'Slope',
+            'Aspect': 'Aspect',
+            'Color_Relief': 'ColorRelief',
+            'ColorRelief': 'ColorRelief',
+            'TRI': 'TRI',
+            'TPI': 'TPI',
+            'Roughness': 'Roughness'
         }
         
-        filename_suffix = filename_mapping.get(mapping_key, mapping_key.lower())
+        filename_suffix = filename_mapping.get(mapping_key, mapping_key.title())
         
-        png_path = f"{output_dir}/{base_filename}_{filename_suffix}.png"
-        tiff_path = f"{output_dir}/{base_filename}_{filename_suffix}.tif"
-        world_path = f"{output_dir}/{base_filename}_{filename_suffix}.wld"
+        # Add possible file paths in order of preference
+        # Pattern 0: PRIORITY - PNG outputs consolidated directory (NEW STANDARD)
+        png_outputs_pattern = f"output/{base_filename}/lidar/png_outputs/{base_filename}_elevation_{processing_type_lower}.png"
+        if os.path.exists(f"output/{base_filename}/lidar/png_outputs"):
+            # Check for files in png_outputs with elevation pattern
+            if os.path.exists(png_outputs_pattern):
+                base_name = os.path.splitext(os.path.basename(png_outputs_pattern))[0]
+                possible_paths.append({
+                    'png': png_outputs_pattern,
+                    'tiff': f"output/{base_filename}/lidar/png_outputs/{base_name}.tif",
+                    'world': f"output/{base_filename}/lidar/png_outputs/{base_name}.wld",
+                    'desc': 'PNG outputs consolidated directory (PRIORITY)'
+                })
+            else:
+                # Try alternative naming patterns in png_outputs
+                import glob
+                search_patterns = [
+                    f"output/{base_filename}/lidar/png_outputs/{base_filename}_elevation_{processing_type_lower}*.png",
+                    f"output/{base_filename}/lidar/png_outputs/*_elevation_{processing_type_lower}.png",
+                    f"output/{base_filename}/lidar/png_outputs/{base_filename}_{filename_suffix}*.png"
+                ]
+                
+                for pattern in search_patterns:
+                    matching_files = glob.glob(pattern)
+                    if matching_files:
+                        png_file = matching_files[0]  # Use first match
+                        base_name = os.path.splitext(os.path.basename(png_file))[0]
+                        possible_paths.append({
+                            'png': png_file,
+                            'tiff': f"output/{base_filename}/lidar/png_outputs/{base_name}.tif",
+                            'world': f"output/{base_filename}/lidar/png_outputs/{base_name}.wld",
+                            'desc': 'PNG outputs consolidated directory (FOUND)'
+                        })
+                        break
+
+        # Pattern 1: New unified structure
+        possible_paths.append({
+            'png': f"{output_dir1}/{base_filename}_{filename_suffix}.png",
+            'tiff': f"{output_dir1}/{base_filename}_{filename_suffix}.tif", 
+            'world': f"{output_dir1}/{base_filename}_{filename_suffix}.wld",
+            'desc': 'Unified structure'
+        })
         
-        print(f"📂 Output directory: {output_dir}")
-        print(f"🖼️  PNG path: {png_path}")
-        print(f"🗺️  TIFF path: {tiff_path}")
-        print(f"🌍 World file path: {world_path}")
+        # Pattern 2: LAZ processing structure
+        possible_paths.append({
+            'png': f"{output_dir2}/{base_filename}_{processing_type_lower}_standard.png",
+            'tiff': f"{output_dir2}/{base_filename}_{processing_type_lower}_standard.tif",
+            'world': f"{output_dir2}/{base_filename}_{processing_type_lower}_standard.wld", 
+            'desc': 'LAZ processing structure'
+        })
         
-        return _process_overlay_files(png_path, tiff_path, world_path, processing_type, base_filename)
+        # Pattern 3: Look for region-based files in png_outputs (try to find matching pattern)
+        if os.path.exists(output_dir3):
+            import glob
+            # Look for files matching pattern: *_elevation_{processing_type}.png
+            search_pattern = f"{output_dir3}/*_elevation_{processing_type_lower}.png"
+            matching_files = glob.glob(search_pattern)
+            
+            if matching_files:
+                # Use the first matching file
+                png_file = matching_files[0]
+                base_name = os.path.splitext(os.path.basename(png_file))[0]
+                possible_paths.append({
+                    'png': png_file,
+                    'tiff': f"{output_dir3}/{base_name}.tif",
+                    'world': f"{output_dir3}/{base_name}.wld",
+                    'desc': 'Region PNG outputs structure'
+                })
+
+        # Pattern 4: Old scattered structure - output/{base_filename}/lidar/{processing_type}/{base_filename}_{processing_type}.png
+        # This is for backwards compatibility with older processing results
+        old_scattered_dir = f"output/{base_filename}/lidar/{processing_type}"
+        if os.path.exists(old_scattered_dir):
+            # Try different filename patterns for old structure
+            old_patterns = [
+                f"{old_scattered_dir}/{base_filename}_{processing_type}.png",
+                f"{old_scattered_dir}/{base_filename}_{processing_type}_standard.png",
+                f"{old_scattered_dir}/{base_filename}_{filename_suffix}.png",
+                f"{old_scattered_dir}/{base_filename}_{filename_suffix}_standard.png"
+            ]
+            
+            for pattern in old_patterns:
+                if os.path.exists(pattern):
+                    base_name = os.path.splitext(os.path.basename(pattern))[0]
+                    possible_paths.append({
+                        'png': pattern,
+                        'tiff': f"{old_scattered_dir}/{base_name}.tif",
+                        'world': f"{old_scattered_dir}/{base_name}.wld",
+                        'desc': f'Old scattered structure ({processing_type} folder)'
+                    })
+                    break
+        
+        # Try each possible path until we find one that works
+        for i, path_info in enumerate(possible_paths):
+            png_path = path_info['png']
+            tiff_path = path_info['tiff'] 
+            world_path = path_info['world']
+            desc = path_info['desc']
+            
+            print(f"\n🔍 Trying path {i+1}: {desc}")
+            print(f"📂 PNG path: {png_path}")
+            print(f"🗺️  TIFF path: {tiff_path}")
+            print(f"🌍 World path: {world_path}")
+            
+            if os.path.exists(png_path):
+                print(f"✅ Found PNG file: {png_path}")
+                return _process_overlay_files(png_path, tiff_path, world_path, processing_type, base_filename)
+            else:
+                print(f"❌ PNG file not found: {png_path}")
+        
+        # If no files found, debug what's actually available
+        print(f"\n🔍 No overlay files found. Debugging available files...")
+        debug_dirs = [
+            f"output/{base_filename}",
+            f"output/LAZ/{base_filename}",
+            f"output/{base_filename}/lidar"
+        ]
+        
+        for debug_dir in debug_dirs:
+            if os.path.exists(debug_dir):
+                print(f"📁 Available in {debug_dir}:")
+                try:
+                    for item in os.listdir(debug_dir):
+                        item_path = os.path.join(debug_dir, item)
+                        if os.path.isdir(item_path):
+                            print(f"   📁 {item}/")
+                        else:
+                            print(f"   📄 {item}")
+                except Exception as e:
+                    print(f"   ❌ Error listing directory: {e}")
+            else:
+                print(f"📁 Directory does not exist: {debug_dir}")
+        
+        return None
         
     except Exception as e:
         print(f"❌ Error getting LAZ overlay data for {base_filename}/{processing_type}: {e}")
@@ -531,6 +665,137 @@ def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, proce
         return None
 
 # Keep original function for backwards compatibility, but route to appropriate new function
+def find_png_files(base_filename: str, processing_type: str, filename_processing_type: str = None) -> list:
+    """
+    Find PNG files for a specific region and processing type using the same fallback patterns as get_laz_overlay_data.
+    
+    Args:
+        base_filename: The base name of the LAZ file (e.g., 'OR_WizardIsland', 'FoxIsland')
+        processing_type: The folder name (e.g., 'Hillshade', 'DTM', 'Slope')
+        filename_processing_type: The specific processing type for filename mapping (e.g., 'hillshade_315_45_08')
+        
+    Returns:
+        List of found PNG file paths
+    """
+    try:
+        print(f"\n🔍 Finding PNG files for {base_filename}/{processing_type}")
+        
+        found_png_files = []
+        
+        # Use filename_processing_type for mapping if provided, otherwise use processing_type
+        mapping_key = filename_processing_type if filename_processing_type else processing_type
+        
+        # Pattern 1: Unified structure - output/{base_filename}/lidar/{processing_type}/{base_filename}_{suffix}.png
+        output_dir1 = f"output/{base_filename}/lidar/{processing_type}"
+        
+        # Pattern 2: LAZ structure - output/LAZ/{base_filename}/{processing_type_lower}/{base_filename}_{processing_type_lower}_standard.png
+        processing_type_lower = processing_type.lower()
+        output_dir2 = f"output/LAZ/{base_filename}/{processing_type_lower}"
+        
+        # Pattern 3: Region PNG outputs - output/{base_filename}/lidar/png_outputs/{region_coords}_elevation_{processing_type_lower}.png
+        output_dir3 = f"output/{base_filename}/lidar/png_outputs"
+        
+        # Map processing type to filename suffix
+        filename_mapping = {
+            'DEM': 'DEM',
+            'DTM': 'DTM', 
+            'DSM': 'DSM',
+            'CHM': 'CHM',
+            'Hillshade': 'Hillshade',
+            'hillshade_315_45_08': 'Hillshade_315_45_08',
+            'hillshade_225_45_08': 'Hillshade_225_45_08', 
+            'Slope': 'Slope',
+            'Aspect': 'Aspect',
+            'Color_Relief': 'ColorRelief',
+            'ColorRelief': 'ColorRelief',
+            'TRI': 'TRI',
+            'TPI': 'TPI',
+            'Roughness': 'Roughness'
+        }
+        
+        filename_suffix = filename_mapping.get(mapping_key, mapping_key.title())
+        
+        # Check Pattern 0: PRIORITY - PNG outputs consolidated directory (NEW STANDARD)
+        png_outputs_pattern = f"output/{base_filename}/lidar/png_outputs/{base_filename}_elevation_{processing_type_lower}.png"
+        if os.path.exists(f"output/{base_filename}/lidar/png_outputs"):
+            if os.path.exists(png_outputs_pattern):
+                found_png_files.append({
+                    'path': png_outputs_pattern,
+                    'desc': 'PNG outputs consolidated directory (PRIORITY)'
+                })
+            else:
+                # Try alternative naming patterns in png_outputs
+                import glob
+                search_patterns = [
+                    f"output/{base_filename}/lidar/png_outputs/{base_filename}_elevation_{processing_type_lower}*.png",
+                    f"output/{base_filename}/lidar/png_outputs/*_elevation_{processing_type_lower}.png",
+                    f"output/{base_filename}/lidar/png_outputs/{base_filename}_{filename_suffix}*.png"
+                ]
+                
+                for pattern in search_patterns:
+                    matching_files = glob.glob(pattern)
+                    if matching_files:
+                        for png_file in matching_files:
+                            found_png_files.append({
+                                'path': png_file,
+                                'desc': 'PNG outputs consolidated directory (FOUND)'
+                            })
+
+        # Check Pattern 1: New unified structure
+        unified_png = f"{output_dir1}/{base_filename}_{filename_suffix}.png"
+        if os.path.exists(unified_png):
+            found_png_files.append({
+                'path': unified_png,
+                'desc': 'Unified structure'
+            })
+        
+        # Check Pattern 2: LAZ processing structure
+        laz_png = f"{output_dir2}/{base_filename}_{processing_type_lower}_standard.png"
+        if os.path.exists(laz_png):
+            found_png_files.append({
+                'path': laz_png,
+                'desc': 'LAZ processing structure'
+            })
+        
+        # Check Pattern 3: Look for region-based files in png_outputs
+        if os.path.exists(output_dir3):
+            import glob
+            search_pattern = f"{output_dir3}/*_elevation_{processing_type_lower}.png"
+            matching_files = glob.glob(search_pattern)
+            
+            if matching_files:
+                for png_file in matching_files:
+                    found_png_files.append({
+                        'path': png_file,
+                        'desc': 'Region PNG outputs structure'
+                    })
+
+        # Check Pattern 4: Old scattered structure
+        old_scattered_dir = f"output/{base_filename}/lidar/{processing_type}"
+        if os.path.exists(old_scattered_dir):
+            old_patterns = [
+                f"{old_scattered_dir}/{base_filename}_{processing_type}.png",
+                f"{old_scattered_dir}/{base_filename}_{processing_type}_standard.png",
+                f"{old_scattered_dir}/{base_filename}_{filename_suffix}.png",
+                f"{old_scattered_dir}/{base_filename}_{filename_suffix}_standard.png"
+            ]
+            
+            for pattern in old_patterns:
+                if os.path.exists(pattern):
+                    found_png_files.append({
+                        'path': pattern,
+                        'desc': f'Old scattered structure ({processing_type} folder)'
+                    })
+        
+        # Format the result to return just the paths
+        return [item['path'] for item in found_png_files]
+        
+    except Exception as e:
+        print(f"❌ Error finding PNG files for {base_filename}/{processing_type}: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
 def get_image_overlay_data(base_filename: str, processing_type: str, filename_processing_type: str = None) -> Optional[Dict]:
     """
     DEPRECATED: Use get_laz_overlay_data or get_sentinel2_overlay_data instead.

@@ -176,7 +176,7 @@ async def process_hillshade(laz_file_path: str, output_dir: str, parameters: Dic
             "input_file": laz_file_path
         }
 
-def generate_hillshade_with_params(input_file: str, azimuth: float, altitude: float, z_factor: float, suffix: str = "") -> str:
+def generate_hillshade_with_params(input_file: str, azimuth: float, altitude: float, z_factor: float, suffix: str = "", region_name: str = None) -> str:
     """
     Generate hillshade with comprehensive logging of all file/folder operations.
     """
@@ -189,31 +189,40 @@ def generate_hillshade_with_params(input_file: str, azimuth: float, altitude: fl
     print(f"⚙️ Parameters: azimuth={azimuth}°, altitude={altitude}°, z_factor={z_factor}")
     print(f"🏷️ Suffix: '{suffix}' (empty = default naming)")
     
-    # Extract region name from file path for consistent naming
-    print(f"\n🔍 [REGION EXTRACTION] Analyzing file path structure...")
+    # Use provided region_name or extract from file path if not provided
+    print(f"\n🔍 [REGION EXTRACTION] Determining region name...")
     input_path = Path(input_file)
     print(f"   📂 Full input path: {input_path}")
     print(f"   🧩 Path parts: {input_path.parts}")
     
-    if "lidar" in input_path.parts:
-        # File is in lidar subfolder: extract parent's parent as region name
-        region_name = input_path.parts[input_path.parts.index("input") + 1]
-        print(f"   🎯 Found 'lidar' subfolder structure")
-        print(f"   📍 Region name from parent directory: {region_name}")
+    if region_name is None:
+        print(f"   ⚠️ No region_name provided, extracting from file path...")
+        if "lidar" in input_path.parts:
+            # File is in lidar subfolder: extract parent's parent as region name
+            region_name = input_path.parts[input_path.parts.index("input") + 1]
+            print(f"   🎯 Found 'lidar' subfolder structure")
+            print(f"   📍 Region name from parent directory: {region_name}")
+        else:
+            # File is directly in input folder: extract parent as region name
+            region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
+            print(f"   🎯 Direct input folder structure")
+            print(f"   📍 Region name extracted: {region_name}")
     else:
-        # File is directly in input folder: extract parent as region name
-        region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
-        print(f"   🎯 Direct input folder structure")
-        print(f"   📍 Region name extracted: {region_name}")
+        print(f"   ✅ Using provided region_name: {region_name}")
         
     print(f"   ✅ [REGION IDENTIFIED] Final region name: {region_name}")
 
     # Extract file stem for consistent directory structure
     file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
     
-    # Create output directory structure: output/LAZ/<file_stem>/hillshade/
+    # Create output directory structure: output/<file_stem>/lidar/Hillshade/
     print(f"\n📁 [FOLDER CREATION] Setting up output directory structure...")
-    output_dir = os.path.join("output", "LAZ", file_stem, "hillshade")
+    
+    # Use provided region_name for output directory if available, otherwise use file_stem
+    output_folder_name = region_name if region_name else file_stem
+    print(f"📁 Using output folder name: {output_folder_name} (from region_name: {region_name})")
+    
+    output_dir = os.path.join("output", output_folder_name, "lidar", "Hillshade")
     print(f"   🏗️ Target directory: {output_dir}")
     print(f"   🔍 Checking if directory exists...")
     
@@ -229,11 +238,11 @@ def generate_hillshade_with_params(input_file: str, azimuth: float, altitude: fl
     # Generate output filename with suffix if provided
     print(f"\n📄 [FILE NAMING] Generating output filename...")
     if suffix:
-        output_filename = f"{file_stem}_hillshade_{suffix}.tif"
-        print(f"   🏷️ Using suffix pattern: <file_stem>_hillshade_<suffix>.tif")
+        output_filename = f"{region_name}_Hillshade_{suffix}.tif"
+        print(f"   🏷️ Using suffix pattern: <region_name>_Hillshade_<suffix>.tif")
     else:
-        output_filename = f"{file_stem}_hillshade.tif"
-        print(f"   🏷️ Using default pattern: <file_stem>_hillshade.tif")
+        output_filename = f"{region_name}_Hillshade.tif"
+        print(f"   🏷️ Using default pattern: <region_name>_Hillshade.tif")
         
     output_path = os.path.join(output_dir, output_filename)
     print(f"   📄 Generated filename: {output_filename}")
@@ -281,7 +290,7 @@ def generate_hillshade_with_params(input_file: str, azimuth: float, altitude: fl
         # Step 1: Generate or locate DTM
         print(f"\n🏔️ [STEP 1] DTM Generation/Location...")
         print(f"   🔍 Checking for DTM as source for hillshade...")
-        dtm_path = dtm(input_file)
+        dtm_path = dtm(input_file, region_name)
         print(f"   ✅ [DTM READY] DTM available at: {dtm_path}")
 
         # Step 2: Generate hillshade using GDAL DEMProcessing
@@ -339,38 +348,38 @@ def generate_hillshade_with_params(input_file: str, azimuth: float, altitude: fl
         print(f"❌ Failed after {total_time:.2f} seconds")
         raise Exception(error_msg)
 
-def hillshade(input_file: str) -> str:
+def hillshade(input_file: str, region_name: str = None) -> str:
     """
     Generate standard hillshade from LAZ file (default parameters)
     
     Args:
         input_file: Path to the input LAZ file
-        
-    Returns:
+        region_name: Optional region name to use for output directory (instead of extracted from filename)
+        Returns:
         Path to the generated hillshade TIF file
     """
-    return generate_hillshade_with_params(input_file, 315.0, 45.0, 1.0, "standard")
+    return generate_hillshade_with_params(input_file, 315.0, 45.0, 1.0, "standard", region_name)
 
-def hillshade_315_45_08(input_file: str) -> str:
+def hillshade_315_45_08(input_file: str, region_name: str = None) -> str:
     """
     Generate hillshade with 315° azimuth, 45° altitude, 0.8 z-factor
     
     Args:
         input_file: Path to the input LAZ file
-        
-    Returns:
+        region_name: Optional region name to use for output directory (instead of extracted from filename)
+        Returns:
         Path to the generated hillshade TIF file
     """
-    return generate_hillshade_with_params(input_file, 315.0, 45.0, 0.8, "315_45_08")
+    return generate_hillshade_with_params(input_file, 315.0, 45.0, 0.8, "315_45_08", region_name)
 
-def hillshade_225_45_08(input_file: str) -> str:
+def hillshade_225_45_08(input_file: str, region_name: str = None) -> str:
     """
     Generate hillshade with 225° azimuth, 45° altitude, 0.8 z-factor
     
     Args:
         input_file: Path to the input LAZ file
-        
-    Returns:
+        region_name: Optional region name to use for output directory (instead of extracted from filename)
+        Returns:
         Path to the generated hillshade TIF file
     """
-    return generate_hillshade_with_params(input_file, 225.0, 45.0, 0.8, "225_45_08")
+    return generate_hillshade_with_params(input_file, 225.0, 45.0, 0.8, "225_45_08", region_name)

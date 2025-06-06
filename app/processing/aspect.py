@@ -156,38 +156,43 @@ async def process_aspect(laz_file_path: str, output_dir: str, parameters: Dict[s
         }
 
 
-def aspect(input_file: str) -> str:
+def aspect(input_file: str, region_name: str = None) -> str:
     """
     Generate aspect analysis from LAZ file (synchronous version)
     
     Args:
         input_file: Path to the input LAZ file
-        
-    Returns:
+        region_name: Optional region name to use for output directory (instead of extracted from filename)
+        Returns:
         Path to the generated aspect TIF file
     """
     print(f"\n🧭 Aspect (sync): Starting analysis for {input_file}")
     sync_start_time = time.time()
     
-    # Extract region name from the file path structure
-    input_path = Path(input_file)
-    if "lidar" in input_path.parts:
-        # e.g. input/<region_name>/lidar/<filename>
-        region_name = input_path.parts[input_path.parts.index("input") + 1]
-    else:
-        # e.g. input/<region_name>/<filename> or input/<filename>
-        region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
-    
     # Extract file stem for consistent directory structure
+    input_path = Path(input_file)
     file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
     
-    # Create default output directory structure: output/LAZ/<file_stem>/aspect/
+    # Only extract region_name from file path if it wasn't provided as a parameter
+    if region_name is None:
+        if "lidar" in input_path.parts:
+            # e.g. input/<region_name>/lidar/<filename>
+            region_name = input_path.parts[input_path.parts.index("input") + 1]
+        else:
+            # e.g. input/<region_name>/<filename> or input/<filename>
+            region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
+    
+    # Use provided region_name for output directory if available, otherwise use file_stem
+    output_folder_name = region_name if region_name else file_stem
+    print(f"📁 Using output folder name: {output_folder_name} (from region_name: {region_name})")
+    
+    # Create default output directory structure: output/<output_folder_name>/lidar/Aspect/
     # This is where the synchronous function will save its output by default.
-    default_output_dir = os.path.join("output", "LAZ", file_stem, "aspect")
+    default_output_dir = os.path.join("output", output_folder_name, "lidar", "Aspect")
     os.makedirs(default_output_dir, exist_ok=True)
     
-    # Generate default output filename: <file_stem>_aspect.tif
-    default_output_filename = f"{file_stem}_aspect.tif"
+    # Generate default output filename: <file_stem>_Aspect.tif
+    default_output_filename = f"{file_stem}_Aspect.tif"
     default_output_path = os.path.join(default_output_dir, default_output_filename)
     
     print(f"📂 Default output directory (sync): {default_output_dir}")
@@ -197,7 +202,7 @@ def aspect(input_file: str) -> str:
         # First, we need to generate or get the DTM
         print(f"🏔️ [DTM REQUIRED] Getting DTM for aspect calculation...")
         dtm_call_start_time = time.time()
-        dtm_path = dtm(input_file) # Call the synchronous dtm function
+        dtm_path = dtm(input_file, region_name) # Call the synchronous dtm function with region_name parameter
         dtm_call_time = time.time() - dtm_call_start_time
         print(f"✅ DTM ready in {dtm_call_time:.2f} seconds: {dtm_path}")
         

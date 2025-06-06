@@ -54,10 +54,11 @@ async def load_laz_file(file: UploadFile = File(...)):
         
         logger.info(f"LAZ file loaded: {input_path}")
         
-        # Create output directory for this file
+        # Create output directory for this file using new unified structure
         file_stem = input_path.stem
-        output_dir = LAZ_OUTPUT_DIR / file_stem
-        output_dir.mkdir(exist_ok=True)
+        # Use unified structure: output/<file_stem>/lidar/<processing_type>/
+        output_dir = BASE_DIR / "output" / file_stem / "lidar"
+        output_dir.mkdir(parents=True, exist_ok=True)
         
         logger.info(f"Output directory created: {output_dir}")
         
@@ -132,13 +133,16 @@ async def upload_and_process_laz(
 
 async def process_laz_file(input_path: Path, processing_type: str, resolution: float) -> str:
     """
-    Process LAZ file to generate raster products
+    Process LAZ file to generate raster products using unified directory structure
     This is a mock implementation - in production, this would use actual LAZ processing tools
     """
     try:
-        # Generate output filename
-        output_name = f"{input_path.stem}_{processing_type}_{resolution}m.tif"
-        output_dir = LAZ_OUTPUT_DIR / input_path.stem
+        # Generate output filename using new naming convention
+        output_name = f"{input_path.stem}_{processing_type.upper()}_{resolution}m.tif"
+        
+        # Use unified directory structure: output/<file_stem>/lidar/<processing_type>/
+        file_stem = input_path.stem
+        output_dir = BASE_DIR / "output" / file_stem / "lidar" / processing_type.upper()
         output_path = output_dir / output_name
         
         # Create output directory if it doesn't exist
@@ -192,19 +196,26 @@ async def get_laz_files():
                         "modified": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat()
                     })
         
-        # Get processed files from output directories
-        if LAZ_OUTPUT_DIR.exists():
-            for dir_path in LAZ_OUTPUT_DIR.iterdir():
-                if dir_path.is_dir():
-                    for file_path in dir_path.glob("*.tif"):
-                        if file_path.is_file():
-                            files.append({
-                                "name": file_path.name,
-                                "path": str(file_path.relative_to(LAZ_OUTPUT_DIR)),
-                                "size": file_path.stat().st_size,
-                                "type": "processed",
-                                "modified": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat()
-                            })
+        # Get processed files from unified output directories
+        output_base_dir = BASE_DIR / "output"
+        if output_base_dir.exists():
+            for file_stem_dir in output_base_dir.iterdir():
+                if file_stem_dir.is_dir():
+                    # Look for lidar subdirectory
+                    lidar_dir = file_stem_dir / "lidar"
+                    if lidar_dir.exists() and lidar_dir.is_dir():
+                        # Recursively find all TIF files in lidar subdirectories
+                        for tif_file in lidar_dir.glob("**/*.tif"):
+                            if tif_file.is_file():
+                                # Calculate relative path from output base
+                                relative_path = tif_file.relative_to(output_base_dir)
+                                files.append({
+                                    "name": tif_file.name,
+                                    "path": str(relative_path),
+                                    "size": tif_file.stat().st_size,
+                                    "type": "processed",
+                                    "modified": datetime.fromtimestamp(tif_file.stat().st_mtime).isoformat()
+                                })
         
         return sorted(files, key=lambda x: x["modified"], reverse=True)
         
@@ -216,10 +227,12 @@ async def get_laz_files():
 async def download_laz_file(file_path: str):
     """Download a LAZ file or processed result"""
     try:
-        # Try input directory first, then output directory
+        # Try input directory first
         full_path = LAZ_INPUT_DIR / file_path
         if not full_path.exists():
-            full_path = LAZ_OUTPUT_DIR / file_path
+            # Try unified output directory structure
+            output_base_dir = BASE_DIR / "output"
+            full_path = output_base_dir / file_path
         
         if not full_path.exists():
             raise HTTPException(status_code=404, detail="File not found")
@@ -229,7 +242,7 @@ async def download_laz_file(file_path: str):
         
         # Security check - ensure file is within our allowed directories
         input_dir_resolved = LAZ_INPUT_DIR.resolve()
-        output_dir_resolved = LAZ_OUTPUT_DIR.resolve()
+        output_dir_resolved = (BASE_DIR / "output").resolve()
         
         if not (str(full_path).startswith(str(input_dir_resolved)) or 
                 str(full_path).startswith(str(output_dir_resolved))):
@@ -251,10 +264,12 @@ async def download_laz_file(file_path: str):
 async def delete_laz_file(file_path: str):
     """Delete a LAZ file"""
     try:
-        # Try input directory first, then output directory
+        # Try input directory first
         full_path = LAZ_INPUT_DIR / file_path
         if not full_path.exists():
-            full_path = LAZ_OUTPUT_DIR / file_path
+            # Try unified output directory structure
+            output_base_dir = BASE_DIR / "output"
+            full_path = output_base_dir / file_path
         
         if not full_path.exists():
             raise HTTPException(status_code=404, detail="File not found")

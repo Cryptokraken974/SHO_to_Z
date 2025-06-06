@@ -148,14 +148,14 @@ async def process_tri(laz_file_path: str, output_dir: str, parameters: Dict[str,
             }
         }
 
-def tri(input_file: str) -> str:
+def tri(input_file: str, region_name: str = None) -> str:
     """
     Generate TRI (Terrain Ruggedness Index) from LAZ file using GDAL DEM processing
     
     Args:
         input_file: Path to the input LAZ file
-        
-    Returns:
+        region_name: Optional region name to use for output directory (instead of extracted from filename)
+        Returns:
         Path to the generated TRI TIF file
     """
     print(f"\n🏔️ TRI: Starting analysis for {input_file}")
@@ -173,8 +173,17 @@ def tri(input_file: str) -> str:
     
     file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
     
-    # Create output directory structure: output/LAZ/<file_stem>/tri/
-    output_dir = os.path.join("output", "LAZ", file_stem, "tri")
+    # Use provided region_name for output directory if available, otherwise use file_stem
+    
+    output_folder_name = region_name if region_name else file_stem
+    
+    print(f"📁 Using output folder name: {output_folder_name} (from region_name: {region_name})")
+    
+    
+    
+    # Create output directory structure: output/<output_folder_name>/lidar/
+    
+    output_dir = os.path.join("output", output_folder_name, "lidar", "TRI")
     os.makedirs(output_dir, exist_ok=True)
     
     # Generate output filename: <file_stem>_TRI.tif
@@ -187,7 +196,7 @@ def tri(input_file: str) -> str:
     try:
         # Step 1: Generate or locate DTM
         print(f"\n🏔️ Step 1: Generating DTM as source for TRI analysis...")
-        dtm_path = dtm(input_file)
+        dtm_path = dtm(input_file, region_name)
         print(f"✅ DTM ready: {dtm_path}")
         
         # Step 2: Generate TRI using GDAL DEMProcessing

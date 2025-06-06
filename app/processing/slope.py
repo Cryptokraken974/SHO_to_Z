@@ -184,37 +184,38 @@ async def process_slope(laz_file_path: str, output_dir: str, parameters: Dict[st
             "input_file": laz_file_path
         }
 
-def slope(input_file: str) -> str:
+def slope(input_file: str, region_name: str = None) -> str:
     """
     Generate slope analysis from LAZ file using GDAL DEM processing
     
     Args:
         input_file: Path to the input LAZ file
-        
-    Returns:
+        region_name: Optional region name to use for output directory (instead of extracted from filename)
+        Returns:
         Path to the generated slope TIF file
     """
     print(f"\n📐 SLOPE: Starting analysis for {input_file}")
     start_time = time.time()
     
-    # Extract region name and file stem from the file path structure
-    # Path structure: input/<region_name>/lidar/<filename> or input/<region_name>/<filename>
+    # Extract filename from the file path structure
     input_path = Path(input_file)
     file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
     
-    if "lidar" in input_path.parts:
-        # File is in lidar subfolder: extract parent's parent as region name
-        region_name = input_path.parts[input_path.parts.index("input") + 1]
-    else:
-        # File is directly in input folder: extract parent as region name
-        region_name = input_path.parent.name if input_path.parent.name != "input" else file_stem
+    # Use provided region_name for output directory if available, otherwise use file_stem
     
-    # Create output directory structure: output/LAZ/<file_stem>/slope/
-    output_dir = os.path.join("output", "LAZ", file_stem, "slope")
+    output_folder_name = region_name if region_name else file_stem
+    
+    print(f"📁 Using output folder name: {output_folder_name} (from region_name: {region_name})")
+    
+    
+    
+    # Create output directory structure: output/<output_folder_name>/lidar/
+    
+    output_dir = os.path.join("output", output_folder_name, "lidar", "Slope")
     os.makedirs(output_dir, exist_ok=True)
     
-    # Generate output filename: <file_stem>_slope.tif
-    output_filename = f"{file_stem}_slope.tif"
+    # Generate output filename: <file_stem>_Slope.tif
+    output_filename = f"{file_stem}_Slope.tif"
     output_path = os.path.join(output_dir, output_filename)
     
     print(f"📂 Output directory: {output_dir}")
@@ -223,7 +224,7 @@ def slope(input_file: str) -> str:
     try:
         # Step 1: Generate or locate DTM
         print(f"\n🏔️ Step 1: Generating DTM as source for slope analysis...")
-        dtm_path = dtm(input_file)
+        dtm_path = dtm(input_file, region_name)
         print(f"✅ DTM ready: {dtm_path}")
         
         # Step 2: Generate slope using GDAL DEMProcessing

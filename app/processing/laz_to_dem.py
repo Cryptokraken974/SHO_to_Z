@@ -1,4 +1,3 @@
-# filepath: /Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/app/processing/laz_to_dem.py
 import pdal
 import json
 import os
@@ -36,7 +35,7 @@ def laz_to_dem(input_file: str) -> str:
     Returns:
         Path to the generated TIF file
     """
-    print(f"\n�� LAZ_TO_DEM: Starting conversion for {input_file}")
+    print(f"\n🗺️ LAZ_TO_DEM: Starting conversion for {input_file}")
     start_time = time.time()
     
     # Extract region name from the file path structure

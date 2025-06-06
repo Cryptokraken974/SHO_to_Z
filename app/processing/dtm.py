@@ -11,6 +11,80 @@ import pdal
 logger = logging.getLogger(__name__)
 
 
+def fill_nodata_enhanced(input_path, output_path, max_distance=100, smoothing_iter=2):
+    """
+    Fills NoData gaps in a raster using GDAL's FillNodata method with enhanced error handling.
+    
+    Args:
+        input_path: Path to input GeoTIFF with NoData areas
+        output_path: Path for output filled GeoTIFF
+        max_distance: Max search distance for interpolation (pixels)
+        smoothing_iter: Number of 3x3 smoothing iterations (0-20)
+    """
+    from osgeo import gdal
+    
+    print(f"🔧 Enhanced FillNodata processing:")
+    print(f"   📁 Input: {input_path}")
+    print(f"   📁 Output: {output_path}")
+    print(f"   🎯 Max distance: {max_distance} pixels")
+    print(f"   🌊 Smoothing iterations: {smoothing_iter}")
+    
+    # Open input dataset
+    input_ds = gdal.Open(input_path)
+    if input_ds is None:
+        raise ValueError(f"Could not open input raster: {input_path}")
+    
+    input_band = input_ds.GetRasterBand(1)
+    
+    # Verify NoData value exists
+    nodata = input_band.GetNoDataValue()
+    if nodata is None:
+        print(f"⚠️ Input raster has no NoData value defined, using -9999")
+        nodata = -9999
+
+    # Create output file with same properties
+    driver = gdal.GetDriverByName("GTiff")
+    output_ds = driver.Create(
+        output_path,
+        input_ds.RasterXSize,
+        input_ds.RasterYSize,
+        1,  # Number of bands
+        input_band.DataType
+    )
+    output_ds.SetGeoTransform(input_ds.GetGeoTransform())
+    output_ds.SetProjection(input_ds.GetProjection())
+    
+    # Copy data to output band
+    output_band = output_ds.GetRasterBand(1)
+    output_band.WriteArray(input_band.ReadAsArray())
+    output_band.SetNoDataValue(nodata)
+    
+    # Perform fill with GDAL's FillNodata
+    print(f"   🔄 Performing FillNodata interpolation...")
+    fillnodata_start = time.time()
+    
+    result = gdal.FillNodata(
+        targetBand=output_band,
+        maskBand=None,  # Auto-create mask from NoData
+        maxSearchDist=max_distance,
+        smoothingIterations=smoothing_iter
+    )
+    
+    fillnodata_time = time.time() - fillnodata_start
+    
+    if result == 0:  # CE_None (success)
+        print(f"✅ Enhanced FillNodata completed successfully in {fillnodata_time:.2f} seconds")
+    else:
+        print(f"⚠️ Enhanced FillNodata returned error code: {result}")
+        raise RuntimeError(f"FillNodata failed with error code: {result}")
+    
+    # Cleanup
+    output_ds.FlushCache()
+    output_ds = input_ds = None
+    
+    print(f"   💾 Output saved: {output_path}")
+
+
 def create_dtm_fallback_pipeline(input_file: str, output_file: str, resolution: float = 1.0) -> Dict[str, Any]:
     """
     Create fallback DTM pipeline when JSON pipeline is not available
@@ -36,13 +110,14 @@ def create_dtm_fallback_pipeline(input_file: str, output_file: str, resolution: 
     }
 
 
-def dtm(input_file: str) -> str:
+def dtm(input_file: str, region_name: str = None) -> str:
     """
     Convert LAZ file to DTM (Digital Terrain Model) - Ground points only
     Implements caching to avoid regenerating DTM if it already exists and is up-to-date
     
     Args:
         input_file: Path to the input LAZ file
+        region_name: The region name to use for the output directory (if None, uses LAZ filename)
         
     Returns:
         Path to the generated TIF file
@@ -58,20 +133,16 @@ def dtm(input_file: str) -> str:
     if not os.access(input_file, os.R_OK):
         raise PermissionError(f"Input LAZ file is not readable: {input_file}")
     
-    # Extract region name and filename from the file path structure
-    # Path structure: input/<region_name>/lidar/<filename> or input/<region_name>/<filename>
+    # Extract filename from the file path structure
     input_path = Path(input_file)
     file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
     
-    if "lidar" in input_path.parts:
-        # File is in lidar subfolder: extract parent's parent as region name
-        region_name = input_path.parts[input_path.parts.index("input") + 1]
-    else:
-        # File is directly in input folder: extract parent as region name
-        region_name = input_path.parent.name if input_path.parent.name != "input" else file_stem
+    # Use provided region_name for output directory if available, otherwise use LAZ filename
+    output_folder_name = region_name if region_name else file_stem
+    print(f"📁 Using output folder name: {output_folder_name} (from region_name: {region_name})")
     
-    # Create output directory structure: output/<region_name>/<file_stem>/elevation/
-    output_dir = os.path.join("output", region_name, file_stem, "elevation")
+    # Create output directory structure: output/<output_folder_name>/lidar/DTM/
+    output_dir = os.path.join("output", output_folder_name, "lidar", "DTM")
     os.makedirs(output_dir, exist_ok=True)
     
     # Generate output filename: <file_stem>_DTM.tif
@@ -239,37 +310,42 @@ def convert_las_to_dtm(input_file: str, output_file: str, resolution: float = 1.
         try:
             from osgeo import gdal
             
-            # Open the DTM dataset
-            dataset = gdal.Open(output_file, gdal.GA_Update)
-            if dataset is None:
-                print(f"⚠️ Could not open DTM file for FillNodata processing")
-            else:
-                band = dataset.GetRasterBand(1)
-                
-                # Create mask band (None means use nodata values as mask)
-                mask_band = None
-                
-                # Apply FillNodata with smooth interpolation
-                print(f"   🎯 Max distance: 100 pixels")
-                print(f"   🌊 Smooth iterations: 2")
-                print(f"   🚫 NoData value: -9999")
-                
-                fillnodata_start = time.time()
-                result = gdal.FillNodata(band, mask_band, maxSearchDist=100, smoothingIterations=2)
-                fillnodata_time = time.time() - fillnodata_start
-                
-                if result == 0:  # CE_None (success)
-                    print(f"✅ FillNodata completed successfully in {fillnodata_time:.2f} seconds")
-                else:
-                    print(f"⚠️ FillNodata returned error code: {result}")
-                
-                # Close dataset to flush changes
-                dataset = None
+            # Apply our enhanced fill_nodata function
+            filled_output_path = output_file.replace('.tif', '_filled.tif')
+            fill_nodata_enhanced(output_file, filled_output_path, max_distance=100, smoothing_iter=2)
+            
+            # Replace original with filled version
+            import shutil
+            shutil.move(filled_output_path, output_file)
+            print(f"✅ Enhanced FillNodata processing completed successfully")
                 
         except ImportError:
             print(f"⚠️ GDAL Python bindings not available. Skipping FillNodata step.")
         except Exception as e:
             print(f"⚠️ Error during FillNodata processing: {str(e)}")
+            # Fallback to original method if enhanced fails
+            try:
+                dataset = gdal.Open(output_file, gdal.GA_Update)
+                if dataset is not None:
+                    band = dataset.GetRasterBand(1)
+                    mask_band = None
+                    
+                    print(f"   🔄 Falling back to basic FillNodata...")
+                    print(f"   🎯 Max distance: 100 pixels")
+                    print(f"   🌊 Smooth iterations: 2")
+                    
+                    fillnodata_start = time.time()
+                    result = gdal.FillNodata(band, mask_band, maxSearchDist=100, smoothingIterations=2)
+                    fillnodata_time = time.time() - fillnodata_start
+                    
+                    if result == 0:
+                        print(f"✅ Basic FillNodata completed in {fillnodata_time:.2f} seconds")
+                    else:
+                        print(f"⚠️ Basic FillNodata returned error code: {result}")
+                    
+                    dataset = None
+            except Exception as fallback_e:
+                print(f"⚠️ Fallback FillNodata also failed: {str(fallback_e)}")
     
     return success, message
 

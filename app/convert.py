@@ -5,7 +5,7 @@ from typing import Optional
 import base64
 import subprocess
 
-def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None, enhanced_resolution: bool = True) -> str:
+def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None, enhanced_resolution: bool = True, save_to_consolidated: bool = True) -> str:
     """
     Convert GeoTIFF file to PNG file with proper scaling and worldfile preservation
     Enhanced version preserves high-resolution detail for better visualization
@@ -14,6 +14,7 @@ def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None, enhanc
         tif_path: Path to the input TIF file
         png_path: Optional path for output PNG file. If None, will be generated from tif_path
         enhanced_resolution: If True, use enhanced settings for better quality
+        save_to_consolidated: If True, save a copy to the consolidated png_outputs directory
         
     Returns:
         Path to the generated PNG file
@@ -143,6 +144,46 @@ def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None, enhanc
         
         # Close dataset
         ds = None
+        
+        # Handle consolidated PNG outputs directory if requested
+        if save_to_consolidated:
+            try:
+                # Extract region name from the path (assumes tif_path format like "output/RegionName/lidar/ProcessingType/...")
+                path_parts = tif_path.split(os.sep)
+                region_idx = path_parts.index("output") + 1 if "output" in path_parts else -1
+                
+                if region_idx > 0 and region_idx < len(path_parts):
+                    region_name = path_parts[region_idx]
+                    processing_type = path_parts[region_idx + 2] if len(path_parts) > region_idx + 2 else None
+                    
+                    # Only proceed if we successfully identified the region and processing type
+                    if region_name and processing_type:
+                        # Create the consolidated png_outputs directory path
+                        consolidated_dir = os.path.join("output", region_name, "lidar", "png_outputs")
+                        os.makedirs(consolidated_dir, exist_ok=True)
+                        
+                        # Create the consolidated PNG path
+                        processing_type_lower = processing_type.lower()
+                        
+                        # Special handling for hillshade with specific parameters
+                        if "hillshade" in processing_type_lower and "315_45_08" in tif_path:
+                            consolidated_png_path = os.path.join(consolidated_dir, f"{region_name}_elevation_hillshade_315_45_08.png")
+                        else:
+                            consolidated_png_path = os.path.join(consolidated_dir, f"{region_name}_elevation_{processing_type_lower}.png")
+                        
+                        # Copy the PNG file to the consolidated directory
+                        import shutil
+                        shutil.copy2(png_path, consolidated_png_path)
+                        
+                        # Copy the worldfile if it exists
+                        worldfile_path = os.path.splitext(png_path)[0] + ".pgw"
+                        consolidated_worldfile_path = os.path.splitext(consolidated_png_path)[0] + ".pgw"
+                        if os.path.exists(worldfile_path):
+                            shutil.copy2(worldfile_path, consolidated_worldfile_path)
+                        
+                        print(f"✅ Copied PNG to consolidated directory: {consolidated_png_path}")
+            except Exception as e:
+                print(f"⚠️ Warning: Failed to save PNG to consolidated directory: {str(e)}")
         
         processing_time = time.time() - start_time
         

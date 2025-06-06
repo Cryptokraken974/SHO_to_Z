@@ -197,52 +197,72 @@
         </div>
         <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="generate-rasters-content">
           <div class="space-y-3">
-            <!-- DTM Generation (Primary) -->
-            <button id="generate-dtm-btn" class="w-full bg-[#8e44ad] hover:bg-[#7d3c98] text-white px-4 py-3 rounded-lg font-medium transition-colors">
-              🏔️ Generate DTM (Digital Terrain Model)
+            <!-- Single Generate All Rasters Button -->
+            <button id="generate-all-rasters-btn" class="w-full bg-[#8e44ad] hover:bg-[#7d3c98] text-white px-4 py-3 rounded-lg font-medium transition-colors">
+              🏔️ Generate Rasters (DTM + All Terrain Analysis)
             </button>
             
-            <!-- Secondary Raster Products -->
-            <div class="grid grid-cols-2 gap-2">
-              <button id="generate-hillshade-btn" class="bg-[#e17055] hover:bg-[#d63447] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
-                🌄 Hillshade
-              </button>
-              <button id="generate-slope-btn" class="bg-[#00cec9] hover:bg-[#00b3b0] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
-                📐 Slope
-              </button>
-              <button id="generate-aspect-btn" class="bg-[#fdcb6e] hover:bg-[#e17055] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
-                🧭 Aspect
-              </button>
-              <button id="generate-contours-btn" class="bg-[#6c5ce7] hover:bg-[#5a4fcf] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
-                📏 Contours
-              </button>
-            </div>
+            <!-- Cancel Button (hidden by default) -->
+            <button id="cancel-all-rasters-btn" class="w-full bg-[#dc3545] hover:bg-[#c82333] text-white px-4 py-2 rounded-lg font-medium transition-colors hidden">
+              ❌ Cancel Processing
+            </button>
             
-            <!-- Advanced Raster Products -->
-            <details class="mt-3">
-              <summary class="text-[#ababab] text-sm cursor-pointer hover:text-white transition-colors">Advanced Products</summary>
-              <div class="mt-2 space-y-2">
-                <div class="grid grid-cols-2 gap-2">
-                  <button id="generate-tri-btn" class="bg-[#fd79a8] hover:bg-[#e84393] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
-                    📊 TRI
-                  </button>
-                  <button id="generate-tpi-btn" class="bg-[#a29bfe] hover:bg-[#6c5ce7] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
-                    📈 TPI
-                  </button>
-                  <button id="generate-roughness-btn" class="bg-[#74b9ff] hover:bg-[#0984e3] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
-                    🪨 Roughness
-                  </button>
-                  <button id="generate-color-relief-btn" class="bg-[#55a3ff] hover:bg-[#2d96ff] text-white px-3 py-2 rounded-lg font-medium transition-colors text-sm">
-                    🎨 Color Relief
-                  </button>
+            <!-- Progress Indicator -->
+            <div id="raster-generation-progress" class="hidden">
+              <div class="bg-[#1a1a1a] rounded-lg p-3 space-y-2">
+                <div class="flex justify-between items-center">
+                  <span id="current-processing-step" class="text-[#ababab] text-sm">Initializing...</span>
+                  <span id="processing-progress-text" class="text-[#ababab] text-sm">0%</span>
+                </div>
+                <div class="w-full bg-[#333] rounded-full h-2">
+                  <div id="processing-progress-bar" class="bg-[#8e44ad] h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
                 </div>
               </div>
-            </details>
+            </div>
+            
+            <!-- Processing Queue Display -->
+            <div id="processing-queue" class="hidden">
+              <div class="text-[#ababab] text-xs mb-2">Processing Queue:</div>
+              <div class="grid grid-cols-3 gap-1 text-xs">
+                <div id="queue-dtm" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#8e44ad]">🏔️</div>
+                  <div>DTM</div>
+                </div>
+                <div id="queue-hillshade" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#e17055]">🌄</div>
+                  <div>Hillshade</div>
+                </div>
+                <div id="queue-slope" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#00cec9]">📐</div>
+                  <div>Slope</div>
+                </div>
+                <div id="queue-aspect" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#fdcb6e]">🧭</div>
+                  <div>Aspect</div>
+                </div>
+                <div id="queue-contours" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#6c5ce7]">📏</div>
+                  <div>Contours</div>
+                </div>
+                <div id="queue-tri" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#fd79a8]">📊</div>
+                  <div>TRI</div>
+                </div>
+                <div id="queue-tpi" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#a29bfe]">📈</div>
+                  <div>TPI</div>
+                </div>
+                <div id="queue-roughness" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#74b9ff]">🪨</div>
+                  <div>Roughness</div>
+                </div>
+              </div>
+            </div>
             
             <!-- Status Indicator -->
             <div id="raster-generation-status" class="text-xs text-[#666] mt-2 hidden">
               <i class="fas fa-info-circle mr-1"></i>
-              <span id="raster-status-text">Ready to generate rasters</span>
+              <span id="raster-status-text">Ready to generate all rasters</span>
             </div>
           </div>
         </div>
@@ -334,11 +354,6 @@
           <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-aspect">
             <div class="flex-1 flex items-center justify-center">
               <div class="text-white text-lg font-medium">Aspect</div>
-            </div>
-          </div>
-          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-color_relief">
-            <div class="flex-1 flex items-center justify-center">
-              <div class="text-white text-lg font-medium">Color Relief</div>
             </div>
           </div>
         </div>
