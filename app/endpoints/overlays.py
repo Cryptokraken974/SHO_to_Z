@@ -2,6 +2,10 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 import os
+import base64
+import io
+import glob
+from PIL import Image, ImageDraw
 
 router = APIRouter()
 
@@ -134,7 +138,6 @@ async def get_overlay_data(processing_type: str, filename: str):
             'slope': 'Slope',
             'aspect': 'Aspect',
             'color_relief': 'ColorRelief',
-            'tri': 'TRI',
             'tpi': 'TPI',
             'roughness': 'Roughness'
         }
@@ -202,15 +205,14 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
             )
         
         # Map processing type to the actual filename pattern
-        # Files are named like: 5.988S_36.145W_elevation_hillshade.png
+        # Files are named like: FoxIsland_elevation_hillshade.png
         type_mapping = {
             'hillshade': 'hillshade', 
             'slope': 'slope',
             'aspect': 'aspect',
             'color_relief': 'color_relief',
-            'tri': 'TRI',
-            'tpi': 'TPI',
-            'roughness': 'TRI'  # Default to TRI for roughness, but could also be TPI
+            'tpi': 'tpi',  # Fixed: lowercase tpi
+            'roughness': 'roughness'  # Fixed: use roughness instead of TPI
         }
         
         filename_pattern = type_mapping.get(processing_type, processing_type)

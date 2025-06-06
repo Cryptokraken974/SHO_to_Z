@@ -63,74 +63,24 @@ def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None, enhanc
         min_val, max_val, mean_val, std_val = band.GetStatistics(True, True)
         print(f"📊 Data range: Min={min_val:.0f}, Max={max_val:.0f}, Mean={mean_val:.1f}, StdDev={std_val:.1f}")
         
-        # Enhanced histogram analysis for better contrast
-        if enhanced_resolution:
-            # Use finer histogram bins for enhanced processing
-            histogram = band.GetHistogram(min_val, max_val, 2000, False, False)  # 2x more bins
-            if histogram:
-                # Calculate 1% and 99% percentiles for enhanced contrast
-                total_pixels = sum(histogram)
-                low_percentile = total_pixels * 0.01  # More aggressive outlier removal
-                high_percentile = total_pixels * 0.99
-                
-                cumulative = 0
-                stretch_min = min_val
-                stretch_max = max_val
-                
-                for i, count in enumerate(histogram):
-                    cumulative += count
-                    if cumulative >= low_percentile and stretch_min == min_val:
-                        stretch_min = min_val + (max_val - min_val) * i / len(histogram)
-                    if cumulative >= high_percentile:
-                        stretch_max = min_val + (max_val - min_val) * i / len(histogram)
-                        break
-                
-                print(f"📈 Enhanced 1-99% stretch: {stretch_min:.0f} to {stretch_max:.0f}")
-            else:
-                # Enhanced fallback with standard deviation stretch
-                stretch_min = max(min_val, mean_val - 2.5 * std_val)
-                stretch_max = min(max_val, mean_val + 2.5 * std_val)
-                print(f"📈 Enhanced stddev stretch: {stretch_min:.0f} to {stretch_max:.0f}")
-        else:
-            # Standard 2% linear stretch
-            histogram = band.GetHistogram(min_val, max_val, 1000, False, False)
-            if histogram:
-                # Calculate 2% and 98% percentiles for better contrast
-                total_pixels = sum(histogram)
-                low_percentile = total_pixels * 0.02
-                high_percentile = total_pixels * 0.98
-                
-                cumulative = 0
-                stretch_min = min_val
-                stretch_max = max_val
-                
-                for i, count in enumerate(histogram):
-                    cumulative += count
-                    if cumulative >= low_percentile and stretch_min == min_val:
-                        stretch_min = min_val + (max_val - min_val) * i / len(histogram)
-                    if cumulative >= high_percentile:
-                        stretch_max = min_val + (max_val - min_val) * i / len(histogram)
-                        break
-                
-                print(f"📈 Standard 2-98% stretch: {stretch_min:.0f} to {stretch_max:.0f}")
-            else:
-                # Fallback to min/max if histogram fails
-                stretch_min = min_val
-                stretch_max = max_val
-                print(f"📈 Full range stretch: {stretch_min:.0f} to {stretch_max:.0f}")
+        # For consistency with test script, we'll skip the enhanced histogram analysis
+        stretch_min = min_val
+        stretch_max = max_val
         
         # Enhanced PNG conversion options
         if enhanced_resolution:
-            # High-quality PNG conversion with enhanced options
+            # Get band statistics for proper scaling (matching test script approach)
+            band = ds.GetRasterBand(1)
+            band.ComputeStatistics(False)
+            min_val, max_val, mean_val, std_val = band.GetStatistics(True, True)
+            
+            # High-quality PNG conversion with test script compatible options
             scale_options = [
-                "-scale", str(stretch_min), str(stretch_max), "0", "255",
+                "-scale", str(min_val), str(max_val), "0", "255",
                 "-ot", "Byte",  # Output as 8-bit for PNG
-                "-co", "WORLDFILE=YES",
-                "-co", "COMPRESS=NONE",  # No compression for best quality
-                "-r", "cubic",  # Cubic resampling for smoother results
-                "-a_nodata", "0"  # Set nodata value for transparency
+                "-co", "WORLDFILE=YES"
             ]
-            print(f"🎨 Enhanced PNG conversion: {stretch_min:.0f}-{stretch_max:.0f} → 0-255 (cubic resampling)")
+            print(f"🎨 Enhanced PNG conversion: {min_val:.0f}-{max_val:.0f} → 0-255")
         else:
             # Standard conversion options
             scale_options = [
@@ -175,13 +125,34 @@ def convert_geotiff_to_png(tif_path: str, png_path: Optional[str] = None, enhanc
                         import shutil
                         shutil.copy2(png_path, consolidated_png_path)
                         
-                        # Copy the worldfile if it exists
+                        # Copy the corresponding TIFF file to the consolidated directory
+                        consolidated_tiff_path = os.path.splitext(consolidated_png_path)[0] + ".tif"
+                        if os.path.exists(tif_path) and not os.path.exists(consolidated_tiff_path):
+                            shutil.copy2(tif_path, consolidated_tiff_path)
+                            print(f"📋 Copied TIFF to consolidated directory: {os.path.basename(consolidated_tiff_path)}")
+                        
+                        # Copy the worldfile if it exists (.pgw format from PNG conversion)
                         worldfile_path = os.path.splitext(png_path)[0] + ".pgw"
                         consolidated_worldfile_path = os.path.splitext(consolidated_png_path)[0] + ".pgw"
                         if os.path.exists(worldfile_path):
                             shutil.copy2(worldfile_path, consolidated_worldfile_path)
+                            print(f"🌍 Copied worldfile to consolidated directory: {os.path.basename(consolidated_worldfile_path)}")
                         
-                        print(f"✅ Copied PNG to consolidated directory: {consolidated_png_path}")
+                        # Also check for .wld file alongside PNG (GDAL sometimes creates .wld instead of .pgw)
+                        png_wld_path = os.path.splitext(png_path)[0] + ".wld"
+                        consolidated_wld_from_png_path = os.path.splitext(consolidated_png_path)[0] + ".wld"
+                        if os.path.exists(png_wld_path) and not os.path.exists(consolidated_wld_from_png_path):
+                            shutil.copy2(png_wld_path, consolidated_wld_from_png_path)
+                            print(f"🌍 Copied PNG .wld file to consolidated directory: {os.path.basename(consolidated_wld_from_png_path)}")
+                        
+                        # Also copy the original .wld file if it exists (from TIFF processing)
+                        original_wld_path = os.path.splitext(tif_path)[0] + ".wld"
+                        consolidated_wld_path = os.path.splitext(consolidated_png_path)[0] + ".wld"
+                        if os.path.exists(original_wld_path) and not os.path.exists(consolidated_wld_path):
+                            shutil.copy2(original_wld_path, consolidated_wld_path)
+                            print(f"🌍 Copied TIFF .wld file to consolidated directory: {os.path.basename(consolidated_wld_path)}")
+                        
+                        print(f"✅ Copied PNG and associated files to consolidated directory: {consolidated_png_path}")
             except Exception as e:
                 print(f"⚠️ Warning: Failed to save PNG to consolidated directory: {str(e)}")
         

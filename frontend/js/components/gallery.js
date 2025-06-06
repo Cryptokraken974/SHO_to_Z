@@ -14,7 +14,6 @@ window.componentManager.register('gallery', (props = {}) => {
         { id: 'hillshade_225_45_08', label: 'Hillshade 225°', target: 'hillshade_225_45_08' },
         { id: 'slope', label: 'Slope', target: 'slope' },
         { id: 'aspect', label: 'Aspect', target: 'aspect' },
-        { id: 'tri', label: 'TRI', target: 'tri' },
         { id: 'tpi', label: 'TPI', target: 'tpi' },
         { id: 'roughness', label: 'Roughness', target: 'roughness' }
     ];

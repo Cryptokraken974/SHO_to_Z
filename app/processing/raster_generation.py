@@ -3,7 +3,7 @@
 Module for generating raster products from elevation TIFF files.
 
 This module provides functionality to:
-1. Generate various raster analysis products (hillshade, slope, aspect, TRI, TPI, color relief)
+1. Generate various raster analysis products (hillshade, slope, aspect, TPI, color relief)
 2. Organize output in structured directories 
 3. Convert TIFF outputs to PNG for visualization
 4. Provide detailed progress and performance reporting
@@ -519,7 +519,7 @@ class RasterGenerator:
         """
         Process all raster products using the unified process_all_raster_products function.
         This method is an alternative to the manual processing and uses the updated function
-        that excludes TRI and TPI processing.
+        that excludes TRI processing but includes TPI processing.
         """
         if progress_callback:
             await progress_callback({

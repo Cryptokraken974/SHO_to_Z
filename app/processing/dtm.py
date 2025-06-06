@@ -11,9 +11,9 @@ import pdal
 logger = logging.getLogger(__name__)
 
 
-def fill_nodata_enhanced(input_path, output_path, max_distance=100, smoothing_iter=2):
+def fill_nodata_enhanced(input_path, output_path, max_distance=15, smoothing_iter=2):
     """
-    Fills NoData gaps in a raster using GDAL's FillNodata method with enhanced error handling.
+    Optimized FillNodata using CreateCopy for better performance and proper error handling.
     
     Args:
         input_path: Path to input GeoTIFF with NoData areas
@@ -22,67 +22,118 @@ def fill_nodata_enhanced(input_path, output_path, max_distance=100, smoothing_it
         smoothing_iter: Number of 3x3 smoothing iterations (0-20)
     """
     from osgeo import gdal
+    import numpy as np
     
-    print(f"🔧 Enhanced FillNodata processing:")
+    # Enable GDAL exceptions for better error handling
+    gdal.UseExceptions()
+    
+    print(f"🔧 Optimized FillNodata processing:")
     print(f"   📁 Input: {input_path}")
     print(f"   📁 Output: {output_path}")
     print(f"   🎯 Max distance: {max_distance} pixels")
     print(f"   🌊 Smoothing iterations: {smoothing_iter}")
     
-    # Open input dataset
-    input_ds = gdal.Open(input_path)
-    if input_ds is None:
-        raise ValueError(f"Could not open input raster: {input_path}")
-    
-    input_band = input_ds.GetRasterBand(1)
-    
-    # Verify NoData value exists
-    nodata = input_band.GetNoDataValue()
-    if nodata is None:
-        print(f"⚠️ Input raster has no NoData value defined, using -9999")
-        nodata = -9999
-
-    # Create output file with same properties
-    driver = gdal.GetDriverByName("GTiff")
-    output_ds = driver.Create(
-        output_path,
-        input_ds.RasterXSize,
-        input_ds.RasterYSize,
-        1,  # Number of bands
-        input_band.DataType
-    )
-    output_ds.SetGeoTransform(input_ds.GetGeoTransform())
-    output_ds.SetProjection(input_ds.GetProjection())
-    
-    # Copy data to output band
-    output_band = output_ds.GetRasterBand(1)
-    output_band.WriteArray(input_band.ReadAsArray())
-    output_band.SetNoDataValue(nodata)
-    
-    # Perform fill with GDAL's FillNodata
-    print(f"   🔄 Performing FillNodata interpolation...")
-    fillnodata_start = time.time()
-    
-    result = gdal.FillNodata(
-        targetBand=output_band,
-        maskBand=None,  # Auto-create mask from NoData
-        maxSearchDist=max_distance,
-        smoothingIterations=smoothing_iter
-    )
-    
-    fillnodata_time = time.time() - fillnodata_start
-    
-    if result == 0:  # CE_None (success)
-        print(f"✅ Enhanced FillNodata completed successfully in {fillnodata_time:.2f} seconds")
-    else:
-        print(f"⚠️ Enhanced FillNodata returned error code: {result}")
-        raise RuntimeError(f"FillNodata failed with error code: {result}")
-    
-    # Cleanup
-    output_ds.FlushCache()
-    output_ds = input_ds = None
-    
-    print(f"   💾 Output saved: {output_path}")
+    try:
+        # Open input dataset
+        input_ds = gdal.Open(input_path, gdal.GA_ReadOnly)
+        if input_ds is None:
+            raise RuntimeError(f"Cannot open input file: {input_path}")
+        
+        # Get initial statistics and diagnostics
+        input_band = input_ds.GetRasterBand(1)
+        nodata_value = input_band.GetNoDataValue()
+        print(f"   📊 NoData value: {nodata_value}")
+        
+        # Get statistics before filling
+        stats_before = input_band.GetStatistics(True, True)
+        print(f"   📈 Before filling - Min: {stats_before[0]:.2f}, Max: {stats_before[1]:.2f}")
+        
+        # Count missing pixels for diagnostics
+        data_array = input_band.ReadAsArray()
+        if nodata_value is not None:
+            missing_pixels = np.sum(data_array == nodata_value)
+        else:
+            missing_pixels = np.sum(np.isnan(data_array))
+        print(f"   🕳️ Missing pixels to fill: {missing_pixels:,}")
+        
+        if missing_pixels == 0:
+            print(f"   ✅ No missing pixels found, skipping FillNodata")
+            # Still create output copy for consistency
+            driver = gdal.GetDriverByName('GTiff')
+            output_ds = driver.CreateCopy(output_path, input_ds, options=['COMPRESS=LZW', 'TILED=YES'])
+            output_ds.FlushCache()
+            output_ds = None
+            input_ds = None
+            return
+        
+        # Use efficient CreateCopy approach (most efficient GDAL operation)
+        driver = gdal.GetDriverByName('GTiff')
+        output_ds = driver.CreateCopy(
+            output_path, 
+            input_ds, 
+            options=['COMPRESS=LZW', 'TILED=YES', 'PREDICTOR=2']
+        )
+        if output_ds is None:
+            raise RuntimeError(f"Cannot create output file: {output_path}")
+        
+        # Get output band for processing
+        output_band = output_ds.GetRasterBand(1)
+        
+        # Perform FillNodata operation
+        print(f"   🔄 Performing FillNodata interpolation...")
+        fillnodata_start = time.time()
+        
+        result = gdal.FillNodata(
+            targetBand=output_band,
+            maskBand=None,  # Use nodata values as mask automatically
+            maxSearchDist=max_distance,
+            smoothingIterations=smoothing_iter
+        )
+        
+        fillnodata_time = time.time() - fillnodata_start
+        
+        if result != gdal.CE_None:
+            raise RuntimeError(f"FillNodata failed with error code: {result}")
+        
+        # Force write to disk
+        output_ds.FlushCache()
+        
+        # Get statistics after filling for validation
+        stats_after = output_band.GetStatistics(True, True)
+        print(f"   📈 After filling - Min: {stats_after[0]:.2f}, Max: {stats_after[1]:.2f}")
+        
+        # Count remaining missing pixels for progress report
+        filled_data = output_band.ReadAsArray()
+        if nodata_value is not None:
+            remaining_missing = np.sum(filled_data == nodata_value)
+        else:
+            remaining_missing = np.sum(np.isnan(filled_data))
+        
+        filled_pixels = missing_pixels - remaining_missing
+        fill_percentage = (filled_pixels / missing_pixels * 100) if missing_pixels > 0 else 0
+        
+        print(f"   ✨ Filled {filled_pixels:,} pixels ({fill_percentage:.1f}%)")
+        print(f"   📊 Remaining missing: {remaining_missing:,} pixels")
+        print(f"   ✅ Optimized FillNodata completed in {fillnodata_time:.2f} seconds")
+        
+        # Proper cleanup
+        output_band = None
+        output_ds = None
+        input_ds = None
+        
+        print(f"   💾 Output saved: {output_path}")
+        
+    except Exception as e:
+        print(f"   ❌ FillNodata failed: {str(e)}")
+        # Cleanup on failure
+        try:
+            if 'output_ds' in locals() and output_ds is not None:
+                output_ds = None
+            if 'input_ds' in locals() and input_ds is not None:
+                input_ds = None
+        except:
+            pass
+        raise e
 
 
 def create_dtm_fallback_pipeline(input_file: str, output_file: str, resolution: float = 1.0) -> Dict[str, Any]:

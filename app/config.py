@@ -186,7 +186,7 @@ def get_data_source_config(source_name: str) -> dict:
 
 def validate_api_keys() -> dict:
     """Check which API keys are available"""
-    settings = get_settings()
+    settings = get_settings() # This call might be part of the problem if get_settings() is not fully initialized
     
     return {
         "opentopography": settings.opentopography_api_key is not None,
@@ -202,7 +202,7 @@ def validate_api_keys() -> dict:
 
 def get_utm_zone_for_longitude(longitude: float) -> int:
     """Get UTM zone for a given longitude in Brazil"""
-    settings = get_settings()
+    settings = get_settings() # This call might be part of the problem
     
     # Simplified UTM zone calculation for Brazil
     if longitude < -66:
@@ -224,7 +224,7 @@ def get_utm_zone_for_longitude(longitude: float) -> int:
 
 def is_coordinate_in_brazil(lat: float, lng: float) -> bool:
     """Check if coordinates are within Brazil boundaries"""
-    settings = get_settings()
+    settings = get_settings() # This call might be part of the problem
     bounds = settings.brazil_bounds
     
     return (

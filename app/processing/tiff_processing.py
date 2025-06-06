@@ -730,6 +730,23 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                         result["png_file"] = converted_png
                         png_size = os.path.getsize(converted_png) / (1024 * 1024)  # MB
                         print(f"🖼️ PNG created: {os.path.basename(converted_png)} ({png_size:.1f} MB)")
+                        
+                        # Also copy the TIFF and world files to png_outputs for overlay API compatibility
+                        import shutil
+                        
+                        # Copy TIFF file
+                        tiff_dest = os.path.join(png_output_dir, f"{tiff_basename}.tif")
+                        if os.path.exists(result["output_file"]) and not os.path.exists(tiff_dest):
+                            shutil.copy2(result["output_file"], tiff_dest)
+                            print(f"📋 TIFF copied: {os.path.basename(tiff_dest)}")
+                        
+                        # Copy world file (.wld)
+                        original_world_file = os.path.splitext(result["output_file"])[0] + ".wld"
+                        world_dest = os.path.join(png_output_dir, f"{tiff_basename}.wld")
+                        if os.path.exists(original_world_file) and not os.path.exists(world_dest):
+                            shutil.copy2(original_world_file, world_dest)
+                            print(f"🌍 World file copied: {os.path.basename(world_dest)}")
+                            
                     else:
                         print(f"⚠️ PNG conversion failed for {task_name}: No output file created")
                         

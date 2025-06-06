@@ -414,14 +414,6 @@ window.ProcessingManager = {
   },
 
   /**
-   * Process TRI (Terrain Ruggedness Index)
-   * @param {Object} options - TRI processing options
-   */
-  async processTRI(options = {}) {
-    return await this.sendProcess('tri', options);
-  },
-
-  /**
    * Process TPI (Topographic Position Index)
    * @param {Object} options - TPI processing options
    */
@@ -525,7 +517,6 @@ window.ProcessingManager = {
       { type: 'hillshade', name: 'Hillshade', icon: '🌄' },
       { type: 'slope', name: 'Slope', icon: '📐' },
       { type: 'aspect', name: 'Aspect', icon: '🧭' },
-      { type: 'tri', name: 'TRI', icon: '📊' },
       { type: 'tpi', name: 'TPI', icon: '📈' },
       { type: 'roughness', name: 'Roughness', icon: '🪨' }
     ];

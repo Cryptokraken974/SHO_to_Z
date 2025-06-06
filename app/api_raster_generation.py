@@ -10,7 +10,6 @@ This service generates:
 - Hillshade (multiple configurations)
 - Slope analysis
 - Aspect analysis  
-- TRI (Terrain Ruggedness Index)
 - TPI (Topographic Position Index)
 - Color relief maps
 - PNG visualizations of all products
@@ -35,7 +34,6 @@ try:
         process_hillshade_tiff,
         process_slope_tiff,
         process_aspect_tiff,
-        process_tri_tiff,
         process_tpi_tiff,
         process_color_relief_tiff
     )
@@ -61,7 +59,6 @@ class RasterGenerationService:
             'hillshade_225_45_08': process_hillshade_tiff,
             'slope': process_slope_tiff,
             'aspect': process_aspect_tiff,
-            'tri': process_tri_tiff,
             'tpi': process_tpi_tiff,
             'color_relief': process_color_relief_tiff
         }
@@ -73,7 +70,6 @@ class RasterGenerationService:
             'hillshade_225_45_08': {'azimuth': 225, 'altitude': 45, 'z_factor': 0.8},
             'slope': {},
             'aspect': {},
-            'tri': {},
             'tpi': {'radius': 3},
             'color_relief': {}
         }
@@ -211,7 +207,6 @@ class RasterGenerationService:
             'hillshade_225_45_08': output_dir / 'hillshade',
             'slope': output_dir / 'terrain_analysis',
             'aspect': output_dir / 'terrain_analysis', 
-            'tri': output_dir / 'terrain_analysis',
             'tpi': output_dir / 'terrain_analysis',
             'color_relief': output_dir / 'visualization'
         }

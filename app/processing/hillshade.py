@@ -315,6 +315,7 @@ def generate_hillshade_with_params(input_file: str, azimuth: float, altitude: fl
             altitude=altitude,
             zFactor=z_factor,
             scale=1.0,
+            computeEdges=True,  # Essential for edge pixels - prevents missing pixels
             format="GTiff"
         )
         

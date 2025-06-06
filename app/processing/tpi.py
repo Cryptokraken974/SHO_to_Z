@@ -161,20 +161,22 @@ def tpi(input_file: str, region_name: str = None) -> str:
     # Extract file stem for consistent directory structure
     # Path structure: input/<region_name>/lidar/<filename> or input/<region_name>/<filename>
     input_path = Path(input_file)
-    if "lidar" in input_path.parts:
-        # File is in lidar subfolder: extract parent's parent as region name
-        region_name = input_path.parts[input_path.parts.index("input") + 1]
-    else:
-        # File is directly in input folder: extract parent as region name
-        region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
+    
+    # Only extract region name from path if not provided as parameter
+    if region_name is None:
+        if "lidar" in input_path.parts:
+            # File is in lidar subfolder: extract parent's parent as region name
+            region_name = input_path.parts[input_path.parts.index("input") + 1]
+        else:
+            # File is directly in input folder: extract parent as region name
+            region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
     
     file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
     
-    # Use provided region_name for output directory if available, otherwise use file_stem
+    # Use provided region_name for output directory
+    output_folder_name = region_name
     
-    output_folder_name = region_name if region_name else file_stem
-    
-    print(f"📁 Using output folder name: {output_folder_name} (from region_name: {region_name})")
+    print(f"📁 Using region name: {region_name} for output directory")
     
     
     

@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .convert import convert_geotiff_to_png_base64
-from .processing import laz_to_dem, dtm, dsm, chm, hillshade, hillshade_315_45_08, hillshade_225_45_08, slope, aspect, color_relief, tri, tpi, roughness
+from .processing import laz_to_dem, dtm, dsm, chm, hillshade, hillshade_315_45_08, hillshade_225_45_08, slope, aspect, color_relief, tpi, roughness
 from .data_acquisition import DataAcquisitionManager
 from .lidar_acquisition import LidarAcquisitionManager
 from .config import get_settings, validate_api_keys, get_data_source_config

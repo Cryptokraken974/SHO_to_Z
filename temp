@@ -1,57 +1,28 @@
 from osgeo import gdal
 
-def fill_nodata(input_path, output_path, max_distance=100, smoothing_iter=2):
-    """
-    Fills NoData gaps in a raster using GDAL's FillNodata method.
-    
-    Args:
-        input_path: Path to input GeoTIFF with NoData areas
-        output_path: Path for output filled GeoTIFF
-        max_distance: Max search distance for interpolation (pixels)
-        smoothing_iter: Number of 3x3 smoothing iterations (0-20)
-    """
-    # Open input dataset
-    input_ds = gdal.Open(input_path)
-    input_band = input_ds.GetRasterBand(1)
-    
-    # Verify NoData value exists
-    nodata = input_band.GetNoDataValue()
-    if nodata is None:
-        raise ValueError("Input raster has no NoData value defined")
+# Make sure gdal prints errors.
+gdal.UseExceptions()
 
-    # Create output file with same properties
-    driver = gdal.GetDriverByName("GTiff")
-    output_ds = driver.Create(
-        output_path,
-        input_ds.RasterXSize,
-        input_ds.RasterYSize,
-        1,  # Number of bands
-        input_band.DataType
-    )
-    output_ds.SetGeoTransform(input_ds.GetGeoTransform())
-    output_ds.SetProjection(input_ds.GetProjection())
-    
-    # Copy data to output band
-    output_band = output_ds.GetRasterBand(1)
-    output_band.WriteArray(input_band.ReadAsArray())
-    output_band.SetNoDataValue(nodata)
-    
-    # Perform fill with GDAL's FillNodata
-    gdal.FillNodata(
-        targetBand=output_band,
-        maskBand=None,  # Auto-create mask from NoData
-        maxSearchDist=max_distance,
-        smoothingIterations=smoothing_iter
-    )
-    
-    # Cleanup
-    output_ds.FlushCache()
-    output_ds = input_ds = None
+# Define the paths.
+input_fh = r"/Users/hmcoerver/Desktop/M_21GZ2_orig.TIF"
+output_fh = r"/Users/hmcoerver/Desktop/out.TIF"
 
-# Example usage matching your command:
-fill_nodata(
-    input_path="./data/FoxIsland_DTM.tif",
-    output_path="./data/FoxIsland_DTM_Fill.tif",
-    max_distance=100,  # Default, same as -md 100
-    smoothing_iter=2    # Same as -si 2
-)
+# Open the dataset.
+ds = gdal.Open(input_fh)
+
+# Check if dataset was opened correctly.
+assert isinstance(ds, gdal.Dataset)
+
+# Create a new copy of the input dataset WITHOUT the filled data.
+driver = gdal.GetDriverByName('GTiff')
+output_ds = driver.CreateCopy(output_fh, ds)
+
+# Get the band.
+band = output_ds.GetRasterBand(1)
+
+# Fill nodata in the band.
+_ = gdal.FillNodata(targetBand = band, maskBand = None, maxSearchDist = 100, smoothingIterations = 0)
+
+# Release the datasets.
+ds = ds.FlushCache()
+output_ds = output_ds.FlushCache()

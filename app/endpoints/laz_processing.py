@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Form
 from ..main import manager, settings
 from fastapi.responses import JSONResponse
 from ..convert import convert_geotiff_to_png_base64
-from ..processing import dtm, dsm, chm, hillshade, hillshade_315_45_08, hillshade_225_45_08, slope, aspect, color_relief, tri, tpi, roughness
+from ..processing import dtm, dsm, chm, hillshade, hillshade_315_45_08, hillshade_225_45_08, slope, aspect, color_relief, tpi, roughness
 
 router = APIRouter()
 
@@ -450,53 +450,6 @@ async def api_color_relief(input_file: str = Form(None), region_name: str = Form
         return {"image": image_b64}
     except Exception as e:
         print(f"❌ Error in api_color_relief: {str(e)}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise
-
-@router.post("/api/tri")
-async def api_tri(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None), display_region_name: str = Form(None)):
-    """Generate TRI from LAZ file - supports both region-based and LAZ file processing"""
-    print(f"\n🎯 API CALL: /api/tri")
-    
-    # Determine processing mode: region-based or LAZ file-based
-    if region_name and processing_type:
-        # Region-based processing: find LAZ file in region
-        print(f"📍 Region-based processing: {region_name}")
-        print(f"🔧 Processing type: {processing_type}")
-        
-        # Region-based processing: find LAZ file in region using proper mapping
-        input_file = resolve_laz_file_from_region(region_name, processing_type)
-        
-    elif input_file:
-        # LAZ file-based processing (legacy support)
-        print(f"📥 LAZ file-based processing: {input_file}")
-        
-    else:
-        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
-    
-    try:
-        # Use display_region_name for output directory if provided, otherwise use original region_name
-        output_region = display_region_name if display_region_name else region_name
-        
-        # Check if tri function accepts region_name parameter
-        try:
-            from inspect import signature
-            sig = signature(tri)
-            if 'region_name' in sig.parameters:
-                tif_path = tri(input_file, output_region)
-            else:
-                tif_path = tri(input_file)
-        except:
-            # Fallback to original function call if anything goes wrong
-            tif_path = tri(input_file)
-        print(f"✅ TIF generated: {tif_path}")
-        
-        image_b64 = convert_geotiff_to_png_base64(tif_path)
-        print(f"✅ Base64 conversion complete")
-        
-        return {"image": image_b64}
-    except Exception as e:
-        print(f"❌ Error in api_tri: {str(e)}")
         print(f"❌ Error type: {type(e).__name__}")
         raise
 

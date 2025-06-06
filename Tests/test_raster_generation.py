@@ -4,7 +4,7 @@ Test script for generating raster products from elevation TIFF files.
 
 This script:
 1. Scans the input directory for elevation TIFF files
-2. Generates various raster analysis products (hillshade, slope, aspect, TRI, TPI, color relief)
+2. Generates various raster analysis products (hillshade, slope, aspect, TPI, color relief)
 3. Organizes output in structured directories 
 4. Converts TIFF outputs to PNG for visualization
 5. Provides detailed progress and performance reporting
@@ -31,7 +31,6 @@ try:
         process_hillshade_tiff,
         process_slope_tiff,
         process_aspect_tiff,
-        process_tri_tiff,
         process_tpi_tiff,
         process_color_relief_tiff
     )
@@ -58,7 +57,6 @@ class RasterTestGenerator:
             'hillshade_225_45_08': process_hillshade_tiff,
             'slope': process_slope_tiff,
             'aspect': process_aspect_tiff,
-            'tri': process_tri_tiff,
             'tpi': process_tpi_tiff,
             'color_relief': process_color_relief_tiff
         }
@@ -153,7 +151,6 @@ class RasterTestGenerator:
             'hillshade_225_45_08': {'azimuth': 225, 'altitude': 45, 'z_factor': 0.8},
             'slope': {},
             'aspect': {},
-            'tri': {},
             'tpi': {'radius': 3},
             'color_relief': {}
         }
@@ -165,7 +162,6 @@ class RasterTestGenerator:
             'hillshade_225_45_08': output_folder / 'Hillshade',
             'slope': output_folder / 'Terrain_Analysis',
             'aspect': output_folder / 'Terrain_Analysis', 
-            'tri': output_folder / 'Terrain_Analysis',
             'tpi': output_folder / 'Terrain_Analysis',
             'color_relief': output_folder / 'Visualization'
         }
@@ -306,7 +302,6 @@ class RasterTestGenerator:
             'hillshade_225_45_08': 'Hillshade',
             'slope': 'Terrain_Analysis',
             'aspect': 'Terrain_Analysis',
-            'tri': 'Terrain_Analysis',
             'tpi': 'Terrain_Analysis',
             'color_relief': 'Visualization'
         }
@@ -610,7 +605,7 @@ async def main():
     print("=" * 50)
     print("This script will:")
     print("1. 🔍 Scan input directory for elevation TIFF files")
-    print("2. 🎯 Generate raster products (hillshade, slope, aspect, TRI, TPI, color relief)")
+    print("2. 🎯 Generate raster products (hillshade, slope, aspect, TPI, color relief)")
     print("3. 📁 Organize outputs in structured directories")
     print("4. 🎨 Convert TIFF outputs to PNG for visualization")
     print("5. 📋 Generate comprehensive reports")
