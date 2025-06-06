@@ -140,6 +140,91 @@ async def list_regions(source: str = None):
     
     return {"regions": regions_with_metadata}
 
+@router.get("/api/get_spatial_metadata")
+async def get_spatial_metadata(filePath: str):
+    """Extract spatial metadata (coordinates) from a LAZ file path
+    
+    Args:
+        filePath: The file path of the LAZ file (e.g., "input/region/lidar_14.87S_39.38W_lidar.laz")
+    
+    Returns:
+        JSON object with latitude and longitude: {"latitude": -14.87, "longitude": -39.38}
+    """
+    print(f"\n🌍 API CALL: GET /api/get_spatial_metadata?filePath={filePath}")
+    
+    try:
+        # Get just the filename from the path
+        filename = os.path.basename(filePath).lower()
+        print(f"🔍 Extracting coordinates from filename: {filename}")
+        
+        # Try multiple coordinate patterns
+        patterns = [
+            # Pattern: lidar_14.87S_39.38W_lidar.laz or lidar_14.87S_39.38W.laz
+            r'lidar_(\d+\.\d+)([ns])_(\d+\.\d+)([ew])',
+            # Pattern: 14.87S_39.38W.laz  
+            r'(\d+\.\d+)([ns])_(\d+\.\d+)([ew])',
+            # Pattern for files with underscores: some_14.87S_39.38W_something.laz
+            r'.*_(\d+\.\d+)([ns])_(\d+\.\d+)([ew]).*'
+        ]
+        
+        latitude = None
+        longitude = None
+        
+        for pattern in patterns:
+            match = re.search(pattern, filename, re.IGNORECASE)
+            if match:
+                lat_val, lat_dir, lng_val, lng_dir = match.groups()
+                latitude = float(lat_val) * (-1 if lat_dir.lower() == 's' else 1)
+                longitude = float(lng_val) * (-1 if lng_dir.lower() == 'w' else 1)
+                print(f"✅ Extracted coordinates: {latitude}, {longitude}")
+                break
+        
+        if latitude is not None and longitude is not None:
+            return {
+                "latitude": latitude,
+                "longitude": longitude
+            }
+        
+        # Check if there's a metadata file in the same directory
+        file_dir = os.path.dirname(filePath)
+        if os.path.exists(file_dir):
+            metadata_files = glob.glob(os.path.join(file_dir, "metadata_*.txt"))
+            
+            if metadata_files:
+                try:
+                    with open(metadata_files[0], 'r') as f:
+                        content = f.read()
+                        # Extract center coordinates from metadata
+                        for line in content.split('\n'):
+                            if line.startswith('# Center:'):
+                                coords_str = line.split('# Center:')[1].strip()
+                                lat, lng = coords_str.split(', ')
+                                latitude = float(lat)
+                                longitude = float(lng)
+                                print(f"✅ Extracted coordinates from metadata: {latitude}, {longitude}")
+                                return {
+                                    "latitude": latitude,
+                                    "longitude": longitude
+                                }
+                except Exception as e:
+                    print(f"⚠️  Error reading metadata file: {e}")
+        
+        # If no coordinates found, return an error
+        print(f"❌ No coordinates found in filename: {filename}")
+        raise HTTPException(
+            status_code=404, 
+            detail=f"No spatial metadata found for file: {os.path.basename(filePath)}"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error extracting spatial metadata: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to extract spatial metadata: {str(e)}"
+        )
+
 @router.delete("/api/delete-region/{region_name}")
 async def delete_region(region_name: str):
     """Delete a region by removing its input and output folders"""

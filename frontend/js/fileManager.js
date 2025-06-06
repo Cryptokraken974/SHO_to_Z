@@ -73,19 +73,20 @@ window.FileManager = {
     }
     
     regions.forEach((regionInfo) => {
-      // regionInfo has: name (display), region_name (for processing), center_lat, center_lng
+      // regionInfo has: name (display), region_name (for processing), center_lat, center_lng, filePath
       const displayName = regionInfo.name;
       const processingRegion = regionInfo.region_name || regionInfo.name; // Fallback to name if region_name not available
       const coords = (regionInfo.center_lat && regionInfo.center_lng) ? 
                      { lat: parseFloat(regionInfo.center_lat), lng: parseFloat(regionInfo.center_lng) } : null;
+      const filePath = regionInfo.filePath; // Assume filePath is provided
       
       const coordsDisplay = coords ? 
         `<small class="file-coords">Lat: ${coords.lat.toFixed(4)}, Lng: ${coords.lng.toFixed(4)}</small>` : 
         '<small class="file-coords">Coordinates not available</small>';
       
-      // Store both display name and processing region name
+      // Store display name, processing region name, and file path
       const regionItem = $(` 
-        <div class="file-item" data-region-name="${displayName}" data-processing-region="${processingRegion}">
+        <div class="file-item" data-region-name="${displayName}" data-processing-region="${processingRegion}" data-file-path="${filePath || ''}">
           <div class="file-name">${displayName}</div>
           <div class="file-info">
             ${coordsDisplay}
@@ -104,6 +105,7 @@ window.FileManager = {
         
         // Store the region data for later selection
         regionItem.data('coords', coords);
+        regionItem.data('filePath', filePath); // Store filePath
       });
       
       fileList.append(regionItem);
@@ -117,8 +119,9 @@ window.FileManager = {
    * @param {string} displayName - Display name of the selected region
    * @param {Object} coords - Coordinates object with lat/lng
    * @param {string} processingRegion - Region name to use for processing API calls
+   * @param {string} regionPath - Full file path of the region (especially for LAZ files)
    */
-  selectRegion(displayName, coords = null, processingRegion = null) { // MODIFIED to selectRegion
+  selectRegion(displayName, coords = null, processingRegion = null, regionPath = null) { // MODIFIED to selectRegion, added regionPath
     this.selectedRegion = displayName;
     this.processingRegion = processingRegion || displayName; // Store the processing region separately
     
@@ -142,7 +145,20 @@ window.FileManager = {
       this.updateLocationPin(coords.lat, coords.lng, displayName); // Pass displayName
     }
     
-    Utils.log('info', `Selected region: ${displayName} (processing region: ${this.processingRegion})`, { coords });
+    // Auto-fill the region name input field with the filename without extension
+    const regionNameWithoutExt = displayName.replace(/\.[^/.]+$/, '');
+    $('#region-name-input').val(regionNameWithoutExt);
+    
+    // This block was added to handle LAZ file specific actions
+    if (displayName && displayName.toLowerCase().endsWith('.laz') && regionPath) { // Check regionPath
+        UIManager.fetchAndDisplayRegionCoords(regionPath); // Pass the full path
+    } else {
+        // Clear lat/lon fields if not a LAZ file or if they should be specific to LAZ selection
+        $('#lat-input').val('');
+        $('#lng-input').val('');
+    }
+
+    Utils.log('info', `Selected region: ${displayName} (processing region: ${this.processingRegion}, path: ${regionPath})`, { coords });
     Utils.showNotification(`Selected Region: ${displayName}`, 'success', 2000);
 
     // Potentially trigger display of Sentinel-2 images for this region if available
@@ -191,6 +207,7 @@ window.FileManager = {
     
     regions.forEach((regionInfo) => {
       const regionName = regionInfo.name;
+      const filePath = regionInfo.filePath; // Assume filePath is provided
       let coords = null;
       if (regionInfo.center_lat && regionInfo.center_lng) {
         coords = { lat: parseFloat(regionInfo.center_lat), lng: parseFloat(regionInfo.center_lng) };
@@ -201,7 +218,7 @@ window.FileManager = {
         const marker = MapManager.addMarker(coords.lat, coords.lng, {
           popup: `Region: ${regionName}<br>Lat: ${coords.lat.toFixed(4)}<br>Lng: ${coords.lng.toFixed(4)}`, // MODIFIED popup text
           onClick: () => {
-            this.selectRegion(regionName, coords); // MODIFIED to selectRegion
+            this.selectRegion(regionName, coords, regionInfo.region_name || regionName, filePath); // MODIFIED to selectRegion, pass filePath
           }
         });
         

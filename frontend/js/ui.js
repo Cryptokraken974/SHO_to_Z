@@ -11,7 +11,8 @@ window.UIManager = {
     this.initializeAccordions();
     this.initializeEventHandlers();
     this.initializeTooltips();
-    this.initializeModals();
+    this.initializeModals(); // General modals
+    this.initializeImageModalEventHandlers(); // Specific for image modal
     this.initializeGlobalRegionSelector();
     this.initializeResizablePanels();
     
@@ -99,21 +100,23 @@ window.UIManager = {
    * @param {Object} coords - Coordinates object with lat/lng
    * @param {string} processingRegion - Region name for processing API calls
    */
-  handleGlobalRegionSelection(regionName, coords = null, processingRegion = null) {
+  handleGlobalRegionSelection(regionName, coords = null, processingRegion = null, filePath = null) {
     // Update global selector
     this.updateGlobalRegionSelector(regionName);
     
     // Update FileManager's selected region
-    FileManager.selectedRegion = regionName;
-    FileManager.processingRegion = processingRegion || regionName;
-    
+    // This will also trigger the lat/lon update if it's a LAZ file due to changes in FileManager.selectRegion
+    FileManager.selectRegion(regionName, coords, processingRegion, filePath);
+
     // Switch to Map tab
     this.switchTab('map');
     
     // Set map view and pin if coordinates are available
+    // Note: FileManager.selectRegion already handles map view and pin if coords are provided.
+    // Redundant calls here might occur but should be harmless or could be optimized.
     if (coords && Utils.isValidCoordinate(coords.lat, coords.lng)) {
       MapManager.setView(coords.lat, coords.lng, 13);
-      FileManager.updateLocationPin(coords.lat, coords.lng, regionName);
+      // FileManager.updateLocationPin is called within FileManager.selectRegion
     }
     
     // Load satellite images and LIDAR data for the region
@@ -123,7 +126,7 @@ window.UIManager = {
     // Show success notification
     Utils.showNotification(`Selected Region: ${regionName}`, 'success', 2000);
     
-    Utils.log('info', `Global region selection completed: ${regionName} (processing region: ${processingRegion})`, { coords });
+    Utils.log('info', `Global region selection completed: ${regionName} (processing region: ${processingRegion}, path: ${filePath})`, { coords });
   },
 
   /**
@@ -439,7 +442,8 @@ window.UIManager = {
 
       const regionName = selectedItem.data('region-name'); // Display name
       let processingRegion = selectedItem.data('processing-region'); // Processing region name
-      
+      const filePath = selectedItem.data('file-path'); // Get file path
+
       // Get coordinates from the stored data
       const coords = selectedItem.data('coords');
       
@@ -455,17 +459,28 @@ window.UIManager = {
       
       if (isForGlobal) {
         // Handle global region selection - this includes API calls
-        UIManager.handleGlobalRegionSelection(regionName, coords, processingRegion);
+        // UIManager.handleGlobalRegionSelection(regionName, coords, processingRegion); // Original
+        // For now, let's assume handleGlobalRegionSelection will internally call selectRegion or be updated separately
+        // to handle filePath if it needs to directly trigger the lat/lon display.
+        // The primary goal here is to ensure selectRegion gets the path.
+        FileManager.selectRegion(regionName, coords, processingRegion, filePath); 
+        // If handleGlobalRegionSelection itself needs the filePath for other reasons, it should be updated.
+        // For now, we ensure that if it *results* in a selection that should show lat/lon,
+        // the underlying selectRegion call (if made by handleGlobalRegionSelection or directly) has the path.
+        // A more direct approach for global selection might be:
+        UIManager.handleGlobalRegionSelection(regionName, coords, processingRegion, filePath);
+
+
         // Clear the flag
         $('#file-modal').removeData('for-global');
       } else if (isForAnalysis) {
         // Update Analysis tab
-        UIManager.updateAnalysisSelectedRegion(regionName);
+        UIManager.updateAnalysisSelectedRegion(regionName); // This likely doesn't need filePath for lat/lon inputs
         // Clear the flag
         $('#file-modal').removeData('for-analysis');
       } else {
         // Select the region using FileManager for Map tab - this includes API calls
-        FileManager.selectRegion(regionName, coords, processingRegion);
+        FileManager.selectRegion(regionName, coords, processingRegion, filePath);
       }
       
       // Close the modal
@@ -719,9 +734,28 @@ window.UIManager = {
     // Get coordinates from input fields
     let lat = $('#lat-input').val();
     let lng = $('#lng-input').val();
-    const regionName = $('#region-name-input').val(); // Get region name
+    let regionName = $('#region-name-input').val(); // Get region name
 
-    // If no coordinates are set, use Portland, Oregon as default (good Sentinel-2 coverage)
+    // Check if we have a selected region but no coordinates in input fields
+    if ((!lat || !lng || lat === '' || lng === '') && FileManager.selectedRegion) {
+      // Try to get coordinates from the selected region
+      const selectedItem = $(`.file-item[data-region-name="${FileManager.selectedRegion}"]`);
+      if (selectedItem.length && selectedItem.data('coords')) {
+        const coords = selectedItem.data('coords');
+        if (coords && coords.lat && coords.lng) {
+          lat = coords.lat;
+          lng = coords.lng;
+          
+          // Update the input fields
+          $('#lat-input').val(lat);
+          $('#lng-input').val(lng);
+          
+          Utils.log('info', `Using coordinates from selected region ${FileManager.selectedRegion}: ${lat}, ${lng}`);
+        }
+      }
+    }
+
+    // If still no coordinates are set, use Portland, Oregon as default (good Sentinel-2 coverage)
     if (!lat || !lng || lat === '' || lng === '') {
       lat = 45.5152;  // Portland, Oregon
       lng = -122.6784;
@@ -737,6 +771,15 @@ window.UIManager = {
       MapManager.addSentinel2TestMarker(lat, lng);
 
       Utils.showNotification('Using Portland, Oregon coordinates for Sentinel-2 test (good satellite coverage area)', 'info');
+    }
+    
+    // Check if we have a selected LAZ file but no region name
+    if (FileManager.selectedRegion && (!regionName || regionName.trim() === '')) {
+      // Extract filename without extension from the selected region
+      regionName = FileManager.selectedRegion.replace(/\.[^/.]+$/, '');
+      // Update the region name input field
+      $('#region-name-input').val(regionName);
+      Utils.log('info', `Auto-filled region name from selected file: ${regionName}`);
     }
 
     // Validate coordinates
@@ -998,6 +1041,12 @@ window.UIManager = {
   async displaySentinel2ImagesForRegion(regionName) {
     Utils.log('info', `Checking for Sentinel-2 images for region: ${regionName}`);
 
+    // Clear the satellite gallery at the start to ensure fresh display
+    const gallery = $('#satellite-gallery');
+    if (gallery.length) {
+      gallery.empty();
+    }
+
     try {
       // Check for available Sentinel-2 bands (RED, NIR, NDVI)
       const availableBands = [];
@@ -1037,7 +1086,11 @@ window.UIManager = {
 
       if (availableBands.length === 0) {
         Utils.log('info', `No Sentinel-2 images found for region ${regionName}`);
-        // Don't show anything in the satellite gallery if no data exists
+        // Clear the satellite gallery and show a message
+        const gallery = $('#satellite-gallery');
+        if (gallery.length) {
+          gallery.empty().html('<div class="no-files text-center text-[#666] p-8">No satellite images available for this region.</div>');
+        }
         return;
       }
 
@@ -1047,6 +1100,11 @@ window.UIManager = {
 
     } catch (error) {
       Utils.log('error', `Error fetching Sentinel-2 images for region ${regionName}:`, error);
+      // Clear the satellite gallery and show an error message
+      const gallery = $('#satellite-gallery');
+      if (gallery.length) {
+        gallery.empty().html('<div class="no-files text-center text-[#666] p-8">Error loading satellite images for this region.</div>');
+      }
     }
   },
 
@@ -1881,6 +1939,7 @@ window.UIManager = {
       }
 
       // Convert bounds to Leaflet format [[south, west], [north, east]]
+
       const bounds = [
         [overlayData.bounds.south, overlayData.bounds.west],
         [overlayData.bounds.north, overlayData.bounds.east]
@@ -1914,6 +1973,134 @@ window.UIManager = {
   },
 
   /**
+   * Acquire elevation data from coordinates
+   */
+  async acquireElevationData() {
+    Utils.log('info', 'Get Elevation Data button clicked');
+
+    // Get coordinates from input fields
+    let lat = $('#lat-input').val();
+    let lng = $('#lng-input').val();
+    let regionName = $('#region-name-input').val();
+
+    // Check if we have a selected LAZ file but no region name
+    if (FileManager.selectedRegion && (!regionName || regionName.trim() === '')) {
+      // Extract filename without extension from the selected region
+      regionName = FileManager.selectedRegion.replace(/\.[^/.]+$/, '');
+      // Update the region name input field
+      $('#region-name-input').val(regionName);
+      Utils.log('info', `Auto-filled region name from selected file: ${regionName}`);
+    }
+
+    // Check if we have a selected region but no coordinates in input fields
+    if ((!lat || !lng || lat === '' || lng === '') && FileManager.selectedRegion) {
+      // Try to get coordinates from the selected region
+      const selectedItem = $(`.file-item[data-region-name="${FileManager.selectedRegion}"]`);
+      if (selectedItem.length && selectedItem.data('coords')) {
+        const coords = selectedItem.data('coords');
+        if (coords && coords.lat && coords.lng) {
+          lat = coords.lat;
+          lng = coords.lng;
+          
+          // Update the input fields
+          $('#lat-input').val(lat);
+          $('#lng-input').val(lng);
+          
+          Utils.log('info', `Using coordinates from selected region ${FileManager.selectedRegion}: ${lat}, ${lng}`);
+        }
+      }
+    }
+
+    // If still no coordinates are set, use Portland, Oregon as default
+    if (!lat || !lng || lat === '' || lng === '') {
+      lat = 45.5152;  // Portland, Oregon
+      lng = -122.6784;
+
+      // Update the input fields
+      $('#lat-input').val(lat);
+      $('#lng-input').val(lng);
+
+      // Center map on the location
+      MapManager.setView(lat, lng, 12);
+
+      Utils.showNotification('Using Portland, Oregon coordinates for elevation data acquisition', 'info');
+    }
+
+    // Validate coordinates
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+
+    if (!Utils.isValidCoordinate(latNum, lngNum)) {
+      Utils.showNotification('Invalid coordinates. Please enter valid latitude and longitude values.', 'error');
+      return;
+    }
+
+    try {
+      this.showProgress('🏔️ Acquiring elevation data...');
+
+      // Start WebSocket connection for progress updates
+      if (window.WebSocketManager) {
+        WebSocketManager.connect();
+      }
+
+      // Prepare region name for the acquisition
+      const effectiveRegionName = regionName && regionName.trim() !== '' ? regionName.trim() : null;
+
+      const elevationRequest = {
+        lat: latNum,
+        lng: lngNum,
+        buffer_km: 2.0
+      };
+
+      if (effectiveRegionName) {
+        elevationRequest.region_name = effectiveRegionName;
+      }
+
+      const response = await fetch('/api/elevation/download-coordinates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(elevationRequest)
+      });
+
+      let result = null;
+      if (response.ok) {
+        result = await response.json();
+        if (result.success) {
+          Utils.log('info', 'Elevation data acquisition completed');
+          Utils.showNotification('Successfully acquired elevation data!', 'success');
+          
+          // Refresh file list and region data
+          if (window.FileManager && window.FileManager.loadFiles) {
+            setTimeout(() => {
+              FileManager.loadFiles();
+            }, 1000);
+          }
+          
+          // If we have a region name, try to display elevation data
+          if (effectiveRegionName || result.metadata?.region_name) {
+            const displayRegionName = effectiveRegionName || result.metadata.region_name;
+            setTimeout(() => {
+              this.displayLidarRasterForRegion(displayRegionName);
+            }, 1500);
+          }
+        } else {
+          throw new Error(result.error || 'Elevation data acquisition failed');
+        }
+      } else {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+
+    } catch (error) {
+      Utils.log('error', 'Error in elevation data acquisition:', error);
+      Utils.showNotification(`Error acquiring elevation data: ${error.message}`, 'error');
+    } finally {
+      this.hideProgress();
+    }
+  },
+
+  /**
    * Get combined data (both elevation and satellite data)
    */
   async getCombinedData() {
@@ -1922,9 +2109,37 @@ window.UIManager = {
     // Get coordinates from input fields
     let lat = $('#lat-input').val();
     let lng = $('#lng-input').val();
-    const regionName = $('#region-name-input').val();
+    let regionName = $('#region-name-input').val();
 
-    // If no coordinates are set, use Portland, Oregon as default
+    // Check if we have a selected LAZ file but no region name
+    if (FileManager.selectedRegion && (!regionName || regionName.trim() === '')) {
+      // Extract filename without extension from the selected region
+      regionName = FileManager.selectedRegion.replace(/\.[^/.]+$/, '');
+      // Update the region name input field
+      $('#region-name-input').val(regionName);
+      Utils.log('info', `Auto-filled region name from selected file: ${regionName}`);
+    }
+
+    // Check if we have a selected region but no coordinates in input fields
+    if ((!lat || !lng || lat === '' || lng === '') && FileManager.selectedRegion) {
+      // Try to get coordinates from the selected region
+      const selectedItem = $(`.file-item[data-region-name="${FileManager.selectedRegion}"]`);
+      if (selectedItem.length && selectedItem.data('coords')) {
+        const coords = selectedItem.data('coords');
+        if (coords && coords.lat && coords.lng) {
+          lat = coords.lat;
+          lng = coords.lng;
+          
+          // Update the input fields
+          $('#lat-input').val(lat);
+          $('#lng-input').val(lng);
+          
+          Utils.log('info', `Using coordinates from selected region ${FileManager.selectedRegion}: ${lat}, ${lng}`);
+        }
+      }
+    }
+
+    // If still no coordinates are set, use Portland, Oregon as default (good Sentinel-2 coverage)
     if (!lat || !lng || lat === '' || lng === '') {
       lat = 45.5152;  // Portland, Oregon
       lng = -122.6784;
@@ -2263,5 +2478,66 @@ window.UIManager = {
     const modal = $('#progress-modal');
     modal.fadeOut();
     Utils.log('info', 'Progress modal hidden');
-  }
+  },
+
+  /**
+   * Show image modal
+   * @param {string} imageSrc - Source URL of the image
+   * @param {string} imageAlt - Alt text for the image (used as caption)
+   */
+  showImageModal(imageSrc, imageAlt) {
+    const modal = $('#image-modal');
+    const imgElement = $('#image-modal-img');
+    const captionElement = $('#image-modal-caption');
+    const titleElement = $('#image-modal-title');
+
+    if (modal.length && imgElement.length && captionElement.length && titleElement.length) {
+      imgElement.attr('src', imageSrc);
+      imgElement.attr('alt', imageAlt);
+      captionElement.text(imageAlt);
+      titleElement.text(imageAlt || 'Image Preview'); // Use alt text as title or default
+      
+      modal.fadeIn();
+      Utils.log('info', `Image modal shown for: ${imageAlt}`);
+    } else {
+      Utils.log('error', 'Image modal elements not found');
+    }
+  },
+
+  /**
+   * Hide image modal
+   */
+  hideImageModal() {
+    const modal = $('#image-modal');
+    if (modal.length) {
+      modal.fadeOut();
+      // Optional: Clear image source to free memory
+      // $('#image-modal-img').attr('src', ''); 
+      Utils.log('info', 'Image modal hidden');
+    }
+  },
+
+  /**
+   * Initialize event handlers for the image modal
+   */
+  initializeImageModalEventHandlers() {
+    // Close modal on X button click
+    $('#image-modal-close').on('click', () => {
+      this.hideImageModal();
+    });
+
+    // Close modal on Escape key (ensure this is registered after modal is added to DOM)
+    $(document).on('keydown', (e) => {
+      if (e.key === 'Escape' && $('#image-modal').is(':visible')) {
+        this.hideImageModal();
+      }
+    });
+
+    // Close modal on background click
+    $('#image-modal').on('click', function(e) {
+      if (e.target === this) {
+        UIManager.hideImageModal();
+      }
+    });
+  },
 };
