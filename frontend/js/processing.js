@@ -210,11 +210,42 @@ window.ProcessingManager = {
         UIManager.showImageModal(imageDataUrl, `${displayName} - ${displayIdentifier}`);
       });
 
-      // Show the "Add to Map" button for this processing type
-      const addToMapBtn = cell.find('.add-to-map-btn');
-      if (addToMapBtn.length) {
+      // Add or show the "Add to Map" button for this processing type
+      let addToMapBtn = cell.find('.add-to-map-btn');
+      if (!addToMapBtn.length) {
+        // Create the button if it doesn't exist
+        const regionName = selectedRegion || displayIdentifier;
+        cell.append(`
+          <button class="add-to-map-btn bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors mt-1" 
+                  data-target="${processingType}"
+                  data-region-name="${regionName}">
+            Add to Map
+          </button>
+        `);
+        addToMapBtn = cell.find('.add-to-map-btn');
+        Utils.log('info', `Created Add to Map button for ${processingType}`);
+      } else {
         addToMapBtn.removeClass('hidden').show();
-        Utils.log('info', `Showing Add to Map button for ${processingType}`);
+        Utils.log('info', `Showing existing Add to Map button for ${processingType}`);
+      }
+
+      // Add click handler for the button if it doesn't already have one
+      if (addToMapBtn.length && !addToMapBtn.data('events')) {
+        addToMapBtn.on('click', function(e) {
+          e.preventDefault();
+          const $button = $(this);
+          const processingType = $button.data('target');
+          
+          if (!processingType) {
+            Utils.log('warn', 'No processing type found in data-target attribute');
+            return;
+          }
+          
+          Utils.log('info', `Processing result: Add to Map clicked for ${processingType}`);
+          
+          // Handle the add to map functionality
+          UIManager.handleProcessingResultsAddToMap(processingType, $button);
+        });
       }
 
       Utils.log('info', `Successfully displayed ${processingType} image in gallery cell for ${selectedRegion ? 'region' : 'file'}: ${displayIdentifier}`);
@@ -511,14 +542,16 @@ window.ProcessingManager = {
     // Reset cancellation flag
     this.isRasterProcessingCancelled = false;
 
-    // Define processing queue (DTM first, then all others)
+    // Define processing queue (DTM first, then DSM, then other terrain analysis, then CHM last)
     const processingQueue = [
       { type: 'dtm', name: 'DTM', icon: '🏔️' },
+      { type: 'dsm', name: 'DSM', icon: '🏗️' },
       { type: 'hillshade', name: 'Hillshade', icon: '🌄' },
       { type: 'slope', name: 'Slope', icon: '📐' },
       { type: 'aspect', name: 'Aspect', icon: '🧭' },
       { type: 'tpi', name: 'TPI', icon: '📈' },
-      { type: 'roughness', name: 'Roughness', icon: '🪨' }
+      { type: 'roughness', name: 'Roughness', icon: '🪨' },
+      { type: 'chm', name: 'CHM', icon: '🌳' }
     ];
 
     try {

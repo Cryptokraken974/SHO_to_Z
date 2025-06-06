@@ -1257,7 +1257,7 @@ window.UIManager = {
     
     try {
       // Processing types that might have LIDAR raster results
-      const processingTypes = ['hillshade', 'slope', 'aspect'];
+      const processingTypes = ['dtm', 'dsm', 'hillshade', 'slope', 'aspect', 'tpi', 'roughness', 'chm'];
       const availableRasters = [];
 
       // Check each processing type for available raster data
@@ -1317,17 +1317,25 @@ window.UIManager = {
       return;
     }
 
-    // Create image items for each available raster
-    const imageItems = availableRasters.map(raster => {
+    // Start with the base gallery structure (all 8 vignettes)
+    this.resetProcessingGalleryToLabels();
+
+    // Update each vignette that has available data
+    availableRasters.forEach(raster => {
       const { processingType, display, overlayData, regionName } = raster;
       const imageDataUrl = `data:image/png;base64,${overlayData.image_data}`;
       
-      return `
-        <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-${processingType}">
-          <div class="flex-1 flex items-center justify-center relative">
+      // Find the corresponding gallery cell
+      const cell = $(`#cell-${processingType}`);
+      
+      if (cell.length) {
+        // Update the cell content to show the image
+        const cellContent = cell.find('.flex-1');
+        cellContent.html(`
+          <div class="relative w-full h-full">
             <img src="${imageDataUrl}" 
                  alt="${display}" 
-                 class="processing-result-image cursor-pointer"
+                 class="processing-result-image cursor-pointer w-full h-full object-cover"
                  title="Click to view larger image">
             <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
               ${display}
@@ -1336,21 +1344,20 @@ window.UIManager = {
               ✓ Ready
             </div>
           </div>
-          <button class="add-to-map-btn bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors" 
+        `);
+
+        // Add the "Add to Map" button below the image
+        cell.append(`
+          <button class="add-to-map-btn bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors mt-1" 
                   data-target="${processingType}"
                   data-region-name="${regionName}">
             Add to Map
           </button>
-        </div>
-      `;
-    }).join('');
+        `);
 
-    // Update the gallery with the image items
-    gallery.html(`
-      <div class="flex gap-4 overflow-x-auto pb-4">
-        ${imageItems}
-      </div>
-    `);
+        Utils.log('info', `Updated gallery cell for ${processingType}`);
+      }
+    });
 
     // Add click handlers for image modal view
     gallery.find('.processing-result-image').on('click', function() {
@@ -1376,7 +1383,7 @@ window.UIManager = {
       UIManager.handleProcessingResultsAddToMap(processingType, $button);
     });
 
-    Utils.log('info', `Displayed ${availableRasters.length} LIDAR raster images in Processing Results gallery`);
+    Utils.log('info', `Updated ${availableRasters.length} LIDAR raster images in Processing Results gallery`);
   },
 
   /**
@@ -1387,9 +1394,14 @@ window.UIManager = {
     
     // Reset to the original text-based gallery structure (no buttons)
     const labelItems = [
+      { id: 'dtm', label: 'DTM' },
+      { id: 'dsm', label: 'DSM' },
       { id: 'hillshade', label: 'Hillshade' },
       { id: 'slope', label: 'Slope' },
-      { id: 'aspect', label: 'Aspect' }
+      { id: 'aspect', label: 'Aspect' },
+      { id: 'tpi', label: 'TPI' },
+      { id: 'roughness', label: 'Roughness' },
+      { id: 'chm', label: 'CHM' }
     ];
 
     const galleryHTML = labelItems.map(item => `

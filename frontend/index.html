@@ -223,10 +223,14 @@
             <!-- Processing Queue Display -->
             <div id="processing-queue" class="hidden">
               <div class="text-[#ababab] text-xs mb-2">Processing Queue:</div>
-              <div class="grid grid-cols-3 gap-1 text-xs">
+              <div class="grid grid-cols-4 gap-1 text-xs">
                 <div id="queue-dtm" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
                   <div class="text-[#8e44ad]">🏔️</div>
                   <div>DTM</div>
+                </div>
+                <div id="queue-dsm" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#2d3436]">🏗️</div>
+                  <div>DSM</div>
                 </div>
                 <div id="queue-hillshade" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
                   <div class="text-[#e17055]">🌄</div>
@@ -247,6 +251,10 @@
                 <div id="queue-roughness" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
                   <div class="text-[#74b9ff]">🪨</div>
                   <div>Roughness</div>
+                </div>
+                <div id="queue-chm" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#00b894]">🌳</div>
+                  <div>CHM</div>
                 </div>
               </div>
             </div>
@@ -333,6 +341,16 @@
       <div class="mb-4">
         <h2 class="text-white text-lg font-semibold mb-4">Processing Results</h2>
         <div id="gallery" class="flex gap-4 overflow-x-auto pb-4">
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-dtm">
+            <div class="flex-1 flex items-center justify-center">
+              <div class="text-white text-lg font-medium">DTM</div>
+            </div>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-dsm">
+            <div class="flex-1 flex items-center justify-center">
+              <div class="text-white text-lg font-medium">DSM</div>
+            </div>
+          </div>
           <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-hillshade">
             <div class="flex-1 flex items-center justify-center">
               <div class="text-white text-lg font-medium">Hillshade</div>
@@ -346,6 +364,21 @@
           <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-aspect">
             <div class="flex-1 flex items-center justify-center">
               <div class="text-white text-lg font-medium">Aspect</div>
+            </div>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-tpi">
+            <div class="flex-1 flex items-center justify-center">
+              <div class="text-white text-lg font-medium">TPI</div>
+            </div>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-roughness">
+            <div class="flex-1 flex items-center justify-center">
+              <div class="text-white text-lg font-medium">Roughness</div>
+            </div>
+          </div>
+          <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-chm">
+            <div class="flex-1 flex items-center justify-center">
+              <div class="text-white text-lg font-medium">CHM</div>
             </div>
           </div>
         </div>
