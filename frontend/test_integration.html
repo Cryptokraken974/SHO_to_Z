@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RegionAnalysisService Integration Test</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #1a1a1a; 
+            color: white; 
+        }
+        .test-section { 
+            margin-bottom: 30px; 
+            padding: 20px; 
+            background-color: #262626; 
+            border-radius: 8px; 
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #test-results {
+            background-color: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>RegionAnalysisService Integration Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Script Loading Test</h2>
+        <p>This test verifies that all required scripts load correctly.</p>
+        <button onclick="testScriptLoading()">Test Script Loading</button>
+        <div id="script-test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. API Client Test</h2>
+        <p>This test verifies that the RegionAnalysisAPIClient is properly integrated.</p>
+        <button onclick="testAPIClient()">Test API Client</button>
+        <div id="api-test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Service Factory Test</h2>
+        <p>This test verifies that the ServiceFactory can create RegionAnalysisService.</p>
+        <button onclick="testServiceFactory()">Test Service Factory</button>
+        <div id="service-test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. AnalysisManager Test</h2>
+        <p>This test verifies that the AnalysisManager is available and can be initialized.</p>
+        <button onclick="testAnalysisManager()">Test Analysis Manager</button>
+        <div id="analysis-test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>5. Integration Test</h2>
+        <p>This test verifies the full integration by testing a sample analysis method.</p>
+        <button onclick="testFullIntegration()">Test Full Integration</button>
+        <div id="integration-test-results"></div>
+    </div>
+
+    <!-- Include all required scripts -->
+    <script src="../js/utils.js"></script>
+    <script src="../js/api-client.js"></script>
+    <script src="../js/services/service-factory.js"></script>
+    <script src="../js/analysis.js"></script>
+
+    <script>
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            element.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+        }
+
+        function testScriptLoading() {
+            const resultsId = 'script-test-results';
+            document.getElementById(resultsId).innerHTML = '';
+            
+            log(resultsId, 'Testing script loading...', 'info');
+            
+            // Test if jQuery is loaded
+            if (typeof $ === 'undefined') {
+                log(resultsId, '❌ jQuery is not loaded', 'error');
+                return;
+            }
+            log(resultsId, '✅ jQuery loaded successfully', 'success');
+            
+            // Test if Utils is loaded
+            if (typeof Utils === 'undefined') {
+                log(resultsId, '❌ Utils is not loaded', 'error');
+            } else {
+                log(resultsId, '✅ Utils loaded successfully', 'success');
+            }
+            
+            // Test if APIClient is loaded
+            if (typeof APIClient === 'undefined') {
+                log(resultsId, '❌ APIClient is not loaded', 'error');
+            } else {
+                log(resultsId, '✅ APIClient loaded successfully', 'success');
+            }
+            
+            // Test if ServiceFactory is loaded
+            if (typeof ServiceFactory === 'undefined') {
+                log(resultsId, '❌ ServiceFactory is not loaded', 'error');
+            } else {
+                log(resultsId, '✅ ServiceFactory loaded successfully', 'success');
+            }
+            
+            // Test if AnalysisManager is loaded
+            if (typeof AnalysisManager === 'undefined') {
+                log(resultsId, '❌ AnalysisManager is not loaded', 'error');
+            } else {
+                log(resultsId, '✅ AnalysisManager loaded successfully', 'success');
+            }
+        }
+
+        function testAPIClient() {
+            const resultsId = 'api-test-results';
+            document.getElementById(resultsId).innerHTML = '';
+            
+            log(resultsId, 'Testing API Client integration...', 'info');
+            
+            try {
+                // Test if APIClientFactory exists
+                if (typeof APIClientFactory === 'undefined') {
+                    log(resultsId, '❌ APIClientFactory is not available', 'error');
+                    return;
+                }
+                
+                // Test if regionAnalysis client can be created
+                const regionAnalysisClient = APIClientFactory.regionAnalysis;
+                if (!regionAnalysisClient) {
+                    log(resultsId, '❌ RegionAnalysisAPIClient is not available', 'error');
+                    return;
+                }
+                
+                log(resultsId, '✅ RegionAnalysisAPIClient is available', 'success');
+                
+                // Test if key methods exist
+                const methods = [
+                    'analyzeRegionTerrain',
+                    'compareRegions', 
+                    'calculateRegionStatistics',
+                    'detectLandCoverChange',
+                    'calculateVegetationIndices',
+                    'performHydrologicalAnalysis',
+                    'generateAnalysisReport'
+                ];
+                
+                methods.forEach(method => {
+                    if (typeof regionAnalysisClient[method] === 'function') {
+                        log(resultsId, `✅ Method ${method} is available`, 'success');
+                    } else {
+                        log(resultsId, `❌ Method ${method} is missing`, 'error');
+                    }
+                });
+                
+            } catch (error) {
+                log(resultsId, `❌ Error testing API Client: ${error.message}`, 'error');
+            }
+        }
+
+        function testServiceFactory() {
+            const resultsId = 'service-test-results';
+            document.getElementById(resultsId).innerHTML = '';
+            
+            log(resultsId, 'Testing Service Factory...', 'info');
+            
+            try {
+                // Test if ServiceFactory exists
+                if (typeof ServiceFactory === 'undefined') {
+                    log(resultsId, '❌ ServiceFactory is not available', 'error');
+                    return;
+                }
+                
+                // Test if getRegionAnalysisService method exists
+                if (typeof ServiceFactory.getRegionAnalysisService !== 'function') {
+                    log(resultsId, '❌ getRegionAnalysisService method is not available', 'error');
+                    return;
+                }
+                
+                log(resultsId, '✅ ServiceFactory.getRegionAnalysisService is available', 'success');
+                
+                // Test service creation
+                const service = ServiceFactory.getRegionAnalysisService();
+                if (!service) {
+                    log(resultsId, '❌ Failed to create RegionAnalysisService', 'error');
+                    return;
+                }
+                
+                log(resultsId, '✅ RegionAnalysisService created successfully', 'success');
+                
+            } catch (error) {
+                log(resultsId, `❌ Error testing Service Factory: ${error.message}`, 'error');
+            }
+        }
+
+        function testAnalysisManager() {
+            const resultsId = 'analysis-test-results';
+            document.getElementById(resultsId).innerHTML = '';
+            
+            log(resultsId, 'Testing Analysis Manager...', 'info');
+            
+            try {
+                // Test if AnalysisManager exists
+                if (typeof AnalysisManager === 'undefined') {
+                    log(resultsId, '❌ AnalysisManager is not available', 'error');
+                    return;
+                }
+                
+                log(resultsId, '✅ AnalysisManager is available', 'success');
+                
+                // Test if key methods exist
+                const methods = [
+                    'init',
+                    'handleTerrainAnalysis',
+                    'handleRegionComparison',
+                    'handleStatisticsCalculation',
+                    'displayResults',
+                    'updateProgress'
+                ];
+                
+                methods.forEach(method => {
+                    if (typeof AnalysisManager[method] === 'function') {
+                        log(resultsId, `✅ Method ${method} is available`, 'success');
+                    } else {
+                        log(resultsId, `❌ Method ${method} is missing`, 'error');
+                    }
+                });
+                
+                // Test initialization
+                try {
+                    // Create dummy DOM elements for testing
+                    $('body').append('<div id="terrain-analysis-btn" style="display:none;"></div>');
+                    $('body').append('<div id="analysis-progress" style="display:none;"></div>');
+                    $('body').append('<div id="analysis-results-content" style="display:none;"></div>');
+                    
+                    AnalysisManager.init();
+                    log(resultsId, '✅ AnalysisManager initialized successfully', 'success');
+                } catch (initError) {
+                    log(resultsId, `⚠️ AnalysisManager initialization had issues: ${initError.message}`, 'info');
+                }
+                
+            } catch (error) {
+                log(resultsId, `❌ Error testing Analysis Manager: ${error.message}`, 'error');
+            }
+        }
+
+        function testFullIntegration() {
+            const resultsId = 'integration-test-results';
+            document.getElementById(resultsId).innerHTML = '';
+            
+            log(resultsId, 'Testing full integration...', 'info');
+            
+            try {
+                // Test the complete flow: ServiceFactory → RegionAnalysisService → API call
+                log(resultsId, 'Creating RegionAnalysisService via ServiceFactory...', 'info');
+                const service = ServiceFactory.getRegionAnalysisService();
+                
+                if (!service) {
+                    log(resultsId, '❌ Failed to create service', 'error');
+                    return;
+                }
+                
+                log(resultsId, '✅ Service created successfully', 'success');
+                
+                // Test if we can access the API client through the service
+                if (!service.apiClient) {
+                    log(resultsId, '❌ Service does not have API client', 'error');
+                    return;
+                }
+                
+                log(resultsId, '✅ Service has API client', 'success');
+                
+                // Test a sample method call structure (without actually making HTTP request)
+                const sampleParams = {
+                    lat: 40.7128,
+                    lng: -74.0060,
+                    region_name: 'test_region'
+                };
+                
+                // Check if the method exists and can be called
+                if (typeof service.apiClient.analyzeRegionTerrain === 'function') {
+                    log(resultsId, '✅ analyzeRegionTerrain method is callable', 'success');
+                    log(resultsId, '✅ Full integration test completed successfully', 'success');
+                    log(resultsId, 'Note: HTTP requests not tested in this environment', 'info');
+                } else {
+                    log(resultsId, '❌ analyzeRegionTerrain method is not available', 'error');
+                }
+                
+            } catch (error) {
+                log(resultsId, `❌ Error in full integration test: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run script loading test when page loads
+        window.onload = function() {
+            testScriptLoading();
+        };
+    </script>
+</body>
+</html>

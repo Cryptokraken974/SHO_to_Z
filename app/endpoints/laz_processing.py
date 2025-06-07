@@ -3,12 +3,31 @@ from ..main import manager, settings
 from fastapi.responses import JSONResponse
 from ..convert import convert_geotiff_to_png_base64
 from ..processing import dtm, dsm, chm, hillshade, hillshade_315_45_08, hillshade_225_45_08, slope, aspect, color_relief, tpi, roughness
+import os
+import re
+from pathlib import Path
 
 router = APIRouter()
+
+def is_coordinate_based_region(region_name: str) -> bool:
+    """
+    Check if a region name follows coordinate-based pattern (e.g., '3.48N_61.36W')
+    These regions are typically created from elevation data acquisition and contain GeoTIFF files, not LAZ files.
+    
+    Args:
+        region_name: The region name to check
+        
+    Returns:
+        bool: True if this is a coordinate-based region, False otherwise
+    """
+    # Pattern: {lat}{N|S}_{lng}{E|W} (e.g., "3.48N_61.36W", "23.46S_45.99W")
+    coordinate_pattern = r'^\d+\.\d+[NS]_\d+\.\d+[EW]$'
+    return bool(re.match(coordinate_pattern, region_name))
 
 def resolve_laz_file_from_region(region_name: str, processing_type: str) -> str:
     """
     Utility function to resolve LAZ file path from region name using the region mapping system.
+    Enhanced to detect coordinate-based regions and provide appropriate error handling.
     
     Args:
         region_name: The region name provided by the user
@@ -23,7 +42,30 @@ def resolve_laz_file_from_region(region_name: str, processing_type: str) -> str:
     print(f"📍 Region-based processing: {region_name}")
     print(f"🔧 Processing type: {processing_type}")
     
-    # Import region mapping system
+    # Check if this is a coordinate-based region (elevation-only)
+    if is_coordinate_based_region(region_name):
+        print(f"🌍 Detected coordinate-based region: {region_name}")
+        print(f"⚠️  Coordinate-based regions contain elevation GeoTIFF files, not LAZ point cloud data")
+        
+        # Check if elevation files exist in this region
+        elevation_dir = Path("input") / region_name
+        if elevation_dir.exists():
+            elevation_files = list(elevation_dir.glob("*.tif")) + list(elevation_dir.glob("*.tiff"))
+            if elevation_files:
+                print(f"📄 Found {len(elevation_files)} elevation file(s) in {elevation_dir}")
+                print(f"💡 Suggestion: Consider using elevation data processing instead of LAZ-based terrain processing")
+            else:
+                print(f"📁 Region directory exists but no elevation files found")
+        else:
+            print(f"📁 Region directory does not exist: {elevation_dir}")
+        
+        raise ValueError(
+            f"Region '{region_name}' is a coordinate-based region created from elevation data acquisition. "
+            f"These regions contain elevation GeoTIFF files, not LAZ point cloud data required for terrain processing. "
+            f"LAZ-based terrain processing (DTM, DSM, hillshade, slope, etc.) is not available for coordinate-based regions."
+        )
+    
+    # Import region mapping system for LAZ-based regions
     from ..region_config.region_mapping import region_mapper
     
     # Use region mapper to find the correct LAZ file
@@ -507,10 +549,6 @@ async def api_roughness(input_file: str = Form(None), region_name: str = Form(No
     
     # Determine processing mode: region-based or LAZ file-based
     if region_name and processing_type:
-        # Region-based processing: find LAZ file in region
-        print(f"📍 Region-based processing: {region_name}")
-        print(f"🔧 Processing type: {processing_type}")
-        
         # Region-based processing: find LAZ file in region using proper mapping
         input_file = resolve_laz_file_from_region(region_name, processing_type)
         

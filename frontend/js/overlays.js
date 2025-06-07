@@ -53,19 +53,16 @@ window.OverlayManager = {
    * @param {string} processingType - Type of processing to remove
    */
   removeOverlay(processingType) {
-    const map = MapManager.getMap();
-    if (!map) return;
-
     const overlay = this.mapOverlays[processingType];
     if (overlay) {
-      map.removeLayer(overlay);
+      const map = MapManager.getMap();
+      if (map) {
+        map.removeLayer(overlay);
+      }
       delete this.mapOverlays[processingType];
       
       // Update button state
       this.updateAddToMapButtonState(processingType, false);
-      
-      // Show notification
-      this.showOverlayNotification(`${processingType} overlay removed from map`, 'info');
       
       Utils.log('info', `Removed ${processingType} overlay from map`);
     }
@@ -77,17 +74,12 @@ window.OverlayManager = {
    */
   toggleOverlay(processingType) {
     const overlay = this.mapOverlays[processingType];
-    if (!overlay) return;
-
-    const currentOpacity = overlay.options.opacity;
-    const newOpacity = currentOpacity > 0 ? 0 : 0.7;
-    
-    overlay.setOpacity(newOpacity);
-    
-    const status = newOpacity > 0 ? 'shown' : 'hidden';
-    this.showOverlayNotification(`${processingType} overlay ${status}`, 'info');
-    
-    Utils.log('info', `Toggled ${processingType} overlay visibility: ${status}`);
+    if (overlay) {
+      const currentOpacity = overlay.getOpacity();
+      const newOpacity = currentOpacity > 0 ? 0 : 0.7;
+      overlay.setOpacity(newOpacity);
+      Utils.log('info', `Toggled ${processingType} overlay visibility`);
+    }
   },
 
   /**
@@ -114,8 +106,7 @@ window.OverlayManager = {
       const baseName = selectedFile.split('/').pop().replace('.laz', '');
       
       // Try to get bounds from test-overlay endpoint
-      const response = await fetch(`/api/test-overlay/${baseName}`);
-      const data = await response.json();
+      const data = await overlays().getTestOverlay(baseName);
       
       if (data.bounds) {
         return data.bounds;
@@ -145,227 +136,681 @@ window.OverlayManager = {
 
   /**
    * Add overlay to map for a specific processing type
-   * @param {string} processingType - Type of processing
+   * @param {string} processingType - Processing type
+   * @param {string} filename - Filename to process
+   * @param {string} selectedRegion - Selected region
+   * @returns {Promise<boolean>} Success status
    */
-  async addProcessingOverlay(processingType) {
-    const selectedFile = FileManager.getSelectedFile();
-    if (!selectedFile) {
-      Utils.showNotification('Please select a LAZ file first', 'warning');
-      return;
-    }
-
+  async addToMap(processingType, filename, selectedRegion) {
     try {
-      // Get the base filename for constructing the overlay path
-      const baseName = selectedFile.split('/').pop().replace('.laz', '');
-      const overlayPath = `/api/overlay/${processingType}/${baseName}`;
+      let overlayData;
+      let displayIdentifier;
+
+      // Get overlay data based on processing context
+      if (selectedRegion) {
+        overlayData = await overlays().getRasterOverlayData(selectedRegion, processingType);
+        displayIdentifier = selectedRegion;
+      } else {
+        displayIdentifier = filename.split('/').pop().replace('.laz', '');
+        overlayData = await overlays().getOverlayData(processingType, displayIdentifier);
+      }
+
+      if (!overlayData || !overlayData.image_base64) {
+        throw new Error('No overlay data received');
+      }
+
+      // Create data URL for the image
+      const imageUrl = `data:image/png;base64,${overlayData.image_base64}`;
       
-      // Get overlay bounds
-      const bounds = await this.getOverlayBounds(selectedFile);
+      // Get bounds
+      let bounds = overlayData.bounds;
+      if (!bounds && !selectedRegion) {
+        bounds = await this.getOverlayBounds(filename);
+      }
+      
       if (!bounds) {
         throw new Error('Could not determine overlay bounds');
       }
 
-      // Add the overlay
-      const success = this.addImageOverlay(processingType, overlayPath, bounds);
+      // Add overlay to map
+      const success = this.addImageOverlay(processingType, imageUrl, bounds);
       
       if (success) {
-        // Show the "Add to Map" button if not already visible
-        this.showAddToMapButton(processingType);
+        Utils.log('info', `Successfully added ${processingType} overlay for ${displayIdentifier}`);
+        this.showOverlayNotification(`${processingType} overlay added to map`, 'success');
       }
+      
+      return success;
 
     } catch (error) {
-      Utils.log('error', `Failed to add ${processingType} overlay`, error);
-      Utils.showNotification(`Failed to add ${processingType} overlay: ${error.message}`, 'error');
+      Utils.log('error', `Failed to add ${processingType} overlay to map`, error);
+      this.showOverlayNotification(`Failed to add ${processingType} overlay: ${error.message}`, 'error');
+      return false;
+    }
+  },
+
+  /**
+   * Update add to map button state
+   * @param {string} processingType - Processing type
+   * @param {boolean} isAdded - Whether overlay is added to map
+   */
+  updateAddToMapButtonState(processingType, isAdded) {
+    const button = document.querySelector(`[data-processing-type="${processingType}"] .add-to-map-btn`);
+    if (button) {
+      if (isAdded) {
+        button.textContent = 'Remove from Map';
+        button.classList.add('remove-mode');
+      } else {
+        button.textContent = 'Add to Map';
+        button.classList.remove('remove-mode');
+      }
     }
   },
 
   /**
    * Show overlay notification
    * @param {string} message - Notification message
-   * @param {string} type - Notification type
+   * @param {string} type - Notification type (success, error, info)
    */
   showOverlayNotification(message, type = 'info') {
-    // Create overlay-specific notification
-    const notification = $(`
-      <div class="overlay-notification overlay-notification-${type}">
-        <i class="overlay-icon"></i>
-        <span>${message}</span>
-        <button class="overlay-close">&times;</button>
-      </div>
-    `);
+    // Try to use existing notification system
+    if (window.NotificationManager && typeof window.NotificationManager.show === 'function') {
+      window.NotificationManager.show(message, type);
+      return;
+    }
+
+    // Fallback notification
+    console.log(`[${type.toUpperCase()}] ${message}`);
     
-    $('#map').append(notification);
+    // Create simple toast notification if no system exists
+    const toast = document.createElement('div');
+    toast.className = `overlay-toast overlay-toast-${type}`;
+    toast.textContent = message;
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: 4px;
+      color: white;
+      font-weight: 500;
+      z-index: 10000;
+      max-width: 300px;
+      word-wrap: break-word;
+      background-color: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+    `;
     
-    // Auto-remove after 3 seconds
+    document.body.appendChild(toast);
+    
+    // Auto remove after 3 seconds
     setTimeout(() => {
-      notification.fadeOut(() => notification.remove());
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
     }, 3000);
-    
-    // Remove on close click
-    notification.find('.overlay-close').on('click', function() {
-      notification.fadeOut(() => notification.remove());
-    });
   },
 
   /**
-   * Update Add to Map button state
-   * @param {string} processingType - Type of processing
-   * @param {boolean} isActive - Whether overlay is active
+   * Handle add to map button click
+   * @param {Event} event - Click event
    */
-  updateAddToMapButtonState(processingType, isActive) {
-    const button = $(`#add-to-map-${processingType.toLowerCase()}`);
-    if (button.length) {
-      if (isActive) {
-        button.text('Remove from Map')
-               .removeClass('btn-primary')
-               .addClass('btn-secondary')
-               .data('active', true);
-      } else {
-        button.text('Add to Map')
-               .removeClass('btn-secondary')
-               .addClass('btn-primary')
-               .data('active', false);
+  async handleAddToMapClick(event) {
+    const button = event.target;
+    const processingType = button.closest('[data-processing-type]')?.dataset.processingType;
+    
+    if (!processingType) {
+      Utils.log('error', 'No processing type found for add to map button');
+      return;
+    }
+
+    // Check if overlay is currently on map
+    const isCurrentlyOnMap = this.mapOverlays[processingType];
+    
+    if (isCurrentlyOnMap) {
+      // Remove from map
+      this.removeOverlay(processingType);
+      this.showOverlayNotification(`${processingType} overlay removed from map`, 'info');
+    } else {
+      // Add to map
+      const filename = window.ProcessingManager?.getCurrentFile?.() || 'default';
+      const selectedRegion = window.RegionManager?.getSelectedRegion?.() || null;
+      
+      button.disabled = true;
+      button.textContent = 'Adding...';
+      
+      try {
+        await this.addToMap(processingType, filename, selectedRegion);
+      } finally {
+        button.disabled = false;
       }
     }
   },
 
   /**
-   * Show Add to Map button after successful processing
-   * @param {string} processingType - Type of processing
+   * Initialize overlay controls and event listeners
    */
-  showAddToMapButton(processingType) {
-    const buttonContainer = $(`#${processingType.toLowerCase()}-map-controls`);
-    if (buttonContainer.length && buttonContainer.is(':hidden')) {
-      buttonContainer.fadeIn();
-    }
+  initializeOverlayControls() {
+    // Add event listeners for add to map buttons
+    document.addEventListener('click', (event) => {
+      if (event.target.classList.contains('add-to-map-btn')) {
+        this.handleAddToMapClick(event);
+      }
+    });
+
+    Utils.log('info', 'Overlay controls initialized');
   },
 
   /**
-   * Handle Add to Map button click
-   * @param {string} processingType - Type of processing
+   * Get all currently active overlays
+   * @returns {Object} Active overlays
    */
-  handleAddToMapClick(processingType) {
-    if (!processingType) {
-      Utils.log('warn', 'handleAddToMapClick: processingType is undefined');
-      return;
-    }
-    
-    const button = $(`#add-to-map-${processingType.toLowerCase()}`);
-    const isActive = button.data('active') || false;
-    
-    if (isActive) {
-      this.removeOverlay(processingType);
-    } else {
-      this.addProcessingOverlay(processingType);
-    }
+  getActiveOverlays() {
+    return { ...this.mapOverlays };
   },
 
   /**
-   * Add test overlay to map
-   * @param {string} imageData - Base64 encoded image data
-   * @param {Array} bounds - Image bounds [[south, west], [north, east]]
-   */
-  addTestOverlay(imageData, bounds) {
-    const map = MapManager.getMap();
-    if (!map) {
-      Utils.log('error', 'Map not available for test overlay');
-      return false;
-    }
-
-    try {
-      // Remove existing test overlay if present
-      this.removeOverlay('TEST');
-
-      // Create new test overlay
-      const overlay = L.imageOverlay(
-        `data:image/png;base64,${imageData}`,
-        bounds,
-        {
-          opacity: 0.7,
-          interactive: false
-        }
-      ).addTo(map);
-
-      // Store overlay reference
-      this.mapOverlays['TEST'] = overlay;
-
-      Utils.log('info', 'Added test overlay to map with bounds:', bounds);
-      return true;
-
-    } catch (error) {
-      Utils.log('error', 'Failed to add test overlay', error);
-      return false;
-    }
-  },
-
-  /**
-   * Add satellite image overlay to map
-   * @param {string} imageFile - Image file path
-   * @param {string} bandType - Band type (RED, NIR, etc.)
-   */
-  addSatelliteImageOverlay(imageFile, bandType, regionName) {
-    const map = MapManager.getMap();
-    if (!map) {
-      Utils.log('error', 'Map not available for satellite overlay');
-      return false;
-    }
-
-    try {
-      // Remove existing satellite overlay of same type if present
-      const overlayKey = `SATELLITE_${bandType}`;
-      this.removeOverlay(overlayKey);
-
-      // For now, we'll need to get bounds from the backend
-      // This is a simplified implementation - in practice, you'd want to fetch the bounds
-      const defaultBounds = [
-        [45.51, -122.68],  // Portland area default bounds
-        [45.52, -122.67]
-      ];
-
-      // Construct the correct image path using regionName
-      const imagePath = regionName ? 
-        `/output/${regionName}/sentinel-2/${imageFile}` : 
-        `/api/image/${imageFile}`;
-
-      // Create new satellite overlay
-      const overlay = L.imageOverlay(
-        imagePath,
-        defaultBounds,
-        {
-          opacity: 0.8,
-          interactive: false
-        }
-      ).addTo(map);
-
-      // Store overlay reference
-      this.mapOverlays[overlayKey] = overlay;
-
-      Utils.log('info', `Added ${bandType} satellite overlay for region ${regionName} to map`);
-      Utils.showNotification(`Added ${bandType} band overlay to map`, 'success');
-      return true;
-
-    } catch (error) {
-      Utils.log('error', 'Failed to add satellite overlay', error);
-      Utils.showNotification(`Failed to add ${bandType} overlay`, 'error');
-      return false;
-    }
-  },
-
-  /**
-   * Clear all overlays
+   * Clear all overlays from map
    */
   clearAllOverlays() {
     Object.keys(this.mapOverlays).forEach(processingType => {
       this.removeOverlay(processingType);
     });
-    Utils.log('info', 'Cleared all overlays');
+    Utils.log('info', 'All overlays cleared from map');
+  },
+
+  // Enhanced overlay management features
+
+  /**
+   * List available overlays with optional region filtering
+   * @param {string} regionName - Optional region name filter
+   */
+  async listAvailableOverlays(regionName = null) {
+    try {
+      const overlayList = await overlays().listAvailableOverlays(regionName);
+      this.displayOverlayList(overlayList);
+    } catch (error) {
+      Utils.log('error', 'Failed to list available overlays', error);
+      this.showOverlayNotification('Failed to load overlay list', 'error');
+    }
   },
 
   /**
-   * Get active overlays
-   * @returns {Array} Array of active overlay types
+   * Display overlay list in UI
+   * @param {Object} overlays - Overlays data
    */
-  getActiveOverlays() {
-    return Object.keys(this.mapOverlays);
+  displayOverlayList(overlays) {
+    const container = document.getElementById('overlay-list-container');
+    if (!container) {
+      Utils.log('warn', 'Overlay list container not found');
+      return;
+    }
+
+    container.innerHTML = '';
+
+    if (!overlays.overlays || overlays.overlays.length === 0) {
+      container.innerHTML = '<p class="no-overlays">No overlays available</p>';
+      return;
+    }
+
+    const listHTML = overlays.overlays.map(overlay => `
+      <div class="overlay-item" data-overlay-id="${overlay.id}">
+        <div class="overlay-header">
+          <h4>${overlay.name || overlay.id}</h4>
+          <div class="overlay-actions">
+            <button class="btn-small overlay-info-btn" data-overlay-id="${overlay.id}">Info</button>
+            <button class="btn-small overlay-controls-btn" data-overlay-id="${overlay.id}">Controls</button>
+            <button class="btn-small overlay-delete-btn" data-overlay-id="${overlay.id}">Delete</button>
+          </div>
+        </div>
+        <div class="overlay-meta">
+          <span class="overlay-type">${overlay.processing_type || 'Unknown'}</span>
+          <span class="overlay-region">${overlay.region || 'N/A'}</span>
+        </div>
+      </div>
+    `).join('');
+
+    container.innerHTML = listHTML;
+
+    // Add event listeners
+    container.addEventListener('click', this.handleOverlayListClick.bind(this));
+  },
+
+  /**
+   * Handle clicks in overlay list
+   * @param {Event} event - Click event
+   */
+  async handleOverlayListClick(event) {
+    const target = event.target;
+    const overlayId = target.dataset.overlayId;
+
+    if (!overlayId) return;
+
+    if (target.classList.contains('overlay-info-btn')) {
+      await this.showOverlayInfo(overlayId);
+    } else if (target.classList.contains('overlay-controls-btn')) {
+      await this.showOverlayControls(overlayId);
+    } else if (target.classList.contains('overlay-delete-btn')) {
+      await this.deleteOverlayWithConfirmation(overlayId);
+    }
+  },
+
+  /**
+   * Show detailed overlay information
+   * @param {string} overlayId - Overlay ID
+   */
+  async showOverlayInfo(overlayId) {
+    try {
+      const [metadata, statistics] = await Promise.all([
+        overlays().getOverlayMetadata(overlayId),
+        overlays().getOverlayStatistics(overlayId).catch(() => null)
+      ]);
+
+      const modal = this.createOverlayInfoModal(overlayId, metadata, statistics);
+      document.body.appendChild(modal);
+    } catch (error) {
+      Utils.log('error', 'Failed to get overlay information', error);
+      this.showOverlayNotification('Failed to load overlay information', 'error');
+    }
+  },
+
+  /**
+   * Create overlay info modal
+   * @param {string} overlayId - Overlay ID
+   * @param {Object} metadata - Overlay metadata
+   * @param {Object} statistics - Overlay statistics
+   * @returns {HTMLElement} Modal element
+   */
+  createOverlayInfoModal(overlayId, metadata, statistics) {
+    const modal = document.createElement('div');
+    modal.className = 'overlay-modal';
+    modal.innerHTML = `
+      <div class="overlay-modal-content">
+        <div class="overlay-modal-header">
+          <h3>Overlay Information</h3>
+          <button class="overlay-modal-close">&times;</button>
+        </div>
+        <div class="overlay-modal-body">
+          <div class="overlay-info-section">
+            <h4>Metadata</h4>
+            <div class="overlay-info-grid">
+              <div class="info-item">
+                <label>ID:</label>
+                <span>${overlayId}</span>
+              </div>
+              <div class="info-item">
+                <label>Name:</label>
+                <span>${metadata.name || 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <label>Type:</label>
+                <span>${metadata.processing_type || 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <label>Region:</label>
+                <span>${metadata.region || 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <label>Created:</label>
+                <span>${metadata.created_at || 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <label>Format:</label>
+                <span>${metadata.format || 'N/A'}</span>
+              </div>
+            </div>
+          </div>
+          ${statistics ? `
+            <div class="overlay-info-section">
+              <h4>Statistics</h4>
+              <div class="overlay-info-grid">
+                <div class="info-item">
+                  <label>Min Value:</label>
+                  <span>${statistics.min_value || 'N/A'}</span>
+                </div>
+                <div class="info-item">
+                  <label>Max Value:</label>
+                  <span>${statistics.max_value || 'N/A'}</span>
+                </div>
+                <div class="info-item">
+                  <label>Mean:</label>
+                  <span>${statistics.mean || 'N/A'}</span>
+                </div>
+                <div class="info-item">
+                  <label>Std Dev:</label>
+                  <span>${statistics.std_dev || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+
+    // Add close event listener
+    modal.querySelector('.overlay-modal-close').addEventListener('click', () => {
+      document.body.removeChild(modal);
+    });
+
+    // Close on outside click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+
+    return modal;
+  },
+
+  /**
+   * Show overlay controls
+   * @param {string} overlayId - Overlay ID
+   */
+  async showOverlayControls(overlayId) {
+    try {
+      const metadata = await overlays().getOverlayMetadata(overlayId);
+      const modal = this.createOverlayControlsModal(overlayId, metadata);
+      document.body.appendChild(modal);
+    } catch (error) {
+      Utils.log('error', 'Failed to load overlay controls', error);
+      this.showOverlayNotification('Failed to load overlay controls', 'error');
+    }
+  },
+
+  /**
+   * Create overlay controls modal
+   * @param {string} overlayId - Overlay ID
+   * @param {Object} metadata - Overlay metadata
+   * @returns {HTMLElement} Modal element
+   */
+  createOverlayControlsModal(overlayId, metadata) {
+    const modal = document.createElement('div');
+    modal.className = 'overlay-modal';
+    modal.innerHTML = `
+      <div class="overlay-modal-content">
+        <div class="overlay-modal-header">
+          <h3>Overlay Controls</h3>
+          <button class="overlay-modal-close">&times;</button>
+        </div>
+        <div class="overlay-modal-body">
+          <div class="overlay-control-section">
+            <h4>Opacity</h4>
+            <div class="control-group">
+              <input type="range" id="opacity-slider" min="0" max="100" value="${(metadata.opacity || 1) * 100}">
+              <span id="opacity-value">${Math.round((metadata.opacity || 1) * 100)}%</span>
+            </div>
+          </div>
+          
+          <div class="overlay-control-section">
+            <h4>Visibility</h4>
+            <div class="control-group">
+              <label class="toggle-switch">
+                <input type="checkbox" id="visibility-toggle" ${metadata.visible !== false ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+              </label>
+              <span>Visible</span>
+            </div>
+          </div>
+
+          <div class="overlay-control-section">
+            <h4>Color Ramp</h4>
+            <div class="control-group">
+              <select id="color-ramp-select">
+                <option value="viridis">Viridis</option>
+                <option value="plasma">Plasma</option>
+                <option value="inferno">Inferno</option>
+                <option value="magma">Magma</option>
+                <option value="coolwarm">Cool Warm</option>
+                <option value="rainbow">Rainbow</option>
+              </select>
+              <button class="btn-small" id="apply-color-ramp">Apply</button>
+            </div>
+          </div>
+
+          <div class="overlay-control-section">
+            <h4>Actions</h4>
+            <div class="control-actions">
+              <button class="btn" id="crop-overlay-btn">Crop Overlay</button>
+              <button class="btn" id="export-overlay-btn">Export Overlay</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Add event listeners
+    const closeBtn = modal.querySelector('.overlay-modal-close');
+    closeBtn.addEventListener('click', () => document.body.removeChild(modal));
+
+    const opacitySlider = modal.querySelector('#opacity-slider');
+    const opacityValue = modal.querySelector('#opacity-value');
+    opacitySlider.addEventListener('input', async (e) => {
+      const opacity = e.target.value / 100;
+      opacityValue.textContent = `${e.target.value}%`;
+      await this.updateOverlayOpacity(overlayId, opacity);
+    });
+
+    const visibilityToggle = modal.querySelector('#visibility-toggle');
+    visibilityToggle.addEventListener('change', async (e) => {
+      await this.toggleOverlayVisibility(overlayId, e.target.checked);
+    });
+
+    const applyColorRampBtn = modal.querySelector('#apply-color-ramp');
+    const colorRampSelect = modal.querySelector('#color-ramp-select');
+    applyColorRampBtn.addEventListener('click', async () => {
+      await this.applyColorRamp(overlayId, colorRampSelect.value);
+    });
+
+    const cropBtn = modal.querySelector('#crop-overlay-btn');
+    cropBtn.addEventListener('click', () => {
+      document.body.removeChild(modal);
+      this.showCropOverlayDialog(overlayId);
+    });
+
+    const exportBtn = modal.querySelector('#export-overlay-btn');
+    exportBtn.addEventListener('click', async () => {
+      await this.exportOverlay(overlayId);
+    });
+
+    return modal;
+  },
+
+  /**
+   * Update overlay opacity
+   * @param {string} overlayId - Overlay ID
+   * @param {number} opacity - Opacity value (0.0 to 1.0)
+   */
+  async updateOverlayOpacity(overlayId, opacity) {
+    try {
+      await overlays().updateOverlayOpacity(overlayId, opacity);
+      Utils.log('info', `Updated overlay ${overlayId} opacity to ${opacity}`);
+    } catch (error) {
+      Utils.log('error', 'Failed to update overlay opacity', error);
+      this.showOverlayNotification('Failed to update opacity', 'error');
+    }
+  },
+
+  /**
+   * Toggle overlay visibility
+   * @param {string} overlayId - Overlay ID
+   * @param {boolean} visible - Visibility state
+   */
+  async toggleOverlayVisibility(overlayId, visible) {
+    try {
+      await overlays().toggleOverlayVisibility(overlayId, visible);
+      Utils.log('info', `Toggled overlay ${overlayId} visibility to ${visible}`);
+    } catch (error) {
+      Utils.log('error', 'Failed to toggle overlay visibility', error);
+      this.showOverlayNotification('Failed to toggle visibility', 'error');
+    }
+  },
+
+  /**
+   * Apply color ramp to overlay
+   * @param {string} overlayId - Overlay ID
+   * @param {string} colorRamp - Color ramp name
+   */
+  async applyColorRamp(overlayId, colorRamp) {
+    try {
+      const result = await overlays().applyColorRamp(overlayId, colorRamp);
+      this.showOverlayNotification(`Applied ${colorRamp} color ramp`, 'success');
+      Utils.log('info', `Applied color ramp ${colorRamp} to overlay ${overlayId}`, result);
+    } catch (error) {
+      Utils.log('error', 'Failed to apply color ramp', error);
+      this.showOverlayNotification('Failed to apply color ramp', 'error');
+    }
+  },
+
+  /**
+   * Show crop overlay dialog
+   * @param {string} overlayId - Overlay ID
+   */
+  showCropOverlayDialog(overlayId) {
+    const modal = document.createElement('div');
+    modal.className = 'overlay-modal';
+    modal.innerHTML = `
+      <div class="overlay-modal-content">
+        <div class="overlay-modal-header">
+          <h3>Crop Overlay</h3>
+          <button class="overlay-modal-close">&times;</button>
+        </div>
+        <div class="overlay-modal-body">
+          <div class="crop-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>North (Max Lat):</label>
+                <input type="number" id="crop-north" step="0.000001" placeholder="e.g., 45.123456">
+              </div>
+              <div class="form-group">
+                <label>South (Min Lat):</label>
+                <input type="number" id="crop-south" step="0.000001" placeholder="e.g., 45.123456">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>East (Max Lng):</label>
+                <input type="number" id="crop-east" step="0.000001" placeholder="e.g., -122.123456">
+              </div>
+              <div class="form-group">
+                <label>West (Min Lng):</label>
+                <input type="number" id="crop-west" step="0.000001" placeholder="e.g., -122.123456">
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn" id="crop-apply-btn">Apply Crop</button>
+              <button class="btn btn-secondary" id="crop-cancel-btn">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Add event listeners
+    modal.querySelector('.overlay-modal-close').addEventListener('click', () => {
+      document.body.removeChild(modal);
+    });
+
+    modal.querySelector('#crop-cancel-btn').addEventListener('click', () => {
+      document.body.removeChild(modal);
+    });
+
+    modal.querySelector('#crop-apply-btn').addEventListener('click', async () => {
+      const north = parseFloat(modal.querySelector('#crop-north').value);
+      const south = parseFloat(modal.querySelector('#crop-south').value);
+      const east = parseFloat(modal.querySelector('#crop-east').value);
+      const west = parseFloat(modal.querySelector('#crop-west').value);
+
+      if (isNaN(north) || isNaN(south) || isNaN(east) || isNaN(west)) {
+        this.showOverlayNotification('Please enter valid coordinates', 'error');
+        return;
+      }
+
+      const bounds = {
+        north: north,
+        south: south,
+        east: east,
+        west: west
+      };
+
+      try {
+        const result = await overlays().cropOverlay(overlayId, bounds);
+        this.showOverlayNotification('Overlay cropped successfully', 'success');
+        Utils.log('info', `Cropped overlay ${overlayId}`, result);
+        document.body.removeChild(modal);
+      } catch (error) {
+        Utils.log('error', 'Failed to crop overlay', error);
+        this.showOverlayNotification('Failed to crop overlay', 'error');
+      }
+    });
+  },
+
+  /**
+   * Export overlay
+   * @param {string} overlayId - Overlay ID
+   * @param {string} format - Export format
+   */
+  async exportOverlay(overlayId, format = 'png') {
+    try {
+      const result = await overlays().exportOverlay(overlayId, format);
+      
+      if (result.download_url) {
+        // Create download link
+        const link = document.createElement('a');
+        link.href = result.download_url;
+        link.download = result.filename || `overlay_${overlayId}.${format}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        this.showOverlayNotification('Overlay exported successfully', 'success');
+      }
+      
+      Utils.log('info', `Exported overlay ${overlayId}`, result);
+    } catch (error) {
+      Utils.log('error', 'Failed to export overlay', error);
+      this.showOverlayNotification('Failed to export overlay', 'error');
+    }
+  },
+
+  /**
+   * Delete overlay with confirmation
+   * @param {string} overlayId - Overlay ID
+   */
+  async deleteOverlayWithConfirmation(overlayId) {
+    if (!confirm(`Are you sure you want to delete overlay ${overlayId}?`)) {
+      return;
+    }
+
+    try {
+      await overlays().deleteOverlay(overlayId);
+      this.showOverlayNotification('Overlay deleted successfully', 'success');
+      Utils.log('info', `Deleted overlay ${overlayId}`);
+      
+      // Refresh overlay list if displayed
+      this.listAvailableOverlays();
+    } catch (error) {
+      Utils.log('error', 'Failed to delete overlay', error);
+      this.showOverlayNotification('Failed to delete overlay', 'error');
+    }
+  },
+
+  /**
+   * Create composite overlay from multiple overlays
+   * @param {string[]} overlayIds - Array of overlay IDs
+   * @param {string} outputName - Name for composite overlay
+   */
+  async createCompositeOverlay(overlayIds, outputName) {
+    try {
+      const result = await overlays().createCompositeOverlay(overlayIds, outputName);
+      this.showOverlayNotification('Composite overlay created successfully', 'success');
+      Utils.log('info', `Created composite overlay: ${outputName}`, result);
+      
+      // Refresh overlay list
+      this.listAvailableOverlays();
+    } catch (error) {
+      Utils.log('error', 'Failed to create composite overlay', error);
+      this.showOverlayNotification('Failed to create composite overlay', 'error');
+    }
   }
 };

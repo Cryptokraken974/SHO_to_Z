@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAZ Coordinate Debug Tool</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+        }
+        .coordinate-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .coordinate-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .coord-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .coord-table th, .coord-table td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .coord-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #f5c6cb;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #c3e6cb;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .json-output {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LAZ Coordinate Debug Tool</h1>
+        
+        <div class="form-group">
+            <label for="filePath">LAZ File Path:</label>
+            <input type="text" id="filePath" placeholder="e.g., NP_T-0251.laz or output/some-file/lidar/DEM/processed.tif">
+        </div>
+        
+        <div class="form-group">
+            <label for="srcEpsg">Source EPSG Code:</label>
+            <select id="srcEpsg">
+                <option value="31978">31978 (SIRGAS 2000 / UTM zone 18S - Brazil)</option>
+                <option value="31979">31979 (SIRGAS 2000 / UTM zone 19S)</option>
+                <option value="31980">31980 (SIRGAS 2000 / UTM zone 20S)</option>
+                <option value="31981">31981 (SIRGAS 2000 / UTM zone 21S)</option>
+                <option value="32618">32618 (WGS 84 / UTM zone 18N)</option>
+                <option value="32718">32718 (WGS 84 / UTM zone 18S)</option>
+                <option value="3857">3857 (Web Mercator)</option>
+                <option value="4326">4326 (WGS84 - Lat/Lng)</option>
+            </select>
+        </div>
+        
+        <button onclick="debugCoordinates()">Debug Coordinates</button>
+        <button onclick="getFileBounds()">Get File Bounds (Production)</button>
+        <button onclick="listLazFiles()">List Available Files</button>
+        
+        <div id="results" class="results" style="display: none;">
+            <h2>Results</h2>
+            <div id="resultsContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/laz';
+        
+        function showResults(content) {
+            document.getElementById('resultsContent').innerHTML = content;
+            document.getElementById('results').style.display = 'block';
+        }
+        
+        function showLoading() {
+            showResults('<div class="loading">Loading...</div>');
+        }
+        
+        function showError(message) {
+            showResults(`<div class="error">Error: ${message}</div>`);
+        }
+        
+        async function debugCoordinates() {
+            const filePath = document.getElementById('filePath').value.trim();
+            const srcEpsg = document.getElementById('srcEpsg').value;
+            
+            if (!filePath) {
+                showError('Please enter a file path');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch(`${API_BASE}/debug-coordinates/${filePath}?src_epsg=${srcEpsg}`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showError(data.detail || `HTTP ${response.status}`);
+                    return;
+                }
+                
+                displayDebugResults(data);
+            } catch (error) {
+                showError(`Network error: ${error.message}`);
+            }
+        }
+        
+        async function getFileBounds() {
+            const filePath = document.getElementById('filePath').value.trim();
+            const srcEpsg = document.getElementById('srcEpsg').value;
+            
+            if (!filePath) {
+                showError('Please enter a file path');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch(`${API_BASE}/bounds-wgs84?file_path=${encodeURIComponent(filePath)}&src_epsg=${srcEpsg}`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showError(data.detail || `HTTP ${response.status}`);
+                    return;
+                }
+                
+                displayProductionResults(data);
+            } catch (error) {
+                showError(`Network error: ${error.message}`);
+            }
+        }
+        
+        async function listLazFiles() {
+            showLoading();
+            
+            try {
+                const response = await fetch(`${API_BASE}/files`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showError(data.detail || `HTTP ${response.status}`);
+                    return;
+                }
+                
+                displayFileList(data);
+            } catch (error) {
+                showError(`Network error: ${error.message}`);
+            }
+        }
+        
+        function displayDebugResults(data) {
+            let html = '<div class="success">Debug analysis completed successfully!</div>';
+            
+            // File info
+            html += `
+                <div class="coordinate-section">
+                    <h3>File Information</h3>
+                    <table class="coord-table">
+                        <tr><th>Property</th><th>Value</th></tr>
+                        <tr><td>Name</td><td>${data.file_info.name}</td></tr>
+                        <tr><td>Size</td><td>${data.file_info.size_mb} MB</td></tr>
+                        <tr><td>Path</td><td>${data.file_info.path}</td></tr>
+                    </table>
+                </div>
+            `;
+            
+            // Raw bounds
+            if (data.raw_bounds_result) {
+                html += `
+                    <div class="coordinate-section">
+                        <h3>Raw PDAL Output</h3>
+                        <div class="json-output">${JSON.stringify(data.raw_bounds_result, null, 2)}</div>
+                    </div>
+                `;
+            }
+            
+            const coord = data.coordinate_analysis;
+            
+            // Original coordinates
+            if (coord.original_bounds) {
+                const orig = coord.original_bounds;
+                html += `
+                    <div class="coordinate-section">
+                        <h3>Original Coordinates (${orig.coordinate_system})</h3>
+                        <table class="coord-table">
+                            <tr><th>Property</th><th>Value</th></tr>
+                            <tr><td>Min X</td><td>${orig.min_x.toFixed(2)}</td></tr>
+                            <tr><td>Max X</td><td>${orig.max_x.toFixed(2)}</td></tr>
+                            <tr><td>Min Y</td><td>${orig.min_y.toFixed(2)}</td></tr>
+                            <tr><td>Max Y</td><td>${orig.max_y.toFixed(2)}</td></tr>
+                            <tr><td>Center X</td><td>${orig.center_x.toFixed(2)}</td></tr>
+                            <tr><td>Center Y</td><td>${orig.center_y.toFixed(2)}</td></tr>
+                            <tr><td>Width</td><td>${orig.width.toFixed(2)}</td></tr>
+                            <tr><td>Height</td><td>${orig.height.toFixed(2)}</td></tr>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            // Transformed coordinates
+            if (coord.transformed_bounds) {
+                const trans = coord.transformed_bounds;
+                html += `
+                    <div class="coordinate-section">
+                        <h3>Transformed Coordinates (${trans.coordinate_system})</h3>
+                        <table class="coord-table">
+                            <tr><th>Property</th><th>Value</th></tr>
+                            <tr><td>North</td><td>${trans.bounding_box.north.toFixed(6)}</td></tr>
+                            <tr><td>South</td><td>${trans.bounding_box.south.toFixed(6)}</td></tr>
+                            <tr><td>East</td><td>${trans.bounding_box.east.toFixed(6)}</td></tr>
+                            <tr><td>West</td><td>${trans.bounding_box.west.toFixed(6)}</td></tr>
+                            <tr><td><strong>Center Lat</strong></td><td><strong>${trans.center.lat.toFixed(6)}</strong></td></tr>
+                            <tr><td><strong>Center Lng</strong></td><td><strong>${trans.center.lng.toFixed(6)}</strong></td></tr>
+                        </table>
+                        
+                        <h4>Corner Points</h4>
+                        <table class="coord-table">
+                            <tr><th>Corner</th><th>Latitude</th><th>Longitude</th></tr>
+                            <tr><td>Southwest</td><td>${trans.corners.southwest.lat.toFixed(6)}</td><td>${trans.corners.southwest.lon.toFixed(6)}</td></tr>
+                            <tr><td>Northeast</td><td>${trans.corners.northeast.lat.toFixed(6)}</td><td>${trans.corners.northeast.lon.toFixed(6)}</td></tr>
+                            <tr><td>Northwest</td><td>${trans.corners.northwest.lat.toFixed(6)}</td><td>${trans.corners.northwest.lon.toFixed(6)}</td></tr>
+                            <tr><td>Southeast</td><td>${trans.corners.southeast.lat.toFixed(6)}</td><td>${trans.corners.southeast.lon.toFixed(6)}</td></tr>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            // Show any errors
+            if (coord.error) {
+                html += `<div class="error">Analysis Error: ${coord.error}</div>`;
+            }
+            
+            if (coord.transformation_error) {
+                html += `<div class="error">Transformation Error: ${coord.transformation_error}</div>`;
+            }
+            
+            // Full JSON output
+            html += `
+                <div class="coordinate-section">
+                    <h3>Complete Debug Output</h3>
+                    <div class="json-output">${JSON.stringify(data, null, 2)}</div>
+                </div>
+            `;
+            
+            showResults(html);
+        }
+        
+        function displayProductionResults(data) {
+            let html = '<div class="success">Production bounds retrieved successfully!</div>';
+            
+            if (data.error) {
+                html = `<div class="error">${data.error}</div>`;
+                showResults(html);
+                return;
+            }
+            
+            if (data.center) {
+                html += `
+                    <div class="coordinate-section">
+                        <h3>Map Center Coordinates</h3>
+                        <table class="coord-table">
+                            <tr><th>Property</th><th>Value</th></tr>
+                            <tr><td><strong>Latitude</strong></td><td><strong>${data.center.lat.toFixed(6)}</strong></td></tr>
+                            <tr><td><strong>Longitude</strong></td><td><strong>${data.center.lng.toFixed(6)}</strong></td></tr>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            if (data.bounds) {
+                html += `
+                    <div class="coordinate-section">
+                        <h3>Bounding Box</h3>
+                        <table class="coord-table">
+                            <tr><th>Direction</th><th>Value</th></tr>
+                            <tr><td>North</td><td>${data.bounds.north.toFixed(6)}</td></tr>
+                            <tr><td>South</td><td>${data.bounds.south.toFixed(6)}</td></tr>
+                            <tr><td>East</td><td>${data.bounds.east.toFixed(6)}</td></tr>
+                            <tr><td>West</td><td>${data.bounds.west.toFixed(6)}</td></tr>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            html += `
+                <div class="coordinate-section">
+                    <h3>Complete Production Output</h3>
+                    <div class="json-output">${JSON.stringify(data, null, 2)}</div>
+                </div>
+            `;
+            
+            showResults(html);
+        }
+        
+        function displayFileList(files) {
+            let html = `<div class="success">Found ${files.length} files</div>`;
+            
+            html += `
+                <div class="coordinate-section">
+                    <h3>Available LAZ Files</h3>
+                    <table class="coord-table">
+                        <tr><th>Name</th><th>Type</th><th>Size (MB)</th><th>Modified</th><th>Action</th></tr>
+            `;
+            
+            files.forEach(file => {
+                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                const date = new Date(file.modified).toLocaleDateString();
+                html += `
+                    <tr>
+                        <td>${file.name}</td>
+                        <td>${file.type}</td>
+                        <td>${sizeMB}</td>
+                        <td>${date}</td>
+                        <td><button onclick="document.getElementById('filePath').value='${file.path}'">Use This File</button></td>
+                    </tr>
+                `;
+            });
+            
+            html += '</table></div>';
+            
+            showResults(html);
+        }
+    </script>
+</body>
+</html>

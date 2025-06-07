@@ -456,20 +456,7 @@ window.SavedPlaces = {
    */
   async saveToStorage() {
     try {
-      const response = await fetch('/api/saved-places', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          places: this.savedPlaces
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
+      const response = await savedPlaces().savePlaces(this.savedPlaces);
       Utils.log('info', 'Saved places data saved to storage successfully');
     } catch (error) {
       Utils.log('error', 'Failed to save places to storage', error);
@@ -490,15 +477,9 @@ window.SavedPlaces = {
    */
   async loadFromStorage() {
     try {
-      const response = await fetch('/api/saved-places');
-      
-      if (response.ok) {
-        const data = await response.json();
-        this.savedPlaces = data.places || [];
-        Utils.log('info', `Loaded ${this.savedPlaces.length} saved places from storage`);
-      } else {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      const data = await savedPlaces().getSavedPlaces();
+      this.savedPlaces = data.places || [];
+      Utils.log('info', `Loaded ${this.savedPlaces.length} saved places from storage`);
     } catch (error) {
       Utils.log('warning', 'Failed to load places from API, trying localStorage', error);
       

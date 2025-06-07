@@ -61,19 +61,49 @@ window.ProcessingManager = {
         Utils.log('info', `Starting ${processingType} processing for file: ${selectedFile}`, {input_file: selectedFile, ...options});
       }
 
-      // Send processing request with form data
-      const response = await fetch(`/api/${processingType}`, {
-        method: 'POST',
-        body: formData  // No need for Content-Type header with FormData
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        this.handleProcessingError(processingType, errorData.detail || `HTTP ${response.status}`);
-        return false;
+      // Send processing request with API client using service-oriented methods
+      const processingOptions = {};
+      
+      // Convert FormData to options object
+      for (const [key, value] of formData.entries()) {
+        processingOptions[key] = value;
       }
 
-      const data = await response.json();
+      // Use specific service methods based on processing type
+      let data;
+      switch (processingType) {
+        case 'dtm':
+          data = await processing().generateDTM(processingOptions);
+          break;
+        case 'dsm':
+          data = await processing().generateDSM(processingOptions);
+          break;
+        case 'chm':
+          data = await processing().generateCHM(processingOptions);
+          break;
+        case 'hillshade':
+          data = await processing().generateHillshade(processingOptions);
+          break;
+        case 'slope':
+          data = await processing().generateSlope(processingOptions);
+          break;
+        case 'aspect':
+          data = await processing().generateAspect(processingOptions);
+          break;
+        case 'color-relief':
+          data = await processing().generateColorRelief(processingOptions);
+          break;
+        case 'tpi':
+          data = await processing().generateTPI(processingOptions);
+          break;
+        case 'roughness':
+          data = await processing().generateRoughness(processingOptions);
+          break;
+        default:
+          // Fallback to generic method for unknown processing types
+          data = await processing().processRegion(processingType, processingOptions);
+          break;
+      }
 
       // Check for successful response - either has success=true OR has image data
       if (data.success || data.image) {
@@ -153,20 +183,12 @@ window.ProcessingManager = {
       if (selectedRegion) {
         // Region-based processing: use the new raster API endpoint
         displayIdentifier = selectedRegion;
-        response = await fetch(`/api/overlay/raster/${selectedRegion}/${processingType}`);
+        overlayData = await overlays().getRasterOverlayData(selectedRegion, processingType);
       } else {
-        // LAZ file-based processing: use the original overlay API
+        // LAZ file-based processing: use the file-based overlay API
         displayIdentifier = selectedFile.replace(/\.[^/.]+$/, "");
-        response = await fetch(`/api/overlay/${processingType}/${displayIdentifier}`);
+        overlayData = await overlays().getOverlayData(processingType, displayIdentifier);
       }
-
-      
-      if (!response.ok) {
-        Utils.log('warn', `No PNG data available for ${processingType}: ${response.status}`);
-        return;
-      }
-
-      const overlayData = await response.json();
       
       if (!overlayData || !overlayData.image_data) {
         Utils.log('warn', `No image data in overlay response for ${processingType}`);
@@ -462,10 +484,21 @@ window.ProcessingManager = {
     }
 
     try {
-      // Note: No backend cancel endpoint available, so we just update the UI
+      // Try to cancel processing on the backend using the new service method
+      const selectedRegion = FileManager.getSelectedRegion();
+      if (selectedRegion) {
+        try {
+          await processing().cancelProcessing(selectedRegion);
+          Utils.log('info', `Backend processing cancelled for region: ${selectedRegion}`);
+        } catch (error) {
+          Utils.log('warn', `Backend cancellation failed, proceeding with local cancellation: ${error.message}`);
+        }
+      }
+      
+      // Always update local state
       this.activeProcesses.delete(processingType);
       this.updateProcessingUI(processingType, 'idle');
-      Utils.showNotification(`${processingType} processing cancelled locally`, 'info');
+      Utils.showNotification(`${processingType} processing cancelled`, 'info');
       return true;
       
     } catch (error) {
@@ -762,5 +795,142 @@ window.ProcessingManager = {
     setTimeout(() => {
       this.hideRasterProcessingUI();
     }, 5000);
+  },
+
+  // Service-Oriented Processing Methods
+  
+  /**
+   * List available LAZ files using the service
+   * @returns {Promise<Object>} List of LAZ files with metadata
+   */
+  async listLazFiles() {
+    try {
+      return await processing().listLazFiles();
+    } catch (error) {
+      Utils.log('error', 'Failed to list LAZ files', error);
+      Utils.showNotification('Failed to retrieve LAZ files list', 'error');
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Load a LAZ file using the service
+   * @param {File} file - LAZ file to upload
+   * @returns {Promise<Object>} Upload result
+   */
+  async loadLazFile(file) {
+    try {
+      Utils.showNotification('Uploading LAZ file...', 'info');
+      const result = await processing().loadLazFile(file);
+      
+      if (result.success) {
+        Utils.showNotification('LAZ file uploaded successfully', 'success');
+      } else {
+        Utils.showNotification('LAZ file upload failed', 'error');
+      }
+      
+      return result;
+    } catch (error) {
+      Utils.log('error', 'Failed to load LAZ file', error);
+      Utils.showNotification('Failed to upload LAZ file', 'error');
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Get LAZ file information using the service
+   * @param {string} filePath - Path to LAZ file
+   * @returns {Promise<Object>} LAZ file information
+   */
+  async getLazInfo(filePath) {
+    try {
+      return await processing().getLazInfo(filePath);
+    } catch (error) {
+      Utils.log('error', 'Failed to get LAZ info', error);
+      Utils.showNotification('Failed to retrieve LAZ file information', 'error');
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Generate all raster products for a region using the service
+   * @param {string} regionName - Region name
+   * @param {number} batchSize - Batch size for processing
+   * @returns {Promise<Object>} Batch generation result
+   */
+  async generateAllRastersForRegion(regionName, batchSize = 4) {
+    try {
+      Utils.showNotification(`Starting batch generation of all rasters for ${regionName}...`, 'info');
+      const result = await processing().generateAllRasters(regionName, batchSize);
+      
+      if (result.success) {
+        Utils.showNotification('Batch raster generation completed successfully', 'success');
+        
+        // Refresh the region display to show new rasters
+        setTimeout(() => {
+          UIManager.displayLidarRasterForRegion(regionName);
+        }, 1000);
+      } else {
+        Utils.showNotification('Batch raster generation failed', 'error');
+      }
+      
+      return result;
+    } catch (error) {
+      Utils.log('error', 'Failed to generate all rasters', error);
+      Utils.showNotification('Batch raster generation failed', 'error');
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Get processing status for a region using the service
+   * @param {string} regionName - Region name
+   * @returns {Promise<Object>} Processing status
+   */
+  async getProcessingStatusForRegion(regionName) {
+    try {
+      return await processing().getProcessingStatus(regionName);
+    } catch (error) {
+      Utils.log('error', 'Failed to get processing status', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Get processing history using the service
+   * @returns {Promise<Object>} Processing history
+   */
+  async getProcessingHistory() {
+    try {
+      return await processing().getProcessingHistory();
+    } catch (error) {
+      Utils.log('error', 'Failed to get processing history', error);
+      Utils.showNotification('Failed to retrieve processing history', 'error');
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Delete processed files for a region using the service
+   * @param {string} regionName - Region name
+   * @param {string[]} fileTypes - Optional array of file types to delete
+   * @returns {Promise<Object>} Deletion result
+   */
+  async deleteProcessedFiles(regionName, fileTypes = null) {
+    try {
+      const result = await processing().deleteProcessedFiles(regionName, fileTypes);
+      
+      if (result.success) {
+        Utils.showNotification(`Processed files deleted for ${regionName}`, 'success');
+      } else {
+        Utils.showNotification('Failed to delete processed files', 'error');
+      }
+      
+      return result;
+    } catch (error) {
+      Utils.log('error', 'Failed to delete processed files', error);
+      Utils.showNotification('Failed to delete processed files', 'error');
+      return { success: false, error: error.message };
+    }
   },
 };

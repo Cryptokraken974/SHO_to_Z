@@ -44,14 +44,9 @@ class GeoTiffLeftPanel {
     async loadFileTree() {
         console.log('📂 Loading GeoTiff file tree');
         try {
-            const response = await fetch('/api/geotiff/files');
-            if (response.ok) {
-                this.fileTree = await response.json();
-                this.renderFileTree();
-            } else {
-                console.error('Failed to load file tree');
-                this.showError('Failed to load file tree');
-            }
+            const response = await geotiff().listGeotiffFiles();
+            this.fileTree = response;
+            this.renderFileTree();
         } catch (error) {
             console.error('Error loading file tree:', error);
             this.showError('Error loading file tree');
@@ -202,6 +197,9 @@ class GeoTiffLeftPanel {
                 case 'crop':
                     await this.cropFile();
                     break;
+                case 'resample':
+                    await this.resampleFile();
+                    break;
                 case 'merge':
                     await this.mergeFiles();
                     break;
@@ -233,24 +231,22 @@ class GeoTiffLeftPanel {
     }
 
     async compressFile() {
-        const response = await fetch('/api/geotiff/compress', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filePath: this.selectedFile })
-        });
-
-        if (response.ok) {
-            const result = await response.json();
-            this.showSuccess(`File compressed successfully. New size: ${this.formatFileSize(result.newSize)}`);
-            this.loadFileTree(); // Refresh to show new file
-        } else {
-            throw new Error('Compression failed');
-        }
+        // Note: Compression functionality not available in geotiff_service.py
+        this.showError('Compression functionality is not currently available');
+        // const result = await geotiff().compressGeotiff(this.selectedFile);
+        // this.showSuccess(`File compressed successfully. New size: ${this.formatFileSize(result.newSize)}`);
+        // this.loadFileTree(); // Refresh to show new file
     }
 
     async cropFile() {
         if (window.geoTiffMainCanvas) {
             window.geoTiffMainCanvas.showCropDialog(this.selectedFile);
+        }
+    }
+
+    async resampleFile() {
+        if (window.geoTiffMainCanvas) {
+            window.geoTiffMainCanvas.showResampleDialog(this.selectedFile);
         }
     }
 
@@ -271,21 +267,11 @@ class GeoTiffLeftPanel {
             if (files.length === 0) return;
 
             try {
-                const formData = new FormData();
-                files.forEach(file => formData.append('files', file));
-
-                const response = await fetch('/api/geotiff/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                    this.showSuccess(`Uploaded ${result.uploadedCount} file(s) successfully`);
-                    this.loadFileTree();
-                } else {
-                    throw new Error('Upload failed');
-                }
+                // Note: Upload functionality not available in geotiff_service.py
+                this.showError('Upload functionality is not currently available through the service');
+                // const result = await geotiff().uploadGeotiffFiles(files);
+                // this.showSuccess(`Uploaded ${result.uploadedCount} file(s) successfully`);
+                // this.loadFileTree();
             } catch (error) {
                 this.showError(`Upload error: ${error.message}`);
             }
@@ -366,11 +352,8 @@ class GeoTiffLeftPanel {
             await window.geoTiffMainCanvas.loadFile(filePath);
             
             // Update detailed metadata in info panel
-            const response = await fetch(`/api/geotiff/metadata/${encodeURIComponent(filePath)}`);
-            if (response.ok) {
-                const metadata = await response.json();
-                this.updateDetailedMetadata(metadata);
-            }
+            const metadata = await geotiff().getGeotiffMetadata(filePath);
+            this.updateDetailedMetadata(metadata);
         } catch (error) {
             console.error('Error loading file metadata:', error);
             const metadataDiv = document.getElementById('detailed-metadata');
@@ -675,20 +658,8 @@ class GeoTiffLeftPanel {
                 
                 this.updateLazProgress(progress, `Loading ${file.name}...`);
                 
-                const formData = new FormData();
-                formData.append('file', file);
-
-                const response = await fetch('/api/laz/load', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                    loadedFiles.push(result);
-                } else {
-                    throw new Error(`Failed to load ${file.name}`);
-                }
+                const result = await laz().loadLAZFile(file);
+                loadedFiles.push(result);
             }
 
             this.updateLazProgress(100, 'Loading complete!');

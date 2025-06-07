@@ -362,39 +362,295 @@ class GeoTiffMainCanvas {
         }
     }
 
-    showError(message) {
-        const canvas = document.getElementById('geotiff-main-canvas');
-        if (canvas) {
-            canvas.innerHTML = `
-                <div class="flex items-center justify-center h-full">
-                    <div class="text-center">
-                        <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
-                        <h3 class="text-white text-lg font-semibold mb-2">Error</h3>
-                        <p class="text-[#ababab]">${message}</p>
+    /**
+     * Show crop dialog for a GeoTIFF file
+     * @param {string} filePath - Path to the file to crop
+     */
+    async showCropDialog(filePath) {
+        const dialog = document.createElement('div');
+        dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        dialog.innerHTML = `
+            <div class="bg-[#2a2a2a] rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-white text-lg font-semibold mb-4">Crop GeoTIFF</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-[#ababab] text-sm mb-1">Min X (West)</label>
+                        <input type="number" id="crop-min-x" class="w-full bg-[#1e1e1e] text-white p-2 rounded border border-[#3a3a3a]" step="any">
+                    </div>
+                    <div>
+                        <label class="block text-[#ababab] text-sm mb-1">Min Y (South)</label>
+                        <input type="number" id="crop-min-y" class="w-full bg-[#1e1e1e] text-white p-2 rounded border border-[#3a3a3a]" step="any">
+                    </div>
+                    <div>
+                        <label class="block text-[#ababab] text-sm mb-1">Max X (East)</label>
+                        <input type="number" id="crop-max-x" class="w-full bg-[#1e1e1e] text-white p-2 rounded border border-[#3a3a3a]" step="any">
+                    </div>
+                    <div>
+                        <label class="block text-[#ababab] text-sm mb-1">Max Y (North)</label>
+                        <input type="number" id="crop-max-y" class="w-full bg-[#1e1e1e] text-white p-2 rounded border border-[#3a3a3a]" step="any">
+                    </div>
+                    <div>
+                        <label class="block text-[#ababab] text-sm mb-1">Output Path (optional)</label>
+                        <input type="text" id="crop-output-path" class="w-full bg-[#1e1e1e] text-white p-2 rounded border border-[#3a3a3a]" placeholder="Leave empty for auto-generated">
                     </div>
                 </div>
-            `;
+                <div class="flex gap-3 mt-6">
+                    <button id="crop-cancel" class="flex-1 bg-[#3a3a3a] text-white px-4 py-2 rounded hover:bg-[#4a4a4a]">Cancel</button>
+                    <button id="crop-submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Crop</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+
+        // Event listeners
+        dialog.querySelector('#crop-cancel').addEventListener('click', () => {
+            document.body.removeChild(dialog);
+        });
+
+        dialog.querySelector('#crop-submit').addEventListener('click', async () => {
+            const bounds = {
+                min_x: parseFloat(document.getElementById('crop-min-x').value),
+                min_y: parseFloat(document.getElementById('crop-min-y').value),
+                max_x: parseFloat(document.getElementById('crop-max-x').value),
+                max_y: parseFloat(document.getElementById('crop-max-y').value)
+            };
+            const outputPath = document.getElementById('crop-output-path').value || null;
+
+            try {
+                const result = await geotiff().cropGeotiff(filePath, bounds, outputPath);
+                console.log('Crop result:', result);
+                this.showSuccessMessage('File cropped successfully');
+                document.body.removeChild(dialog);
+            } catch (error) {
+                console.error('Crop error:', error);
+                this.showErrorMessage(`Crop failed: ${error.message}`);
+            }
+        });
+    }
+
+    /**
+     * Show conversion dialog for a GeoTIFF file
+     * @param {string} filePath - Path to the file to convert
+     */
+    async showConversionDialog(filePath) {
+        const dialog = document.createElement('div');
+        dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        dialog.innerHTML = `
+            <div class="bg-[#2a2a2a] rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-white text-lg font-semibold mb-4">Convert GeoTIFF</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-[#ababab] text-sm mb-1">Conversion Type</label>
+                        <select id="conversion-type" class="w-full bg-[#1e1e1e] text-white p-2 rounded border border-[#3a3a3a]">
+                            <option value="png">Convert to PNG</option>
+                            <option value="base64">Convert to Base64 PNG</option>
+                        </select>
+                    </div>
+                    <div id="output-path-section">
+                        <label class="block text-[#ababab] text-sm mb-1">Output Path (optional)</label>
+                        <input type="text" id="conversion-output-path" class="w-full bg-[#1e1e1e] text-white p-2 rounded border border-[#3a3a3a]" placeholder="Leave empty for auto-generated">
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button id="conversion-cancel" class="flex-1 bg-[#3a3a3a] text-white px-4 py-2 rounded hover:bg-[#4a4a4a]">Cancel</button>
+                    <button id="conversion-submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Convert</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+
+        // Update UI based on conversion type
+        const conversionType = dialog.querySelector('#conversion-type');
+        const outputPathSection = dialog.querySelector('#output-path-section');
+        
+        conversionType.addEventListener('change', () => {
+            if (conversionType.value === 'base64') {
+                outputPathSection.style.display = 'none';
+            } else {
+                outputPathSection.style.display = 'block';
+            }
+        });
+
+        // Event listeners
+        dialog.querySelector('#conversion-cancel').addEventListener('click', () => {
+            document.body.removeChild(dialog);
+        });
+
+        dialog.querySelector('#conversion-submit').addEventListener('click', async () => {
+            const type = conversionType.value;
+            const outputPath = document.getElementById('conversion-output-path').value || null;
+
+            try {
+                let result;
+                if (type === 'png') {
+                    result = await geotiff().convertGeotiffToPng(filePath, outputPath);
+                } else if (type === 'base64') {
+                    result = await geotiff().convertToBase64(filePath);
+                }
+                
+                console.log('Conversion result:', result);
+                this.showSuccessMessage(`File converted to ${type.toUpperCase()} successfully`);
+                document.body.removeChild(dialog);
+            } catch (error) {
+                console.error('Conversion error:', error);
+                this.showErrorMessage(`Conversion failed: ${error.message}`);
+            }
+        });
+    }
+
+    /**
+     * Show file info with enhanced details using the new service
+     * @param {string} filePath - Path to the file
+     */
+    async showFileInfo(filePath) {
+        try {
+            // Get comprehensive file information
+            const [info, metadata, statistics] = await Promise.all([
+                geotiff().getGeotiffInfo(filePath),
+                geotiff().getGeotiffMetadata(filePath),
+                geotiff().getGeotiffStatistics(filePath).catch(() => null) // Statistics might not be available for all files
+            ]);
+
+            const canvas = document.getElementById('geotiff-main-canvas');
+            if (canvas) {
+                canvas.innerHTML = `
+                    <div class="p-6">
+                        <h2 class="text-white text-xl font-semibold mb-4">File Information</h2>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="bg-[#2a2a2a] rounded-lg p-4">
+                                <h3 class="text-white font-semibold mb-3">Basic Info</h3>
+                                <div class="space-y-2 text-sm">
+                                    ${Object.entries(info).map(([key, value]) => 
+                                        `<div class="flex justify-between">
+                                            <span class="text-[#ababab]">${key}:</span>
+                                            <span class="text-white">${value}</span>
+                                        </div>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                            <div class="bg-[#2a2a2a] rounded-lg p-4">
+                                <h3 class="text-white font-semibold mb-3">Metadata</h3>
+                                <div class="space-y-2 text-sm max-h-64 overflow-y-auto">
+                                    ${Object.entries(metadata).map(([key, value]) => 
+                                        `<div class="flex justify-between">
+                                            <span class="text-[#ababab]">${key}:</span>
+                                            <span class="text-white">${typeof value === 'object' ? JSON.stringify(value) : value}</span>
+                                        </div>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                            ${statistics ? `
+                                <div class="bg-[#2a2a2a] rounded-lg p-4 lg:col-span-2">
+                                    <h3 class="text-white font-semibold mb-3">Statistics</h3>
+                                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                                        ${Object.entries(statistics).map(([key, value]) => 
+                                            `<div class="text-center">
+                                                <div class="text-[#ababab]">${key}</div>
+                                                <div class="text-white font-semibold">${typeof value === 'number' ? value.toFixed(4) : value}</div>
+                                            </div>`
+                                        ).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading file info:', error);
+            this.showErrorMessage(`Failed to load file information: ${error.message}`);
         }
     }
 
-    showProcessingStatus(operation, progress) {
-        const canvas = document.getElementById('geotiff-main-canvas');
-        if (canvas) {
-            canvas.innerHTML = `
-                <div class="flex items-center justify-center h-full">
-                    <div class="text-center">
-                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00bfff] mx-auto mb-4"></div>
-                        <h3 class="text-white text-lg font-semibold mb-2">${operation}</h3>
-                        <p class="text-[#ababab] mb-4">Processing your GeoTiff file...</p>
-                        <div class="w-64 bg-[#303030] rounded-full h-2">
-                            <div class="bg-[#00bfff] h-2 rounded-full transition-all duration-300" style="width: ${progress}%"></div>
-                        </div>
-                        <p class="text-[#ababab] text-sm mt-2">${progress}% complete</p>
+    /**
+     * Show resample dialog for a GeoTIFF file
+     * @param {string} filePath - Path to the file to resample
+     */
+    async showResampleDialog(filePath) {
+        const dialog = document.createElement('div');
+        dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        dialog.innerHTML = `
+            <div class="bg-[#2a2a2a] rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-white text-lg font-semibold mb-4">Resample GeoTIFF</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-[#ababab] text-sm mb-1">Target Resolution</label>
+                        <input type="number" id="resample-resolution" class="w-full bg-[#1e1e1e] text-white p-2 rounded border border-[#3a3a3a]" step="any" placeholder="e.g., 30.0">
+                    </div>
+                    <div>
+                        <label class="block text-[#ababab] text-sm mb-1">Output Path (optional)</label>
+                        <input type="text" id="resample-output-path" class="w-full bg-[#1e1e1e] text-white p-2 rounded border border-[#3a3a3a]" placeholder="Leave empty for auto-generated">
                     </div>
                 </div>
-            `;
-        }
+                <div class="flex gap-3 mt-6">
+                    <button id="resample-cancel" class="flex-1 bg-[#3a3a3a] text-white px-4 py-2 rounded hover:bg-[#4a4a4a]">Cancel</button>
+                    <button id="resample-submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Resample</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+
+        // Event listeners
+        dialog.querySelector('#resample-cancel').addEventListener('click', () => {
+            document.body.removeChild(dialog);
+        });
+
+        dialog.querySelector('#resample-submit').addEventListener('click', async () => {
+            const resolution = parseFloat(document.getElementById('resample-resolution').value);
+            const outputPath = document.getElementById('resample-output-path').value || null;
+
+            if (isNaN(resolution) || resolution <= 0) {
+                this.showErrorMessage('Please enter a valid resolution');
+                return;
+            }
+
+            try {
+                const result = await geotiff().resampleGeotiff(filePath, resolution, outputPath);
+                console.log('Resample result:', result);
+                this.showSuccessMessage('File resampled successfully');
+                document.body.removeChild(dialog);
+            } catch (error) {
+                console.error('Resample error:', error);
+                this.showErrorMessage(`Resample failed: ${error.message}`);
+            }
+        });
     }
+
+    /**
+     * Show success message
+     * @param {string} message - Success message to display
+     */
+    showSuccessMessage(message) {
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50';
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        setTimeout(() => {
+            if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
+            }
+        }, 3000);
+    }
+
+    /**
+     * Show error message
+     * @param {string} message - Error message to display
+     */
+    showErrorMessage(message) {
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded shadow-lg z-50';
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        setTimeout(() => {
+            if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
+            }
+        }, 5000);
+    }
+
 }
 
 // Initialize GeoTiff Main Canvas when DOM is ready

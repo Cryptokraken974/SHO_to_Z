@@ -30,16 +30,9 @@ window.FileManager = {
     try {
       $('#file-list').html('<div class="loading">Loading regions...</div>');
       
-      // Build API endpoint with optional source filter
-      let url = '/api/list-regions';
-      if (source) {
-        url += `?source=${source}`;
-      }
+      console.log('🌐 API call via RegionAPIClient');
       
-      console.log('🌐 API call to:', url);
-      
-      const response = await fetch(url);
-      const data = await response.json();
+      const data = await regions().listRegions(source);
       
       if (data.error) {
         throw new Error(data.error);
@@ -48,8 +41,11 @@ window.FileManager = {
       console.log('✅ API response received:', data);
       console.log(`📊 Found ${(data.regions || []).length} regions in ${source || 'all'} folder(s)`);
       
-      this.displayRegions(data.regions || []); // MODIFIED to displayRegions and data.regions
-      this.createRegionMarkers(data.regions || []); // MODIFIED to createRegionMarkers and data.regions
+      // Fetch coordinates for LAZ files before displaying
+      const regionsWithCoords = await this.fetchLAZCoordinates(data.regions || []);
+      
+      this.displayRegions(regionsWithCoords); // MODIFIED to displayRegions and data.regions
+      this.createRegionMarkers(regionsWithCoords); // MODIFIED to createRegionMarkers and data.regions
       
     } catch (error) {
       console.error('❌ Error loading regions:', error);
@@ -73,12 +69,12 @@ window.FileManager = {
     }
     
     regions.forEach((regionInfo) => {
-      // regionInfo has: name (display), region_name (for processing), center_lat, center_lng, filePath
+      // regionInfo has: name (display), region_name (for processing), center_lat, center_lng, file_path
       const displayName = regionInfo.name;
       const processingRegion = regionInfo.region_name || regionInfo.name; // Fallback to name if region_name not available
       const coords = (regionInfo.center_lat && regionInfo.center_lng) ? 
                      { lat: parseFloat(regionInfo.center_lat), lng: parseFloat(regionInfo.center_lng) } : null;
-      const filePath = regionInfo.filePath; // Assume filePath is provided
+      const filePath = regionInfo.file_path; // Use correct property name from backend
       
       const coordsDisplay = coords ? 
         `<small class="file-coords">Lat: ${coords.lat.toFixed(4)}, Lng: ${coords.lng.toFixed(4)}</small>` : 
@@ -207,7 +203,7 @@ window.FileManager = {
     
     regions.forEach((regionInfo) => {
       const regionName = regionInfo.name;
-      const filePath = regionInfo.filePath; // Assume filePath is provided
+      const filePath = regionInfo.file_path; // Use correct property name from backend
       let coords = null;
       if (regionInfo.center_lat && regionInfo.center_lng) {
         coords = { lat: parseFloat(regionInfo.center_lat), lng: parseFloat(regionInfo.center_lng) };
@@ -302,11 +298,7 @@ window.FileManager = {
     try {
       Utils.log('info', `Deleting region: ${regionName}`);
       
-      const response = await fetch(`/api/delete-region/${regionName}`, {
-        method: 'DELETE',
-      });
-      
-      const data = await response.json();
+      const data = await regions().deleteRegion(regionName);
       
       if (data.success) {
         Utils.log('info', `Successfully deleted region: ${regionName}`, data);
@@ -343,5 +335,67 @@ window.FileManager = {
         message: error.message || 'An error occurred while deleting the region'
       };
     }
+  },
+
+  /**
+   * Fetch coordinates for LAZ files and update region data
+   * @param {Array} regions - Array of region information
+   * @returns {Array} Updated regions with coordinates for LAZ files
+   */
+  async fetchLAZCoordinates(regions) {
+    const updatedRegions = [...regions]; // Create a copy to avoid mutation
+    
+    Utils.log('info', 'Checking for LAZ files that need coordinate fetching...');
+    
+    // Find LAZ files that don't have coordinates
+    const lazRegions = updatedRegions.filter(region => {
+      const isLAZ = region.file_path && region.file_path.toLowerCase().endsWith('.laz');
+      const hasCoords = region.center_lat && region.center_lng;
+      return isLAZ && !hasCoords;
+    });
+    
+    if (lazRegions.length === 0) {
+      Utils.log('info', 'No LAZ files need coordinate fetching');
+      return updatedRegions;
+    }
+    
+    Utils.log('info', `Found ${lazRegions.length} LAZ files that need coordinates`);
+    
+    // Fetch coordinates for each LAZ file
+    for (const region of lazRegions) {
+      try {
+        Utils.log('info', `Fetching coordinates for LAZ file: ${region.file_path}`);
+        
+        // Extract just the filename from the file path
+        // region.file_path might be something like "input/LAZ/NP_T-0251.laz"
+        // but the backend expects just "NP_T-0251.laz"
+        const fileName = region.file_path.split('/').pop();
+        
+        // Use the LAZ API to get bounds
+        const boundsData = await APIClient.laz.getLAZFileBounds(fileName);
+        
+        if (boundsData && boundsData.center) {
+          // Update the region with coordinates
+          const regionIndex = updatedRegions.findIndex(r => r.file_path === region.file_path);
+          if (regionIndex !== -1) {
+            updatedRegions[regionIndex] = {
+              ...updatedRegions[regionIndex],
+              center_lat: boundsData.center.lat,
+              center_lng: boundsData.center.lng,
+              bounds: boundsData.bounds // Store full bounds if needed
+            };
+            
+            Utils.log('info', `Updated coordinates for ${region.name}: ${boundsData.center.lat}, ${boundsData.center.lng}`);
+          }
+        } else {
+          Utils.log('warn', `Failed to get coordinates for LAZ file: ${region.file_path}`);
+        }
+      } catch (error) {
+        Utils.log('error', `Error fetching coordinates for ${region.file_path}:`, error);
+        // Continue with other files even if one fails
+      }
+    }
+    
+    return updatedRegions;
   },
 };

@@ -689,15 +689,8 @@ window.UIManager = {
       // Use selectedRegion directly as it's the identifier (e.g., folder name)
       Utils.log('info', `Testing overlay for region: ${selectedRegion}`);
 
-      // Call the test overlay API endpoint, assuming it now takes regionName
-      const response = await fetch(`/api/test-overlay/${selectedRegion}`); // Pass region name
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
+      // Use overlay service from factory
+      const data = await overlays().getTestOverlayData(selectedRegion);
 
       if (data.success) {
         Utils.log('info', 'Test overlay successful:', data);
@@ -810,20 +803,8 @@ window.UIManager = {
         requestBody.region_name = regionName.trim();
       }
 
-      const response = await fetch('/api/download-sentinel2', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      const result = await response.json();
+      // Use satellite service from factory
+      const result = await satellite().downloadSentinel2Data(requestBody);
 
       if (result.success) {
         Utils.log('info', 'Sentinel-2 download successful:', result);
@@ -868,17 +849,8 @@ window.UIManager = {
       const formData = new FormData();
       formData.append('region_name', regionName);
 
-      const response = await fetch('/api/convert-sentinel2', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      const result = await response.json();
+      // Use satellite service from factory for Sentinel-2 conversion
+      const result = await satellite().convertSentinel2ToPNG(regionName);
 
       if (result.success && result.files && result.files.length > 0) {
         Utils.log('info', `Successfully converted ${result.files.length} Sentinel-2 images for ${regionName}`);
@@ -1061,20 +1033,17 @@ window.UIManager = {
           }
 
           const regionBand = `${apiRegionName}_${band}`;
-          const response = await fetch(`/api/overlay/sentinel2/${regionBand}`);
+          const overlayData = await satellite().getSentinel2Overlay(regionBand);
 
-          if (response.ok) {
-            const overlayData = await response.json();
-            if (overlayData && overlayData.image_data) {
-              availableBands.push({
-                band: band,
-                bandType: this.getSentinel2BandDisplayName(band),
-                overlayData: overlayData,
-                regionName: regionName,
-                filename: overlayData.filename || `${regionName}_${band}`
-              });
-              Utils.log('info', `Found ${band} data for region ${regionName}`);
-            }
+          if (overlayData && overlayData.image_data) {
+            availableBands.push({
+              band: band,
+              bandType: this.getSentinel2BandDisplayName(band),
+              overlayData: overlayData,
+              regionName: regionName,
+              filename: overlayData.filename || `${regionName}_${band}`
+            });
+            Utils.log('info', `Found ${band} data for region ${regionName}`);
           } else {
             // This is expected - not all bands may be available
             Utils.log('debug', `No ${band} data available for region ${regionName}`);
@@ -1263,21 +1232,18 @@ window.UIManager = {
       // Check each processing type for available raster data
       for (const processingType of processingTypes) {
         try {
-          const response = await fetch(`/api/overlay/raster/${regionName}/${processingType}`);
+          const overlayData = await overlays().getRasterOverlayData(regionName, processingType);
           
-          if (response.ok) {
-            const overlayData = await response.json();
-            if (overlayData && overlayData.image_data) {
-              availableRasters.push({
-                processingType: processingType,
-                display: this.getProcessingDisplayName(processingType),
-                color: this.getProcessingColor(processingType),
-                overlayData: overlayData,
-                regionName: regionName,
-                filename: overlayData.filename || `${regionName}_${processingType}`
-              });
-              Utils.log('info', `Found ${processingType} raster data for region ${regionName}`);
-            }
+          if (overlayData && overlayData.image_data) {
+            availableRasters.push({
+              processingType: processingType,
+              display: this.getProcessingDisplayName(processingType),
+              color: this.getProcessingColor(processingType),
+              overlayData: overlayData,
+              regionName: regionName,
+              filename: overlayData.filename || `${regionName}_${processingType}`
+            });
+            Utils.log('info', `Found ${processingType} raster data for region ${regionName}`);
           } else {
             // This is expected - not all processing types may be available
             Utils.log('debug', `No ${processingType} raster data available for region ${regionName}`);
@@ -1473,6 +1439,17 @@ window.UIManager = {
       this.analysisImages = [];
     }
     
+    // Initialize the AnalysisManager if it exists and hasn't been initialized
+    if (typeof AnalysisManager !== 'undefined' && !this.analysisManagerInitialized) {
+      try {
+        AnalysisManager.init();
+        this.analysisManagerInitialized = true;
+        Utils.log('info', 'AnalysisManager initialized');
+      } catch (error) {
+        Utils.log('error', 'Failed to initialize AnalysisManager:', error);
+      }
+    }
+    
     // Update the main area to show initial state
     this.updateAnalysisMainArea();
     
@@ -1503,13 +1480,9 @@ window.UIManager = {
    */
   async loadAnalysisImages(regionName) {
     try {
-      const response = await fetch(`/api/regions/${encodeURIComponent(regionName)}/images`);
+      // Use region API client
+      const data = await regions().getRegionImages(regionName);
       
-      if (!response.ok) {
-        throw new Error(`Failed to load images: ${response.status}`);
-      }
-      
-      const data = await response.json();
       // The API returns {images: [...], region_name: "...", total_images: 3}
       // so we need to access the images array
       const images = data.images || [];
@@ -1572,7 +1545,7 @@ window.UIManager = {
             <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
               ${typeIcon} ${imageType}
             </div>
-            <div class="absolute top-2 right-2 bg-opacity-75 text-white text-xs px-2 py-1 rounded"
+            <div class="absolute top-2 right-8 bg-opacity-75 text-white text-xs px-2 py-1 rounded"
                  style="background-color: ${typeColor};">
               ${processingType}
             </div>
@@ -1691,15 +1664,14 @@ window.UIManager = {
    * Update the analysis main area with selected images
    */
   updateAnalysisMainArea() {
-    const mainArea = $('#analysis-main-canvas');
+    const mainArea = $('#analysis-results-content');
     
     if (!this.analysisImages || this.analysisImages.length === 0) {
       mainArea.html(`
-        <div class="flex items-center justify-center h-full text-[#666]">
-          <div class="text-center">
-            <div class="text-xl mb-2">No images selected for analysis</div>
-            <div class="text-sm">Select images from the left panel to begin analysis</div>
-          </div>
+        <div class="text-[#ababab] text-center py-8">
+          <i class="fas fa-chart-line text-4xl mb-3 text-[#404040]"></i>
+          <p>Analysis results will be displayed here after running analysis tools</p>
+          <p class="text-sm mt-2">Select an analysis tool from the sidebar to get started</p>
         </div>
       `);
       return;
@@ -1881,14 +1853,8 @@ window.UIManager = {
     try {
       Utils.log('info', `Adding ${displayName} overlay for region ${regionName}`);
 
-      // Fetch overlay data from the raster API
-      const response = await fetch(`/api/overlay/raster/${regionName}/${processingType}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch overlay data: ${response.status}`);
-      }
-
-      const overlayData = await response.json();
+      // Use overlay API client for raster overlay data
+      const overlayData = await overlays().getRasterOverlayData(regionName, processingType);
       
       if (!overlayData.success || !overlayData.image_data || !overlayData.bounds) {
         throw new Error('Invalid overlay data received from server');
@@ -1937,14 +1903,8 @@ window.UIManager = {
     try {
       Utils.log('info', `Adding ${bType} Sentinel-2 overlay for ${regionBand}`);
 
-      // Fetch overlay data from the Sentinel-2 API
-      const response = await fetch(`/api/overlay/sentinel2/${regionBand}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch Sentinel-2 overlay data: ${response.status}`);
-      }
-
-      const overlayData = await response.json();
+      // Use satellite service from factory for Sentinel-2 overlay data
+      const overlayData = await satellite().getSentinel2Overlay(regionBand);
       
       if (!overlayData.bounds || !overlayData.image_data) {
         throw new Error('Invalid Sentinel-2 overlay data received from server');
@@ -2062,46 +2022,34 @@ window.UIManager = {
         lat: latNum,
         lng: lngNum,
         buffer_km: 2.0
-      };
-
-      if (effectiveRegionName) {
+      };      if (effectiveRegionName) {
         elevationRequest.region_name = effectiveRegionName;
       }
 
-      const response = await fetch('/api/elevation/download-coordinates', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(elevationRequest)
-      });
+      // Use elevation service from factory
+      const elevationService = elevation();
+      const result = await elevationService.downloadElevationData(elevationRequest);
 
-      let result = null;
-      if (response.ok) {
-        result = await response.json();
-        if (result.success) {
-          Utils.log('info', 'Elevation data acquisition completed');
-          Utils.showNotification('Successfully acquired elevation data!', 'success');
-          
-          // Refresh file list and region data
-          if (window.FileManager && window.FileManager.loadFiles) {
-            setTimeout(() => {
-              FileManager.loadFiles();
-            }, 1000);
-          }
-          
-          // If we have a region name, try to display elevation data
-          if (effectiveRegionName || result.metadata?.region_name) {
-            const displayRegionName = effectiveRegionName || result.metadata.region_name;
-            setTimeout(() => {
-              this.displayLidarRasterForRegion(displayRegionName);
-            }, 1500);
-          }
-        } else {
-          throw new Error(result.error || 'Elevation data acquisition failed');
+      if (result && result.success) {
+        Utils.log('info', 'Elevation data acquisition completed');
+        Utils.showNotification('Successfully acquired elevation data!', 'success');
+        
+        // Refresh file list and region data
+        if (window.FileManager && window.FileManager.loadFiles) {
+          setTimeout(() => {
+            FileManager.loadFiles();
+          }, 1000);
+        }
+        
+        // If we have a region name, try to display elevation data
+        if (effectiveRegionName || result.metadata?.region_name) {
+          const displayRegionName = effectiveRegionName || result.metadata.region_name;
+          setTimeout(() => {
+            this.displayLidarRasterForRegion(displayRegionName);
+          }, 1500);
         }
       } else {
-        throw new Error(`HTTP error: ${response.status}`);
+        throw new Error(result?.error || 'Elevation data acquisition failed');
       }
 
     } catch (error) {
@@ -2199,25 +2147,15 @@ window.UIManager = {
         elevationRequest.region_name = effectiveRegionName;
       }
 
-      const elevationResponse = await fetch('/api/elevation/download-coordinates', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(elevationRequest)
-      });
-
-      let elevationResult = null;
-      if (elevationResponse.ok) {
-        elevationResult = await elevationResponse.json();
-        if (elevationResult.success) {
-          Utils.log('info', 'Elevation data acquisition completed');
-          this.updateProgress(50, 'Elevation data acquired. Starting satellite data download...');
-        } else {
-          Utils.log('warn', 'Elevation data acquisition failed:', elevationResult.error);
-        }
+      // Use elevation service from factory
+      const elevationService = elevation();
+      const elevationResult = await elevationService.downloadElevationData(elevationRequest);
+      
+      if (elevationResult && elevationResult.success) {
+        Utils.log('info', 'Elevation data acquisition completed');
+        this.updateProgress(50, 'Elevation data acquired. Starting satellite data download...');
       } else {
-        Utils.log('warn', 'Elevation data acquisition request failed:', elevationResponse.status);
+        Utils.log('warn', 'Elevation data acquisition failed:', elevationResult?.error);
       }
 
       // Step 2: Acquire Sentinel-2 satellite data
@@ -2234,31 +2172,21 @@ window.UIManager = {
 
       this.updateProgress(75, 'Downloading Sentinel-2 satellite data...');
 
-      const sentinelResponse = await fetch('/api/download-sentinel2', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(sentinelRequest)
-      });
+      // Use satellite service from factory
+      const satelliteService = satellite();
+      const sentinelResult = await satelliteService.downloadSentinel2Data(sentinelRequest);
+      
+      if (sentinelResult && sentinelResult.success) {
+        Utils.log('info', 'Sentinel-2 data download completed');
+        this.updateProgress(90, 'Converting satellite images...');
 
-      let sentinelResult = null;
-      if (sentinelResponse.ok) {
-        sentinelResult = await sentinelResponse.json();
-        if (sentinelResult.success) {
-          Utils.log('info', 'Sentinel-2 data download completed');
-          this.updateProgress(90, 'Converting satellite images...');
-
-          // Auto-convert Sentinel-2 images if we have a region name
-          const sentinelRegionName = sentinelResult.metadata?.region_name || effectiveRegionName;
-          if (sentinelRegionName) {
-            await this.convertAndDisplaySentinel2(sentinelRegionName);
-          }
-        } else {
-          Utils.log('warn', 'Sentinel-2 data download failed:', sentinelResult.error);
+        // Auto-convert Sentinel-2 images if we have a region name
+        const sentinelRegionName = sentinelResult.metadata?.region_name || effectiveRegionName;
+        if (sentinelRegionName) {
+          await this.convertAndDisplaySentinel2(sentinelRegionName);
         }
       } else {
-        Utils.log('warn', 'Sentinel-2 data download request failed:', sentinelResponse.status);
+        Utils.log('warn', 'Sentinel-2 data download failed:', sentinelResult?.error);
       }
 
       // Step 3: Summarize results
@@ -2552,4 +2480,165 @@ window.UIManager = {
       }
     });
   },
+
+  /**
+   * Fetch and display region coordinates for LAZ files
+   * @param {string} regionPath - Path to the LAZ file
+   */
+  async fetchAndDisplayRegionCoords(regionPath) {
+    try {
+      Utils.log('info', `Fetching bounds for LAZ file: ${regionPath}`);
+      
+      // Use LAZ service to get WGS84 bounds
+      const lazService = laz();
+      const boundsData = await lazService.getLAZFileBounds(regionPath);
+      
+      if (boundsData.error) {
+        Utils.log('warn', `Failed to get LAZ bounds: ${boundsData.error}`);
+        return;
+      }
+      
+      let coords = null;
+      
+      // First try to use the center coordinates from WGS84 response (preferred)
+      if (boundsData.center && boundsData.center.lat && boundsData.center.lng) {
+        coords = {
+          lat: boundsData.center.lat,
+          lng: boundsData.center.lng
+        };
+        Utils.log('info', `Using WGS84 center coordinates: lat=${coords.lat}, lng=${coords.lng}`);
+      }
+      // Fallback to extracting coordinates from bounds data
+      else if (boundsData.bounds) {
+        coords = this.extractCoordsFromBounds(boundsData.bounds);
+        if (coords) {
+          Utils.log('info', `LAZ bounds extracted: lat=${coords.lat}, lng=${coords.lng}`);
+        }
+      }
+      
+      if (!coords) {
+        Utils.log('warn', 'No bounds or center data found in LAZ file');
+        return;
+      }
+      
+      if (coords) {
+        // Update map view and location pin
+        MapManager.setView(coords.lat, coords.lng, 13);
+        FileManager.updateLocationPin(coords.lat, coords.lng, regionPath);
+        
+        // Update coordinate input fields
+        $('#goto-lat-input').val(coords.lat.toFixed(6));
+        $('#goto-lng-input').val(coords.lng.toFixed(6));
+        $('#lat-input').val(coords.lat.toFixed(6));
+        $('#lng-input').val(coords.lng.toFixed(6));
+        
+        Utils.showNotification(`Map centered on LAZ file: ${regionPath.split('/').pop()}`, 'success');
+      } else {
+        Utils.log('warn', 'Could not extract valid coordinates from LAZ bounds');
+      }
+      
+    } catch (error) {
+      Utils.log('error', 'Error fetching LAZ file bounds', error);
+      Utils.showNotification('Failed to fetch LAZ file coordinates', 'error');
+    }
+  },
+
+  /**
+   * Extract center coordinates from various bounds formats
+   * @param {Object|Array|String} bounds - Bounds data in various formats
+   * @returns {Object|null} Object with lat/lng or null if invalid
+   */
+  extractCoordsFromBounds(bounds) {
+    try {
+      // Handle different boundary formats from PDAL
+      if (typeof bounds === 'string') {
+        // Sometimes bounds come as string, try to parse as JSON
+        try {
+          bounds = JSON.parse(bounds);
+        } catch (e) {
+          Utils.log('warn', 'Cannot parse bounds string as JSON');
+          return null;
+        }
+      }
+      
+      if (Array.isArray(bounds)) {
+        // Array format: might be [minX, minY, maxX, maxY] or nested arrays
+        if (bounds.length >= 4) {
+          const [minX, minY, maxX, maxY] = bounds;
+          return {
+            lat: (minY + maxY) / 2,
+            lng: (minX + maxX) / 2
+          };
+        }
+        
+        // Handle nested array format like [[x,y],[x,y],[x,y],[x,y]] (polygon)
+        if (bounds.length > 0 && Array.isArray(bounds[0])) {
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+          
+          bounds.forEach(coord => {
+            if (Array.isArray(coord) && coord.length >= 2) {
+              const [x, y] = coord;
+              minX = Math.min(minX, x);
+              maxX = Math.max(maxX, x);
+              minY = Math.min(minY, y);
+              maxY = Math.max(maxY, y);
+            }
+          });
+          
+          if (isFinite(minX) && isFinite(maxX) && isFinite(minY) && isFinite(maxY)) {
+            return {
+              lat: (minY + maxY) / 2,
+              lng: (minX + maxX) / 2
+            };
+          }
+        }
+      }
+      
+      if (typeof bounds === 'object' && bounds !== null) {
+        // Object format: check for various property names
+        const props = bounds;
+        
+        // Format: { minX, minY, maxX, maxY }
+        if ('minX' in props && 'minY' in props && 'maxX' in props && 'maxY' in props) {
+          return {
+            lat: (props.minY + props.maxY) / 2,
+            lng: (props.minX + props.maxX) / 2
+          };
+        }
+        
+        // Format: { west, south, east, north }
+        if ('west' in props && 'south' in props && 'east' in props && 'north' in props) {
+          return {
+            lat: (props.south + props.north) / 2,
+            lng: (props.west + props.east) / 2
+          };
+        }
+        
+        // Format: { min: [x,y], max: [x,y] }
+        if ('min' in props && 'max' in props && Array.isArray(props.min) && Array.isArray(props.max)) {
+          return {
+            lat: (props.min[1] + props.max[1]) / 2,
+            lng: (props.min[0] + props.max[0]) / 2
+          };
+        }
+        
+        // Format: GeoJSON-like bbox
+        if ('bbox' in props && Array.isArray(props.bbox) && props.bbox.length >= 4) {
+          const [minX, minY, maxX, maxY] = props.bbox;
+          return {
+            lat: (minY + maxY) / 2,
+            lng: (minX + maxX) / 2
+          };
+        }
+      }
+      
+      Utils.log('warn', 'Unrecognized bounds format:', bounds);
+      return null;
+      
+    } catch (error) {
+      Utils.log('error', 'Error extracting coordinates from bounds', error);
+      return null;
+    }
+  },
+
 };
