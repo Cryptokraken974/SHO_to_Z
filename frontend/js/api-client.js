@@ -1502,6 +1502,142 @@ class DataAcquisitionAPIClient extends BaseAPIClient {
 }
 
 /**
+ * Cache Management Service
+ */
+class CacheManagementAPIClient extends BaseAPIClient {
+  /**
+   * Get cache statistics
+   * @returns {Promise<Object>} Cache statistics including entry counts and file sizes
+   */
+  async getCacheStats() {
+    return this.get('cache/metadata/stats');
+  }
+
+  /**
+   * List all cached files
+   * @returns {Promise<Object>} List of all files in the cache with their metadata
+   */
+  async listCachedFiles() {
+    return this.get('cache/metadata/list');
+  }
+
+  /**
+   * Get cached metadata for a specific file
+   * @param {string} filePath - Path to the LAZ file
+   * @returns {Promise<Object>} Cached metadata if available
+   */
+  async getCachedMetadata(filePath) {
+    if (!filePath) {
+      throw new Error('File path is required for getCachedMetadata');
+    }
+    return this.get(`cache/metadata/${encodeURIComponent(filePath)}`);
+  }
+
+  /**
+   * Refresh cache for a specific file
+   * @param {string} filePath - Path to the LAZ file
+   * @returns {Promise<Object>} Success status of cache refresh operation
+   */
+  async refreshFileCache(filePath) {
+    if (!filePath) {
+      throw new Error('File path is required for refreshFileCache');
+    }
+    return this.post(`cache/metadata/refresh/${encodeURIComponent(filePath)}`);
+  }
+
+  /**
+   * Refresh cache for all files
+   * @returns {Promise<Object>} Success status of global cache refresh operation
+   */
+  async refreshAllCache() {
+    return this.post('cache/metadata/refresh-all');
+  }
+
+  /**
+   * Clear all cache entries
+   * @returns {Promise<Object>} Success status of cache clearing operation
+   */
+  async clearCache() {
+    return this.delete('cache/metadata/clear');
+  }
+
+  /**
+   * Validate cache integrity
+   * @returns {Promise<Object>} Cache validation results
+   */
+  async validateCache() {
+    return this.get('cache/metadata/validate');
+  }
+
+  /**
+   * Get cache health status
+   * @returns {Promise<Object>} Cache health information
+   */
+  async getCacheHealth() {
+    const stats = await this.getCacheStats();
+    const validation = await this.validateCache();
+    
+    return {
+      success: true,
+      health: {
+        ...stats.stats,
+        validation: validation
+      }
+    };
+  }
+
+  /**
+   * Perform cache maintenance
+   * @param {Object} options - Maintenance options
+   * @param {boolean} options.validateIntegrity - Whether to validate cache integrity
+   * @param {boolean} options.removeInvalid - Whether to remove invalid entries
+   * @returns {Promise<Object>} Maintenance results
+   */
+  async performMaintenance(options = { validateIntegrity: true, removeInvalid: false }) {
+    const results = {
+      validation: null,
+      cleanup: null,
+      stats_before: null,
+      stats_after: null
+    };
+
+    try {
+      // Get stats before maintenance
+      const statsBefore = await this.getCacheStats();
+      results.stats_before = statsBefore.stats;
+
+      // Validate cache if requested
+      if (options.validateIntegrity) {
+        results.validation = await this.validateCache();
+      }
+
+      // Remove invalid entries if requested
+      if (options.removeInvalid && results.validation?.invalid_entries?.length > 0) {
+        // For now, we'll clear the entire cache if there are invalid entries
+        // A more sophisticated approach would selectively remove invalid entries
+        results.cleanup = await this.clearCache();
+      }
+
+      // Get stats after maintenance
+      const statsAfter = await this.getCacheStats();
+      results.stats_after = statsAfter.stats;
+
+      return {
+        success: true,
+        results: results
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        results: results
+      };
+    }
+  }
+}
+
+/**
  * API Client Factory
  */
 class APIClientFactory {
@@ -1546,6 +1682,9 @@ class APIClientFactory {
           break;
         case 'dataAcquisition':
           this._clients[clientType] = new DataAcquisitionAPIClient();
+          break;
+        case 'cacheManagement':
+          this._clients[clientType] = new CacheManagementAPIClient();
           break;
         default:
           throw new Error(`Unknown client type: ${clientType}`);
@@ -1623,6 +1762,13 @@ class APIClientFactory {
   get dataAcquisition() {
     return this.getClient('dataAcquisition');
   }
+
+  /**
+   * Get cache management client
+   */
+  get cacheManagement() {
+    return this.getClient('cacheManagement');
+  }
 }
 
 // Global API client factory instance
@@ -1641,6 +1787,7 @@ window.SavedPlacesAPIClient = SavedPlacesAPIClient;
 window.GeotiffAPIClient = GeotiffAPIClient;
 window.LAZAPIClient = LAZAPIClient;
 window.DataAcquisitionAPIClient = DataAcquisitionAPIClient;
+window.CacheManagementAPIClient = CacheManagementAPIClient;
 window.APIClientFactory = APIClientFactory;
 
 Utils.log('info', 'API Client system initialized successfully');

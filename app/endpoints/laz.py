@@ -23,6 +23,8 @@ sys.path.append(str(Path(__file__).parent.parent))
 from geo_utils import get_image_bounds_from_world_file
 from osgeo import osr, ogr
 
+
+
 # Set up logging
 logger = logging.getLogger(__name__)
 
@@ -412,13 +414,18 @@ async def get_laz_bounds_wgs84(file_name: str):
     """
     Get LAZ file bounds and center point in WGS84 (EPSG:4326) coordinates.
     The file_name is relative to the LAZ_INPUT_DIR.
+    Creates processing metadata file after successful coordinate extraction.
     """
+    logger.info(f"Processing LAZ bounds for {file_name}")
+    
     full_file_path = (LAZ_INPUT_DIR / file_name).resolve()
     pdal_output_str = "" # Initialize for potential use in error logging
 
     if not full_file_path.is_file():
+        error_msg = f"LAZ file not found: {file_name}"
         logger.error(f"LAZ file not found for WGS84 bounds: {full_file_path}")
-        raise HTTPException(status_code=404, detail=f"LAZ file not found: {file_name}")
+        
+        raise HTTPException(status_code=404, detail=error_msg)
 
     try:
         pdal_command = ['pdal', 'info', '--all', '--stats', str(full_file_path)]
@@ -520,20 +527,27 @@ async def get_laz_bounds_wgs84(file_name: str):
                 "pdal_command": ' '.join(pdal_command)
             }
         }
+        
         logger.info(f"Successfully calculated WGS84 bounds for {full_file_path}: center {response_data['center']}")
         return JSONResponse(content=response_data)
 
     except HTTPException:
         raise
     except json.JSONDecodeError as e:
+        error_msg = f"Failed to parse PDAL output: {e}"
         logger.error(f"JSONDecodeError processing PDAL output for {full_file_path}: {e}. Output: {pdal_output_str[:1000]}") # Log more of the output
-        raise HTTPException(status_code=500, detail=f"Failed to parse PDAL output: {e}")
+        
+        raise HTTPException(status_code=500, detail=error_msg)
     except subprocess.TimeoutExpired: # This won't be caught by asyncio.create_subprocess_exec directly, but good to have if switching to subprocess.run
+        error_msg = "PDAL command timed out"
         logger.error(f"PDAL command timed out for {full_file_path}")
-        raise HTTPException(status_code=508, detail="PDAL command timed out.")
+        
+        raise HTTPException(status_code=508, detail=error_msg)
     except Exception as e:
+        error_msg = f"An unexpected error occurred: {str(e)}"
         logger.exception(f"Unexpected error getting WGS84 bounds for {full_file_path}: {e}")
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+        
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 # Helper functions for LAZ file analysis

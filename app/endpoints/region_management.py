@@ -8,6 +8,98 @@ from ..main import manager, settings
 
 router = APIRouter()
 
+def _read_coordinates_from_metadata(region_name: str) -> tuple[float, float] | None:
+    """Read existing coordinates from a region's metadata.txt file if it exists.
+    
+    Returns:
+        tuple[float, float] | None: (lat, lng) if found, None if not found or file doesn't exist
+    """
+    try:
+        metadata_file = os.path.join("output", region_name, "metadata.txt")
+        if not os.path.exists(metadata_file):
+            return None
+            
+        with open(metadata_file, 'r') as f:
+            content = f.read()
+            
+        # Look for coordinate lines in the metadata
+        for line in content.split('\n'):
+            line = line.strip()
+            if line.startswith('Center Latitude:') and 'N/A' not in line:
+                lat_line = line
+                # Find the corresponding longitude line
+                for lng_line in content.split('\n'):
+                    lng_line = lng_line.strip()
+                    if lng_line.startswith('Center Longitude:') and 'N/A' not in lng_line:
+                        try:
+                            lat = float(lat_line.split('Center Latitude:')[1].strip())
+                            lng = float(lng_line.split('Center Longitude:')[1].strip())
+                            print(f"  📍 Found cached coordinates for {region_name}: ({lat}, {lng})")
+                            return (lat, lng)
+                        except (ValueError, IndexError):
+                            continue
+                        break
+                break
+        return None
+    except Exception as e:
+        print(f"  ⚠️  Error reading cached coordinates for {region_name}: {str(e)}")
+        return None
+
+def _generate_metadata_content(region: dict) -> str:
+    """Generate metadata content for a region based on its type and available coordinate information."""
+    from datetime import datetime
+    
+    region_name = region.get("name", "Unknown")
+    source = region.get("source", "unknown")
+    file_path = region.get("file_path", "")
+    
+    # Determine the source type for better metadata
+    if file_path.lower().endswith(('.laz', '.las')):
+        source_type = "LAZ file analysis"
+    elif source == "input" and "S_" in region_name and "W" in region_name:
+        source_type = "Coordinate-based folder"
+    else:
+        source_type = source
+    
+    # Start with basic metadata
+    content = f"""# Region Metadata
+# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+# Source: {source_type}
+
+Region Name: {region_name}
+Source: {source}"""
+    
+    if file_path:
+        content += f"""
+File Path: {file_path}"""
+    
+    # Add coordinate information if available
+    center_lat = region.get("center_lat")
+    center_lng = region.get("center_lng")
+    
+    if center_lat is not None and center_lng is not None:
+        content += f"""
+
+# Coordinate Information (from {source_type})
+Center Latitude: {center_lat}
+Center Longitude: {center_lng}"""
+        
+        # Add bounds if this was from LAZ analysis
+        if file_path.lower().endswith(('.laz', '.las')):
+            content += f"""
+
+# Additional Information
+Source CRS: Will be populated during LAZ processing
+Native Bounds: Will be populated during LAZ processing"""
+    else:
+        content += f"""
+
+# Coordinate Information
+Center Latitude: N/A
+Center Longitude: N/A"""
+    
+    return content
+
 @router.get("/api/list-regions")
 async def list_regions(source: str = None):
     """List all region subdirectories in the output directory and LAZ files from the input directory with coordinate metadata
@@ -105,7 +197,12 @@ async def list_regions(source: str = None):
             
             # Add hardcoded coordinates for demo files
             filename = os.path.basename(file_path).lower()
-            if "foxisland" in filename:
+            
+            # First, check if coordinates are already cached in metadata.txt
+            cached_coords = _read_coordinates_from_metadata(file_name)
+            if cached_coords:
+                region_info["center_lat"], region_info["center_lng"] = cached_coords
+            elif "foxisland" in filename:
                 region_info["center_lat"] = 44.4268
                 region_info["center_lng"] = -68.2048
             elif "wizardisland" in filename or "or_wizardisland" in filename:
@@ -124,13 +221,73 @@ async def list_regions(source: str = None):
                     region_info["center_lng"] = lng
                     print(f"Extracted coordinates from filename '{filename}': {lat}, {lng}")
                 else:
-                    print(f"No coordinate match found for filename: '{filename}'")
+                    print(f"No coordinate match found for filename: '{filename}' - will need LAZ analysis")
             
             regions_with_metadata.append(region_info)
     else:
         print(f"  ⏭️ Skipping input folder scan (source={source}, exists={os.path.exists(input_dir)})")
         
     regions_with_metadata.sort(key=lambda x: x["name"])
+    
+    # Second pass: Perform LAZ analysis for regions without coordinates
+    print(f"\n🔍 Analyzing LAZ files without cached coordinates...")
+    for region in regions_with_metadata:
+        if (region.get("source") == "input" and 
+            region.get("file_path") and 
+            region["file_path"].lower().endswith(('.laz', '.las')) and
+            region.get("center_lat") is None):
+            
+            file_name = os.path.basename(region["file_path"])
+            print(f"  🔬 Analyzing LAZ file: {file_name}")
+            
+            try:
+                import requests
+                response = requests.get(f'http://localhost:8000/api/laz/bounds-wgs84/{file_name}', timeout=30)
+                if response.status_code == 200:
+                    bounds_data = response.json()
+                    if bounds_data and "center" in bounds_data:
+                        center = bounds_data["center"]
+                        region["center_lat"] = center["lat"]
+                        region["center_lng"] = center["lng"]
+                        print(f"  ✅ Extracted coordinates from LAZ analysis for '{file_name}': ({center['lat']}, {center['lng']})")
+                else:
+                    print(f"  ❌ LAZ bounds analysis failed for {file_name}: HTTP {response.status_code}")
+            except Exception as e:
+                print(f"  ❌ Error analyzing LAZ file {file_name}: {str(e)}")
+
+    # Create metadata.txt files with coordinate information for all found regions
+    print(f"\n📄 Creating metadata.txt files with coordinates for regions...")
+    for region in regions_with_metadata:
+        region_name = region.get("name")
+        if region_name:
+            # Create output directory path for this region
+            output_dir = os.path.join("output", region_name)
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # Create metadata.txt file path
+            metadata_file = os.path.join(output_dir, "metadata.txt")
+            
+            try:
+                # Generate metadata content based on region type
+                metadata_content = _generate_metadata_content(region)
+                
+                # Write metadata to file
+                with open(metadata_file, 'w') as f:
+                    f.write(metadata_content)
+                    
+                if region.get("center_lat") and region.get("center_lng"):
+                    print(f"  ✅ Created metadata.txt with coordinates for region: {region_name} ({region['center_lat']}, {region['center_lng']})")
+                else:
+                    print(f"  ✅ Created metadata.txt for region: {region_name} (coordinates extracted from LAZ analysis)")
+                    
+            except Exception as e:
+                print(f"  ❌ Failed to create metadata.txt for region {region_name}: {str(e)}")
+                # Create empty file as fallback
+                try:
+                    with open(metadata_file, 'w') as f:
+                        f.write(f"# Region: {region_name}\n# Error occurred while extracting coordinates: {str(e)}\n")
+                except:
+                    pass
     
     print(f"\n✅ Backend scan complete:")
     print(f"  📊 Total regions found: {len(regions_with_metadata)}")
@@ -276,5 +433,57 @@ async def progress_callback_wrapper(progress_data: dict, region_name: Optional[s
 
 # ============================================================================
 # SAVED PLACES API ENDPOINTS
+# ============================================================================
+
+# ============================================================================
+# REGION METADATA API ENDPOINTS
+# ============================================================================
+
+@router.post("/api/save-region-metadata")
+async def save_region_metadata(data: dict):
+    """Save simple coordinate-only metadata for a selected region
+    
+    Args:
+        data: Dictionary containing region_name and metadata
+    """
+    try:
+        region_name = data.get('region_name')
+        metadata = data.get('metadata')
+        
+        if not region_name or not metadata:
+            raise HTTPException(status_code=400, detail="region_name and metadata are required")
+        
+        # Create output directory for the region
+        output_dir = os.path.join("output", region_name)
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Create simple metadata file with just coordinates
+        metadata_path = os.path.join(output_dir, "metadata.txt")
+        
+        metadata_content = f"""# Region Selection Metadata
+# Created: {metadata.get('creation_time', 'Unknown')}
+# Source: {metadata.get('source', 'region_selection')}
+
+Region Name: {metadata.get('region_name', region_name)}
+Display Name: {metadata.get('display_name', region_name)}
+Center Latitude: {metadata.get('center_latitude', 'N/A')}
+Center Longitude: {metadata.get('center_longitude', 'N/A')}
+"""
+        
+        with open(metadata_path, 'w') as f:
+            f.write(metadata_content)
+        
+        print(f"✅ Created simple metadata file: {metadata_path}")
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": f"Metadata saved for region {region_name}",
+            "file_path": metadata_path
+        })
+        
+    except Exception as e:
+        print(f"❌ Error saving metadata: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save metadata: {str(e)}")
+
 # ============================================================================
 

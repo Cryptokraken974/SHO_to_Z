@@ -667,6 +667,9 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
     
     print(f"📂 Output directory: {base_output_dir}")
     
+    # Create the base output directory if it doesn't exist
+    os.makedirs(base_output_dir, exist_ok=True)
+    
     # Define all processing tasks
     processing_tasks = [
         ("hillshade_315", process_hillshade_tiff, {"azimuth": 315, "altitude": 45}),

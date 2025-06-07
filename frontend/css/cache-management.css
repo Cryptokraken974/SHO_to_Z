@@ -1,0 +1,352 @@
+/* Cache Management UI Styles */
+
+/* Cache Management Section */
+#cache-management-section {
+  background: #1a1a1a;
+  border: 1px solid #404040;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 15px 0;
+}
+
+#cache-management-section h3 {
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 15px 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #404040;
+}
+
+/* Cache Statistics Container */
+#cache-stats-container {
+  background: #262626;
+  border: 1px solid #404040;
+  border-radius: 6px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.cache-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.stat-item {
+  background: #1a1a1a;
+  border: 1px solid #404040;
+  border-radius: 6px;
+  padding: 12px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.stat-item:hover {
+  border-color: #00bfff;
+  background: #202020;
+}
+
+.stat-label {
+  color: #ababab;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 5px;
+}
+
+.stat-value {
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* Cache Health Indicator */
+.cache-health {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #404040;
+}
+
+.cache-health h4 {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 10px 0;
+}
+
+.health-indicator {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.health-indicator.healthy {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #22c55e;
+}
+
+.health-indicator.warning {
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  color: #fbbf24;
+}
+
+.health-indicator.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+/* Cache Actions */
+.cache-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.cache-actions .btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: none;
+  min-width: 140px;
+}
+
+.cache-actions .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.cache-actions .btn:active {
+  transform: translateY(0);
+}
+
+.cache-actions .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Button Colors */
+.btn.btn-primary {
+  background: #00bfff;
+  color: #ffffff;
+}
+
+.btn.btn-primary:hover {
+  background: #0099cc;
+}
+
+.btn.btn-warning {
+  background: #fbbf24;
+  color: #1a1a1a;
+}
+
+.btn.btn-warning:hover {
+  background: #f59e0b;
+}
+
+.btn.btn-secondary {
+  background: #6b7280;
+  color: #ffffff;
+}
+
+.btn.btn-secondary:hover {
+  background: #4b5563;
+}
+
+.btn.btn-info {
+  background: #8e44ad;
+  color: #ffffff;
+}
+
+.btn.btn-info:hover {
+  background: #7d3c98;
+}
+
+.btn.btn-danger {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.btn.btn-danger:hover {
+  background: #dc2626;
+}
+
+/* Operations Log */
+.operations-log {
+  background: #262626;
+  border: 1px solid #404040;
+  border-radius: 6px;
+  padding: 15px;
+}
+
+.operations-log h4 {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 15px 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #404040;
+}
+
+#cache-log-content {
+  background: #1a1a1a;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  padding: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.log-entry {
+  color: #ababab;
+  padding: 2px 0;
+  border-bottom: 1px solid transparent;
+}
+
+.log-entry.success {
+  color: #22c55e;
+}
+
+.log-entry.error {
+  color: #ef4444;
+}
+
+.log-entry.warning {
+  color: #fbbf24;
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
+/* Error States */
+.error {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 14px;
+}
+
+.loading {
+  color: #00bfff;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .cache-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .cache-actions {
+    flex-direction: column;
+  }
+  
+  .cache-actions .btn {
+    width: 100%;
+    min-width: unset;
+  }
+}
+
+@media (max-width: 480px) {
+  .cache-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  #cache-management-section {
+    padding: 15px;
+    margin: 10px 0;
+  }
+}
+
+/* Custom Scrollbar for Log */
+#cache-log-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+#cache-log-content::-webkit-scrollbar-track {
+  background: #404040;
+  border-radius: 3px;
+}
+
+#cache-log-content::-webkit-scrollbar-thumb {
+  background: #666666;
+  border-radius: 3px;
+}
+
+#cache-log-content::-webkit-scrollbar-thumb:hover {
+  background: #888888;
+}
+
+/* Animation for Loading States */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.loading {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Tooltip Styles */
+.cache-tooltip {
+  position: relative;
+}
+
+.cache-tooltip:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a1a;
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #404040;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Admin Section Integration */
+.admin-section {
+  background: #1a1a1a;
+  border: 1px solid #404040;
+  border-radius: 8px;
+  margin: 15px 0;
+}
+
+.admin-section:first-child {
+  margin-top: 0;
+}
+
+.admin-section:last-child {
+  margin-bottom: 0;
+}

@@ -290,6 +290,8 @@ class RasterGenerationService:
         except Exception as e:
             print(f"❌ Colorized DEM error: {str(e)}")
             return None
+    
+
 
 
 # API endpoint function for Flask integration

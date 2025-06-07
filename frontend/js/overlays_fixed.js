@@ -301,8 +301,9 @@ window.OverlayManager = {
    * Add satellite image overlay to map
    * @param {string} imageFile - Image file path
    * @param {string} bandType - Band type (RED, NIR, etc.)
+   * @param {string} regionName - Region name for the overlay
    */
-  addSatelliteImageOverlay(imageFile, bandType, regionName) {
+  async addSatelliteImageOverlay(imageFile, bandType, regionName) {
     const map = MapManager.getMap();
     if (!map) {
       Utils.log('error', 'Map not available for satellite overlay');
@@ -314,22 +315,43 @@ window.OverlayManager = {
       const overlayKey = `SATELLITE_${bandType}`;
       this.removeOverlay(overlayKey);
 
-      // For now, we'll need to get bounds from the backend
-      // This is a simplified implementation - in practice, you'd want to fetch the bounds
-      const defaultBounds = [
-        [45.51, -122.68],  // Portland area default bounds
-        [45.52, -122.67]
+      // Convert bandType to proper API format (e.g., "RED" -> "RED_B04")
+      let bandName = bandType;
+      if (bandType === 'RED') bandName = 'RED_B04';
+      else if (bandType === 'NIR') bandName = 'NIR_B08';
+      // NDVI and other bands should already be in correct format
+
+      // Create regionBand identifier for API call
+      const regionBand = `${regionName}_${bandName}`;
+      
+      Utils.log('info', `Fetching Sentinel-2 overlay data for ${regionBand}`);
+
+      // Fetch actual bounds and image data from Sentinel-2 overlay API
+      const response = await fetch(`/api/overlay/sentinel2/${encodeURIComponent(regionBand)}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch overlay data: ${response.status} ${response.statusText}`);
+      }
+
+      const overlayData = await response.json();
+      
+      if (!overlayData.bounds || !overlayData.image_data) {
+        throw new Error('Invalid overlay data received from server');
+      }
+
+      // Convert bounds to Leaflet format [[south, west], [north, east]]
+      const bounds = [
+        [overlayData.bounds.south, overlayData.bounds.west],
+        [overlayData.bounds.north, overlayData.bounds.east]
       ];
 
-      // Construct the correct image path using regionName
-      const imagePath = regionName ? 
-        `/output/${regionName}/sentinel-2/${imageFile}` : 
-        `/api/image/${imageFile}`;
+      // Create image data URL from base64
+      const imageDataUrl = `data:image/png;base64,${overlayData.image_data}`;
 
-      // Create new satellite overlay
+      // Create new satellite overlay using the actual bounds and image data
       const overlay = L.imageOverlay(
-        imagePath,
-        defaultBounds,
+        imageDataUrl,
+        bounds,
         {
           opacity: 0.8,
           interactive: false
@@ -339,13 +361,16 @@ window.OverlayManager = {
       // Store overlay reference
       this.mapOverlays[overlayKey] = overlay;
 
-      Utils.log('info', `Added ${bandType} satellite overlay for region ${regionName} to map`);
+      // Fit map to overlay bounds for better visibility
+      map.fitBounds(bounds);
+
+      Utils.log('info', `Added ${bandType} satellite overlay for region ${regionName} to map with bounds:`, bounds);
       Utils.showNotification(`Added ${bandType} band overlay to map`, 'success');
       return true;
 
     } catch (error) {
       Utils.log('error', 'Failed to add satellite overlay', error);
-      Utils.showNotification(`Failed to add ${bandType} overlay`, 'error');
+      Utils.showNotification(`Failed to add ${bandType} overlay: ${error.message}`, 'error');
       return false;
     }
   },

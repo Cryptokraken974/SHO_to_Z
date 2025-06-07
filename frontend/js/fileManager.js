@@ -154,6 +154,11 @@ window.FileManager = {
         $('#lng-input').val('');
     }
 
+    // Create simple coordinate metadata when a region is selected
+    if (coords && coords.lat && coords.lng && window.MetadataManager) {
+      MetadataManager.createRegionMetadata(displayName, coords, this.processingRegion);
+    }
+
     Utils.log('info', `Selected region: ${displayName} (processing region: ${this.processingRegion}, path: ${regionPath})`, { coords });
     Utils.showNotification(`Selected Region: ${displayName}`, 'success', 2000);
 
@@ -386,6 +391,275 @@ window.FileManager = {
             };
             
             Utils.log('info', `Updated coordinates for ${region.name}: ${boundsData.center.lat}, ${boundsData.center.lng}`);
+          }
+        } else {
+          Utils.log('warn', `Failed to get coordinates for LAZ file: ${region.file_path}`);
+        }
+      } catch (error) {
+        Utils.log('error', `Error fetching coordinates for ${region.file_path}:`, error);
+        // Continue with other files even if one fails
+      }
+    }
+    
+    return updatedRegions;
+  },
+
+  /**
+   * Get cache statistics for administrative display
+   * @returns {Object} Cache statistics
+   */
+  async getCacheStatistics() {
+    try {
+      const cacheClient = APIClient.cacheManagement;
+      const stats = await cacheClient.getCacheStats();
+      const health = await cacheClient.getCacheHealth();
+      
+      return {
+        success: true,
+        statistics: stats.stats,
+        health: health.health
+      };
+    } catch (error) {
+      Utils.log('error', 'Failed to get cache statistics:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  /**
+   * Display cache management UI (for administrators)
+   */
+  displayCacheManagement() {
+    const cacheSection = `
+      <div id="cache-management-section" class="admin-section">
+        <h3>LAZ Metadata Cache Management</h3>
+        <div id="cache-stats-container">
+          <div class="loading">Loading cache statistics...</div>
+        </div>
+        <div class="cache-actions">
+          <button id="refresh-cache-btn" class="btn btn-primary">Refresh All Cache</button>
+          <button id="clear-cache-btn" class="btn btn-warning">Clear Cache</button>
+          <button id="validate-cache-btn" class="btn btn-secondary">Validate Cache</button>
+          <button id="cache-maintenance-btn" class="btn btn-info">Run Maintenance</button>
+        </div>
+        <div id="cache-operations-log" class="operations-log">
+          <h4>Cache Operations Log</h4>
+          <div id="cache-log-content"></div>
+        </div>
+      </div>
+    `;
+
+    // Add cache section to file manager or admin panel
+    const targetContainer = $('#admin-panel') || $('#file-manager-container');
+    if (targetContainer.length) {
+      targetContainer.append(cacheSection);
+      this.bindCacheManagementEvents();
+      this.loadCacheStatistics();
+    }
+  },
+
+  /**
+   * Bind event handlers for cache management actions
+   */
+  bindCacheManagementEvents() {
+    const cacheClient = APIClient.cacheManagement;
+
+    $('#refresh-cache-btn').on('click', async () => {
+      await this.performCacheOperation('refresh', async () => {
+        return await cacheClient.refreshAllCache();
+      });
+    });
+
+    $('#clear-cache-btn').on('click', async () => {
+      if (confirm('Are you sure you want to clear all cached metadata? This will require re-processing coordinates for all LAZ files.')) {
+        await this.performCacheOperation('clear', async () => {
+          return await cacheClient.clearCache();
+        });
+      }
+    });
+
+    $('#validate-cache-btn').on('click', async () => {
+      await this.performCacheOperation('validate', async () => {
+        return await cacheClient.validateCache();
+      });
+    });
+
+    $('#cache-maintenance-btn').on('click', async () => {
+      await this.performCacheOperation('maintenance', async () => {
+        return await cacheClient.performMaintenance({
+          validateIntegrity: true,
+          removeInvalid: true
+        });
+      });
+    });
+  },
+
+  /**
+   * Perform a cache operation and log the results
+   * @param {string} operationType - Type of operation
+   * @param {Function} operation - Async operation function
+   */
+  async performCacheOperation(operationType, operation) {
+    const logContainer = $('#cache-log-content');
+    const timestamp = new Date().toLocaleTimeString();
+    
+    logContainer.append(`<div class="log-entry">[${timestamp}] Starting ${operationType} operation...</div>`);
+    
+    try {
+      const result = await operation();
+      
+      if (result.success) {
+        logContainer.append(`<div class="log-entry success">[${timestamp}] ${operationType} completed successfully</div>`);
+        if (result.message) {
+          logContainer.append(`<div class="log-entry">[${timestamp}] ${result.message}</div>`);
+        }
+      } else {
+        logContainer.append(`<div class="log-entry error">[${timestamp}] ${operationType} failed: ${result.error || 'Unknown error'}</div>`);
+      }
+      
+      // Refresh cache statistics after operation
+      setTimeout(() => this.loadCacheStatistics(), 1000);
+      
+    } catch (error) {
+      logContainer.append(`<div class="log-entry error">[${timestamp}] ${operationType} failed: ${error.message}</div>`);
+    }
+    
+    // Auto-scroll to latest log entry
+    logContainer.scrollTop(logContainer[0].scrollHeight);
+  },
+
+  /**
+   * Load and display cache statistics
+   */
+  async loadCacheStatistics() {
+    const statsContainer = $('#cache-stats-container');
+    
+    try {
+      const cacheStats = await this.getCacheStatistics();
+      
+      if (cacheStats.success) {
+        const stats = cacheStats.statistics;
+        const health = cacheStats.health;
+        
+        const statsHtml = `
+          <div class="cache-stats-grid">
+            <div class="stat-item">
+              <div class="stat-label">Total Entries</div>
+              <div class="stat-value">${stats.total_entries || 0}</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Valid Entries</div>
+              <div class="stat-value">${stats.valid_entries || 0}</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Error Entries</div>
+              <div class="stat-value">${stats.error_entries || 0}</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Cache Size</div>
+              <div class="stat-value">${stats.cache_file_size_mb || 0} MB</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Oldest Entry</div>
+              <div class="stat-value">${stats.oldest_entry ? new Date(stats.oldest_entry).toLocaleDateString() : 'N/A'}</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Newest Entry</div>
+              <div class="stat-value">${stats.newest_entry ? new Date(stats.newest_entry).toLocaleDateString() : 'N/A'}</div>
+            </div>
+          </div>
+          <div class="cache-health">
+            <h4>Cache Health</h4>
+            <div class="health-indicator ${stats.error_entries === 0 ? 'healthy' : 'warning'}">
+              ${stats.error_entries === 0 ? '✅ Healthy' : `⚠️ ${stats.error_entries} errors found`}
+            </div>
+          </div>
+        `;
+        
+        statsContainer.html(statsHtml);
+      } else {
+        statsContainer.html(`<div class="error">Failed to load cache statistics: ${cacheStats.error}</div>`);
+      }
+    } catch (error) {
+      statsContainer.html(`<div class="error">Error loading cache statistics: ${error.message}</div>`);
+    }
+  },
+
+  /**
+   * Enhanced fetchLAZCoordinates with cache awareness and improved error handling
+   * @param {Array} regions - Array of region information
+   * @returns {Array} Updated regions with coordinates for LAZ files
+   */
+  async fetchLAZCoordinatesWithCache(regions) {
+    const updatedRegions = [...regions]; // Create a copy to avoid mutation
+    
+    Utils.log('info', 'Checking for LAZ files that need coordinate fetching...');
+    
+    // Find LAZ files that don't have coordinates
+    const lazRegions = updatedRegions.filter(region => {
+      const isLAZ = region.file_path && region.file_path.toLowerCase().endsWith('.laz');
+      const hasCoords = region.center_lat && region.center_lng;
+      return isLAZ && !hasCoords;
+    });
+    
+    if (lazRegions.length === 0) {
+      Utils.log('info', 'No LAZ files need coordinate fetching');
+      return updatedRegions;
+    }
+    
+    Utils.log('info', `Found ${lazRegions.length} LAZ files that need coordinates`);
+    
+    // Fetch coordinates for each LAZ file with cache awareness
+    for (const region of lazRegions) {
+      try {
+        Utils.log('info', `Fetching coordinates for LAZ file: ${region.file_path}`);
+        
+        // Extract just the filename from the file path
+        const fileName = region.file_path.split('/').pop();
+        
+        // Try to get cached data first
+        let boundsData = null;
+        let fromCache = false;
+        
+        try {
+          const cachedData = await APIClient.cacheManagement.getCachedMetadata(fileName);
+          if (cachedData.success && cachedData.cached && cachedData.metadata && !cachedData.metadata.error) {
+            boundsData = {
+              center: cachedData.metadata.center,
+              bounds: cachedData.metadata.bounds,
+              _cached: true,
+              _cache_timestamp: cachedData.metadata.cache_timestamp
+            };
+            fromCache = true;
+            Utils.log('info', `Using cached coordinates for ${fileName}`);
+          }
+        } catch (cacheError) {
+          Utils.log('warn', `Cache lookup failed for ${fileName}, will fetch fresh data:`, cacheError);
+        }
+        
+        // If no cached data, fetch from LAZ API
+        if (!boundsData) {
+          boundsData = await APIClient.laz.getLAZFileBounds(fileName);
+          Utils.log('info', `Fetched fresh coordinates for ${fileName}`);
+        }
+        
+        if (boundsData && boundsData.center) {
+          // Update the region with coordinates
+          const regionIndex = updatedRegions.findIndex(r => r.file_path === region.file_path);
+          if (regionIndex !== -1) {
+            updatedRegions[regionIndex] = {
+              ...updatedRegions[regionIndex],
+              center_lat: boundsData.center.lat,
+              center_lng: boundsData.center.lng,
+              bounds: boundsData.bounds, // Store full bounds if needed
+              _cached_data: fromCache, // Indicate if data came from cache
+              _cache_timestamp: boundsData._cache_timestamp
+            };
+            
+            const source = fromCache ? '(cached)' : '(fresh)';
+            Utils.log('info', `Updated coordinates for ${region.name}: ${boundsData.center.lat}, ${boundsData.center.lng} ${source}`);
           }
         } else {
           Utils.log('warn', `Failed to get coordinates for LAZ file: ${region.file_path}`);
