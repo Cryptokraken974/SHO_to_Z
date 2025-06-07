@@ -1,5 +1,6 @@
 #SHO
 output/
+input/
 
 # Elevation data and configuration
 elevation_config.ini
