@@ -91,6 +91,14 @@ window.FileManager = {
         </div>
       `);
       
+      // Store the region data immediately when creating the item
+      if (coords) {
+        regionItem.data('coords', coords);
+      }
+      if (filePath) {
+        regionItem.data('filePath', filePath);
+      }
+      
       // Handle region highlighting (browsing) - don't trigger selection yet
       regionItem.on('click', () => {
         // Only highlight the region, don't select it yet
@@ -99,10 +107,6 @@ window.FileManager = {
         
         // Show the delete button when a region is highlighted
         $('#delete-region-btn').removeClass('hidden');
-        
-        // Store the region data for later selection
-        regionItem.data('coords', coords);
-        regionItem.data('filePath', filePath); // Store filePath
       });
       
       fileList.append(regionItem);
@@ -119,6 +123,13 @@ window.FileManager = {
    * @param {string} regionPath - Full file path of the region (especially for LAZ files)
    */
   selectRegion(displayName, coords = null, processingRegion = null, regionPath = null) { // MODIFIED to selectRegion, added regionPath
+    // Clear satellite gallery immediately when region is selected
+    const satelliteGallery = document.getElementById('satellite-gallery');
+    if (satelliteGallery) {
+      satelliteGallery.innerHTML = '<div class="text-center text-gray-500 p-4">🔄 Switching to new region...</div>';
+      Utils.log('info', 'Cleared satellite gallery for region switch');
+    }
+    
     this.selectedRegion = displayName;
     this.processingRegion = processingRegion || displayName; // Store the processing region separately
     this.regionPath = regionPath; // Store the region path

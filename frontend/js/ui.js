@@ -119,8 +119,26 @@ window.UIManager = {
       // FileManager.updateLocationPin is called within FileManager.selectRegion
     }
     
+    // Clear satellite gallery immediately when switching regions to prevent showing old images
+    const gallery = $('#satellite-gallery');
+    if (gallery.length) {
+      gallery.empty();
+      // Add a loading message to provide immediate visual feedback
+      gallery.html('<div class="loading-message text-center text-[#666] p-8">🔄 Switching to new region...</div>');
+      Utils.log('info', '🗑️ Cleared satellite gallery for new region selection (including any downloaded images)');
+    }
+    
     // Load satellite images and LIDAR data for the region
-    this.displaySentinel2ImagesForRegion(regionName);
+    // ALWAYS load both Sentinel-2 images AND LiDAR data regardless of file type
+    // Use processing region name for consistent Sentinel-2 calls
+    const sentinel2RegionName = processingRegion || regionName;
+    Utils.log('info', `🛰️ === HANDLESELECTION CALLING SENTINEL-2 ===`);
+    Utils.log('info', `📍 Display Name: ${regionName}`);
+    Utils.log('info', `📍 Processing Region: ${processingRegion}`);
+    Utils.log('info', `📍 Using Region Name: ${sentinel2RegionName}`);
+    Utils.log('info', `📍 File Path: ${filePath}`);
+    this.displaySentinel2ImagesForRegion(sentinel2RegionName);
+    
     this.displayLidarRasterForRegion(regionName);
     
     // Show success notification
@@ -719,10 +737,31 @@ window.UIManager = {
   },
 
   /**
-   * Test Sentinel-2 Images functionality
+   * Test Sentinel-2 Images functionality (DEBUG ONLY)
+   * Note: Sentinel-2 images normally load automatically when selecting a region.
+   * This function is for testing/debugging coordinate and download functionality.
    */
   async testSentinel2() {
-    Utils.log('info', 'Test Sentinel-2 button clicked');
+    Utils.log('info', '🧪 === STARTING SENTINEL-2 DEBUG TEST ===');
+    
+    // Log current region state for debugging
+    Utils.log('info', '📊 Current region state:', {
+      selectedRegion: FileManager.getSelectedRegion(),
+      processingRegion: FileManager.getProcessingRegion(),
+      regionPath: FileManager.getRegionPath()
+    });
+    
+    // Check if Sentinel-2 images are already loaded for selected region
+    if (FileManager.selectedRegion) {
+      const existingImages = $('#satellite-gallery .gallery-item').length;
+      if (existingImages > 0) {
+        const proceed = confirm(`Sentinel-2 images are already loaded for ${FileManager.selectedRegion}. This test will download additional images. Continue?`);
+        if (!proceed) {
+          Utils.log('info', 'Test Sentinel-2 cancelled by user - images already loaded');
+          return;
+        }
+      }
+    }
 
     // Get coordinates from input fields
     let lat = $('#lat-input').val();
@@ -733,18 +772,36 @@ window.UIManager = {
     if ((!lat || !lng || lat === '' || lng === '') && FileManager.selectedRegion) {
       // Try to get coordinates from the selected region
       const selectedItem = $(`.file-item[data-region-name="${FileManager.selectedRegion}"]`);
+      let coords = null;
+      
+      // First try to get coordinates from stored data
       if (selectedItem.length && selectedItem.data('coords')) {
-        const coords = selectedItem.data('coords');
-        if (coords && coords.lat && coords.lng) {
-          lat = coords.lat;
-          lng = coords.lng;
-          
-          // Update the input fields
-          $('#lat-input').val(lat);
-          $('#lng-input').val(lng);
-          
-          Utils.log('info', `Using coordinates from selected region ${FileManager.selectedRegion}: ${lat}, ${lng}`);
+        coords = selectedItem.data('coords');
+        Utils.log('info', `Found coordinates in selected item data:`, coords);
+      }
+      
+      // If no coordinates in item data, try to extract from coordinate input fields that might have been set during region selection
+      if (!coords && $('#lat-input').val() && $('#lng-input').val()) {
+        const inputLat = parseFloat($('#lat-input').val());
+        const inputLng = parseFloat($('#lng-input').val());
+        if (Utils.isValidCoordinate(inputLat, inputLng)) {
+          coords = { lat: inputLat, lng: inputLng };
+          Utils.log('info', `Using coordinates from input fields: ${inputLat}, ${inputLng}`);
         }
+      }
+      
+      // If we found valid coordinates, use them
+      if (coords && coords.lat && coords.lng && Utils.isValidCoordinate(coords.lat, coords.lng)) {
+        lat = coords.lat;
+        lng = coords.lng;
+        
+        // Update the input fields
+        $('#lat-input').val(lat);
+        $('#lng-input').val(lng);
+        
+        Utils.log('info', `Using coordinates from selected region ${FileManager.selectedRegion}: ${lat}, ${lng}`);
+      } else {
+        Utils.log('warn', `No valid coordinates found for selected region ${FileManager.selectedRegion}`);
       }
     }
 
@@ -881,7 +938,10 @@ window.UIManager = {
       Utils.log('error', 'Satellite gallery not found');
       return;
     }
-    gallery.empty(); // Clear previous images
+    
+    // Clear previous images and loading message
+    gallery.empty(); 
+    Utils.log('info', '🗑️ Cleared satellite gallery before displaying converted images');
 
     // Create image items with the same styling as Analysis tab
     const imageItems = files.map(fileObj => {
@@ -1011,12 +1071,26 @@ window.UIManager = {
    * @param {string} regionName - The name of the region.
    */
   async displaySentinel2ImagesForRegion(regionName) {
+    // Add comprehensive debugging to track all calls
+    const caller = (new Error()).stack.split('\n')[2]?.trim() || 'unknown';
+    Utils.log('info', `🛰️ === DISPLAY SENTINEL-2 IMAGES CALLED ===`);
+    Utils.log('info', `📍 Region Name: ${regionName}`);
+    Utils.log('info', `📞 Called from: ${caller}`);
+    Utils.log('info', `📊 Current FileManager state:`, {
+      selectedRegion: FileManager.getSelectedRegion(),
+      processingRegion: FileManager.getProcessingRegion(),
+      regionPath: FileManager.getRegionPath()
+    });
+    
     Utils.log('info', `Checking for Sentinel-2 images for region: ${regionName}`);
 
     // Clear the satellite gallery at the start to ensure fresh display
     const gallery = $('#satellite-gallery');
     if (gallery.length) {
       gallery.empty();
+      // Add a loading message to provide visual feedback
+      gallery.html('<div class="loading-message text-center text-[#666] p-8">🛰️ Loading Sentinel-2 images...</div>');
+      Utils.log('info', '🗑️ Cleared satellite gallery and added loading message');
     }
 
     try {
@@ -1087,7 +1161,10 @@ window.UIManager = {
       Utils.log('error', 'Satellite gallery not found');
       return;
     }
-    gallery.empty(); // Clear previous images
+    
+    // Clear previous images and loading message
+    gallery.empty(); 
+    Utils.log('info', '🗑️ Cleared satellite gallery before displaying band images');
 
     // Create image items with the same styling as the converted images
     const imageItems = availableBands.map(bandData => {
@@ -2007,18 +2084,36 @@ window.UIManager = {
     if ((!lat || !lng || lat === '' || lng === '') && FileManager.selectedRegion) {
       // Try to get coordinates from the selected region
       const selectedItem = $(`.file-item[data-region-name="${FileManager.selectedRegion}"]`);
+      let coords = null;
+      
+      // First try to get coordinates from stored data
       if (selectedItem.length && selectedItem.data('coords')) {
-        const coords = selectedItem.data('coords');
-        if (coords && coords.lat && coords.lng) {
-          lat = coords.lat;
-          lng = coords.lng;
-          
-          // Update the input fields
-          $('#lat-input').val(lat);
-          $('#lng-input').val(lng);
-          
-          Utils.log('info', `Using coordinates from selected region ${FileManager.selectedRegion}: ${lat}, ${lng}`);
+        coords = selectedItem.data('coords');
+        Utils.log('info', `Found coordinates in selected item data:`, coords);
+      }
+      
+      // If no coordinates in item data, try to extract from coordinate input fields that might have been set during region selection
+      if (!coords && $('#lat-input').val() && $('#lng-input').val()) {
+        const inputLat = parseFloat($('#lat-input').val());
+        const inputLng = parseFloat($('#lng-input').val());
+        if (Utils.isValidCoordinate(inputLat, inputLng)) {
+          coords = { lat: inputLat, lng: inputLng };
+          Utils.log('info', `Using coordinates from input fields: ${inputLat}, ${inputLng}`);
         }
+      }
+      
+      // If we found valid coordinates, use them
+      if (coords && coords.lat && coords.lng && Utils.isValidCoordinate(coords.lat, coords.lng)) {
+        lat = coords.lat;
+        lng = coords.lng;
+        
+        // Update the input fields
+        $('#lat-input').val(lat);
+        $('#lng-input').val(lng);
+        
+        Utils.log('info', `Using coordinates from selected region ${FileManager.selectedRegion}: ${lat}, ${lng}`);
+      } else {
+        Utils.log('warn', `No valid coordinates found for selected region ${FileManager.selectedRegion}`);
       }
     }
 
@@ -2123,18 +2218,36 @@ window.UIManager = {
     if ((!lat || !lng || lat === '' || lng === '') && FileManager.selectedRegion) {
       // Try to get coordinates from the selected region
       const selectedItem = $(`.file-item[data-region-name="${FileManager.selectedRegion}"]`);
+      let coords = null;
+      
+      // First try to get coordinates from stored data
       if (selectedItem.length && selectedItem.data('coords')) {
-        const coords = selectedItem.data('coords');
-        if (coords && coords.lat && coords.lng) {
-          lat = coords.lat;
-          lng = coords.lng;
-          
-          // Update the input fields
-          $('#lat-input').val(lat);
-          $('#lng-input').val(lng);
-          
-          Utils.log('info', `Using coordinates from selected region ${FileManager.selectedRegion}: ${lat}, ${lng}`);
+        coords = selectedItem.data('coords');
+        Utils.log('info', `Found coordinates in selected item data:`, coords);
+      }
+      
+      // If no coordinates in item data, try to extract from coordinate input fields that might have been set during region selection
+      if (!coords && $('#lat-input').val() && $('#lng-input').val()) {
+        const inputLat = parseFloat($('#lat-input').val());
+        const inputLng = parseFloat($('#lng-input').val());
+        if (Utils.isValidCoordinate(inputLat, inputLng)) {
+          coords = { lat: inputLat, lng: inputLng };
+          Utils.log('info', `Using coordinates from input fields: ${inputLat}, ${inputLng}`);
         }
+      }
+      
+      // If we found valid coordinates, use them
+      if (coords && coords.lat && coords.lng && Utils.isValidCoordinate(coords.lat, coords.lng)) {
+        lat = coords.lat;
+        lng = coords.lng;
+        
+        // Update the input fields
+        $('#lat-input').val(lat);
+        $('#lng-input').val(lng);
+        
+        Utils.log('info', `Using coordinates from selected region ${FileManager.selectedRegion}: ${lat}, ${lng}`);
+      } else {
+        Utils.log('warn', `No valid coordinates found for selected region ${FileManager.selectedRegion}`);
       }
     }
 
@@ -2262,6 +2375,12 @@ window.UIManager = {
         const displayRegionName = effectiveRegionName || sentinelResult.metadata.region_name;
         setTimeout(() => {
           this.displayLidarRasterForRegion(displayRegionName);
+          
+          // ALWAYS load both LiDAR raster and Sentinel-2 images regardless of file type
+          Utils.log('info', `🛰️ === GETCOMBINEDDATA CALLING SENTINEL-2 ===`);
+          Utils.log('info', `📍 Display Region Name: ${displayRegionName}`);
+          Utils.log('info', `📍 Effective Region Name: ${effectiveRegionName}`);
+          Utils.log('info', `📍 Sentinel Result Region: ${sentinelResult?.metadata?.region_name}`);
           this.displaySentinel2ImagesForRegion(displayRegionName);
         }, 1500);
       }

@@ -157,14 +157,28 @@ window.ProcessingManager = {
     // Display PNG image in gallery cell automatically
     this.displayProcessingResultImage(processingType);
     
-    // Also refresh Sentinel-2 images for the region if we're doing region-based processing
+    // Check if we're processing LAZ-based data (LiDAR point cloud) 
+    // LAZ files should NOT trigger Sentinel-2 satellite imagery calls since they're completely different data types
     const selectedRegion = FileManager.getSelectedRegion();
-    if (selectedRegion) {
-      Utils.log('info', `Refreshing Sentinel-2 images for region: ${selectedRegion}`);
-      // Use setTimeout to allow the raster image to display first
+    const processingRegion = FileManager.getProcessingRegion(); // Get processing region for consistency
+    const regionPath = FileManager.getRegionPath();
+    const isLAZProcessing = regionPath && regionPath.toLowerCase().includes('.laz');
+    
+    if (selectedRegion && !isLAZProcessing) {
+      // Only refresh Sentinel-2 images for non-LAZ processing (e.g., elevation data processing)
+      // Use processing region name for consistent Sentinel-2 calls
+      const sentinel2RegionName = processingRegion || selectedRegion;
+      Utils.log('info', `🛰️ === PROCESSING.JS CALLING SENTINEL-2 ===`);
+      Utils.log('info', `📍 Selected Region: ${selectedRegion}`);
+      Utils.log('info', `📍 Processing Region: ${processingRegion}`);
+      Utils.log('info', `📍 Using Region Name: ${sentinel2RegionName}`);
+      Utils.log('info', `📍 Region Path: ${regionPath}`);
+      Utils.log('info', `Refreshing Sentinel-2 images for region: ${sentinel2RegionName} (selected: ${selectedRegion}, processing: ${processingRegion})`);
       setTimeout(() => {
-        UIManager.displaySentinel2ImagesForRegion(selectedRegion);
+        UIManager.displaySentinel2ImagesForRegion(sentinel2RegionName);
       }, 100);
+    } else if (isLAZProcessing) {
+      Utils.log('info', `Skipping Sentinel-2 refresh for LAZ-based processing - LAZ files are LiDAR point cloud data, not satellite imagery`);
     }
     
     // Show Add to Map button

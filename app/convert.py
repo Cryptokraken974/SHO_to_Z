@@ -262,117 +262,134 @@ def convert_sentinel2_to_png(data_dir: str, region_name: str) -> dict:
         output_dir.mkdir(parents=True, exist_ok=True)
         print(f"CREATED FOLDER (convert_sentinel2_to_png): {output_dir}") # LOGGING ADDED
         print(f"📁 Output directory: {output_dir}")
-         # Process each 4-band Sentinel-2 TIF file (RED, GREEN, BLUE, NIR bands)
-        for tif_file in input_dir.glob("*.tif"):
-            try:
-                base_name = tif_file.stem  # Get filename without extension
-                print(f"🛰️ Processing 4-band Sentinel-2 TIF: {tif_file}")
+        
+        # Get all TIF files and sort by modification time to get the most recent
+        tif_files = list(input_dir.glob("*.tif"))
+        if not tif_files:
+            results['errors'].append(f"No TIF files found in {input_dir}")
+            return results
+        
+        # Sort by modification time (most recent first) and take only the latest
+        tif_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        latest_tif = tif_files[0]
+        
+        print(f"📊 Found {len(tif_files)} TIF files, processing most recent: {latest_tif.name}")
+        if len(tif_files) > 1:
+            print(f"⚠️ Skipping {len(tif_files) - 1} older TIF files:")
+            for older_tif in tif_files[1:]:
+                print(f"   - {older_tif.name}")
+        
+        # Process only the latest 4-band Sentinel-2 TIF file (RED, GREEN, BLUE, NIR bands)
+        tif_file = latest_tif
+        try:
+            base_name = tif_file.stem  # Get filename without extension
+            print(f"🛰️ Processing 4-band Sentinel-2 TIF: {tif_file}")
+            
+            # Extract RED band (Band 1 = B04 RED)
+            red_tif_path = output_dir / f"{base_name}_RED_B04.tif"
+            red_png_path = output_dir / f"{base_name}_RED_B04.png"
+            
+            print(f"🔴 Extracting RED band (B04): Band 1 -> {red_tif_path}")
+            extract_result = extract_sentinel2_band(str(tif_file), str(red_tif_path), 1)
+            
+            if extract_result:
+                # Convert RED TIF to PNG
+                print(f"🎨 Converting RED band to PNG: {red_tif_path} -> {red_png_path}")
+                actual_red_png = convert_geotiff_to_png(str(red_tif_path), str(red_png_path))
                 
-                # Extract RED band (Band 1 = B04 RED)
-                red_tif_path = output_dir / f"{base_name}_RED_B04.tif"
-                red_png_path = output_dir / f"{base_name}_RED_B04.png"
-                
-                print(f"🔴 Extracting RED band (B04): Band 1 -> {red_tif_path}")
-                extract_result = extract_sentinel2_band(str(tif_file), str(red_tif_path), 1)
-                
-                if extract_result:
-                    # Convert RED TIF to PNG
-                    print(f"🎨 Converting RED band to PNG: {red_tif_path} -> {red_png_path}")
-                    actual_red_png = convert_geotiff_to_png(str(red_tif_path), str(red_png_path))
-                    
-                    if os.path.exists(actual_red_png):
-                        results['files'].append({
-                            'band': 'RED_B04',
-                            'tif_path': str(red_tif_path),
-                            'png_path': actual_red_png,
-                            'size_mb': os.path.getsize(actual_red_png) / (1024 * 1024)
-                        })
-                        print(f"✅ Successfully converted RED band")
-                    else:
-                        results['errors'].append(f"Failed to create PNG for RED band")
+                if os.path.exists(actual_red_png):
+                    results['files'].append({
+                        'band': 'RED_B04',
+                        'tif_path': str(red_tif_path),
+                        'png_path': actual_red_png,
+                        'size_mb': os.path.getsize(actual_red_png) / (1024 * 1024)
+                    })
+                    print(f"✅ Successfully converted RED band")
                 else:
-                    results['errors'].append(f"Failed to extract RED band from {tif_file.name}")
+                    results['errors'].append(f"Failed to create PNG for RED band")
+            else:
+                results['errors'].append(f"Failed to extract RED band from {tif_file.name}")
 
-                # Extract NIR band (Band 4 = B08 NIR)  
-                nir_tif_path = output_dir / f"{base_name}_NIR_B08.tif"
-                nir_png_path = output_dir / f"{base_name}_NIR_B08.png"
+            # Extract NIR band (Band 4 = B08 NIR)  
+            nir_tif_path = output_dir / f"{base_name}_NIR_B08.tif"
+            nir_png_path = output_dir / f"{base_name}_NIR_B08.png"
+            
+            print(f"🌿 Extracting NIR band (B08): Band 4 -> {nir_tif_path}")
+            extract_result = extract_sentinel2_band(str(tif_file), str(nir_tif_path), 4)
+            
+            if extract_result:
+                # Convert NIR TIF to PNG
+                print(f"🎨 Converting NIR band to PNG: {nir_tif_path} -> {nir_png_path}")
+                actual_nir_png = convert_geotiff_to_png(str(nir_tif_path), str(nir_png_path))
                 
-                print(f"🌿 Extracting NIR band (B08): Band 4 -> {nir_tif_path}")
-                extract_result = extract_sentinel2_band(str(tif_file), str(nir_tif_path), 4)
-                
-                if extract_result:
-                    # Convert NIR TIF to PNG
-                    print(f"🎨 Converting NIR band to PNG: {nir_tif_path} -> {nir_png_path}")
-                    actual_nir_png = convert_geotiff_to_png(str(nir_tif_path), str(nir_png_path))
+                if os.path.exists(actual_nir_png):
+                    results['files'].append({
+                        'band': 'NIR_B08',
+                        'tif_path': str(nir_tif_path),
+                        'png_path': actual_nir_png,
+                        'size_mb': os.path.getsize(actual_nir_png) / (1024 * 1024)
+                    })
+                    print(f"✅ Successfully converted NIR band")
                     
-                    if os.path.exists(actual_nir_png):
-                        results['files'].append({
-                            'band': 'NIR_B08',
-                            'tif_path': str(nir_tif_path),
-                            'png_path': actual_nir_png,
-                            'size_mb': os.path.getsize(actual_nir_png) / (1024 * 1024)
-                        })
-                        print(f"✅ Successfully converted NIR band")
-                        
-                        # Check if we have both RED and NIR bands for NDVI calculation
-                        red_band_extracted = any(f['band'] == 'RED_B04' for f in results['files'] if f.get('tif_path') and base_name in f['tif_path'])
-                        nir_band_extracted = True  # We just successfully extracted NIR
-                        
-                        if red_band_extracted and nir_band_extracted:
-                            try:
-                                print(f"\n🌱 BOTH RED AND NIR BANDS AVAILABLE - GENERATING NDVI")
+                    # Check if we have both RED and NIR bands for NDVI calculation
+                    red_band_extracted = any(f['band'] == 'RED_B04' for f in results['files'] if f.get('tif_path') and base_name in f['tif_path'])
+                    nir_band_extracted = True  # We just successfully extracted NIR
+                    
+                    if red_band_extracted and nir_band_extracted:
+                        try:
+                            print(f"\n🌱 BOTH RED AND NIR BANDS AVAILABLE - GENERATING NDVI")
+                            
+                            # Import NDVI processor
+                            from .processing.ndvi_processing import NDVIProcessor
+                            
+                            # Generate NDVI
+                            ndvi_processor = NDVIProcessor()
+                            
+                            # Create NDVI output path
+                            ndvi_tif_path = output_dir / f"{base_name}_NDVI.tif"
+                            
+                            # Calculate NDVI using the extracted band files
+                            ndvi_success = ndvi_processor.calculate_ndvi(
+                                str(red_tif_path), 
+                                str(nir_tif_path), 
+                                str(ndvi_tif_path)
+                            )
+                            
+                            if ndvi_success and os.path.exists(ndvi_tif_path):
+                                # Convert NDVI TIF to PNG
+                                ndvi_png_path = output_dir / f"{base_name}_NDVI.png"
+                                print(f"🎨 Converting NDVI to PNG: {ndvi_tif_path} -> {ndvi_png_path}")
+                                actual_ndvi_png = convert_geotiff_to_png(str(ndvi_tif_path), str(ndvi_png_path))
                                 
-                                # Import NDVI processor
-                                from .processing.ndvi_processing import NDVIProcessor
-                                
-                                # Generate NDVI
-                                ndvi_processor = NDVIProcessor()
-                                
-                                # Create NDVI output path
-                                ndvi_tif_path = output_dir / f"{base_name}_NDVI.tif"
-                                
-                                # Calculate NDVI using the extracted band files
-                                ndvi_success = ndvi_processor.calculate_ndvi(
-                                    str(red_tif_path), 
-                                    str(nir_tif_path), 
-                                    str(ndvi_tif_path)
-                                )
-                                
-                                if ndvi_success and os.path.exists(ndvi_tif_path):
-                                    # Convert NDVI TIF to PNG
-                                    ndvi_png_path = output_dir / f"{base_name}_NDVI.png"
-                                    print(f"🎨 Converting NDVI to PNG: {ndvi_tif_path} -> {ndvi_png_path}")
-                                    actual_ndvi_png = convert_geotiff_to_png(str(ndvi_tif_path), str(ndvi_png_path))
-                                    
-                                    if os.path.exists(actual_ndvi_png):
-                                        results['files'].append({
-                                            'band': 'NDVI',
-                                            'tif_path': str(ndvi_tif_path),
-                                            'png_path': actual_ndvi_png,
-                                            'size_mb': os.path.getsize(actual_ndvi_png) / (1024 * 1024)
-                                        })
-                                        print(f"✅ Successfully generated and converted NDVI")
-                                    else:
-                                        results['errors'].append(f"Failed to create PNG for NDVI")
-                                        print(f"❌ Failed to create NDVI PNG")
+                                if os.path.exists(actual_ndvi_png):
+                                    results['files'].append({
+                                        'band': 'NDVI',
+                                        'tif_path': str(ndvi_tif_path),
+                                        'png_path': actual_ndvi_png,
+                                        'size_mb': os.path.getsize(actual_ndvi_png) / (1024 * 1024)
+                                    })
+                                    print(f"✅ Successfully generated and converted NDVI")
                                 else:
-                                    results['errors'].append(f"Failed to calculate NDVI from {base_name}")
-                                    print(f"❌ Failed to calculate NDVI")
-                                    
-                            except Exception as ndvi_e:
-                                error_msg = f"Error generating NDVI for {base_name}: {str(ndvi_e)}"
-                                print(f"❌ {error_msg}")
-                                results['errors'].append(error_msg)
-                        
-                    else:
-                        results['errors'].append(f"Failed to create PNG for NIR band")
-                else:
-                    results['errors'].append(f"Failed to extract NIR band from {tif_file.name}")
+                                    results['errors'].append(f"Failed to create PNG for NDVI")
+                                    print(f"❌ Failed to create NDVI PNG")
+                            else:
+                                results['errors'].append(f"Failed to calculate NDVI from {base_name}")
+                                print(f"❌ Failed to calculate NDVI")
+                                
+                        except Exception as ndvi_e:
+                            error_msg = f"Error generating NDVI for {base_name}: {str(ndvi_e)}"
+                            print(f"❌ {error_msg}")
+                            results['errors'].append(error_msg)
                     
-            except Exception as e:
-                error_msg = f"Error processing {tif_file.name}: {str(e)}"
-                print(f"❌ {error_msg}")
-                results['errors'].append(error_msg)
+                else:
+                    results['errors'].append(f"Failed to create PNG for NIR band")
+            else:
+                results['errors'].append(f"Failed to extract NIR band from {tif_file.name}")
+                
+        except Exception as e:
+            error_msg = f"Error processing {tif_file.name}: {str(e)}"
+            print(f"❌ {error_msg}")
+            results['errors'].append(error_msg)
         
         results['success'] = len(results['files']) > 0
         print(f"✅ Conversion complete: {len(results['files'])} files converted")

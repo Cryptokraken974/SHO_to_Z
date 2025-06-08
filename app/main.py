@@ -136,7 +136,7 @@ from .endpoints.overlays import router as overlays_router
 from .endpoints.elevation_api import router as elevation_router
 from .endpoints.region_management import router as region_router
 from .endpoints.saved_places import router as saved_places_router
-# from .endpoints.sentinel2 import router as sentinel2_router
+from .endpoints.sentinel2 import router as sentinel2_router
 from .endpoints.geotiff import router as geotiff_router
 from .endpoints.laz import router as laz_file_router
 from .endpoints.cache_management import router as cache_router
@@ -151,7 +151,7 @@ app.include_router(overlays_router)
 app.include_router(elevation_router)
 app.include_router(region_router)
 app.include_router(saved_places_router)
-# app.include_router(sentinel2_router)
+app.include_router(sentinel2_router)
 app.include_router(geotiff_router)
 app.include_router(laz_file_router)
 app.include_router(cache_router)
