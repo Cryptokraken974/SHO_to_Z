@@ -638,47 +638,187 @@ class GeoTiffLeftPanel {
     }
 
     async loadLazFiles() {
-        if (!this.selectedLazFiles || this.selectedLazFiles.length === 0) {
-            this.showError('No files selected for loading');
+        const files = this.selectedLazFiles;
+        if (!files || files.length === 0) {
+            this.showError('No files selected');
             return;
         }
 
-        console.log('📂 Loading LAZ files:', this.selectedLazFiles.length);
-
-        // Show progress
-        this.showLazProgress(true);
-        this.updateLazProgress(0, 'Loading files...');
-
         try {
-            // Load files one by one
-            const loadedFiles = [];
-            for (let i = 0; i < this.selectedLazFiles.length; i++) {
-                const file = this.selectedLazFiles[i];
-                const progress = ((i + 1) / this.selectedLazFiles.length) * 100;
-                
-                this.updateLazProgress(progress, `Loading ${file.name}...`);
-                
-                const result = await laz().loadLAZFile(file);
-                loadedFiles.push(result);
+            this.showLazProgress(true);
+            this.updateLazProgress(0, 'Starting upload...');
+
+            const formData = new FormData();
+            files.forEach(file => {
+                formData.append('files', file);
+            });
+
+            // Upload files and get coordinates
+            const response = await fetch('/api/laz/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`Upload failed: ${response.statusText}`);
             }
 
-            this.updateLazProgress(100, 'Loading complete!');
+            const result = await response.json();
+            console.log('LAZ upload result:', result);
+
+            this.updateLazProgress(50, 'Files uploaded, processing coordinates...');
+
+            // Store the loaded files info
+            const loadedFiles = result.files || [];
             
-            // Show success message
-            this.showSuccess(`Successfully loaded ${loadedFiles.length} LAZ files`);
-            
-            // Refresh file tree to show new files
             this.loadFileTree();
             
-            // Close modal after a short delay
-            setTimeout(() => {
-                this.closeLazFileModal();
-            }, 1500);
+            // 🔧 FIX: Automatically select the first uploaded LAZ file as the current region
+            if (loadedFiles.length > 0 && window.FileManager) {
+                const firstUploadedFile = loadedFiles[0];
+                const fileName = firstUploadedFile.inputFile; // This should be the LAZ filename like "CUI_A01.laz"
+                const regionName = fileName.replace(/\.[^/.]+$/, ''); // Remove extension to get "CUI_A01"
+                
+                console.log('🎯 Automatically selecting uploaded LAZ file as region:', regionName);
+                console.log('📁 Original filename:', fileName);
+                
+                this.updateLazProgress(100, 'Setting up region...');
+                
+                // Set the selected region to use the uploaded LAZ file
+                // This ensures ProcessingManager.processAllRasters() will use this region instead of coordinates
+                window.FileManager.selectRegion(
+                    regionName,                 // displayName: use clean name for output folders (no .laz extension)
+                    null,                       // coords: let it be fetched automatically
+                    regionName,                 // processingRegion: use the name without extension
+                    `input/LAZ/${fileName}`     // regionPath: full path for LAZ file operations
+                );
+                
+                console.log('✅ Region selected:', regionName);
+                
+                // Wait for region setup to complete before triggering raster generation
+                this.updateLazProgress(100, 'Region setup complete. Starting raster generation...');
+                
+                // Show raster generation progress section
+                this.showLazRasterProgress(true);
+                
+                // Give extra time for the region selection and coordinate fetching to complete
+                setTimeout(async () => {
+                    // Verify that the region is properly selected before proceeding
+                    if (window.FileManager.hasSelectedRegion()) {
+                        console.log('🚀 Region setup complete. Triggering automatic raster generation...');
+                        
+                        // Additional delay to ensure backend file is ready
+                        setTimeout(async () => {
+                            console.log('🎯 Calling ProcessingManager.processAllRasters() with LAZ modal progress integration');
+                            try {
+                                // Show notification that rasters are being generated
+                                if (window.Utils && window.Utils.showNotification) {
+                                    window.Utils.showNotification('🚀 Automatic raster generation started! Progress shown in LAZ loading window.', 'info');
+                                }
+                                
+                                // Start raster processing with LAZ modal progress integration
+                                const result = await this.processAllRastersWithLazModalProgress();
+                                
+                                if (result) {
+                                    console.log('✅ Automatic raster generation completed successfully');
+                                    // Keep modal open for a bit to show completion status
+                                    setTimeout(() => {
+                                        this.closeLazFileModal();
+                                    }, 3000);
+                                } else {
+                                    console.warn('⚠️ Automatic raster generation failed');
+                                    if (window.Utils && window.Utils.showNotification) {
+                                        window.Utils.showNotification('Raster generation failed. Please try the "Generate Rasters" button manually.', 'warning');
+                                    }
+                                    // Close modal on failure after a delay
+                                    setTimeout(() => {
+                                        this.closeLazFileModal();
+                                    }, 2000);
+                                }
+                            } catch (error) {
+                                console.error('❌ Error during automatic raster generation:', error);
+                                if (window.Utils && window.Utils.showNotification) {
+                                    window.Utils.showNotification('Error during automatic processing. Please try the "Generate Rasters" button.', 'error');
+                                }
+                                // Close modal on error after a delay
+                                setTimeout(() => {
+                                    this.closeLazFileModal();
+                                }, 2000);
+                            }
+                        }, 1000); // Extra 1 second for backend file availability
+                        
+                    } else {
+                        console.warn('⚠️ Region selection not completed, skipping automatic raster generation');
+                        this.updateLazProgress(100, 'Region setup incomplete - manual processing required');
+                        // Close modal after a delay
+                        setTimeout(() => {
+                            this.closeLazFileModal();
+                        }, 3000);
+                    }
+                }, 3000); // Increased delay for region setup completion
+                
+            } else {
+                // No files loaded or FileManager not available - fallback to original behavior
+                console.log('🚀 Triggering automatic raster generation after LAZ loading...');
+                if (window.ProcessingManager && typeof window.ProcessingManager.processAllRasters === 'function') {
+                    this.updateLazProgress(100, 'Starting automatic raster generation...');
+                    this.showLazRasterProgress(true);
+                    
+                    setTimeout(async () => {
+                        console.log('🎯 Calling ProcessingManager.processAllRasters() with LAZ modal progress integration');
+                        try {
+                            // Show notification that rasters are being generated  
+                            if (window.Utils && window.Utils.showNotification) {
+                                window.Utils.showNotification('🚀 Automatic raster generation started! Progress shown in LAZ loading window.', 'info');
+                            }
+                            
+                            // Start raster processing with LAZ modal progress integration
+                            const result = await this.processAllRastersWithLazModalProgress();
+                            
+                            if (result) {
+                                console.log('✅ Automatic raster generation completed successfully');
+                                // Keep modal open for a bit to show completion status
+                                setTimeout(() => {
+                                    this.closeLazFileModal();
+                                }, 3000);
+                            } else {
+                                console.warn('⚠️ Automatic raster generation failed');
+                                if (window.Utils && window.Utils.showNotification) {
+                                    window.Utils.showNotification('Raster generation failed. Please try the "Generate Rasters" button manually.', 'warning');
+                                }
+                                // Close modal on failure after a delay
+                                setTimeout(() => {
+                                    this.closeLazFileModal();
+                                }, 2000);
+                            }
+                        } catch (error) {
+                            console.error('❌ Error during automatic raster generation:', error);
+                            if (window.Utils && window.Utils.showNotification) {
+                                window.Utils.showNotification('Error during automatic processing. Please try the "Generate Rasters" button.', 'error');
+                            }
+                            // Close modal on error after a delay
+                            setTimeout(() => {
+                                this.closeLazFileModal();
+                            }, 2000);
+                        }
+                    }, 2000);
+                } else {
+                    console.warn('⚠️ ProcessingManager not available for automatic raster generation');
+                    // Close modal if no processing available
+                    setTimeout(() => {
+                        this.closeLazFileModal();
+                    }, 2000);
+                }
+            }
 
         } catch (error) {
             console.error('LAZ loading error:', error);
             this.showError(`Loading failed: ${error.message}`);
             this.showLazProgress(false);
+            // Close modal on error
+            setTimeout(() => {
+                this.closeLazFileModal();
+            }, 3000);
         }
     }
 
@@ -703,6 +843,321 @@ class GeoTiffLeftPanel {
         
         if (progressStatus) {
             progressStatus.textContent = status;
+        }
+    }
+
+    /**
+     * Show/hide LAZ raster generation progress section
+     * @param {boolean} show - Whether to show or hide the progress section
+     */
+    showLazRasterProgress(show) {
+        const progressSection = document.getElementById('laz-raster-progress-section');
+        const loadButton = document.getElementById('load-laz-files');
+        const cancelButton = document.getElementById('cancel-laz-raster-processing');
+        
+        if (progressSection) {
+            if (show) {
+                progressSection.classList.remove('hidden');
+                // Hide load button and show cancel button
+                if (loadButton) loadButton.classList.add('hidden');
+                if (cancelButton) cancelButton.classList.remove('hidden');
+            } else {
+                progressSection.classList.add('hidden');
+                // Show load button and hide cancel button
+                if (loadButton) loadButton.classList.remove('hidden');
+                if (cancelButton) cancelButton.classList.add('hidden');
+            }
+        }
+    }
+
+    /**
+     * Update LAZ modal raster processing step display
+     * @param {string} stepName - Name of the current step
+     * @param {number} currentIndex - Current step index
+     * @param {number} totalSteps - Total number of steps
+     */
+    updateLazRasterProcessingStep(stepName, currentIndex, totalSteps) {
+        const stepEl = document.getElementById('laz-current-processing-step');
+        const progressTextEl = document.getElementById('laz-processing-progress-text');
+        const progressBarEl = document.getElementById('laz-processing-progress-bar');
+
+        if (stepEl) {
+            stepEl.textContent = `Processing ${stepName}...`;
+        }
+
+        const progressPercent = Math.round(((currentIndex + 1) / totalSteps) * 100);
+        
+        if (progressTextEl) {
+            progressTextEl.textContent = `${progressPercent}%`;
+        }
+
+        if (progressBarEl) {
+            progressBarEl.style.width = `${progressPercent}%`;
+        }
+    }
+
+    /**
+     * Update LAZ modal processing queue visual display
+     * @param {Array} queue - Processing queue array
+     * @param {number} currentIndex - Current processing index
+     */
+    updateLazRasterProcessingQueue(queue, currentIndex) {
+        queue.forEach((process, index) => {
+            const queueItem = document.getElementById(`laz-queue-${process.type.replace('_', '-')}`);
+            if (queueItem) {
+                // Reset classes
+                queueItem.className = 'p-2 rounded bg-[#1a1a1a] text-center border-l-2';
+                
+                if (index < currentIndex) {
+                    // Completed
+                    queueItem.classList.add('border-green-500', 'bg-green-900', 'bg-opacity-20');
+                } else if (index === currentIndex) {
+                    // Currently processing
+                    queueItem.classList.add('border-yellow-500', 'bg-yellow-900', 'bg-opacity-20', 'animate-pulse');
+                } else {
+                    // Pending
+                    queueItem.classList.add('border-[#666]');
+                }
+            }
+        });
+    }
+
+    /**
+     * Mark a LAZ modal queue item as complete with status
+     * @param {string} processType - Type of processing
+     * @param {string} status - Status (success, error)
+     */
+    markLazQueueItemComplete(processType, status) {
+        const queueItem = document.getElementById(`laz-queue-${processType.replace('_', '-')}`);
+        if (queueItem) {
+            queueItem.className = 'p-2 rounded bg-[#1a1a1a] text-center border-l-2';
+            
+            if (status === 'success') {
+                queueItem.classList.add('border-green-500', 'bg-green-900', 'bg-opacity-20');
+            } else if (status === 'error') {
+                queueItem.classList.add('border-red-500', 'bg-red-900', 'bg-opacity-20');
+            }
+        }
+    }
+
+    /**
+     * Show LAZ raster processing completion summary
+     * @param {number} successCount - Number of successful processes
+     * @param {Array} failedProcesses - Array of failed process names
+     */
+    showLazRasterProcessingComplete(successCount, failedProcesses) {
+        const statusEl = document.getElementById('laz-raster-status-text');
+        if (statusEl) {
+            if (failedProcesses.length === 0) {
+                statusEl.textContent = `All ${successCount} raster products generated successfully! ✅`;
+                statusEl.className = 'text-green-400';
+            } else {
+                statusEl.textContent = `${successCount} successful, ${failedProcesses.length} failed: ${failedProcesses.join(', ')}`;
+                statusEl.className = 'text-yellow-400';
+            }
+        }
+    }
+
+    /**
+     * Process all rasters with LAZ modal progress integration
+     * This mimics ProcessingManager.processAllRasters() but updates the LAZ modal UI
+     */
+    async processAllRastersWithLazModalProgress() {
+        // Check prerequisites
+        const selectedRegion = window.FileManager?.getSelectedRegion();
+        const processingRegion = window.FileManager?.getProcessingRegion();
+        const selectedFile = typeof window.FileManager?.getSelectedFile === 'function' ? window.FileManager.getSelectedFile() : null;
+        
+        if (!selectedRegion && !selectedFile) {
+            if (window.Utils) window.Utils.showNotification('Please select a region or LAZ file first', 'warning');
+            return false;
+        }
+
+        // Define processing queue (same as ProcessingManager)
+        const processingQueue = [
+            { type: 'dtm', name: 'DTM', icon: '🏔️' },
+            { type: 'dsm', name: 'DSM', icon: '🏗️' },
+            { type: 'hillshade', name: 'Hillshade', icon: '🌄' },
+            { type: 'slope', name: 'Slope', icon: '📐' },
+            { type: 'aspect', name: 'Aspect', icon: '🧭' },
+            { type: 'tpi', name: 'TPI', icon: '📈' },
+            { type: 'roughness', name: 'Roughness', icon: '🪨' },
+            { type: 'chm', name: 'CHM', icon: '🌳' }
+        ];
+
+        try {
+            // Initialize LAZ modal progress display
+            this.updateLazRasterProcessingQueue(processingQueue, -1);
+            
+            if (window.Utils) window.Utils.showNotification('Starting sequential raster generation...', 'info');
+            
+            let successCount = 0;
+            let failedProcesses = [];
+            let lazProcessingCancelled = false;
+
+            // Set up cancel button handler
+            const cancelButton = document.getElementById('cancel-laz-raster-processing');
+            if (cancelButton) {
+                const cancelHandler = () => {
+                    lazProcessingCancelled = true;
+                    console.log('🛑 LAZ raster processing cancelled by user');
+                    if (window.Utils) window.Utils.showNotification('Raster processing cancelled', 'info');
+                };
+                
+                cancelButton.addEventListener('click', cancelHandler);
+                
+                // Clean up event listener when processing completes
+                const cleanup = () => {
+                    cancelButton.removeEventListener('click', cancelHandler);
+                };
+                
+                // Store cleanup function for later use
+                this._lazCancelCleanup = cleanup;
+            }
+
+            // Process each item in the queue sequentially
+            for (let i = 0; i < processingQueue.length; i++) {
+                // Check for cancellation
+                if (lazProcessingCancelled) {
+                    console.log('LAZ processing cancelled by user');
+                    this.showLazRasterProgress(false);
+                    return false;
+                }
+
+                const process = processingQueue[i];
+                
+                try {
+                    // Update LAZ modal UI to show current processing step
+                    this.updateLazRasterProcessingStep(process.name, i, processingQueue.length);
+                    this.updateLazRasterProcessingQueue(processingQueue, i);
+                    
+                    console.log(`Processing ${process.name} (${i + 1}/${processingQueue.length})`);
+                    
+                    // Execute the processing using ProcessingManager
+                    const success = await window.ProcessingManager.sendProcess(process.type);
+                    
+                    if (success) {
+                        successCount++;
+                        this.markLazQueueItemComplete(process.type, 'success');
+                        console.log(`${process.name} completed successfully`);
+                    } else {
+                        failedProcesses.push(process.name);
+                        this.markLazQueueItemComplete(process.type, 'error');
+                        console.log(`${process.name} failed`);
+                    }
+                    
+                    // Small delay between processes
+                    if (i < processingQueue.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                    
+                } catch (error) {
+                    failedProcesses.push(process.name);
+                    this.markLazQueueItemComplete(process.type, 'error');
+                    console.log(`${process.name} processing failed:`, error);
+                }
+            }
+
+            // Clean up cancel event listener
+            if (this._lazCancelCleanup) {
+                this._lazCancelCleanup();
+                delete this._lazCancelCleanup;
+            }
+
+            // Generate metadata.txt file after all rasters are complete
+            if (successCount > 0) {
+                try {
+                    console.log('📄 Generating metadata.txt file...');
+                    this.updateLazRasterProcessingStep('Generating Metadata', processingQueue.length, processingQueue.length + 1);
+                    
+                    const selectedRegion = window.FileManager?.getSelectedRegion();
+                    const processingRegion = window.FileManager?.getProcessingRegion();
+                    const regionName = processingRegion || selectedRegion;
+                    
+                    if (regionName) {
+                        // Get the LAZ filename from the region path
+                        const regionPath = window.FileManager?.getRegionPath();
+                        let lazFileName = regionName + '.laz'; // Default fallback
+                        
+                        if (regionPath && regionPath.includes('input/LAZ/')) {
+                            // Extract actual filename from path like "input/LAZ/CUI_A01.laz"
+                            const pathParts = regionPath.split('/');
+                            lazFileName = pathParts[pathParts.length - 1];
+                        }
+                        
+                        console.log(`📄 Creating metadata for region: ${regionName}, file: ${lazFileName}`);
+                        
+                        const formData = new FormData();
+                        formData.append('region_name', regionName);
+                        formData.append('file_name', lazFileName);
+                        
+                        const metadataResponse = await fetch('/api/laz/generate-metadata', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (metadataResponse.ok) {
+                            const metadataResult = await metadataResponse.json();
+                            console.log('✅ Metadata generated successfully:', metadataResult);
+                            
+                            // Update UI to show metadata generation completed
+                            this.updateLazRasterProcessingStep('Metadata Generated', processingQueue.length + 1, processingQueue.length + 1);
+                            this.markLazQueueItemComplete('metadata', 'success');
+                        } else {
+                            console.warn('⚠️ Metadata generation failed:', metadataResponse.statusText);
+                            this.updateLazRasterProcessingStep('Metadata Generation Failed', processingQueue.length + 1, processingQueue.length + 1);
+                            this.markLazQueueItemComplete('metadata', 'error');
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Metadata generation error:', error);
+                    this.updateLazRasterProcessingStep('Metadata Generation Error', processingQueue.length + 1, processingQueue.length + 1);
+                    this.markLazQueueItemComplete('metadata', 'error');
+                }
+            }
+
+            // Show completion summary in LAZ modal
+            this.showLazRasterProcessingComplete(successCount, failedProcesses);
+            
+            // Final notification
+            if (failedProcesses.length === 0) {
+                if (window.Utils) window.Utils.showNotification(`All ${successCount} raster products generated successfully!`, 'success');
+                
+                // Refresh overlay display after successful raster generation
+                setTimeout(() => {
+                    const selectedRegion = window.FileManager?.getSelectedRegion();
+                    const processingRegion = window.FileManager?.getProcessingRegion();
+                    
+                    if (processingRegion || selectedRegion) {
+                        console.log('🔄 Refreshing LIDAR raster display after successful generation...');
+                        window.UIManager?.displayLidarRasterForRegion(processingRegion || selectedRegion);
+                    }
+                }, 2000); // 2 second delay to ensure files are ready
+                
+            } else if (successCount > 0) {
+                if (window.Utils) window.Utils.showNotification(`${successCount} raster products completed, ${failedProcesses.length} failed`, 'warning');
+                
+                // Still refresh display for successful ones
+                setTimeout(() => {
+                    const selectedRegion = window.FileManager?.getSelectedRegion();
+                    const processingRegion = window.FileManager?.getProcessingRegion();
+                    
+                    if (processingRegion || selectedRegion) {
+                        console.log('🔄 Refreshing LIDAR raster display for successful generations...');
+                        window.UIManager?.displayLidarRasterForRegion(processingRegion || selectedRegion);
+                    }
+                }, 2000);
+            } else {
+                if (window.Utils) window.Utils.showNotification('Raster generation failed. Please check your input data.', 'error');
+            }
+
+            return successCount > 0;
+
+        } catch (error) {
+            console.log('Sequential raster processing failed:', error);
+            if (window.Utils) window.Utils.showNotification('Sequential raster processing failed', 'error');
+            this.showLazRasterProgress(false);
+            return false;
         }
     }
 }

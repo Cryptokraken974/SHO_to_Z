@@ -261,6 +261,22 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
                 content={"success": False, "error": f"PNG file not found: {png_path}"}
             )
         
+        # Check for optimized overlay version first
+        from ..geo_utils import _get_optimized_overlay_path
+        overlay_png_path = _get_optimized_overlay_path(png_path)
+        is_optimized = False
+        
+        if overlay_png_path and os.path.exists(overlay_png_path):
+            print(f"🎯 Using optimized overlay: {overlay_png_path}")
+            # Update paths to use optimized versions
+            png_path = overlay_png_path
+            base_path = png_path.replace('.png', '')
+            world_path = f"{base_path}.pgw"  # PNG world files use .pgw
+            tiff_path = png_path.replace('_overlays.png', '.tif')  # Original TIFF for bounds
+            is_optimized = True
+        else:
+            print(f"📂 Using original file: {png_path}")
+        
         # Try to get bounds from GeoTIFF first, then world file
         bounds = None
         
@@ -305,8 +321,17 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
             'image_data': image_data,
             'processing_type': processing_type,
             'region_name': region_name,
-            'filename': os.path.basename(png_path)
+            'filename': os.path.basename(png_path),
+            'is_optimized': is_optimized
         }
+        
+        # Add optimization metadata if using optimized version
+        if is_optimized:
+            overlay_data['optimization_info'] = {
+                'source': 'automatic_overlay_generation',
+                'optimized_for_browser': True,
+                'original_file': png_path.replace('_overlays.png', '.png')
+            }
         
         return overlay_data
         

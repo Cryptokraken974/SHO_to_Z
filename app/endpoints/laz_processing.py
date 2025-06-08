@@ -109,6 +109,11 @@ async def api_laz_to_dem(input_file: str = Form(...)):
 async def api_dtm(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None), display_region_name: str = Form(None)):
     """Convert LAZ to DTM (ground points only) - supports both region-based and LAZ file processing"""
     print(f"\n🎯 API CALL: /api/dtm")
+    print(f"📥 Received parameters:")
+    print(f"   input_file: {input_file}")
+    print(f"   region_name: {region_name}")
+    print(f"   processing_type: {processing_type}")
+    print(f"   display_region_name: {display_region_name}")
     
     # Determine processing mode: region-based or LAZ file-based
     if region_name and processing_type:

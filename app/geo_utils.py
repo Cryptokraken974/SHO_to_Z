@@ -415,7 +415,18 @@ def get_laz_overlay_data(base_filename: str, processing_type: str, filename_proc
             
             if os.path.exists(png_path):
                 print(f"✅ Found PNG file: {png_path}")
-                return _process_overlay_files(png_path, tiff_path, world_path, processing_type, base_filename)
+                
+                # Check for optimized overlay version first
+                overlay_png_path = _get_optimized_overlay_path(png_path)
+                if overlay_png_path and os.path.exists(overlay_png_path):
+                    print(f"🎯 Using optimized overlay: {overlay_png_path}")
+                    # Update paths to use optimized versions
+                    overlay_tiff_path = overlay_png_path.replace('.png', '.tif')
+                    overlay_world_path = overlay_png_path.replace('.png', '.wld')
+                    return _process_overlay_files(overlay_png_path, overlay_tiff_path, overlay_world_path, processing_type, base_filename, is_optimized=True)
+                else:
+                    print(f"📂 Using original file: {png_path}")
+                    return _process_overlay_files(png_path, tiff_path, world_path, processing_type, base_filename)
             else:
                 print(f"❌ PNG file not found: {png_path}")
         
@@ -547,7 +558,22 @@ def get_sentinel2_overlay_data_util(region_name: str, band_name: str) -> Optiona
         print(f"🗺️  TIFF path: {tiff_path}")
         print(f"🌍 World file path: {world_path}")
         
-        return _process_overlay_files(png_path, tiff_path, world_path, "sentinel-2", folder_region_name, band_name, region_name)
+        # Check for optimized overlay version first
+        overlay_png_path = _get_optimized_overlay_path(png_path)
+        is_optimized = False
+        
+        if overlay_png_path and os.path.exists(overlay_png_path):
+            print(f"🎯 Using optimized Sentinel-2 overlay: {overlay_png_path}")
+            # Update paths to use optimized versions
+            png_path = overlay_png_path
+            # World file for optimized overlay
+            world_path = png_path.replace('.png', '.wld')
+            # Keep original TIFF for bounds extraction
+            is_optimized = True
+        else:
+            print(f"📂 Using original Sentinel-2 file: {png_path}")
+        
+        return _process_overlay_files(png_path, tiff_path, world_path, "sentinel-2", folder_region_name, band_name, region_name, is_optimized)
         
     except Exception as e:
         print(f"❌ Error getting Sentinel-2 overlay data for {region_name}/{band_name}: {e}")
@@ -575,7 +601,37 @@ def parse_coordinate_folder_name(folder_name: str) -> Tuple[float, float]:
     else:
         raise ValueError(f"Cannot parse coordinates from folder name: {folder_name}")
 
-def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, processing_type: str, base_filename: str, band_name: str = None, region_name: str = None) -> Optional[Dict]:
+def _get_optimized_overlay_path(original_png_path: str) -> Optional[str]:
+    """
+    Get the path to an optimized overlay version of a PNG file.
+    
+    Args:
+        original_png_path: Path to the original PNG file
+        
+    Returns:
+        Path to optimized overlay if it exists, None otherwise
+    """
+    try:
+        # Extract directory and filename
+        directory = os.path.dirname(original_png_path)
+        filename = os.path.basename(original_png_path)
+        
+        # Create overlay filename with "_overlays" suffix
+        if filename.endswith('.png'):
+            overlay_filename = filename[:-4] + '_overlays.png'
+        else:
+            overlay_filename = filename + '_overlays'
+        
+        overlay_path = os.path.join(directory, overlay_filename)
+        
+        print(f"🔍 Checking for optimized overlay: {overlay_path}")
+        return overlay_path if os.path.exists(overlay_path) else None
+        
+    except Exception as e:
+        print(f"❌ Error checking for optimized overlay: {e}")
+        return None
+
+def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, processing_type: str, base_filename: str, band_name: str = None, region_name: str = None, is_optimized: bool = False) -> Optional[Dict]:
     """
     Common function to process overlay files and extract bounds and image data.
     """
@@ -647,7 +703,8 @@ def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, proce
             'bounds': bounds,
             'image_data': image_data,
             'processing_type': processing_type,
-            'filename': base_filename
+            'filename': base_filename,
+            'is_optimized': is_optimized
         }
         
         # Add band and region info if available
@@ -655,6 +712,14 @@ def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, proce
             result['band'] = band_name
         if region_name:
             result['region'] = region_name
+        
+        # Add optimization metadata
+        if is_optimized:
+            result['optimization_info'] = {
+                'source': 'automatic_overlay_generation',
+                'optimized_for_browser': True,
+                'original_file': png_path.replace('_overlays.png', '.png')
+            }
             
         return result
         

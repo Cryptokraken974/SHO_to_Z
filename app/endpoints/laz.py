@@ -23,6 +23,9 @@ sys.path.append(str(Path(__file__).parent.parent))
 from geo_utils import get_image_bounds_from_world_file
 from osgeo import osr, ogr
 
+# Import LAZ metadata caching
+from services.laz_metadata_cache import get_metadata_cache
+
 
 
 # Set up logging
@@ -36,6 +39,75 @@ LAZ_INPUT_DIR = BASE_DIR / "input" / "LAZ"
 LAZ_OUTPUT_DIR = BASE_DIR / "output" / "LAZ"
 LAZ_INPUT_DIR.mkdir(parents=True, exist_ok=True)
 LAZ_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _create_laz_metadata_file(file_name: str, response_data: Dict[str, Any], source_crs_info: str = None) -> bool:
+    """Create metadata.txt file for LAZ region with coordinate information.
+    
+    Args:
+        file_name: Name of the LAZ file
+        response_data: Response data containing bounds and center
+        source_crs_info: Source CRS information from PDAL
+        
+    Returns:
+        True if metadata file was created successfully, False otherwise
+    """
+    try:
+        from datetime import datetime
+        
+        # Create region name from file name (remove extension)
+        region_name = Path(file_name).stem
+        
+        # Create output directory
+        output_dir = BASE_DIR / "output" / region_name
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Extract coordinate information
+        bounds = response_data.get("bounds", {})
+        center = response_data.get("center", {})
+        debug_info = response_data.get("_debug_info", {})
+        
+        # Create metadata content
+        metadata_content = f"""# LAZ Region Metadata
+# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+# Source: LAZ file coordinate extraction
+
+Region Name: {region_name}
+Source: LAZ
+File Path: {file_name}
+
+# Coordinate Information (WGS84 - EPSG:4326)
+Center Latitude: {center.get('lat', 'N/A')}
+Center Longitude: {center.get('lng', 'N/A')}
+
+# Bounds Information (WGS84 - EPSG:4326)
+North Bound: {bounds.get('max_lat', 'N/A')}
+South Bound: {bounds.get('min_lat', 'N/A')}
+East Bound: {bounds.get('max_lng', 'N/A')}
+West Bound: {bounds.get('min_lng', 'N/A')}
+
+# Source CRS Information
+Source CRS: {source_crs_info or debug_info.get('source_crs_wkt', 'N/A')}
+
+# Native Bounds (Original CRS)
+Native Bounds: {debug_info.get('native_bounds', 'N/A')}
+
+# Processing Information
+PDAL Command: {debug_info.get('pdal_command', 'N/A')}
+Extraction Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+        
+        # Write metadata file
+        metadata_path = output_dir / "metadata.txt"
+        with open(metadata_path, 'w') as f:
+            f.write(metadata_content)
+        
+        logger.info(f"Created LAZ metadata file: {metadata_path}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to create LAZ metadata file for {file_name}: {e}")
+        return False
 
 
 def get_crs_from_pdal_info(pdal_data: Dict[str, Any], file_path_logging: str = "") -> Optional[osr.SpatialReference]:
@@ -128,8 +200,90 @@ def get_crs_from_pdal_info(pdal_data: Dict[str, Any], file_path_logging: str = "
         logger.info(f"Final CRS determined {context_log}- WKT: {srs.ExportToWkt()[:150]}...")
         return srs
     else:
-        logger.error(f"Could not determine CRS from PDAL info {context_log}")
+        logger.warning(f"Could not determine CRS from PDAL metadata {context_log}. Attempting coordinate-based detection...")
         return None
+
+
+def guess_crs_from_coordinates(minx: float, miny: float, maxx: float, maxy: float, file_path_logging: str = "") -> Optional[osr.SpatialReference]:
+    """
+    Attempt to guess the CRS based on coordinate ranges when metadata is missing.
+    This is a fallback method for LAZ files without proper CRS information.
+    """
+    context_log = f"for file {file_path_logging} " if file_path_logging else ""
+    logger.info(f"Attempting CRS detection {context_log}from coordinate bounds: X({minx}, {maxx}), Y({miny}, {maxy})")
+    
+    # Calculate coordinate ranges
+    x_range = maxx - minx
+    y_range = maxy - miny
+    
+    # Check if coordinates look like geographic (lat/lng)
+    if -180 <= minx <= 180 and -180 <= maxx <= 180 and -90 <= miny <= 90 and -90 <= maxy <= 90:
+        logger.info(f"Coordinates {context_log}appear to be geographic (WGS84)")
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(4326)  # WGS84
+        return srs
+    
+    # Check for UTM-like coordinates (typically 6-7 digit X, 7-8 digit Y)
+    if 100000 <= minx <= 900000 and 100000 <= maxx <= 900000:
+        # Determine hemisphere and zone based on Y coordinate and context
+        if miny > 1000000:
+            # Very large Y coordinates indicate Southern Hemisphere UTM
+            logger.info(f"Coordinates {context_log}appear to be UTM Southern hemisphere (Y > 1M)")
+            # For southern hemisphere, estimate zone from X coordinate
+            center_x = (minx + maxx) / 2
+            if 800000 <= center_x <= 900000:
+                zone = 18  # Common for eastern Brazil
+            elif 700000 <= center_x <= 800000:
+                zone = 19
+            elif 600000 <= center_x <= 700000:
+                zone = 20
+            elif 500000 <= center_x <= 600000:
+                zone = 21
+            else:
+                zone = 18  # Default
+            epsg_code = 32700 + zone  # UTM South zones
+        elif miny >= 0 and miny < 1000000:
+            # Northern hemisphere
+            logger.info(f"Coordinates {context_log}appear to be UTM Northern hemisphere")
+            # Estimate zone from X coordinate
+            center_x = (minx + maxx) / 2
+            zone = max(1, min(60, int(center_x / 1000000) + 31))
+            epsg_code = 32600 + zone  # UTM North zones
+        else:
+            # Negative Y coordinates - could be southern hemisphere with different datum
+            logger.info(f"Coordinates {context_log}may be SIRGAS 2000 UTM (negative Y)")
+            # Based on X coordinate range, guess UTM zone for SIRGAS 2000
+            center_x = (minx + maxx) / 2
+            if 800000 <= center_x <= 900000:
+                epsg_code = 31978  # SIRGAS 2000 / UTM zone 18S (common in Brazil)
+            elif 700000 <= center_x <= 800000:
+                epsg_code = 31979  # SIRGAS 2000 / UTM zone 19S
+            elif 600000 <= center_x <= 700000:
+                epsg_code = 31980  # SIRGAS 2000 / UTM zone 20S
+            elif 500000 <= center_x <= 600000:
+                epsg_code = 31981  # SIRGAS 2000 / UTM zone 21S
+            else:
+                epsg_code = 31978  # Default to zone 18S
+        
+        try:
+            srs = osr.SpatialReference()
+            if srs.ImportFromEPSG(epsg_code) == ogr.OGRERR_NONE:
+                logger.info(f"Guessed CRS {context_log}as EPSG:{epsg_code}")
+                return srs
+            else:
+                logger.warning(f"Failed to import guessed EPSG:{epsg_code} {context_log}")
+        except Exception as e:
+            logger.warning(f"Error importing guessed EPSG:{epsg_code} {context_log}: {e}")
+    
+    # Check for Web Mercator-like coordinates (very large numbers)
+    if abs(minx) > 1000000 and abs(maxx) > 1000000 and abs(miny) > 1000000 and abs(maxy) > 1000000:
+        logger.info(f"Coordinates {context_log}appear to be Web Mercator (EPSG:3857)")
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(3857)  # Web Mercator
+        return srs
+    
+    logger.warning(f"Could not guess CRS {context_log}from coordinate bounds")
+    return None
 
 
 @router.post("/load")
@@ -416,138 +570,20 @@ async def get_laz_bounds_wgs84(file_name: str):
     The file_name is relative to the LAZ_INPUT_DIR.
     Creates processing metadata file after successful coordinate extraction.
     """
-    logger.info(f"Processing LAZ bounds for {file_name}")
-    
-    full_file_path = (LAZ_INPUT_DIR / file_name).resolve()
-    pdal_output_str = "" # Initialize for potential use in error logging
-
-    if not full_file_path.is_file():
-        error_msg = f"LAZ file not found: {file_name}"
-        logger.error(f"LAZ file not found for WGS84 bounds: {full_file_path}")
-        
-        raise HTTPException(status_code=404, detail=error_msg)
-
     try:
-        pdal_command = ['pdal', 'info', '--all', '--stats', str(full_file_path)]
-        logger.info(f"Executing PDAL command for WGS84 bounds: {' '.join(pdal_command)}")
+        # Use the internal function to get the data
+        response_data = await _get_laz_bounds_data_internal(file_name)
         
-        process = await asyncio.create_subprocess_exec(
-            *pdal_command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await process.communicate()
-
-        if process.returncode != 0:
-            err_msg = stderr.decode().strip() if stderr else "Unknown PDAL error"
-            logger.error(f"PDAL info command failed for {full_file_path}. Return code: {process.returncode}. Error: {err_msg}")
-            raise HTTPException(status_code=500, detail=f"PDAL analysis failed: {err_msg}")
-
-        pdal_output_str = stdout.decode()
-        if not pdal_output_str.strip(): # Check if output is empty or just whitespace
-            logger.error(f"PDAL info command returned empty output for {full_file_path}.")
-            raise HTTPException(status_code=500, detail="PDAL analysis returned empty output.")
-            
-        pdal_data = json.loads(pdal_output_str)
-
-        native_bbox = None
-        try:
-            # Try extracting bounds from multiple possible locations in PDAL output
-            if ('stats' in pdal_data and isinstance(pdal_data['stats'], dict) and 
-                'bbox' in pdal_data['stats'] and isinstance(pdal_data['stats']['bbox'], dict) and 
-                'native' in pdal_data['stats']['bbox'] and isinstance(pdal_data['stats']['bbox']['native'], dict) and 
-                'bbox' in pdal_data['stats']['bbox']['native']):
-                native_bbox = pdal_data['stats']['bbox']['native']['bbox']
-                logger.debug(f"Extracted bounds from stats.bbox.native.bbox for {full_file_path}")
-            elif ('metadata' in pdal_data and isinstance(pdal_data['metadata'], dict)):
-                # Try to extract from metadata section
-                metadata = pdal_data['metadata']
-                if all(k in metadata for k in ['minx', 'miny', 'maxx', 'maxy']):
-                    native_bbox = {
-                        'minx': metadata['minx'],
-                        'miny': metadata['miny'], 
-                        'maxx': metadata['maxx'],
-                        'maxy': metadata['maxy']
-                    }
-                    logger.debug(f"Extracted bounds from metadata for {full_file_path}")
-            elif ('summary' in pdal_data and isinstance(pdal_data['summary'], dict) and 
-                  'bounds' in pdal_data['summary'] and isinstance(pdal_data['summary']['bounds'], dict) and 
-                  'native' in pdal_data['summary']['bounds']):
-                 native_bbox = pdal_data['summary']['bounds']['native']
-                 logger.debug(f"Extracted bounds from summary.bounds.native for {full_file_path}")
-
-            if not isinstance(native_bbox, dict) or not all(k in native_bbox for k in ['minx', 'miny', 'maxx', 'maxy']):
-                logger.error(f"Could not extract valid native bounding box from PDAL info for {full_file_path}. Available keys in PDAL data: {list(pdal_data.keys())}")
-                raise HTTPException(status_code=500, detail="Could not extract native bounding box from LAZ file.")
-        except KeyError as e:
-            logger.error(f"KeyError while extracting native bounding box for {full_file_path}: {e}. Available keys in PDAL data: {list(pdal_data.keys())}")
-            raise HTTPException(status_code=500, detail=f"Error parsing native bounds: {e}")
-
-        minx, miny, maxx, maxy = native_bbox['minx'], native_bbox['miny'], native_bbox['maxx'], native_bbox['maxy']
-
-        source_srs = get_crs_from_pdal_info(pdal_data, file_path_logging=str(full_file_path))
-        if source_srs is None:
-            logger.error(f"Could not determine source CRS for LAZ file: {full_file_path}. PDAL Data: {json.dumps(pdal_data, indent=2)}")
-            raise HTTPException(status_code=500, detail="Could not determine source CRS of LAZ file.")
+        # Create metadata file for the LAZ region
+        _create_laz_metadata_file(file_name, response_data, response_data.get("_debug_info", {}).get("source_crs_wkt"))
         
-        source_srs_wkt = source_srs.ExportToWkt()
-        logger.info(f"Source CRS for {full_file_path}: {source_srs_wkt}")
-
-        target_srs = osr.SpatialReference()
-        target_srs.ImportFromEPSG(4326) # WGS84
-        if hasattr(osr, 'OAMS_TRADITIONAL_GIS_ORDER') and int(osgeo.__version__[0]) >= 3:
-            target_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
-
-        transform = osr.CoordinateTransformation(source_srs, target_srs)
-        if not transform: # Should not happen if SRS objects are valid
-             logger.error(f"Failed to create coordinate transformation from {source_srs.GetName()} to WGS84 for {full_file_path}.")
-             raise HTTPException(status_code=500, detail="Failed to create coordinate transformation.")
-
-        wgs84_min_lon, wgs84_min_lat, _ = transform.TransformPoint(minx, miny)
-        wgs84_max_lon, wgs84_max_lat, _ = transform.TransformPoint(maxx, maxy)
-        
-        final_min_lon = min(wgs84_min_lon, wgs84_max_lon)
-        final_max_lon = max(wgs84_min_lon, wgs84_max_lon)
-        final_min_lat = min(wgs84_min_lat, wgs84_max_lat)
-        final_max_lat = max(wgs84_min_lat, wgs84_max_lat)
-
-        center_lon = (final_min_lon + final_max_lon) / 2
-        center_lat = (final_min_lat + final_max_lat) / 2
-
-        response_data = {
-            "bounds": {
-                "min_lng": final_min_lon, "min_lat": final_min_lat,
-                "max_lng": final_max_lon, "max_lat": final_max_lat,
-            },
-            "center": {"lat": center_lat, "lng": center_lon},
-            "file_name": file_name,
-            "_debug_info": { # Adding debug info, prefixed with underscore
-                "source_crs_wkt": source_srs_wkt,
-                "native_bounds": native_bbox,
-                "pdal_command": ' '.join(pdal_command)
-            }
-        }
-        
-        logger.info(f"Successfully calculated WGS84 bounds for {full_file_path}: center {response_data['center']}")
         return JSONResponse(content=response_data)
-
+        
     except HTTPException:
         raise
-    except json.JSONDecodeError as e:
-        error_msg = f"Failed to parse PDAL output: {e}"
-        logger.error(f"JSONDecodeError processing PDAL output for {full_file_path}: {e}. Output: {pdal_output_str[:1000]}") # Log more of the output
-        
-        raise HTTPException(status_code=500, detail=error_msg)
-    except subprocess.TimeoutExpired: # This won't be caught by asyncio.create_subprocess_exec directly, but good to have if switching to subprocess.run
-        error_msg = "PDAL command timed out"
-        logger.error(f"PDAL command timed out for {full_file_path}")
-        
-        raise HTTPException(status_code=508, detail=error_msg)
     except Exception as e:
-        error_msg = f"An unexpected error occurred: {str(e)}"
-        logger.exception(f"Unexpected error getting WGS84 bounds for {full_file_path}: {e}")
-        
-        raise HTTPException(status_code=500, detail=error_msg)
+        logger.exception(f"Unexpected error in get_laz_bounds_wgs84: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 
 # Helper functions for LAZ file analysis
@@ -1397,3 +1433,305 @@ async def serve_debug_tool():
         media_type='text/html',
         filename='laz-debug.html'
     )
+
+@router.post("/upload")
+async def upload_multiple_laz_files(
+    files: List[UploadFile] = File(...)
+):
+    """Upload multiple LAZ/LAS files"""
+    try:
+        if not files:
+            raise HTTPException(status_code=400, detail="No files provided")
+        
+        uploaded_files = []
+        
+        for file in files:
+            # Validate file type
+            allowed_extensions = ['.laz', '.las']
+            file_ext = Path(file.filename).suffix.lower()
+            
+            if file_ext not in allowed_extensions:
+                logger.warning(f"Skipping invalid file type: {file.filename}")
+                continue
+            
+            # Read file content
+            content = await file.read()
+            
+            if not content:
+                logger.warning(f"Skipping empty file: {file.filename}")
+                continue
+            
+            # Create unique filename if file already exists
+            upload_path = LAZ_INPUT_DIR / file.filename
+            counter = 1
+            original_stem = upload_path.stem
+            
+            while upload_path.exists():
+                new_name = f"{original_stem}_{counter}{upload_path.suffix}"
+                upload_path = LAZ_INPUT_DIR / new_name
+                counter += 1
+            
+            # Save file
+            with open(upload_path, 'wb') as f:
+                f.write(content)
+            
+            logger.info(f"Uploaded LAZ file: {upload_path}")
+            
+            # Create output directory structure
+            file_stem = upload_path.stem
+            output_dir = BASE_DIR / "output" / file_stem / "lidar"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            uploaded_files.append({
+                "inputFile": upload_path.name,
+                "outputDirectory": str(output_dir.relative_to(BASE_DIR)),
+                "size": len(content)
+            })
+        
+        if not uploaded_files:
+            raise HTTPException(status_code=400, detail="No valid LAZ/LAS files were uploaded")
+        
+        return {
+            "message": f"Successfully uploaded {len(uploaded_files)} files",
+            "files": uploaded_files
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading LAZ files: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+async def _get_laz_bounds_data_internal(file_name: str) -> Dict[str, Any]:
+    """Internal function to get LAZ bounds data without JSONResponse wrapper"""
+    logger.info(f"Processing LAZ bounds for {file_name}")
+    
+    # Check for cached metadata first
+    try:
+        cache = get_metadata_cache()
+        cached_metadata = cache.get_cached_metadata(file_name)
+        if cached_metadata and not cached_metadata.get("error"):
+            logger.info(f"Using cached LAZ metadata for {file_name}")
+            
+            # Convert cached format to response format
+            center = cached_metadata.get("center", {})
+            bounds = cached_metadata.get("bounds", {})
+            
+            response_data = {
+                "bounds": {
+                    "min_lng": bounds.get("west", 0),
+                    "min_lat": bounds.get("south", 0),
+                    "max_lng": bounds.get("east", 0),
+                    "max_lat": bounds.get("north", 0),
+                },
+                "center": {
+                    "lat": center.get("lat", 0),
+                    "lng": center.get("lng", 0)
+                },
+                "file_name": file_name,
+                "_cached": True  # Indicate this was from cache
+            }
+            
+            return response_data
+            
+    except Exception as cache_error:
+        logger.warning(f"Error checking cache for {file_name}: {cache_error}")
+    
+    full_file_path = (LAZ_INPUT_DIR / file_name).resolve()
+    pdal_output_str = "" # Initialize for potential use in error logging
+
+    if not full_file_path.is_file():
+        error_msg = f"LAZ file not found: {file_name}"
+        logger.error(f"LAZ file not found for WGS84 bounds: {full_file_path}")
+        raise HTTPException(status_code=404, detail=error_msg)
+
+    try:
+        pdal_command = ['pdal', 'info', '--all', '--stats', str(full_file_path)]
+        logger.info(f"Executing PDAL command for WGS84 bounds: {' '.join(pdal_command)}")
+        
+        process = await asyncio.create_subprocess_exec(
+            *pdal_command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            err_msg = stderr.decode().strip() if stderr else "Unknown PDAL error"
+            logger.error(f"PDAL info command failed for {full_file_path}. Return code: {process.returncode}. Error: {err_msg}")
+            raise HTTPException(status_code=500, detail=f"PDAL analysis failed: {err_msg}")
+
+        pdal_output_str = stdout.decode()
+        if not pdal_output_str.strip(): # Check if output is empty or just whitespace
+            logger.error(f"PDAL info command returned empty output for {full_file_path}.")
+            raise HTTPException(status_code=500, detail="PDAL analysis returned empty output.")
+            
+        pdal_data = json.loads(pdal_output_str)
+
+        native_bbox = None
+        try:
+            # Try extracting bounds from multiple possible locations in PDAL output
+            if ('stats' in pdal_data and isinstance(pdal_data['stats'], dict) and 
+                'bbox' in pdal_data['stats'] and isinstance(pdal_data['stats']['bbox'], dict) and 
+                'native' in pdal_data['stats']['bbox'] and isinstance(pdal_data['stats']['bbox']['native'], dict) and 
+                'bbox' in pdal_data['stats']['bbox']['native']):
+                native_bbox = pdal_data['stats']['bbox']['native']['bbox']
+                logger.debug(f"Extracted bounds from stats.bbox.native.bbox for {full_file_path}")
+            elif ('metadata' in pdal_data and isinstance(pdal_data['metadata'], dict)):
+                # Try to extract from metadata section
+                metadata = pdal_data['metadata']
+                if all(k in metadata for k in ['minx', 'miny', 'maxx', 'maxy']):
+                    native_bbox = {
+                        'minx': metadata['minx'],
+                        'miny': metadata['miny'], 
+                        'maxx': metadata['maxx'],
+                        'maxy': metadata['maxy']
+                    }
+                    logger.debug(f"Extracted bounds from metadata for {full_file_path}")
+            elif ('summary' in pdal_data and isinstance(pdal_data['summary'], dict) and 
+                  'bounds' in pdal_data['summary'] and isinstance(pdal_data['summary']['bounds'], dict) and 
+                  'native' in pdal_data['summary']['bounds']):
+                 native_bbox = pdal_data['summary']['bounds']['native']
+                 logger.debug(f"Extracted bounds from summary.bounds.native for {full_file_path}")
+
+            if not isinstance(native_bbox, dict) or not all(k in native_bbox for k in ['minx', 'miny', 'maxx', 'maxy']):
+                logger.error(f"Could not extract valid native bounding box from PDAL info for {full_file_path}. Available keys in PDAL data: {list(pdal_data.keys())}")
+                raise HTTPException(status_code=500, detail="Could not extract native bounding box from LAZ file.")
+        except KeyError as e:
+            logger.error(f"KeyError while extracting native bounding box for {full_file_path}: {e}. Available keys in PDAL data: {list(pdal_data.keys())}")
+            raise HTTPException(status_code=500, detail=f"Error parsing native bounds: {e}")
+
+        minx, miny, maxx, maxy = native_bbox['minx'], native_bbox['miny'], native_bbox['maxx'], native_bbox['maxy']
+
+        source_srs = get_crs_from_pdal_info(pdal_data, file_path_logging=str(full_file_path))
+        if source_srs is None:
+            logger.warning(f"CRS metadata missing for {full_file_path}. Attempting coordinate-based detection...")
+            source_srs = guess_crs_from_coordinates(minx, miny, maxx, maxy, file_path_logging=str(full_file_path))
+            
+            if source_srs is None:
+                logger.error(f"Could not determine or guess source CRS for LAZ file: {full_file_path}")
+                raise HTTPException(status_code=500, detail="Could not determine source CRS of LAZ file. Please ensure the file has proper spatial reference information.")
+            else:
+                logger.info(f"Successfully guessed CRS for {full_file_path}")
+        
+        source_srs_wkt = source_srs.ExportToWkt()
+        logger.info(f"Source CRS for {full_file_path}: {source_srs_wkt}")
+
+        target_srs = osr.SpatialReference()
+        target_srs.ImportFromEPSG(4326) # WGS84
+        if hasattr(osr, 'OAMS_TRADITIONAL_GIS_ORDER') and int(osgeo.__version__[0]) >= 3:
+            target_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+
+        transform = osr.CoordinateTransformation(source_srs, target_srs)
+        if not transform: # Should not happen if SRS objects are valid
+             logger.error(f"Failed to create coordinate transformation from {source_srs.GetName()} to WGS84 for {full_file_path}.")
+             raise HTTPException(status_code=500, detail="Failed to create coordinate transformation.")
+
+        wgs84_min_lon, wgs84_min_lat, _ = transform.TransformPoint(minx, miny)
+        wgs84_max_lon, wgs84_max_lat, _ = transform.TransformPoint(maxx, maxy)
+        
+        final_min_lon = min(wgs84_min_lon, wgs84_max_lon)
+        final_max_lon = max(wgs84_min_lon, wgs84_max_lon)
+        final_min_lat = min(wgs84_min_lat, wgs84_max_lat)
+        final_max_lat = max(wgs84_min_lat, wgs84_max_lat)
+
+        center_lon = (final_min_lon + final_max_lon) / 2
+        center_lat = (final_min_lat + final_max_lat) / 2
+
+        response_data = {
+            "bounds": {
+                "min_lng": final_min_lon, "min_lat": final_min_lat,
+                "max_lng": final_max_lon, "max_lat": final_max_lat,
+            },
+            "center": {"lat": center_lat, "lng": center_lon},
+            "file_name": file_name,
+            "_debug_info": { # Adding debug info, prefixed with underscore
+                "source_crs_wkt": source_srs_wkt,
+                "native_bounds": native_bbox,
+                "pdal_command": ' '.join(pdal_command)
+            }
+        }
+        
+        logger.info(f"Successfully calculated WGS84 bounds for {full_file_path}: center {response_data['center']}")
+        
+        # Cache the metadata for future use
+        try:
+            cache = get_metadata_cache()
+            metadata_for_cache = {
+                "center": response_data["center"],
+                "bounds": {
+                    "north": final_max_lat,
+                    "south": final_min_lat,
+                    "east": final_max_lon,
+                    "west": final_min_lon
+                },
+                "source_epsg": getattr(source_srs, 'GetAuthorityCode', lambda x: None)('PROJCS') or 
+                              getattr(source_srs, 'GetAuthorityCode', lambda x: None)('GEOGCS') or 
+                              "Unknown"
+            }
+            
+            cache_success = cache.cache_metadata(file_name, metadata_for_cache)
+            if cache_success:
+                logger.info(f"Successfully cached LAZ metadata for {file_name}")
+            else:
+                logger.warning(f"Failed to cache LAZ metadata for {file_name}")
+                
+        except Exception as cache_error:
+            logger.warning(f"Error caching LAZ metadata for {file_name}: {cache_error}")
+        
+        return response_data
+
+    except HTTPException:
+        raise
+    except json.JSONDecodeError as e:
+        error_msg = f"Failed to parse PDAL output: {e}"
+        logger.error(f"JSONDecodeError processing PDAL output for {full_file_path}: {e}. Output: {pdal_output_str[:1000]}") # Log more of the output
+        raise HTTPException(status_code=500, detail=error_msg)
+    except Exception as e:
+        error_msg = f"An unexpected error occurred: {str(e)}"
+        logger.exception(f"Unexpected error getting WGS84 bounds for {full_file_path}: {e}")
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
+@router.post("/generate-metadata")
+async def generate_laz_metadata(
+    region_name: str = Form(...),
+    file_name: str = Form(...)
+):
+    """Generate metadata.txt file for a LAZ region after raster processing is complete"""
+    try:
+        logger.info(f"Generating metadata for region: {region_name}, file: {file_name}")
+        
+        # Get LAZ file bounds and coordinates using internal function
+        response_data = await _get_laz_bounds_data_internal(file_name)
+        
+        if not response_data:
+            raise HTTPException(status_code=500, detail="Failed to get LAZ coordinates")
+        
+        # Create metadata file
+        success = _create_laz_metadata_file(file_name, response_data, response_data.get("_debug_info", {}).get("source_crs_wkt"))
+        
+        if success:
+            # Get the metadata file path for response
+            region_output_dir = BASE_DIR / "output" / region_name
+            metadata_path = region_output_dir / "metadata.txt"
+            
+            return {
+                "message": "Metadata file generated successfully",
+                "region": region_name,
+                "file": file_name,
+                "metadata_path": str(metadata_path.relative_to(BASE_DIR)),
+                "coordinates": {
+                    "bounds_wgs84": response_data.get("bounds"),
+                    "center_wgs84": response_data.get("center"),
+                    "source_crs": response_data.get("_debug_info", {}).get("source_crs_wkt")
+                }
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create metadata file")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating LAZ metadata: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Metadata generation failed: {str(e)}")

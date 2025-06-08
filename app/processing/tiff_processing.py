@@ -716,6 +716,7 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                         sys.path.insert(0, str(app_dir))
                     
                     from convert import convert_geotiff_to_png
+                    from overlay_optimization import OverlayOptimizer
                     
                     # Create PNG output directory under the main lidar output folder
                     png_output_dir = os.path.join(base_output_dir, "png_outputs")
@@ -733,6 +734,24 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                         result["png_file"] = converted_png
                         png_size = os.path.getsize(converted_png) / (1024 * 1024)  # MB
                         print(f"🖼️ PNG created: {os.path.basename(converted_png)} ({png_size:.1f} MB)")
+                        
+                        # Generate optimized overlay if needed
+                        overlay_optimizer = OverlayOptimizer()
+                        overlay_path = overlay_optimizer.optimize_tiff_to_overlay(result["output_file"])
+                        
+                        if overlay_path:
+                            # Move overlay to png_outputs directory
+                            overlay_dest = os.path.join(png_output_dir, os.path.basename(overlay_path))
+                            if overlay_path != overlay_dest:
+                                import shutil
+                                shutil.move(overlay_path, overlay_dest)
+                                print(f"📦 Overlay moved to png_outputs: {os.path.basename(overlay_dest)}")
+                                
+                                # Also move overlay worldfile if it exists
+                                overlay_worldfile = os.path.splitext(overlay_path)[0] + ".pgw"
+                                overlay_worldfile_dest = os.path.splitext(overlay_dest)[0] + ".pgw"
+                                if os.path.exists(overlay_worldfile):
+                                    shutil.move(overlay_worldfile, overlay_worldfile_dest)
                         
                         # Also copy the TIFF and world files to png_outputs for overlay API compatibility
                         import shutil

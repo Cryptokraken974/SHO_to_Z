@@ -1,0 +1,130 @@
+/* Large Image Optimization Progress Styles */
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background-color: #2a2a2a;
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00bfff, #1e90ff);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+/* Notification Styles */
+.overlay-status {
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 4px 0;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.overlay-status.info {
+  background-color: #1e3a8a;
+  border: 1px solid #3b82f6;
+  color: #93c5fd;
+}
+
+.overlay-status.success {
+  background-color: #166534;
+  border: 1px solid #22c55e;
+  color: #86efac;
+}
+
+.overlay-status.warning {
+  background-color: #92400e;
+  border: 1px solid #f59e0b;
+  color: #fde68a;
+}
+
+.overlay-status.error {
+  background-color: #991b1b;
+  border: 1px solid #ef4444;
+  color: #fca5a5;
+}
+
+/* Large Image Processing Indicator */
+.large-image-processing {
+  position: relative;
+  overflow: hidden;
+}
+
+.large-image-processing::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  animation: processing-shimmer 2s infinite;
+}
+
+@keyframes processing-shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* Memory Usage Warning */
+.memory-warning {
+  background: linear-gradient(45deg, #dc2626, #991b1b);
+  color: white;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #ef4444;
+  animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-warning {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Optimization Success Indicator */
+.optimization-success {
+  background: linear-gradient(45deg, #059669, #047857);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #10b981;
+  animation: success-glow 3s ease-out;
+}
+
+@keyframes success-glow {
+  0% {
+    box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(16, 185, 129, 0.5);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .overlay-status {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  
+  .progress-bar {
+    height: 3px;
+    margin-top: 6px;
+  }
+}

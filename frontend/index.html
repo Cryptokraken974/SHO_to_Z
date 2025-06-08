@@ -26,6 +26,7 @@
   <link rel="stylesheet" href="./css/scrollbar-focus.css" />
   <link rel="stylesheet" href="./css/geotiff-tools.css" />
   <link rel="stylesheet" href="./css/cache-management.css" />
+  <link rel="stylesheet" href="./css/large-image-optimization.css" />
   
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   
@@ -850,6 +851,73 @@
             <div class="bg-[#8e44ad] h-2 rounded-full transition-all duration-300" id="laz-progress-bar" style="width: 0%"></div>
           </div>
         </div>
+
+        <!-- Raster Generation Progress Section (hidden by default) -->
+        <div id="laz-raster-progress-section" class="hidden">
+          <div class="border-t border-[#303030] pt-4 mt-4">
+            <h4 class="text-white font-medium mb-3">🏔️ Raster Generation Progress</h4>
+            
+            <!-- Progress Indicator -->
+            <div class="bg-[#1a1a1a] rounded-lg p-3 space-y-2 mb-4">
+              <div class="flex justify-between items-center">
+                <span id="laz-current-processing-step" class="text-[#ababab] text-sm">Initializing...</span>
+                <span id="laz-processing-progress-text" class="text-[#ababab] text-sm">0%</span>
+              </div>
+              <div class="w-full bg-[#333] rounded-full h-2">
+                <div id="laz-processing-progress-bar" class="bg-[#8e44ad] h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+              </div>
+            </div>
+            
+            <!-- Processing Queue Display -->
+            <div class="bg-[#1a1a1a] rounded-lg p-3">
+              <div class="text-[#ababab] text-sm mb-2">Processing Queue:</div>
+              <div class="grid grid-cols-4 gap-2 text-xs">
+                <div id="laz-queue-dtm" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#8e44ad]">🏔️</div>
+                  <div>DTM</div>
+                </div>
+                <div id="laz-queue-dsm" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#fd79a8]">🏗️</div>
+                  <div>DSM</div>
+                </div>
+                <div id="laz-queue-hillshade" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#fdcb6e]">🌄</div>
+                  <div>Hillshade</div>
+                </div>
+                <div id="laz-queue-slope" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#e17055]">📐</div>
+                  <div>Slope</div>
+                </div>
+                <div id="laz-queue-aspect" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#00b894]">🧭</div>
+                  <div>Aspect</div>
+                </div>
+                <div id="laz-queue-tpi" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#0984e3]">📈</div>
+                  <div>TPI</div>
+                </div>
+                <div id="laz-queue-roughness" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#74b9ff]">🪨</div>
+                  <div>Roughness</div>
+                </div>
+                <div id="laz-queue-chm" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#00b894]">🌳</div>
+                  <div>CHM</div>
+                </div>
+                <div id="laz-queue-metadata" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#a29bfe]">📄</div>
+                  <div>Metadata</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Status Indicator -->
+            <div id="laz-raster-generation-status" class="text-xs text-[#666] mt-2">
+              <i class="fas fa-info-circle mr-1"></i>
+              <span id="laz-raster-status-text">Starting raster generation...</span>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="modal-footer flex justify-between gap-3 p-6 border-t border-[#303030]">
         <button id="clear-laz-files" class="bg-[#dc3545] hover:bg-[#c82333] text-white px-4 py-2 rounded-lg font-medium transition-colors">
@@ -859,6 +927,10 @@
           <button id="cancel-laz-modal" class="cancel-btn bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
           <button id="load-laz-files" class="bg-[#8e44ad] hover:bg-[#7d3c98] text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
             <i class="fas fa-download mr-2"></i>Load Files
+          </button>
+          <!-- Cancel Raster Processing button (hidden by default) -->
+          <button id="cancel-laz-raster-processing" class="bg-[#dc3545] hover:bg-[#c82333] text-white px-4 py-2 rounded-lg font-medium transition-colors hidden">
+            ❌ Cancel Processing
           </button>
         </div>
       </div>
@@ -890,7 +962,7 @@
   <script src="/static/js/map.js"></script>
   <script src="/static/js/fileManager.js"></script>
   <script src="/static/js/metadataManager.js"></script>
-  <script src="/static/js/overlays.js"></script>
+  <script src="/static/js/overlays_fixed.js"></script>
   <script src="/static/js/processing.js"></script>
   <script src="/static/js/saved_places.js"></script>
   <script src="/static/js/analysis.js"></script>

@@ -5,6 +5,7 @@
 window.FileManager = {
   selectedRegion: null, // Changed from selectedLazFile
   processingRegion: null, // Region name to use for API processing calls
+  regionPath: null, // Store the full path to the region file
   regionMarkers: [], // Changed from lazFileMarkers
   currentLocationPin: null,
 
@@ -120,6 +121,7 @@ window.FileManager = {
   selectRegion(displayName, coords = null, processingRegion = null, regionPath = null) { // MODIFIED to selectRegion, added regionPath
     this.selectedRegion = displayName;
     this.processingRegion = processingRegion || displayName; // Store the processing region separately
+    this.regionPath = regionPath; // Store the region path
     
     // Update UI to show selected region
     $('.file-item').removeClass('selected');
@@ -161,14 +163,6 @@ window.FileManager = {
 
     Utils.log('info', `Selected region: ${displayName} (processing region: ${this.processingRegion}, path: ${regionPath})`, { coords });
     Utils.showNotification(`Selected Region: ${displayName}`, 'success', 2000);
-
-    // Potentially trigger display of Sentinel-2 images for this region if available
-    // Check if Sentinel-2 data exists for this region and display it
-    // This requires a new function or modification to an existing one
-    UIManager.displaySentinel2ImagesForRegion(displayName);
-
-    //Potentially trigger display of LIDAR raster images for this region if available
-    UIManager.displayLidarRasterForRegion(displayName);
     
   },
 
@@ -261,6 +255,14 @@ window.FileManager = {
   },
 
   /**
+   * Get the region file path
+   * @returns {string|null} Region file path or null
+   */
+  getRegionPath() {
+    return this.regionPath;
+  },
+
+  /**
    * Check if a region is selected (previously file)
    * @returns {boolean} True if a region is selected
    */
@@ -274,6 +276,7 @@ window.FileManager = {
   clearSelection() {
     this.selectedRegion = null; // MODIFIED to selectedRegion
     this.processingRegion = null; // Clear processing region too
+    this.regionPath = null; // Clear region path too
     $('#selected-region-name').text('No region selected').removeClass('text-[#00bfff]').addClass('text-[#666]'); // MODIFIED message
     $('#analysis-selected-region-name').text('No region selected'); // Clear Analysis tab too
     

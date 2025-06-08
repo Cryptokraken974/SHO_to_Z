@@ -1,0 +1,14 @@
+{
+  "scenario": "Large Image",
+  "original_size": {
+    "width": 8192,
+    "height": 8192
+  },
+  "file_size_mb": 0.32073307037353516,
+  "base64_size_mb": 0.4276466369628906,
+  "pixels_m": 67.108864,
+  "needs_optimization": true,
+  "optimization_reasons": [
+    "Too many pixels (67.1M > 50M)"
+  ]
+}

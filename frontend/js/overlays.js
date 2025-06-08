@@ -159,6 +159,10 @@ window.OverlayManager = {
         throw new Error('No overlay data received');
       }
 
+      // Check for optimization metadata
+      const isOptimized = overlayData.is_optimized || false;
+      const optimizationInfo = overlayData.optimization_info || null;
+
       // Create data URL for the image
       const imageUrl = `data:image/png;base64,${overlayData.image_base64}`;
       
@@ -177,7 +181,23 @@ window.OverlayManager = {
       
       if (success) {
         Utils.log('info', `Successfully added ${processingType} overlay for ${displayIdentifier}`);
-        this.showOverlayNotification(`${processingType} overlay added to map`, 'success');
+        
+        // Create notification message with optimization status
+        let notificationMessage = `${processingType} overlay added to map`;
+        if (isOptimized) {
+          notificationMessage += ' ✓ Optimized for browser performance';
+          
+          // Log optimization details
+          if (optimizationInfo) {
+            Utils.log('info', `Optimization details for ${processingType}:`, optimizationInfo);
+            if (optimizationInfo.original_size && optimizationInfo.optimized_size) {
+              const reduction = ((1 - optimizationInfo.optimized_size / optimizationInfo.original_size) * 100).toFixed(1);
+              Utils.log('info', `Size reduction: ${reduction}% (${optimizationInfo.original_size} → ${optimizationInfo.optimized_size} pixels)`);
+            }
+          }
+        }
+        
+        this.showOverlayNotification(notificationMessage, 'success');
       }
       
       return success;

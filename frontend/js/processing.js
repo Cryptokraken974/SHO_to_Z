@@ -18,8 +18,17 @@ window.ProcessingManager = {
     const processingRegion = FileManager.getProcessingRegion(); // Get the actual region for API calls
     const selectedFile = typeof FileManager.getSelectedFile === 'function' ? FileManager.getSelectedFile() : null;
     
+    // DEBUG: Log current state
+    Utils.log('debug', `sendProcess DEBUG - processingType: ${processingType}`, {
+      selectedRegion,
+      processingRegion,
+      selectedFile,
+      options
+    });
+    
     if (!selectedRegion && !selectedFile) {
       Utils.showNotification('Please select a region or LAZ file first', 'warning');
+      Utils.log('error', 'sendProcess failed: No region or file selected');
       return false;
     }
 
@@ -68,6 +77,13 @@ window.ProcessingManager = {
       for (const [key, value] of formData.entries()) {
         processingOptions[key] = value;
       }
+
+      // DEBUG: Log final processing options that will be sent to API
+      Utils.log('debug', `sendProcess API call parameters:`, {
+        processingType,
+        processingOptions,
+        formDataEntries: Array.from(formData.entries())
+      });
 
       // Use specific service methods based on processing type
       let data;
@@ -391,6 +407,16 @@ window.ProcessingManager = {
    * @param {Object} options - DTM processing options
    */
   async processDTM(options = {}) {
+    // Check if a region is selected before proceeding
+    const selectedRegion = FileManager.getSelectedRegion();
+    const selectedFile = typeof FileManager.getSelectedFile === 'function' ? FileManager.getSelectedFile() : null;
+    
+    if (!selectedRegion && !selectedFile) {
+      Utils.showNotification('Please select a region or LAZ file before processing DTM', 'warning');
+      console.log('❌ DTM processing attempted without region selection');
+      return false;
+    }
+    
     const defaultOptions = {
       resolution: 1.0,
       output_type: 'min'
@@ -404,6 +430,16 @@ window.ProcessingManager = {
    * @param {Object} options - Hillshade processing options
    */
   async processHillshade(options = {}) {
+    // Check if a region is selected before proceeding
+    const selectedRegion = FileManager.getSelectedRegion();
+    const selectedFile = typeof FileManager.getSelectedFile === 'function' ? FileManager.getSelectedFile() : null;
+    
+    if (!selectedRegion && !selectedFile) {
+      Utils.showNotification('Please select a region or LAZ file before processing Hillshade', 'warning');
+      console.log('❌ Hillshade processing attempted without region selection');
+      return false;
+    }
+    
     const defaultOptions = {
       azimuth: 315.0,
       altitude: 45.0,
@@ -418,6 +454,16 @@ window.ProcessingManager = {
    * @param {Object} options - DSM processing options
    */
   async processDSM(options = {}) {
+    // Check if a region is selected before proceeding
+    const selectedRegion = FileManager.getSelectedRegion();
+    const selectedFile = typeof FileManager.getSelectedFile === 'function' ? FileManager.getSelectedFile() : null;
+    
+    if (!selectedRegion && !selectedFile) {
+      Utils.showNotification('Please select a region or LAZ file before processing DSM', 'warning');
+      console.log('❌ DSM processing attempted without region selection');
+      return false;
+    }
+    
     const defaultOptions = {
       resolution: 1.0,
       output_type: 'max'
@@ -651,8 +697,32 @@ window.ProcessingManager = {
       // Final notification
       if (failedProcesses.length === 0) {
         Utils.showNotification(`All ${successCount} raster products generated successfully!`, 'success');
+        
+        // 🎯 NOW refresh overlay display after successful raster generation
+        setTimeout(() => {
+          const selectedRegion = FileManager.getSelectedRegion();
+          const processingRegion = FileManager.getProcessingRegion();
+          
+          if (processingRegion || selectedRegion) {
+            Utils.log('info', '🔄 Refreshing LIDAR raster display after successful generation...');
+            UIManager.displayLidarRasterForRegion(processingRegion || selectedRegion);
+          }
+        }, 2000); // 2 second delay to ensure files are ready
+        
       } else if (successCount > 0) {
         Utils.showNotification(`${successCount} raster products completed, ${failedProcesses.length} failed`, 'warning');
+        
+        // Still refresh display for successful ones
+        setTimeout(() => {
+          const selectedRegion = FileManager.getSelectedRegion();
+          const processingRegion = FileManager.getProcessingRegion();
+          
+          if (processingRegion || selectedRegion) {
+            Utils.log('info', '🔄 Refreshing LIDAR raster display for successful generations...');
+            UIManager.displayLidarRasterForRegion(processingRegion || selectedRegion);
+          }
+        }, 2000);
+        
       } else {
         Utils.showNotification('Raster generation failed. Please check your input data.', 'error');
       }

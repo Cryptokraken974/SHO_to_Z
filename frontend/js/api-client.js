@@ -11,7 +11,7 @@
 class BaseAPIClient {
   constructor() {
     this.baseURL = window.location.origin;
-    this.timeout = 30000; // 30 seconds
+    this.timeout = 300000; // 5 minutes to accommodate large LAZ file processing
   }
 
   /**
@@ -228,10 +228,11 @@ class ProcessingAPIClient extends BaseAPIClient {
   async generateDTM(options = {}) {
     const formData = new FormData();
     
-    if (options.inputFile) formData.append('input_file', options.inputFile);
-    if (options.regionName) formData.append('region_name', options.regionName);
-    if (options.processingType) formData.append('processing_type', options.processingType);
-    if (options.displayRegionName) formData.append('display_region_name', options.displayRegionName);
+    // Support both camelCase and snake_case parameter names for flexibility
+    if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
+    if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
+    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
     
     return this.postForm('dtm', formData);
   }
@@ -248,10 +249,11 @@ class ProcessingAPIClient extends BaseAPIClient {
   async generateDSM(options = {}) {
     const formData = new FormData();
     
-    if (options.inputFile) formData.append('input_file', options.inputFile);
-    if (options.regionName) formData.append('region_name', options.regionName);
-    if (options.processingType) formData.append('processing_type', options.processingType);
-    if (options.displayRegionName) formData.append('display_region_name', options.displayRegionName);
+    // Support both camelCase and snake_case parameter names for flexibility
+    if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
+    if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
+    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
     
     return this.postForm('dsm', formData);
   }
@@ -268,10 +270,11 @@ class ProcessingAPIClient extends BaseAPIClient {
   async generateCHM(options = {}) {
     const formData = new FormData();
     
-    if (options.inputFile) formData.append('input_file', options.inputFile);
-    if (options.regionName) formData.append('region_name', options.regionName);
-    if (options.processingType) formData.append('processing_type', options.processingType);
-    if (options.displayRegionName) formData.append('display_region_name', options.displayRegionName);
+    // Support both camelCase and snake_case parameter names for flexibility
+    if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
+    if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
+    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
     
     return this.postForm('chm', formData);
   }
@@ -290,10 +293,11 @@ class ProcessingAPIClient extends BaseAPIClient {
   async generateHillshade(options = {}) {
     const formData = new FormData();
     
-    if (options.inputFile) formData.append('input_file', options.inputFile);
-    if (options.regionName) formData.append('region_name', options.regionName);
-    if (options.processingType) formData.append('processing_type', options.processingType);
-    if (options.displayRegionName) formData.append('display_region_name', options.displayRegionName);
+    // Support both camelCase and snake_case parameter names for flexibility
+    if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
+    if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
+    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
     
     return this.postForm('hillshade', formData);
   }
@@ -310,10 +314,11 @@ class ProcessingAPIClient extends BaseAPIClient {
   async generateSlope(options = {}) {
     const formData = new FormData();
     
-    if (options.inputFile) formData.append('input_file', options.inputFile);
-    if (options.regionName) formData.append('region_name', options.regionName);
-    if (options.processingType) formData.append('processing_type', options.processingType);
-    if (options.displayRegionName) formData.append('display_region_name', options.displayRegionName);
+    // Support both camelCase and snake_case parameter names for flexibility
+    if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
+    if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
+    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
     
     return this.postForm('slope', formData);
   }
@@ -330,10 +335,11 @@ class ProcessingAPIClient extends BaseAPIClient {
   async generateAspect(options = {}) {
     const formData = new FormData();
     
-    if (options.inputFile) formData.append('input_file', options.inputFile);
-    if (options.regionName) formData.append('region_name', options.regionName);
-    if (options.processingType) formData.append('processing_type', options.processingType);
-    if (options.displayRegionName) formData.append('display_region_name', options.displayRegionName);
+    // Support both camelCase and snake_case parameter names for flexibility
+    if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
+    if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
+    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
     
     return this.postForm('aspect', formData);
   }
@@ -350,10 +356,11 @@ class ProcessingAPIClient extends BaseAPIClient {
   async generateColorRelief(options = {}) {
     const formData = new FormData();
     
-    if (options.inputFile) formData.append('input_file', options.inputFile);
-    if (options.regionName) formData.append('region_name', options.regionName);
-    if (options.processingType) formData.append('processing_type', options.processingType);
-    if (options.displayRegionName) formData.append('display_region_name', options.displayRegionName);
+    // Support both camelCase and snake_case parameter names for flexibility
+    if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
+    if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
+    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
     
     return this.postForm('color_relief', formData);
   }
@@ -370,10 +377,11 @@ class ProcessingAPIClient extends BaseAPIClient {
   async generateTPI(options = {}) {
     const formData = new FormData();
     
-    if (options.inputFile) formData.append('input_file', options.inputFile);
-    if (options.regionName) formData.append('region_name', options.regionName);
-    if (options.processingType) formData.append('processing_type', options.processingType);
-    if (options.displayRegionName) formData.append('display_region_name', options.displayRegionName);
+    // Support both camelCase and snake_case parameter names for flexibility
+    if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
+    if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
+    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
     
     return this.postForm('tpi', formData);
   }
@@ -390,10 +398,11 @@ class ProcessingAPIClient extends BaseAPIClient {
   async generateRoughness(options = {}) {
     const formData = new FormData();
     
-    if (options.inputFile) formData.append('input_file', options.inputFile);
-    if (options.regionName) formData.append('region_name', options.regionName);
-    if (options.processingType) formData.append('processing_type', options.processingType);
-    if (options.displayRegionName) formData.append('display_region_name', options.displayRegionName);
+    // Support both camelCase and snake_case parameter names for flexibility
+    if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
+    if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
+    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
     
     return this.postForm('roughness', formData);
   }

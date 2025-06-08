@@ -288,10 +288,47 @@ def convert_las_to_dtm(input_file: str, output_file: str, resolution: float = 1.
             pipeline_config = json.loads(pipeline_str)
             
             print(f"📋 Using JSON pipeline configuration")
-            pipeline = pdal.Pipeline(json.dumps(pipeline_config))
             
-            # Execute pipeline
-            pipeline.execute()
+            # Create temporary pipeline file for subprocess execution with timeout
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
+                json.dump(pipeline_config, temp_file, indent=2)
+                temp_pipeline_path = temp_file.name
+            
+            try:
+                # Execute PDAL pipeline with timeout using subprocess
+                print(f"🔄 Executing PDAL pipeline with 300 second timeout...")
+                start_time = time.time()
+                
+                result = subprocess.run(
+                    ['pdal', 'pipeline', temp_pipeline_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 minute timeout
+                )
+                
+                execution_time = time.time() - start_time
+                print(f"⏱️ PDAL execution completed in {execution_time:.2f} seconds")
+                
+                if result.returncode == 0:
+                    if os.path.exists(output_file):
+                        success = True
+                        message = f"DTM generated successfully using JSON pipeline: {output_file}"
+                        print(f"✅ {message}")
+                    else:
+                        raise Exception("Output file was not created")
+                else:
+                    raise Exception(f"PDAL failed with return code {result.returncode}: {result.stderr}")
+                    
+            except subprocess.TimeoutExpired:
+                print(f"⏰ PDAL pipeline timed out after 300 seconds")
+                raise Exception("PDAL pipeline execution timed out")
+            finally:
+                # Clean up temporary file
+                try:
+                    os.unlink(temp_pipeline_path)
+                except:
+                    pass
             
             if os.path.exists(output_file):
                 success = True
@@ -309,17 +346,47 @@ def convert_las_to_dtm(input_file: str, output_file: str, resolution: float = 1.
         try:
             print(f"🔄 Using hardcoded DTM pipeline...")
             pipeline_config = create_dtm_fallback_pipeline(input_file, output_file, resolution)
-            pipeline = pdal.Pipeline(json.dumps(pipeline_config))
             
-            # Execute pipeline
-            pipeline.execute()
+            # Create temporary pipeline file for subprocess execution with timeout
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
+                json.dump(pipeline_config, temp_file, indent=2)
+                temp_pipeline_path = temp_file.name
             
-            if os.path.exists(output_file):
-                success = True
-                message = f"DTM generated successfully using hardcoded pipeline: {output_file}"
-                print(f"✅ {message}")
-            else:
-                raise Exception("Output file was not created")
+            try:
+                # Execute PDAL pipeline with timeout using subprocess
+                print(f"🔄 Executing fallback PDAL pipeline with 300 second timeout...")
+                start_time = time.time()
+                
+                result = subprocess.run(
+                    ['pdal', 'pipeline', temp_pipeline_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 minute timeout
+                )
+                
+                execution_time = time.time() - start_time
+                print(f"⏱️ Fallback PDAL execution completed in {execution_time:.2f} seconds")
+                
+                if result.returncode == 0:
+                    if os.path.exists(output_file):
+                        success = True
+                        message = f"DTM generated successfully using hardcoded pipeline: {output_file}"
+                        print(f"✅ {message}")
+                    else:
+                        raise Exception("Output file was not created")
+                else:
+                    raise Exception(f"PDAL failed with return code {result.returncode}: {result.stderr}")
+                    
+            except subprocess.TimeoutExpired:
+                print(f"⏰ Fallback PDAL pipeline also timed out after 300 seconds")
+                raise Exception("Both JSON and fallback PDAL pipelines timed out")
+            finally:
+                # Clean up temporary file
+                try:
+                    os.unlink(temp_pipeline_path)
+                except:
+                    pass
                 
         except Exception as e:
             success = False

@@ -228,8 +228,10 @@ async def list_regions(source: str = None):
         
     regions_with_metadata.sort(key=lambda x: x["name"])
     
-    # Second pass: Perform LAZ analysis for regions without coordinates
-    print(f"\n🔍 Analyzing LAZ files without cached coordinates...")
+    # Second pass: Skip automatic LAZ analysis during app startup to prevent unwanted processing
+    # LAZ coordinates will be extracted when files are explicitly selected or processed by the user
+    print(f"\n⏭️ Skipping automatic LAZ analysis during startup to prevent unwanted processing...")
+    laz_files_count = 0
     for region in regions_with_metadata:
         if (region.get("source") == "input" and 
             region.get("file_path") and 
@@ -237,25 +239,23 @@ async def list_regions(source: str = None):
             region.get("center_lat") is None):
             
             file_name = os.path.basename(region["file_path"])
-            print(f"  🔬 Analyzing LAZ file: {file_name}")
+            laz_files_count += 1
+            print(f"  📋 LAZ file found (analysis deferred): {file_name}")
             
-            try:
-                import requests
-                response = requests.get(f'http://localhost:8000/api/laz/bounds-wgs84/{file_name}', timeout=30)
-                if response.status_code == 200:
-                    bounds_data = response.json()
-                    if bounds_data and "center" in bounds_data:
-                        center = bounds_data["center"]
-                        region["center_lat"] = center["lat"]
-                        region["center_lng"] = center["lng"]
-                        print(f"  ✅ Extracted coordinates from LAZ analysis for '{file_name}': ({center['lat']}, {center['lng']})")
-                else:
-                    print(f"  ❌ LAZ bounds analysis failed for {file_name}: HTTP {response.status_code}")
-            except Exception as e:
-                print(f"  ❌ Error analyzing LAZ file {file_name}: {str(e)}")
+            # Set placeholder coordinates instead of triggering automatic analysis
+            # These will be populated when the user explicitly selects the region
+            region["center_lat"] = None
+            region["center_lng"] = None
+            
+    if laz_files_count > 0:
+        print(f"  ℹ️  Found {laz_files_count} LAZ file(s) - coordinates will be extracted when explicitly requested")
 
-    # Create metadata.txt files with coordinate information for all found regions
-    print(f"\n📄 Creating metadata.txt files with coordinates for regions...")
+    # Create or update metadata.txt files only when necessary
+    print(f"\n📄 Checking metadata.txt files for regions...")
+    metadata_created_count = 0
+    metadata_updated_count = 0
+    metadata_skipped_count = 0
+    
     for region in regions_with_metadata:
         region_name = region.get("name")
         if region_name:
@@ -266,27 +266,57 @@ async def list_regions(source: str = None):
             # Create metadata.txt file path
             metadata_file = os.path.join(output_dir, "metadata.txt")
             
-            try:
-                # Generate metadata content based on region type
-                metadata_content = _generate_metadata_content(region)
-                
-                # Write metadata to file
-                with open(metadata_file, 'w') as f:
-                    f.write(metadata_content)
-                    
-                if region.get("center_lat") and region.get("center_lng"):
-                    print(f"  ✅ Created metadata.txt with coordinates for region: {region_name} ({region['center_lat']}, {region['center_lng']})")
+            should_create_metadata = False
+            should_update_coordinates = False
+            
+            # Check if metadata file exists
+            if not os.path.exists(metadata_file):
+                should_create_metadata = True
+                print(f"  📄 Metadata file missing for {region_name} - will create")
+            else:
+                # File exists, check if it has coordinates
+                existing_coords = _read_coordinates_from_metadata(region_name)
+                if existing_coords is None and region.get("center_lat") and region.get("center_lng"):
+                    should_update_coordinates = True
+                    print(f"  📝 Metadata exists for {region_name} but missing coordinates - will update")
                 else:
-                    print(f"  ✅ Created metadata.txt for region: {region_name} (coordinates extracted from LAZ analysis)")
-                    
-            except Exception as e:
-                print(f"  ❌ Failed to create metadata.txt for region {region_name}: {str(e)}")
-                # Create empty file as fallback
+                    metadata_skipped_count += 1
+                    print(f"  ✅ Metadata for {region_name} already exists with coordinates - skipping")
+            
+            # Only create or update if necessary
+            if should_create_metadata or should_update_coordinates:
                 try:
+                    # Generate metadata content based on region type
+                    metadata_content = _generate_metadata_content(region)
+                    
+                    # Write metadata to file
                     with open(metadata_file, 'w') as f:
-                        f.write(f"# Region: {region_name}\n# Error occurred while extracting coordinates: {str(e)}\n")
-                except:
-                    pass
+                        f.write(metadata_content)
+                    
+                    if should_create_metadata:
+                        metadata_created_count += 1
+                        if region.get("center_lat") and region.get("center_lng"):
+                            print(f"  ✅ Created metadata.txt with coordinates for region: {region_name} ({region['center_lat']}, {region['center_lng']})")
+                        else:
+                            print(f"  ✅ Created metadata.txt for region: {region_name} (no coordinates available)")
+                    elif should_update_coordinates:
+                        metadata_updated_count += 1
+                        print(f"  ✅ Updated metadata.txt with coordinates for region: {region_name} ({region['center_lat']}, {region['center_lng']})")
+                        
+                except Exception as e:
+                    print(f"  ❌ Failed to create/update metadata.txt for region {region_name}: {str(e)}")
+                    # Create empty file as fallback if it doesn't exist
+                    if should_create_metadata:
+                        try:
+                            with open(metadata_file, 'w') as f:
+                                f.write(f"# Region: {region_name}\n# Error occurred while extracting coordinates: {str(e)}\n")
+                        except:
+                            pass
+    
+    print(f"\n📊 Metadata file summary:")
+    print(f"  ✅ Created: {metadata_created_count}")
+    print(f"  📝 Updated: {metadata_updated_count}") 
+    print(f"  ⏭️ Skipped: {metadata_skipped_count}")
     
     print(f"\n✅ Backend scan complete:")
     print(f"  📊 Total regions found: {len(regions_with_metadata)}")

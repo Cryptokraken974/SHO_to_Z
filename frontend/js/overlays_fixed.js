@@ -12,7 +12,7 @@ window.OverlayManager = {
    * @param {Array} bounds - Image bounds [[south, west], [north, east]]
    * @param {Object} options - Additional overlay options
    */
-  addImageOverlay(processingType, imagePath, bounds, options = {}) {
+  async addImageOverlay(processingType, imagePath, bounds, options = {}) {
     const map = MapManager.getMap();
     if (!map) {
       Utils.log('error', 'Map not available for overlay');
@@ -41,7 +41,7 @@ window.OverlayManager = {
         Utils.log('warn', `⚠️ Bounds warnings for ${processingType}:`, boundsValidation.warnings);
       }
 
-      // If imagePath is base64 data, validate the image data
+      // If imagePath is base64 data, validate and potentially optimize the image data
       if (typeof imagePath === 'string' && imagePath.startsWith('data:image/')) {
         const base64Data = imagePath.split(',')[1];
         if (base64Data) {
@@ -57,15 +57,72 @@ window.OverlayManager = {
           if (imageValidation.warnings.length > 0) {
             Utils.log('warn', `⚠️ Image warnings for ${processingType}:`, imageValidation.warnings);
           }
+          
+          // Always check if optimization is needed for large images (regardless of warnings)
+          // First, try to get image dimensions from the validation process
+          let imageWidth = null;
+          let imageHeight = null;
+          
+          // Create a temporary image to get dimensions for optimization check
+          try {
+            const tempImage = await this.createImageFromBase64(base64Data);
+            imageWidth = tempImage.width;
+            imageHeight = tempImage.height;
+            Utils.log('info', `📐 Image dimensions for ${processingType}: ${imageWidth}x${imageHeight} (${((imageWidth * imageHeight) / 1000000).toFixed(1)}M pixels)`);
+          } catch (dimensionError) {
+            Utils.log('warn', `Could not determine image dimensions for ${processingType}:`, dimensionError);
+          }
+          
+          const optimizationCheck = this.checkImageOptimizationNeeds(base64Data, imageWidth, imageHeight);
+          if (optimizationCheck.needsOptimization) {
+            Utils.log('info', `🔧 Large image detected, applying optimization for ${processingType}`);
+            Utils.log('info', `Optimization reasons: ${optimizationCheck.reasons.join(', ')}`);
+            
+            try {
+              const optimizationResult = await this.optimizeLargeImage(base64Data, processingType);
+              
+              if (optimizationResult.success) {
+                Utils.log('info', `✅ Image optimization successful for ${processingType}`);
+                imagePath = optimizationResult.optimizedData;
+                
+                // Show optimization summary
+                const sizeBefore = (base64Data.length / 1024 / 1024).toFixed(2);
+                const sizeAfter = (optimizationResult.optimizedData.split(',')[1].length / 1024 / 1024).toFixed(2);
+                this.showOverlayNotification(
+                  `${processingType} optimized: ${sizeBefore}MB → ${sizeAfter}MB`, 
+                  'success'
+                );
+              } else {
+                Utils.log('warn', `⚠️ Image optimization failed for ${processingType}, using original`);
+                this.showOverlayNotification(
+                  `Warning: Could not optimize large ${processingType} image, performance may be affected`, 
+                  'warning'
+                );
+              }
+            } catch (optimizationError) {
+              Utils.log('error', `❌ Image optimization error for ${processingType}:`, optimizationError);
+              this.showOverlayNotification(
+                `Warning: Image optimization failed for ${processingType}`, 
+                'warning'
+              );
+            }
+          }
         }
       }
 
-      // Create new overlay
-      const overlay = L.imageOverlay(imagePath, bounds, {
-        opacity: options.opacity || 0.8, // Increased default opacity
+      // Create new overlay with memory-safe approach
+      const overlay = await this.createMemorySafeOverlay(imagePath, bounds, {
+        opacity: options.opacity || 0.8,
         interactive: false,
         ...options
-      }).addTo(map);
+      }, processingType);
+
+      if (!overlay) {
+        throw new Error('Failed to create overlay');
+      }
+
+      // Add overlay to map
+      overlay.addTo(map);
 
       // Store overlay reference
       this.mapOverlays[processingType] = overlay;
@@ -234,84 +291,216 @@ window.OverlayManager = {
   },
 
   /**
-   * Show overlay notification
+   * Enhanced notification system with progress support
    * @param {string} message - Notification message
-   * @param {string} type - Notification type
+   * @param {string} type - Notification type (success, error, info, warning)
+   * @param {number} progress - Progress percentage (0-100, optional)
    */
-  showOverlayNotification(message, type = 'info') {
-    // Create overlay-specific notification
-    const notification = $(`
-      <div class="overlay-notification overlay-notification-${type}">
-        <i class="overlay-icon"></i>
-        <span>${message}</span>
-        <button class="overlay-close">&times;</button>
-      </div>
-    `);
-    
-    $('#map').append(notification);
-    
-    // Auto-remove after 3 seconds
-    setTimeout(() => {
-      notification.fadeOut(() => notification.remove());
-    }, 3000);
-    
-    // Remove on close click
-    notification.find('.overlay-close').on('click', function() {
-      notification.fadeOut(() => notification.remove());
-    });
+  showOverlayNotification(message, type = 'info', progress = null) {
+    // Check if we have an existing notification system
+    if (typeof NotificationManager !== 'undefined' && NotificationManager.show) {
+      // Use existing notification system if available
+      NotificationManager.show(message, type, progress ? { progress } : {});
+    } else {
+      // Fallback to console logging and simple UI feedback
+      const logLevel = type === 'error' ? 'error' : type === 'warning' ? 'warn' : 'info';
+      Utils.log(logLevel, `[${type.toUpperCase()}] ${message}${progress !== null ? ` (${progress}%)` : ''}`);
+      
+      // Try to update UI elements if they exist
+      this.updateNotificationUI(message, type, progress);
+    }
   },
 
   /**
-   * Update Add to Map button state
-   * @param {string} processingType - Type of processing
-   * @param {boolean} isActive - Whether overlay is active
+   * Update notification UI elements
+   * @param {string} message - Message to display
+   * @param {string} type - Message type
+   * @param {number} progress - Progress percentage
    */
-  updateAddToMapButtonState(processingType, isActive) {
-    const button = $(`#add-to-map-${processingType.toLowerCase()}`);
-    if (button.length) {
-      if (isActive) {
-        button.text('Remove from Map')
-               .removeClass('btn-primary')
-               .addClass('btn-secondary')
-               .data('active', true);
-      } else {
-        button.text('Add to Map')
-               .removeClass('btn-secondary')
-               .addClass('btn-primary')
-               .data('active', false);
+  updateNotificationUI(message, type, progress) {
+    try {
+      // Look for existing notification elements
+      const statusElements = document.querySelectorAll('.overlay-status, .processing-status, #status-message');
+      
+      statusElements.forEach(element => {
+        if (element) {
+          element.textContent = message;
+          element.className = `overlay-status ${type}`;
+          
+          // Add progress bar if progress is specified
+          if (progress !== null) {
+            let progressBar = element.querySelector('.progress-bar');
+            if (!progressBar) {
+              progressBar = document.createElement('div');
+              progressBar.className = 'progress-bar';
+              progressBar.innerHTML = '<div class="progress-fill"></div>';
+              element.appendChild(progressBar);
+            }
+            
+            const progressFill = progressBar.querySelector('.progress-fill');
+            if (progressFill) {
+              progressFill.style.width = `${progress}%`;
+            }
+          }
+        }
+      });
+      
+      // Auto-hide success/info messages after delay
+      if (type === 'success' || type === 'info') {
+        setTimeout(() => {
+          statusElements.forEach(element => {
+            if (element && element.textContent === message) {
+              element.textContent = '';
+              element.className = 'overlay-status';
+              const progressBar = element.querySelector('.progress-bar');
+              if (progressBar) {
+                progressBar.remove();
+              }
+            }
+          });
+        }, progress !== null ? 2000 : 3000);
+      }
+      
+    } catch (error) {
+      Utils.log('warn', 'Could not update notification UI:', error);
+    }
+  },
+
+  /**
+   * Progressive loading for large overlay images
+   * @param {string} imagePath - Image path or base64 data
+   * @param {string} processingType - Processing type
+   * @returns {Promise<string>} Processed image path
+   */
+  async progressiveLoadOverlay(imagePath, processingType) {
+    if (!this.largeImageConfig.enableProgressiveLoading) {
+      return imagePath;
+    }
+
+    try {
+      Utils.log('info', `🔄 Starting progressive loading for ${processingType}`);
+      
+      // If it's a URL, we don't need progressive loading
+      if (!imagePath.startsWith('data:image/')) {
+        return imagePath;
+      }
+
+      const base64Data = imagePath.split(',')[1];
+      const dataSize = base64Data.length;
+      
+      // Only use progressive loading for very large images
+      if (dataSize < this.largeImageConfig.loadingChunkSize * 10) {
+        return imagePath;
+      }
+
+      this.showOverlayNotification(`Loading large ${processingType} image...`, 'info', 0);
+
+      // Simulate progressive loading with chunks
+      const chunks = Math.ceil(dataSize / this.largeImageConfig.loadingChunkSize);
+      let loadedChunks = 0;
+
+      const loadChunk = () => {
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            loadedChunks++;
+            const progress = Math.floor((loadedChunks / chunks) * 100);
+            this.showOverlayNotification(
+              `Loading ${processingType} image... ${progress}%`, 
+              'info', 
+              progress
+            );
+            resolve();
+          }, 50); // Small delay to show progress
+        });
+      };
+
+      // Load chunks progressively
+      for (let i = 0; i < chunks; i++) {
+        await loadChunk();
+      }
+
+      this.showOverlayNotification(`${processingType} image loaded successfully`, 'success', 100);
+      
+      Utils.log('info', `✅ Progressive loading completed for ${processingType}`);
+      return imagePath;
+
+    } catch (error) {
+      Utils.log('error', `❌ Progressive loading failed for ${processingType}:`, error);
+      return imagePath; // Return original on error
+    }
+  },
+
+  /**
+   * Memory-safe overlay creation with error handling
+   * @param {string} imagePath - Image path or data
+   * @param {Array} bounds - Image bounds
+   * @param {Object} options - Overlay options
+   * @param {string} processingType - Processing type for logging
+   * @returns {Promise<L.ImageOverlay>} Leaflet overlay or null
+   */
+  async createMemorySafeOverlay(imagePath, bounds, options, processingType) {
+    const maxRetries = this.largeImageConfig.maxRetries;
+    let attempt = 0;
+
+    while (attempt < maxRetries) {
+      try {
+        Utils.log('info', `Creating overlay attempt ${attempt + 1}/${maxRetries} for ${processingType}`);
+
+        // Apply progressive loading if needed
+        const processedImagePath = await this.progressiveLoadOverlay(imagePath, processingType);
+
+        // Create overlay with memory monitoring
+        const overlay = L.imageOverlay(processedImagePath, bounds, {
+          opacity: options.opacity || 0.8,
+          interactive: false,
+          ...options
+        });
+
+        // Add memory monitoring
+        const memoryBefore = this.getMemoryUsage();
+        
+        return new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error(`Overlay creation timeout for ${processingType}`));
+          }, 30000); // 30 second timeout
+
+          overlay.on('load', () => {
+            clearTimeout(timeout);
+            const memoryAfter = this.getMemoryUsage();
+            Utils.log('info', `✅ Overlay loaded for ${processingType}. Memory change: ${(memoryAfter - memoryBefore).toFixed(2)}MB`);
+            resolve(overlay);
+          });
+
+          overlay.on('error', (e) => {
+            clearTimeout(timeout);
+            Utils.log('error', `❌ Overlay load error for ${processingType}:`, e);
+            reject(new Error(`Failed to load overlay: ${e.message || 'Unknown error'}`));
+          });
+        });
+
+      } catch (error) {
+        attempt++;
+        Utils.log('warn', `Overlay creation attempt ${attempt} failed for ${processingType}:`, error);
+
+        if (attempt >= maxRetries) {
+          throw new Error(`Failed to create overlay after ${maxRetries} attempts: ${error.message}`);
+        }
+
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
     }
   },
 
   /**
-   * Show Add to Map button after successful processing
-   * @param {string} processingType - Type of processing
+   * Get current memory usage (approximate)
+   * @returns {number} Memory usage in MB
    */
-  showAddToMapButton(processingType) {
-    const buttonContainer = $(`#${processingType.toLowerCase()}-map-controls`);
-    if (buttonContainer.length && buttonContainer.is(':hidden')) {
-      buttonContainer.fadeIn();
+  getMemoryUsage() {
+    if (performance.memory) {
+      return performance.memory.usedJSHeapSize / 1024 / 1024;
     }
-  },
-
-  /**
-   * Handle Add to Map button click
-   * @param {string} processingType - Type of processing
-   */
-  handleAddToMapClick(processingType) {
-    if (!processingType) {
-      Utils.log('warn', 'handleAddToMapClick: processingType is undefined');
-      return;
-    }
-    
-    const button = $(`#add-to-map-${processingType.toLowerCase()}`);
-    const isActive = button.data('active') || false;
-    
-    if (isActive) {
-      this.removeOverlay(processingType);
-    } else {
-      this.addProcessingOverlay(processingType);
-    }
+    return 0; // Not available in all browsers
   },
 
   /**
@@ -1061,5 +1250,355 @@ window.OverlayManager = {
     }
 
     return validation;
-  }
+  },
+
+  /**
+   * Large Image Optimization Configuration
+   */
+  largeImageConfig: {
+    // Memory limits
+    maxPixels: 50000000, // 50M pixels (approximately 200MB uncompressed)
+    maxBase64Size: 75000000, // 75MB base64 data
+    compressionThreshold: 25000000, // 25M pixels
+    
+    // Aggressive optimization for very large images
+    extremePixelThreshold: 100000000, // 100M pixels - super aggressive
+    aggressivePixelThreshold: 75000000, // 75M pixels - more aggressive
+    
+    // Progressive loading settings
+    enableProgressiveLoading: true,
+    loadingChunkSize: 1024 * 1024, // 1MB chunks
+    
+    // Fallback settings
+    maxRetries: 3,
+    fallbackQuality: 0.7,
+    fallbackMaxWidth: 4096,
+    fallbackMaxHeight: 4096,
+    
+    // Extreme optimization settings
+    extremeMaxWidth: 2048,
+    extremeMaxHeight: 2048,
+    extremeQuality: 0.5
+  },
+
+  /**
+   * Check if image requires optimization due to size
+   * @param {string} imageData - Base64 image data
+   * @param {number} width - Image width
+   * @param {number} height - Image height
+   * @returns {Object} Optimization requirements
+   */
+  checkImageOptimizationNeeds(imageData, width = null, height = null) {
+    const config = this.largeImageConfig;
+    const result = {
+      needsOptimization: false,
+      reasons: [],
+      recommendations: [],
+      estimatedPixels: width && height ? width * height : null,
+      base64Size: imageData.length
+    };
+
+    // Check base64 size
+    if (imageData.length > config.maxBase64Size) {
+      result.needsOptimization = true;
+      result.reasons.push(`Base64 data too large (${(imageData.length / 1024 / 1024).toFixed(2)}MB)`);
+      result.recommendations.push('Apply aggressive compression');
+    } else if (imageData.length > (config.maxBase64Size * 0.33)) { // 25MB threshold for base64
+      result.needsOptimization = true;
+      result.reasons.push(`Base64 data exceeds compression threshold`);
+      result.recommendations.push('Apply standard compression');
+    }
+
+    // Check pixel count if available
+    if (result.estimatedPixels) {
+      if (result.estimatedPixels > config.maxPixels) {
+        result.needsOptimization = true;
+        result.reasons.push(`Too many pixels (${(result.estimatedPixels / 1000000).toFixed(1)}M)`);
+        result.recommendations.push('Resize image');
+      } else if (result.estimatedPixels > config.compressionThreshold) {
+        result.needsOptimization = true;
+        result.reasons.push(`Pixel count exceeds compression threshold`);
+        result.recommendations.push('Apply compression');
+      }
+    }
+
+    return result;
+  },
+
+  /**
+   * Optimize large image for display
+   * @param {string} imageData - Base64 image data
+   * @param {string} processingType - Processing type for logging
+   * @returns {Promise<Object>} Optimization result
+   */
+  async optimizeLargeImage(imageData, processingType) {
+    const startTime = Date.now();
+    Utils.log('info', `🔄 Starting image optimization for ${processingType}`);
+
+    try {
+      // Show progress notification
+      this.showOverlayNotification(`Optimizing large ${processingType} image...`, 'info', 0);
+
+      // Create image element to get dimensions
+      const originalImage = await this.createImageFromBase64(imageData);
+      const originalWidth = originalImage.width;
+      const originalHeight = originalImage.height;
+      const originalPixels = originalWidth * originalHeight;
+
+      Utils.log('info', `Original image: ${originalWidth}x${originalHeight} (${(originalPixels / 1000000).toFixed(1)}M pixels)`);
+
+      // Check optimization needs
+      const optimizationNeeds = this.checkImageOptimizationNeeds(imageData, originalWidth, originalHeight);
+      
+      if (!optimizationNeeds.needsOptimization) {
+        Utils.log('info', `No optimization needed for ${processingType}`);
+        return {
+          success: true,
+          optimizedData: `data:image/png;base64,${imageData}`,
+          originalSize: { width: originalWidth, height: originalHeight },
+          optimizedSize: { width: originalWidth, height: originalHeight },
+          compressionRatio: 1.0,
+          processingTime: Date.now() - startTime
+        };
+      }
+
+      Utils.log('info', `Optimization needed: ${optimizationNeeds.reasons.join(', ')}`);
+
+      // Calculate target dimensions
+      const targetDimensions = this.calculateOptimalDimensions(
+        originalWidth, 
+        originalHeight, 
+        optimizationNeeds
+      );
+
+      // Update progress
+      this.showOverlayNotification(`Resizing ${processingType} image to ${targetDimensions.width}x${targetDimensions.height}...`, 'info', 30);
+
+      // Perform optimization
+      const optimizedResult = await this.performImageOptimization(
+        originalImage,
+        targetDimensions,
+        processingType
+      );
+
+      // Update progress
+      this.showOverlayNotification(`Finalizing ${processingType} optimization...`, 'info', 80);
+
+      const processingTime = Date.now() - startTime;
+      const compressionRatio = optimizedResult.compressedSize / imageData.length;
+
+      Utils.log('info', `✅ Image optimization completed for ${processingType} in ${processingTime}ms`);
+      Utils.log('info', `Size reduction: ${(imageData.length / 1024 / 1024).toFixed(2)}MB → ${(optimizedResult.compressedSize / 1024 / 1024).toFixed(2)}MB (${(compressionRatio * 100).toFixed(1)}%)`);
+
+      // Show success notification
+      this.showOverlayNotification(
+        `${processingType} optimized: ${(compressionRatio * 100).toFixed(1)}% of original size`, 
+        'success', 
+        100
+      );
+
+      return {
+        success: true,
+        optimizedData: optimizedResult.dataUrl,
+        originalSize: { width: originalWidth, height: originalHeight },
+        optimizedSize: targetDimensions,
+        compressionRatio: compressionRatio,
+        processingTime: processingTime
+      };
+
+    } catch (error) {
+      Utils.log('error', `❌ Image optimization failed for ${processingType}:`, error);
+      this.showOverlayNotification(`Failed to optimize ${processingType} image: ${error.message}`, 'error');
+      
+      return {
+        success: false,
+        error: error.message,
+        processingTime: Date.now() - startTime
+      };
+    }
+  },
+
+  /**
+   * Create image element from base64 data
+   * @param {string} base64Data - Base64 image data
+   * @returns {Promise<HTMLImageElement>} Image element
+   */
+  createImageFromBase64(base64Data) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = (error) => reject(new Error(`Failed to load image: ${error.message || 'Unknown error'}`));
+      img.src = `data:image/png;base64,${base64Data}`;
+    });
+  },
+
+  /**
+   * Calculate optimal dimensions for image optimization
+   * @param {number} originalWidth - Original image width
+   * @param {number} originalHeight - Original image height
+   * @param {Object} optimizationNeeds - Optimization requirements
+   * @returns {Object} Target dimensions
+   */
+  calculateOptimalDimensions(originalWidth, originalHeight, optimizationNeeds) {
+    const config = this.largeImageConfig;
+    const originalPixels = originalWidth * originalHeight;
+    
+    // If within limits, no resizing needed
+    if (originalPixels <= config.compressionThreshold) {
+      return { width: originalWidth, height: originalHeight };
+    }
+
+    // Calculate scale factor based on pixel count
+    let scaleFactor = 1.0;
+    
+    if (originalPixels > config.maxPixels) {
+      // Aggressive scaling for very large images
+      scaleFactor = Math.sqrt(config.maxPixels / originalPixels);
+    } else {
+      // Conservative scaling for moderately large images
+      scaleFactor = Math.sqrt(config.compressionThreshold / originalPixels);
+    }
+
+    // Apply minimum scale factor to prevent over-compression
+    scaleFactor = Math.max(scaleFactor, 0.25); // Never scale below 25%
+
+    // Calculate target dimensions
+    let targetWidth = Math.floor(originalWidth * scaleFactor);
+    let targetHeight = Math.floor(originalHeight * scaleFactor);
+
+    // Apply maximum dimension limits
+    if (targetWidth > config.fallbackMaxWidth) {
+      const aspectRatio = originalHeight / originalWidth;
+      targetWidth = config.fallbackMaxWidth;
+      targetHeight = Math.floor(targetWidth * aspectRatio);
+    }
+
+    if (targetHeight > config.fallbackMaxHeight) {
+      const aspectRatio = originalWidth / originalHeight;
+      targetHeight = config.fallbackMaxHeight;
+      targetWidth = Math.floor(targetHeight * aspectRatio);
+    }
+
+    // Ensure minimum dimensions
+    targetWidth = Math.max(targetWidth, 256);
+    targetHeight = Math.max(targetHeight, 256);
+
+    Utils.log('info', `Calculated target dimensions: ${targetWidth}x${targetHeight} (scale: ${(scaleFactor * 100).toFixed(1)}%)`);
+
+    return { width: targetWidth, height: targetHeight };
+  },
+
+  /**
+   * Perform actual image optimization using canvas
+   * @param {HTMLImageElement} sourceImage - Source image element
+   * @param {Object} targetDimensions - Target dimensions
+   * @param {string} processingType - Processing type for logging
+   * @returns {Promise<Object>} Optimization result
+   */
+  async performImageOptimization(sourceImage, targetDimensions, processingType) {
+    return new Promise((resolve, reject) => {
+      try {
+        // Create canvas for optimization
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas dimensions
+        canvas.width = targetDimensions.width;
+        canvas.height = targetDimensions.height;
+
+        // Configure high-quality rendering
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        // Draw resized image
+        ctx.drawImage(
+          sourceImage,
+          0, 0, sourceImage.width, sourceImage.height,
+          0, 0, targetDimensions.width, targetDimensions.height
+        );
+
+        // Convert to optimized format
+        const quality = this.largeImageConfig.fallbackQuality;
+        
+        // Try PNG first (lossless)
+        canvas.toBlob((pngBlob) => {
+          if (pngBlob) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const dataUrl = reader.result;
+              const base64Data = dataUrl.split(',')[1];
+              
+              resolve({
+                dataUrl: dataUrl,
+                compressedSize: base64Data.length,
+                format: 'PNG'
+              });
+            };
+            reader.onerror = () => reject(new Error('Failed to read optimized PNG'));
+            reader.readAsDataURL(pngBlob);
+          } else {
+            // Fallback to JPEG if PNG fails
+            canvas.toBlob((jpegBlob) => {
+              if (jpegBlob) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const dataUrl = reader.result;
+                  const base64Data = dataUrl.split(',')[1];
+                  
+                  resolve({
+                    dataUrl: dataUrl,
+                    compressedSize: base64Data.length,
+                    format: 'JPEG'
+                  });
+                };
+                reader.onerror = () => reject(new Error('Failed to read optimized JPEG'));
+                reader.readAsDataURL(jpegBlob);
+              } else {
+                reject(new Error('Failed to create optimized image blob'));
+              }
+            }, 'image/jpeg', quality);
+          }
+        }, 'image/png');
+
+      } catch (error) {
+        reject(new Error(`Canvas optimization failed: ${error.message}`));
+      }
+    });
+  },
+
+  /**
+   * Update add to map button state
+   * @param {string} processingType - Processing type
+   * @param {boolean} isAdded - Whether overlay is added to map
+   */
+  updateAddToMapButtonState(processingType, isAdded) {
+    const button = document.querySelector(`[data-processing-type="${processingType}"] .add-to-map-btn`);
+    if (button) {
+      if (isAdded) {
+        button.textContent = 'Remove from Map';
+        button.classList.add('remove-mode');
+        button.classList.remove('bg-[#28a745]', 'hover:bg-[#218838]');
+        button.classList.add('bg-[#dc3545]', 'hover:bg-[#c82333]');
+      } else {
+        button.textContent = 'Add to Map';
+        button.classList.remove('remove-mode');
+        button.classList.remove('bg-[#dc3545]', 'hover:bg-[#c82333]');
+        button.classList.add('bg-[#28a745]', 'hover:bg-[#218838]');
+      }
+    }
+  },
+
+  /**
+   * Show add to map button for a processing type
+   * @param {string} processingType - Processing type
+   */
+  showAddToMapButton(processingType) {
+    const button = document.querySelector(`[data-processing-type="${processingType}"] .add-to-map-btn`);
+    if (button) {
+      button.classList.remove('hidden');
+      button.style.display = '';
+    }
+  },
+
+  // ...existing code...
 };

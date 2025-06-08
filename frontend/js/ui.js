@@ -1860,8 +1860,20 @@ window.UIManager = {
         throw new Error('Invalid overlay data received from server');
       }
 
+      // Check for optimization metadata
+      const isOptimized = overlayData.is_optimized || false;
+      const optimizationInfo = overlayData.optimization_info || null;
+
       // Log detailed coordinate information
       Utils.log('info', `Retrieved overlay data for ${regionName} - Bounds: N:${overlayData.bounds.north}, S:${overlayData.bounds.south}, E:${overlayData.bounds.east}, W:${overlayData.bounds.west}`);
+
+      // Log optimization status
+      if (isOptimized) {
+        Utils.log('info', `✓ ${displayName} overlay is optimized for browser performance`);
+        if (optimizationInfo) {
+          Utils.log('info', `Optimization details:`, optimizationInfo);
+        }
+      }
 
       // Convert bounds to Leaflet format [[south, west], [north, east]]
       const bounds = [
@@ -1882,7 +1894,13 @@ window.UIManager = {
       });
 
       if (success) {
-        Utils.showNotification(`Added ${displayName} overlay to map`, 'success');
+        // Create notification message with optimization status
+        let notificationMessage = `Added ${displayName} overlay to map`;
+        if (isOptimized) {
+          notificationMessage += ' ✓ Optimized for browser performance';
+        }
+        
+        Utils.showNotification(notificationMessage, 'success');
         Utils.log('info', `Successfully added ${displayName} overlay for region ${regionName} with coordinates: North: ${overlayData.bounds.north}, South: ${overlayData.bounds.south}, East: ${overlayData.bounds.east}, West: ${overlayData.bounds.west}`);
         return true;
       } else {
@@ -1913,6 +1931,18 @@ window.UIManager = {
         throw new Error('Invalid Sentinel-2 overlay data received from server');
       }
 
+      // Check for optimization metadata
+      const isOptimized = overlayData.is_optimized || false;
+      const optimizationInfo = overlayData.optimization_info || null;
+
+      // Log optimization status
+      if (isOptimized) {
+        Utils.log('info', `✓ ${bType} Sentinel-2 overlay is optimized for browser performance`);
+        if (optimizationInfo) {
+          Utils.log('info', `Optimization details:`, optimizationInfo);
+        }
+      }
+
       // Convert bounds to Leaflet format [[south, west], [north, east]]
 
       const bounds = [
@@ -1933,7 +1963,13 @@ window.UIManager = {
       });
 
       if (success) {
-        Utils.showNotification(`Added ${bType} Sentinel-2 overlay to map`, 'success');
+        // Create notification message with optimization status
+        let notificationMessage = `Added ${bType} Sentinel-2 overlay to map`;
+        if (isOptimized) {
+          notificationMessage += ' ✓ Optimized for browser performance';
+        }
+        
+        Utils.showNotification(notificationMessage, 'success');
         Utils.log('info', `Successfully added ${bType} Sentinel-2 overlay for ${regionBand}`);
         return true;
       } else {
@@ -2492,9 +2528,14 @@ window.UIManager = {
     try {
       Utils.log('info', `Fetching bounds for LAZ file: ${regionPath}`);
       
+      // Extract just the filename from the path for the API call
+      // The LAZ bounds API expects just the filename, not the full path
+      const fileName = regionPath.split('/').pop();
+      Utils.log('info', `Extracted filename for API call: ${fileName}`);
+      
       // Use LAZ service to get WGS84 bounds
       const lazService = laz();
-      const boundsData = await lazService.getLAZFileBounds(regionPath);
+      const boundsData = await lazService.getLAZFileBounds(fileName);
       
       if (boundsData.error) {
         Utils.log('warn', `Failed to get LAZ bounds: ${boundsData.error}`);
