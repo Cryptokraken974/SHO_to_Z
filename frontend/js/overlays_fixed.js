@@ -23,14 +23,69 @@ window.OverlayManager = {
       // Remove existing overlay if present
       this.removeOverlay(processingType);
 
+      // Enhanced logging for debugging
+      Utils.log('info', `Creating overlay "${processingType}" with bounds:`, bounds);
+      Utils.log('info', `Image path type: ${typeof imagePath}, length: ${imagePath.length > 100 ? imagePath.substring(0, 100) + '...' : imagePath}`);
+
+      // Enhanced validation with detailed diagnostics
+      const boundsValidation = this.validateBounds(bounds, processingType);
+      Utils.log('info', `🔍 Bounds validation for ${processingType}:`, boundsValidation);
+      
+      if (!boundsValidation.isValid) {
+        Utils.log('error', `❌ Bounds validation failed for ${processingType}:`, boundsValidation.errors);
+        this.showOverlayNotification(`Invalid bounds for ${processingType}: ${boundsValidation.errors.join(', ')}`, 'error');
+        return false;
+      }
+
+      if (boundsValidation.warnings.length > 0) {
+        Utils.log('warn', `⚠️ Bounds warnings for ${processingType}:`, boundsValidation.warnings);
+      }
+
+      // If imagePath is base64 data, validate the image data
+      if (typeof imagePath === 'string' && imagePath.startsWith('data:image/')) {
+        const base64Data = imagePath.split(',')[1];
+        if (base64Data) {
+          const imageValidation = this.validateImageData(base64Data, processingType);
+          Utils.log('info', `🖼️ Image validation for ${processingType}:`, imageValidation);
+          
+          if (!imageValidation.isValid) {
+            Utils.log('error', `❌ Image validation failed for ${processingType}:`, imageValidation.errors);
+            this.showOverlayNotification(`Invalid image data for ${processingType}: ${imageValidation.errors.join(', ')}`, 'error');
+            return false;
+          }
+
+          if (imageValidation.warnings.length > 0) {
+            Utils.log('warn', `⚠️ Image warnings for ${processingType}:`, imageValidation.warnings);
+          }
+        }
+      }
+
       // Create new overlay
       const overlay = L.imageOverlay(imagePath, bounds, {
-        opacity: options.opacity || 0.7,
+        opacity: options.opacity || 0.8, // Increased default opacity
+        interactive: false,
         ...options
       }).addTo(map);
 
       // Store overlay reference
       this.mapOverlays[processingType] = overlay;
+
+      // Fit map to overlay bounds for better visibility
+      try {
+        map.fitBounds(bounds, { padding: [20, 20] });
+        Utils.log('info', `Map fitted to overlay bounds for ${processingType}`);
+      } catch (boundsError) {
+        Utils.log('warn', `Could not fit map to bounds for ${processingType}:`, boundsError);
+      }
+
+      // Add overlay loaded event listener for debugging
+      overlay.on('load', () => {
+        Utils.log('info', `Overlay image loaded successfully for ${processingType}`);
+      });
+
+      overlay.on('error', (e) => {
+        Utils.log('error', `Overlay image failed to load for ${processingType}:`, e);
+      });
 
       // Update button state
       this.updateAddToMapButtonState(processingType, true);
@@ -38,7 +93,7 @@ window.OverlayManager = {
       // Show notification
       this.showOverlayNotification(`${processingType} overlay added to map`, 'success');
 
-      Utils.log('info', `Added ${processingType} overlay to map`);
+      Utils.log('info', `Successfully added ${processingType} overlay to map with enhanced visibility features`);
       return true;
 
     } catch (error) {
@@ -345,8 +400,15 @@ window.OverlayManager = {
         [overlayData.bounds.north, overlayData.bounds.east]
       ];
 
+      // Log detailed coordinate information
+      Utils.log('info', `Retrieved ${bandType} overlay data for ${regionName} - Bounds: N:${overlayData.bounds.north}, S:${overlayData.bounds.south}, E:${overlayData.bounds.east}, W:${overlayData.bounds.west}`);
+
       // Create image data URL from base64
       const imageDataUrl = `data:image/png;base64,${overlayData.image_data}`;
+
+      // Enhanced logging for debugging
+      Utils.log('info', `Creating ${bandType} satellite overlay with image data length: ${overlayData.image_data.length} chars`);
+      Utils.log('info', `Satellite overlay bounds: [[${bounds[0][0]}, ${bounds[0][1]}], [${bounds[1][0]}, ${bounds[1][1]}]]`);
 
       // Create new satellite overlay using the actual bounds and image data
       const overlay = L.imageOverlay(
@@ -358,13 +420,27 @@ window.OverlayManager = {
         }
       ).addTo(map);
 
+      // Add overlay event listeners for debugging
+      overlay.on('load', () => {
+        Utils.log('info', `Satellite overlay image loaded successfully for ${bandType}`);
+      });
+
+      overlay.on('error', (e) => {
+        Utils.log('error', `Satellite overlay image failed to load for ${bandType}:`, e);
+      });
+
       // Store overlay reference
       this.mapOverlays[overlayKey] = overlay;
 
-      // Fit map to overlay bounds for better visibility
-      map.fitBounds(bounds);
+      // Fit map to overlay bounds for better visibility with padding
+      try {
+        map.fitBounds(bounds, { padding: [20, 20] });
+        Utils.log('info', `Map fitted to satellite overlay bounds for ${bandType}`);
+      } catch (boundsError) {
+        Utils.log('warn', `Could not fit map to satellite bounds for ${bandType}:`, boundsError);
+      }
 
-      Utils.log('info', `Added ${bandType} satellite overlay for region ${regionName} to map with bounds:`, bounds);
+      Utils.log('info', `Successfully added ${bandType} satellite overlay for region ${regionName} with coordinates: N:${overlayData.bounds.north}, S:${overlayData.bounds.south}, E:${overlayData.bounds.east}, W:${overlayData.bounds.west}`);
       Utils.showNotification(`Added ${bandType} band overlay to map`, 'success');
       return true;
 
@@ -823,5 +899,167 @@ window.OverlayManager = {
       Utils.log('error', 'Failed to create composite overlay', error);
       this.showOverlayNotification('Failed to create composite overlay', 'error');
     }
+  },
+
+  /**
+   * Validate base64 image data and detect potential issues
+   * @param {string} imageData - Base64 encoded image data
+   * @param {string} processingType - Processing type for logging
+   * @returns {Object} Validation results
+   */
+  validateImageData(imageData, processingType) {
+    const validation = {
+      isValid: true,
+      warnings: [],
+      errors: [],
+      info: {}
+    };
+
+    try {
+      // Check if image data exists
+      if (!imageData) {
+        validation.errors.push('No image data provided');
+        validation.isValid = false;
+        return validation;
+      }
+
+      // Check image data length
+      validation.info.dataLength = imageData.length;
+      if (imageData.length < 100) {
+        validation.warnings.push(`Very small image data (${imageData.length} chars)`);
+      } else if (imageData.length > 50000000) { // 50MB limit
+        validation.warnings.push(`Very large image data (${(imageData.length / 1024 / 1024).toFixed(2)} MB)`);
+      }
+
+      // Check for valid base64 format
+      const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+      if (!base64Regex.test(imageData)) {
+        validation.errors.push('Invalid base64 format detected');
+        validation.isValid = false;
+      }
+
+      // Try to decode and validate as image
+      try {
+        const testImage = new Image();
+        const dataUrl = `data:image/png;base64,${imageData}`;
+        
+        // Test if browser can create the image (async validation)
+        testImage.onload = () => {
+          Utils.log('info', `✅ Image validation passed for ${processingType}: ${testImage.width}x${testImage.height}`);
+        };
+        
+        testImage.onerror = (e) => {
+          Utils.log('error', `❌ Image validation failed for ${processingType}:`, e);
+        };
+        
+        testImage.src = dataUrl;
+        validation.info.testImageCreated = true;
+        
+      } catch (imageError) {
+        validation.errors.push(`Image creation failed: ${imageError.message}`);
+        validation.isValid = false;
+      }
+
+      // Check for PNG header
+      if (imageData.startsWith('iVBORw0KGgo')) {
+        validation.info.format = 'PNG';
+      } else if (imageData.startsWith('/9j/')) {
+        validation.info.format = 'JPEG';
+        validation.warnings.push('JPEG format detected, PNG expected');
+      } else {
+        validation.warnings.push('Unknown image format detected');
+      }
+
+    } catch (error) {
+      validation.errors.push(`Validation error: ${error.message}`);
+      validation.isValid = false;
+    }
+
+    return validation;
+  },
+
+  /**
+   * Enhanced bounds validation with geographic coordinate checks
+   * @param {Array} bounds - Leaflet bounds [[south, west], [north, east]]
+   * @param {string} processingType - Processing type for logging
+   * @returns {Object} Validation results
+   */
+  validateBounds(bounds, processingType) {
+    const validation = {
+      isValid: true,
+      warnings: [],
+      errors: [],
+      info: {}
+    };
+
+    try {
+      // Check bounds format
+      if (!Array.isArray(bounds) || bounds.length !== 2) {
+        validation.errors.push('Invalid bounds format - must be [[south, west], [north, east]]');
+        validation.isValid = false;
+        return validation;
+      }
+
+      const [southwest, northeast] = bounds;
+      if (!Array.isArray(southwest) || !Array.isArray(northeast) || 
+          southwest.length !== 2 || northeast.length !== 2) {
+        validation.errors.push('Invalid bounds corner format');
+        validation.isValid = false;
+        return validation;
+      }
+
+      const [south, west] = southwest;
+      const [north, east] = northeast;
+
+      // Store parsed values
+      validation.info = { south, west, north, east };
+
+      // Check for valid numeric values
+      if ([south, west, north, east].some(coord => typeof coord !== 'number' || isNaN(coord))) {
+        validation.errors.push('Non-numeric coordinates detected');
+        validation.isValid = false;
+        return validation;
+      }
+
+      // Check latitude bounds (-90 to 90)
+      if (south < -90 || south > 90 || north < -90 || north > 90) {
+        validation.errors.push(`Invalid latitude values: south=${south}, north=${north}`);
+        validation.isValid = false;
+      }
+
+      // Check longitude bounds (-180 to 180)
+      if (west < -180 || west > 180 || east < -180 || east > 180) {
+        validation.errors.push(`Invalid longitude values: west=${west}, east=${east}`);
+        validation.isValid = false;
+      }
+
+      // Check logical ordering
+      if (south >= north) {
+        validation.errors.push(`South (${south}) must be less than North (${north})`);
+        validation.isValid = false;
+      }
+
+      // Note: We don't enforce west < east due to possible dateline crossing
+
+      // Calculate area
+      const width = Math.abs(east - west);
+      const height = Math.abs(north - south);
+      validation.info.width = width;
+      validation.info.height = height;
+      validation.info.area = width * height;
+
+      // Check for reasonable size
+      if (width > 180 || height > 90) {
+        validation.warnings.push(`Very large overlay area: ${width.toFixed(4)}° x ${height.toFixed(4)}°`);
+      } else if (width < 0.001 || height < 0.001) {
+        validation.warnings.push(`Very small overlay area: ${width.toFixed(6)}° x ${height.toFixed(6)}°`);
+      }
+
+    } catch (error) {
+      validation.errors.push(`Bounds validation error: ${error.message}`);
+      validation.isValid = false;
+    }
+
+    return validation;
   }
 };

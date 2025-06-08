@@ -4,12 +4,19 @@
 
 # Import optimal elevation API with integrated quality findings
 import sys
+import os
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Form
 from pydantic import BaseModel
 from typing import Optional
-from ..main import manager, settings, CoordinateRequest
 from fastapi.responses import JSONResponse
+
+# Define request models locally to avoid circular imports
+class CoordinateRequest(BaseModel):
+    lat: float
+    lng: float
+    buffer_km: Optional[float] = 5.0
+    region_name: Optional[str] = None
 
 router = APIRouter()
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -24,11 +31,14 @@ except ImportError:
 # Initialize optimal elevation API if available
 if OPTIMAL_ELEVATION_AVAILABLE:
     try:
+        from ..main import settings  # Local import to avoid circular import
         optimal_elevation_api = OptimalElevationAPI(output_dir=str(Path(settings.output_dir) / "optimal_elevation"))
         print("🎯 Optimal Elevation API initialized with quality-tested configuration")
     except Exception as e:
         print(f"Warning: Could not initialize optimal elevation API: {e}")
-        OPTIMAL_ELEVATION_AVAILABLE = False
+        optimal_elevation_api = None
+else:
+    optimal_elevation_api = None
 
 class ElevationRequest(BaseModel):
     latitude: float
@@ -421,6 +431,7 @@ async def download_elevation_coordinates(request: CoordinateRequest):
         
         # Create progress callback that sends updates via WebSocket
         async def progress_callback(update):
+            from ..main import manager  # Local import to avoid circular import
             await manager.send_progress_update({
                 "source": "elevation_data",
                 "coordinates": {"lat": request.lat, "lng": request.lng},
@@ -434,6 +445,7 @@ async def download_elevation_coordinates(request: CoordinateRequest):
         
         # Clean up download registration
         try:
+            from ..main import manager  # Local import to avoid circular import
             manager.cancel_download(download_id)
         except:
             pass
@@ -532,6 +544,7 @@ async def download_elevation_coordinates(request: CoordinateRequest):
     except Exception as e:
         # Send error message via WebSocket if possible
         try:
+            from ..main import manager  # Local import to avoid circular import
             await manager.send_progress_update({
                 "source": "elevation_data", 
                 "coordinates": {"lat": request.lat, "lng": request.lng},
@@ -544,6 +557,7 @@ async def download_elevation_coordinates(request: CoordinateRequest):
         
         # Clean up download registration
         try:
+            from ..main import manager  # Local import to avoid circular import
             manager.cancel_download(download_id)
         except:
             pass

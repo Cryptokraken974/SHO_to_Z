@@ -1860,6 +1860,9 @@ window.UIManager = {
         throw new Error('Invalid overlay data received from server');
       }
 
+      // Log detailed coordinate information
+      Utils.log('info', `Retrieved overlay data for ${regionName} - Bounds: N:${overlayData.bounds.north}, S:${overlayData.bounds.south}, E:${overlayData.bounds.east}, W:${overlayData.bounds.west}`);
+
       // Convert bounds to Leaflet format [[south, west], [north, east]]
       const bounds = [
         [overlayData.bounds.south, overlayData.bounds.west],
@@ -1880,7 +1883,7 @@ window.UIManager = {
 
       if (success) {
         Utils.showNotification(`Added ${displayName} overlay to map`, 'success');
-        Utils.log('info', `Successfully added ${displayName} overlay for region ${regionName}`);
+        Utils.log('info', `Successfully added ${displayName} overlay for region ${regionName} with coordinates: North: ${overlayData.bounds.north}, South: ${overlayData.bounds.south}, East: ${overlayData.bounds.east}, West: ${overlayData.bounds.west}`);
         return true;
       } else {
         throw new Error('Failed to add overlay to map');

@@ -4,7 +4,6 @@ from typing import Optional
 import os
 import glob
 import re
-from ..main import manager, settings
 
 router = APIRouter()
 
@@ -427,6 +426,7 @@ async def delete_region(region_name: str):
 
 async def progress_callback_wrapper(progress_data: dict, region_name: Optional[str] = None):
     """Wraps the progress callback to include region_name if available."""
+    from ..main import manager
     if region_name:
         progress_data['region_name'] = region_name
     await manager.send_progress_update(progress_data)

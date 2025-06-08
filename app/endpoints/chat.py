@@ -1,7 +1,5 @@
 from fastapi import APIRouter
 
-from ..main import manager, settings  # noqa: F401  # imported for consistency
-
 router = APIRouter()
 
 @router.post("/api/chat")

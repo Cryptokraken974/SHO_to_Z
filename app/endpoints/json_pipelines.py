@@ -1,7 +1,5 @@
 from fastapi import APIRouter
 
-from ..main import manager, settings  # noqa: F401
-
 router = APIRouter()
 
 @router.get("/api/pipelines/json")
