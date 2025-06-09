@@ -202,27 +202,50 @@ def get_image_bounds_from_geotiff(tiff_path: str) -> Optional[Dict]:
                 se_lon, se_lat = se_result[0], se_result[1]
                 print(f"   SE: ({east}, {south}) -> ({se_lon}, {se_lat})")
                 
-                # Check if coordinates seem swapped
-                # For Oregon, we expect longitude around -122 and latitude around 42
-                # If we see latitude-like values in the "longitude" position, swap them
+                # Check if coordinates seem swapped by examining coordinate ranges
                 avg_lon = (sw_lon + ne_lon + nw_lon + se_lon) / 4
                 avg_lat = (sw_lat + ne_lat + nw_lat + se_lat) / 4
                 
                 print(f"🔍 Average transformed coordinates: lon={avg_lon}, lat={avg_lat}")
                 
-                # Check if the "longitude" values look like latitudes (positive values for US)
-                # and "latitude" values look like longitudes (negative values for US West Coast)
-                if (avg_lon > 0 and avg_lon < 90 and avg_lat < -90):
-                    print("🔄 Coordinates appear to be in lat/lon order, swapping to lon/lat...")
-                    # Swap the coordinates
+                # Check if the coordinate values are in the wrong positions
+                # For Amazon region (NP_T-0066), we expect:
+                # - Latitude around -8.37 (Amazon region, negative because south of equator)
+                # - Longitude around -71.57 (Amazon region, negative because west of Greenwich)
+                # If we're getting lat=-71.57 and lon=-8.37, they're clearly swapped
+                coords_swapped = False
+                
+                # Method 1: Check if longitude values are in typical latitude range while latitude values are extreme
+                if (abs(avg_lon) <= 90 and abs(avg_lat) > 90):
+                    print("🔄 Coordinates appear to be swapped (longitude in lat position), correcting...")
+                    coords_swapped = True
+                # Method 2: Check for logical geographic inconsistencies
+                # If avg_lon is in typical latitude range (-90 to 90) and avg_lat is in typical longitude range
+                # AND they seem to be in the wrong positions for the expected region
+                elif (abs(avg_lon) <= 90 and abs(avg_lat) <= 180):
+                    # For regions we expect to be in certain areas, check if coordinates make sense
+                    # Amazon region should have lat around -8 and lon around -71
+                    # If we see "lat" around -71 and "lon" around -8, they're swapped
+                    if abs(avg_lat) > abs(avg_lon) * 5:  # If lat magnitude is much larger than lon magnitude
+                        print(f"🔄 Geographic inconsistency detected: lat={avg_lat}, lon={avg_lon}")
+                        print("🔄 Latitude magnitude much larger than longitude - likely swapped")
+                        coords_swapped = True
+                # Method 3: Check for extreme longitude values
+                elif (abs(avg_lat) > 180 or abs(avg_lon) > 180):
+                    print("🔄 Extreme coordinate values detected, checking for swap...")
+                    if abs(avg_lon) <= 90 and abs(avg_lat) > 90:
+                        coords_swapped = True
+                
+                if coords_swapped:
+                    print("🔄 Swapping lat/lon coordinates...")
                     sw_lon, sw_lat = sw_lat, sw_lon
                     ne_lon, ne_lat = ne_lat, ne_lon
                     nw_lon, nw_lat = nw_lat, nw_lon
                     se_lon, se_lat = se_lat, se_lon
-                    print(f"   SW swapped: ({sw_lon}, {sw_lat})")
-                    print(f"   NE swapped: ({ne_lon}, {ne_lat})")
-                    print(f"   NW swapped: ({nw_lon}, {nw_lat})")
-                    print(f"   SE swapped: ({se_lon}, {se_lat})")
+                    print(f"   SW corrected: ({sw_lon}, {sw_lat})")
+                    print(f"   NE corrected: ({ne_lon}, {ne_lat})")
+                    print(f"   NW corrected: ({nw_lon}, {nw_lat})")
+                    print(f"   SE corrected: ({se_lon}, {se_lat})")
                 
                 # Get the actual bounds after transformation
                 final_west = min(sw_lon, nw_lon, se_lon, ne_lon)
@@ -674,7 +697,7 @@ def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, proce
                     # Check if coordinates look like UTM (large numbers)
                     if (abs(test_bounds['west']) > 180 or abs(test_bounds['east']) > 180 or 
                         abs(test_bounds['north']) > 90 or abs(test_bounds['south']) > 90):
-                        # Coordinates appear to be projected - try common UTM zones
+                        # Coordinates appear projected - try common UTM zones
                         # For US East Coast (like Maine): UTM Zone 19N
                         # For US West Coast (like Oregon): UTM Zone 10N
                         # Default to UTM Zone 19N for now
@@ -877,3 +900,40 @@ def get_image_overlay_data(base_filename: str, processing_type: str, filename_pr
     else:
         # Route to LAZ processing function
         return get_laz_overlay_data(base_filename, processing_type, filename_processing_type)
+
+def correct_coordinate_order(source_srs, epsg_code, sw_lon, sw_lat, ne_lon, ne_lat, nw_lon, nw_lat, se_lon, se_lat):
+    """
+    Correct coordinate order based on EPSG code and axis order conventions.
+    Some coordinate systems have different axis orders (lat/lon vs lon/lat).
+    """
+    try:
+        # Check if coordinates need to be swapped based on axis order
+        axis_order = source_srs.GetAxisName(None, 0) if source_srs else None
+        
+        # For some EPSG codes, the axis order is lat/lon instead of lon/lat
+        # This is common in many projected coordinate systems
+        swap_needed = False
+        
+        if epsg_code:
+            # EPSG codes that commonly use lat/lon order
+            lat_lon_first_epsg = {4326}  # WGS84 geographic can vary by implementation
+            
+            # Check axis order from the SRS
+            if source_srs and hasattr(source_srs, 'GetAxisName'):
+                try:
+                    first_axis = source_srs.GetAxisName(None, 0)
+                    if first_axis and 'lat' in first_axis.lower():
+                        swap_needed = True
+                except:
+                    pass
+        
+        if swap_needed:
+            print(f"📐 Swapping coordinate order for EPSG:{epsg_code}")
+            return sw_lat, sw_lon, ne_lat, ne_lon, nw_lat, nw_lon, se_lat, se_lon
+        else:
+            return sw_lon, sw_lat, ne_lon, ne_lat, nw_lon, nw_lat, se_lon, se_lat
+            
+    except Exception as e:
+        print(f"⚠️ Error in coordinate order correction: {e}")
+        # Return original coordinates if correction fails
+        return sw_lon, sw_lat, ne_lon, ne_lat, nw_lon, nw_lat, se_lon, se_lat

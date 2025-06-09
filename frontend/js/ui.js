@@ -991,7 +991,7 @@ window.UIManager = {
             <button class="add-to-map-btn w-full bg-[#28a745] hover:bg-[#218838] text-white px-3 py-2 text-sm font-medium rounded transition-colors" 
                     data-image-file="${fileName}" 
                     data-region-name="${regionName}" 
-                    data-band-type="${band}"
+                    data-band-type="${bandType}"
                     data-band="${band}">
               Add ${bandType} to Map
             </button>

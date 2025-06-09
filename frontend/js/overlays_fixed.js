@@ -41,7 +41,7 @@ window.OverlayManager = {
         Utils.log('warn', `⚠️ Bounds warnings for ${processingType}:`, boundsValidation.warnings);
       }
 
-      // If imagePath is base64 data, validate and potentially optimize the image data
+      // If imagePath is base64 data, do basic validation
       if (typeof imagePath === 'string' && imagePath.startsWith('data:image/')) {
         const base64Data = imagePath.split(',')[1];
         if (base64Data) {
@@ -57,72 +57,15 @@ window.OverlayManager = {
           if (imageValidation.warnings.length > 0) {
             Utils.log('warn', `⚠️ Image warnings for ${processingType}:`, imageValidation.warnings);
           }
-          
-          // Always check if optimization is needed for large images (regardless of warnings)
-          // First, try to get image dimensions from the validation process
-          let imageWidth = null;
-          let imageHeight = null;
-          
-          // Create a temporary image to get dimensions for optimization check
-          try {
-            const tempImage = await this.createImageFromBase64(base64Data);
-            imageWidth = tempImage.width;
-            imageHeight = tempImage.height;
-            Utils.log('info', `📐 Image dimensions for ${processingType}: ${imageWidth}x${imageHeight} (${((imageWidth * imageHeight) / 1000000).toFixed(1)}M pixels)`);
-          } catch (dimensionError) {
-            Utils.log('warn', `Could not determine image dimensions for ${processingType}:`, dimensionError);
-          }
-          
-          const optimizationCheck = this.checkImageOptimizationNeeds(base64Data, imageWidth, imageHeight);
-          if (optimizationCheck.needsOptimization) {
-            Utils.log('info', `🔧 Large image detected, applying optimization for ${processingType}`);
-            Utils.log('info', `Optimization reasons: ${optimizationCheck.reasons.join(', ')}`);
-            
-            try {
-              const optimizationResult = await this.optimizeLargeImage(base64Data, processingType);
-              
-              if (optimizationResult.success) {
-                Utils.log('info', `✅ Image optimization successful for ${processingType}`);
-                imagePath = optimizationResult.optimizedData;
-                
-                // Show optimization summary
-                const sizeBefore = (base64Data.length / 1024 / 1024).toFixed(2);
-                const sizeAfter = (optimizationResult.optimizedData.split(',')[1].length / 1024 / 1024).toFixed(2);
-                this.showOverlayNotification(
-                  `${processingType} optimized: ${sizeBefore}MB → ${sizeAfter}MB`, 
-                  'success'
-                );
-              } else {
-                Utils.log('warn', `⚠️ Image optimization failed for ${processingType}, using original`);
-                this.showOverlayNotification(
-                  `Warning: Could not optimize large ${processingType} image, performance may be affected`, 
-                  'warning'
-                );
-              }
-            } catch (optimizationError) {
-              Utils.log('error', `❌ Image optimization error for ${processingType}:`, optimizationError);
-              this.showOverlayNotification(
-                `Warning: Image optimization failed for ${processingType}`, 
-                'warning'
-              );
-            }
-          }
         }
       }
 
-      // Create new overlay with memory-safe approach
-      const overlay = await this.createMemorySafeOverlay(imagePath, bounds, {
+      // Create new overlay directly with simple approach
+      const overlay = L.imageOverlay(imagePath, bounds, {
         opacity: options.opacity || 0.8,
         interactive: false,
         ...options
-      }, processingType);
-
-      if (!overlay) {
-        throw new Error('Failed to create overlay');
-      }
-
-      // Add overlay to map
-      overlay.addTo(map);
+      }).addTo(map);
 
       // Store overlay reference
       this.mapOverlays[processingType] = overlay;
@@ -134,15 +77,6 @@ window.OverlayManager = {
       } catch (boundsError) {
         Utils.log('warn', `Could not fit map to bounds for ${processingType}:`, boundsError);
       }
-
-      // Add overlay loaded event listener for debugging
-      overlay.on('load', () => {
-        Utils.log('info', `Overlay image loaded successfully for ${processingType}`);
-      });
-
-      overlay.on('error', (e) => {
-        Utils.log('error', `Overlay image failed to load for ${processingType}:`, e);
-      });
 
       // Update button state
       this.updateAddToMapButtonState(processingType, true);
@@ -363,132 +297,6 @@ window.OverlayManager = {
       
     } catch (error) {
       Utils.log('warn', 'Could not update notification UI:', error);
-    }
-  },
-
-  /**
-   * Progressive loading for large overlay images
-   * @param {string} imagePath - Image path or base64 data
-   * @param {string} processingType - Processing type
-   * @returns {Promise<string>} Processed image path
-   */
-  async progressiveLoadOverlay(imagePath, processingType) {
-    if (!this.largeImageConfig.enableProgressiveLoading) {
-      return imagePath;
-    }
-
-    try {
-      Utils.log('info', `🔄 Starting progressive loading for ${processingType}`);
-      
-      // If it's a URL, we don't need progressive loading
-      if (!imagePath.startsWith('data:image/')) {
-        return imagePath;
-      }
-
-      const base64Data = imagePath.split(',')[1];
-      const dataSize = base64Data.length;
-      
-      // Only use progressive loading for very large images
-      if (dataSize < this.largeImageConfig.loadingChunkSize * 10) {
-        return imagePath;
-      }
-
-      this.showOverlayNotification(`Loading large ${processingType} image...`, 'info', 0);
-
-      // Simulate progressive loading with chunks
-      const chunks = Math.ceil(dataSize / this.largeImageConfig.loadingChunkSize);
-      let loadedChunks = 0;
-
-      const loadChunk = () => {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            loadedChunks++;
-            const progress = Math.floor((loadedChunks / chunks) * 100);
-            this.showOverlayNotification(
-              `Loading ${processingType} image... ${progress}%`, 
-              'info', 
-              progress
-            );
-            resolve();
-          }, 50); // Small delay to show progress
-        });
-      };
-
-      // Load chunks progressively
-      for (let i = 0; i < chunks; i++) {
-        await loadChunk();
-      }
-
-      this.showOverlayNotification(`${processingType} image loaded successfully`, 'success', 100);
-      
-      Utils.log('info', `✅ Progressive loading completed for ${processingType}`);
-      return imagePath;
-
-    } catch (error) {
-      Utils.log('error', `❌ Progressive loading failed for ${processingType}:`, error);
-      return imagePath; // Return original on error
-    }
-  },
-
-  /**
-   * Memory-safe overlay creation with error handling
-   * @param {string} imagePath - Image path or data
-   * @param {Array} bounds - Image bounds
-   * @param {Object} options - Overlay options
-   * @param {string} processingType - Processing type for logging
-   * @returns {Promise<L.ImageOverlay>} Leaflet overlay or null
-   */
-  async createMemorySafeOverlay(imagePath, bounds, options, processingType) {
-    const maxRetries = this.largeImageConfig.maxRetries;
-    let attempt = 0;
-
-    while (attempt < maxRetries) {
-      try {
-        Utils.log('info', `Creating overlay attempt ${attempt + 1}/${maxRetries} for ${processingType}`);
-
-        // Apply progressive loading if needed
-        const processedImagePath = await this.progressiveLoadOverlay(imagePath, processingType);
-
-        // Create overlay with memory monitoring
-        const overlay = L.imageOverlay(processedImagePath, bounds, {
-          opacity: options.opacity || 0.8,
-          interactive: false,
-          ...options
-        });
-
-        // Add memory monitoring
-        const memoryBefore = this.getMemoryUsage();
-        
-        return new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error(`Overlay creation timeout for ${processingType}`));
-          }, 30000); // 30 second timeout
-
-          overlay.on('load', () => {
-            clearTimeout(timeout);
-            const memoryAfter = this.getMemoryUsage();
-            Utils.log('info', `✅ Overlay loaded for ${processingType}. Memory change: ${(memoryAfter - memoryBefore).toFixed(2)}MB`);
-            resolve(overlay);
-          });
-
-          overlay.on('error', (e) => {
-            clearTimeout(timeout);
-            Utils.log('error', `❌ Overlay load error for ${processingType}:`, e);
-            reject(new Error(`Failed to load overlay: ${e.message || 'Unknown error'}`));
-          });
-        });
-
-      } catch (error) {
-        attempt++;
-        Utils.log('warn', `Overlay creation attempt ${attempt} failed for ${processingType}:`, error);
-
-        if (attempt >= maxRetries) {
-          throw new Error(`Failed to create overlay after ${maxRetries} attempts: ${error.message}`);
-        }
-
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-      }
     }
   },
 
