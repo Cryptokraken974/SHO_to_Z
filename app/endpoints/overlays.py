@@ -186,154 +186,37 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
     print(f"\n🗺️  API CALL: /api/overlay/raster/{region_name}/{processing_type}")
     
     try:
-        from ..geo_utils import get_image_bounds_from_geotiff, get_image_bounds_from_world_file
-        import base64
-        import glob
-        import os
+        from ..geo_utils import get_laz_overlay_data
         
         print(f"📂 Region name: {region_name}")
         print(f"🔄 Processing type: {processing_type}")
         
-        # Construct path to PNG outputs directory
-        png_outputs_dir = f"output/{region_name}/lidar/png_outputs"
+        # Use the updated geo_utils function that prioritizes metadata.txt
+        overlay_data = get_laz_overlay_data(region_name, processing_type.title())
         
-        if not os.path.exists(png_outputs_dir):
-            print(f"❌ PNG outputs directory not found: {png_outputs_dir}")
+        if not overlay_data:
+            print(f"❌ No overlay data found for {region_name}/{processing_type}")
             return JSONResponse(
                 status_code=404,
-                content={"success": False, "error": f"PNG outputs directory not found for region {region_name}"}
+                content={"success": False, "error": f"No overlay data found for {processing_type} in region {region_name}"}
             )
-        
-        # Map processing type to the actual filename pattern
-        # Files are named like: FoxIsland_elevation_hillshade.png
-        type_mapping = {
-            'hillshade': 'hillshade', 
-            'slope': 'slope',
-            'aspect': 'aspect',
-            'color_relief': 'color_relief',
-            'tpi': 'tpi',  # Fixed: lowercase tpi
-            'roughness': 'roughness'  # Fixed: use roughness instead of TPI
-        }
-        
-        filename_pattern = type_mapping.get(processing_type, processing_type)
-        
-        # Find PNG files matching the pattern: *_elevation_{pattern}.png
-        png_pattern = f"{png_outputs_dir}/*_elevation_{filename_pattern}.png"
-        png_files = glob.glob(png_pattern)
-        
-        print(f"🔍 PNG pattern: {png_pattern}")
-        print(f"📁 Found PNG files: {png_files}")
-        
-        if not png_files:
-            print(f"❌ No PNG files found matching pattern: {png_pattern}")
-            # Debug: List what files actually exist
-            if os.path.exists(png_outputs_dir):
-                files = os.listdir(png_outputs_dir)
-                png_files_available = [f for f in files if f.endswith('.png')]
-                print(f"🔍 Available PNG files: {png_files_available}")
-            
-            return JSONResponse(
-                status_code=404,
-                content={"success": False, "error": f"No PNG files found for {processing_type} in region {region_name}"}
-            )
-        
-        # Use the most recent file if multiple exist
-        png_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-        png_path = png_files[0]
-        
-        # Derive world file and tiff paths
-        base_path = png_path.replace('.png', '')
-        world_path = f"{base_path}.wld"
-        tiff_path = f"{base_path}.tif"
-        
-        print(f"🖼️  PNG path: {png_path}")
-        print(f"🗺️  TIFF path: {tiff_path}")
-        print(f"🌍 World file path: {world_path}")
-        
-        # Check if files exist
-        print(f"📁 PNG exists: {os.path.exists(png_path)}")
-        print(f"🗺️  TIFF exists: {os.path.exists(tiff_path)}")
-        print(f"🌍 World file exists: {os.path.exists(world_path)}")
-        
-        if not os.path.exists(png_path):
-            return JSONResponse(
-                status_code=404,
-                content={"success": False, "error": f"PNG file not found: {png_path}"}
-            )
-        
-        # Check for optimized overlay version first
-        from ..geo_utils import _get_optimized_overlay_path
-        overlay_png_path = _get_optimized_overlay_path(png_path)
-        is_optimized = False
-        
-        if overlay_png_path and os.path.exists(overlay_png_path):
-            print(f"🎯 Using optimized overlay: {overlay_png_path}")
-            # Update paths to use optimized versions
-            png_path = overlay_png_path
-            base_path = png_path.replace('.png', '')
-            world_path = f"{base_path}.pgw"  # PNG world files use .pgw
-            tiff_path = png_path.replace('_overlays.png', '.tif')  # Original TIFF for bounds
-            is_optimized = True
-        else:
-            print(f"📂 Using original file: {png_path}")
-        
-        # Try to get bounds from GeoTIFF first, then world file
-        bounds = None
-        
-        if os.path.exists(tiff_path):
-            print("🗺️  Trying to extract bounds from GeoTIFF...")
-            bounds = get_image_bounds_from_geotiff(tiff_path)
-            if bounds:
-                print(f"✅ Bounds from GeoTIFF: {bounds}")
-            else:
-                print("❌ Failed to extract bounds from GeoTIFF")
-        
-        if not bounds and os.path.exists(world_path):
-            print("🌍 Trying to extract bounds from world file...")
-            # Get image dimensions from PNG
-            from PIL import Image
-            with Image.open(png_path) as img:
-                width, height = img.size
-            print(f"📏 Image dimensions: {width}x{height}")
-            
-            bounds = get_image_bounds_from_world_file(world_path, width, height, None)
-            if bounds:
-                print(f"✅ Bounds from world file: {bounds}")
-            else:
-                print("❌ Failed to extract bounds from world file")
-        
-        if not bounds:
-            print("❌ No coordinate information found")
-            return JSONResponse(
-                status_code=500,
-                content={"success": False, "error": "Could not extract coordinate information from files"}
-            )
-        
-        # Read and encode PNG image
-        print("🖼️  Reading and encoding PNG image...")
-        with open(png_path, 'rb') as f:
-            image_data = base64.b64encode(f.read()).decode('utf-8')
         
         print(f"✅ Successfully prepared raster overlay data")
-        overlay_data = {
+        result = {
             'success': True,
-            'bounds': bounds,
-            'image_data': image_data,
+            'bounds': overlay_data['bounds'],
+            'image_data': overlay_data['image_data'],
             'processing_type': processing_type,
             'region_name': region_name,
-            'filename': os.path.basename(png_path),
-            'is_optimized': is_optimized
+            'filename': overlay_data.get('filename', region_name),
+            'is_optimized': overlay_data.get('is_optimized', False)
         }
         
-        # Add optimization metadata if using optimized version
-        if is_optimized:
-            overlay_data['optimization_info'] = {
-                'source': 'automatic_overlay_generation',
-                'optimized_for_browser': True,
-                'original_file': png_path.replace('_overlays.png', '.png')
-            }
+        # Add optimization metadata if available
+        if overlay_data.get('optimization_info'):
+            result['optimization_info'] = overlay_data['optimization_info']
         
-        return overlay_data
+        return result
         
     except Exception as e:
         print(f"❌ Error getting raster overlay data: {str(e)}")

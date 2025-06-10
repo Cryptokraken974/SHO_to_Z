@@ -1759,7 +1759,7 @@ async def generate_laz_metadata(
                         start_date=satellite_request["start_date"],
                         end_date=satellite_request["end_date"],
                         bands=satellite_request["bands"],
-                        buffer_km=satellite_request["buffer_km"],
+                        cloud_cover_max=satellite_request["cloud_cover_max"],
                         region_name=region_name  # Pass region name for proper file organization
                     )
                     

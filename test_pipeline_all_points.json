@@ -1,0 +1,12 @@
+{
+  "pipeline": [
+    "input/LAZ/CUI_A01_10-01.laz",
+    {
+      "type": "writers.gdal",
+      "filename": "test_dtm/test_dtm_all_points.tif",
+      "resolution": 2.0,
+      "output_type": "mean",
+      "nodata": -9999
+    }
+  ]
+}

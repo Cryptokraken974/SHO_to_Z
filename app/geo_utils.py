@@ -668,49 +668,101 @@ def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, proce
             print(f"❌ PNG file not found: {png_path}")
             return None
         
-        # Try to get bounds from GeoTIFF first, then world file
-        bounds = None
-        epsg_code = None
-        
-        if os.path.exists(tiff_path):
-            print("🗺️  Trying to extract bounds from GeoTIFF...")
-            bounds = get_image_bounds_from_geotiff(tiff_path)
-            if bounds:
-                epsg_code = bounds.get('epsg')
-                print(f"✅ Bounds from GeoTIFF: {bounds}")
-            else:
-                print("❌ Failed to extract bounds from GeoTIFF")
+        # PRIORITY: Try to get bounds from metadata.txt file first (most reliable)
+        metadata_center = _get_center_from_metadata(base_filename)
+        if metadata_center:
+            print(f"✅ Center coordinates from metadata.txt: {metadata_center}")
             
-        if not bounds and os.path.exists(world_path):
-            print("🌍 Trying to extract bounds from world file...")
-            # Get image dimensions from PNG
-            from PIL import Image
-            with Image.open(png_path) as img:
-                width, height = img.size
-            print(f"📏 Image dimensions: {width}x{height}")
+            # Try to get actual image bounds from world file using the correct center
+            bounds = None
+            if os.path.exists(world_path):
+                print("🗺️  Calculating actual image bounds from world file...")
+                # Get image dimensions from PNG
+                from PIL import Image
+                with Image.open(png_path) as img:
+                    width, height = img.size
+                print(f"📏 Image dimensions: {width}x{height}")
+                
+                # Calculate bounds using world file transformation but validate with metadata center
+                bounds = get_image_bounds_from_world_file_with_center_validation(world_path, width, height, metadata_center)
+                if bounds:
+                    print(f"✅ Bounds from world file with metadata validation: {bounds}")
+                else:
+                    print("❌ Failed to extract bounds from world file with validation")
             
-            # If we got EPSG from an associated TIFF, use it for world file transformation
-            if not epsg_code:
-                # Try to guess based on coordinates
-                test_bounds = get_image_bounds_from_world_file(world_path, width, height, None)
-                if test_bounds:
-                    # Check if coordinates look like UTM (large numbers)
-                    if (abs(test_bounds['west']) > 180 or abs(test_bounds['east']) > 180 or 
-                        abs(test_bounds['north']) > 90 or abs(test_bounds['south']) > 90):
-                        # Coordinates appear projected - try common UTM zones
-                        # For US East Coast (like Maine): UTM Zone 19N
-                        # For US West Coast (like Oregon): UTM Zone 10N
-                        # Default to UTM Zone 19N for now
-                        epsg_code = 32619
-                        print(f"🔍 Coordinates appear projected, assuming UTM Zone 19N (EPSG:{epsg_code})")
+            # Fallback: use metadata center with reasonable buffer if world file fails
+            if not bounds:
+                print("📄 Using metadata center with image-based buffer...")
+                # Calculate buffer based on image dimensions (assume 1 meter per pixel as default)
+                if os.path.exists(world_path):
+                    world_data = read_world_file(world_path)
+                    if world_data:
+                        # Use actual pixel size from world file
+                        pixel_size_x = abs(world_data['pixel_size_x'])
+                        pixel_size_y = abs(world_data['pixel_size_y'])
+                        
+                        # Get image dimensions
+                        from PIL import Image
+                        with Image.open(png_path) as img:
+                            width, height = img.size
+                        
+                        # Convert pixel dimensions to degrees (rough approximation)
+                        # 1 degree ≈ 111,000 meters at equator
+                        width_degrees = (width * pixel_size_x) / 111000.0
+                        height_degrees = (height * pixel_size_y) / 111000.0
+                        
+                        bounds = {
+                            'north': metadata_center['lat'] + height_degrees / 2,
+                            'south': metadata_center['lat'] - height_degrees / 2,
+                            'east': metadata_center['lng'] + width_degrees / 2,
+                            'west': metadata_center['lng'] - width_degrees / 2,
+                            'center_lat': metadata_center['lat'],
+                            'center_lng': metadata_center['lng'],
+                            'source': 'metadata.txt + world_file_dimensions'
+                        }
+                        print(f"✅ Calculated bounds from metadata center + world file dimensions: {bounds}")
                     else:
-                        print(f"🔍 Coordinates appear to be in geographic (lat/lon) format")
+                        # Fallback with small fixed buffer
+                        buffer = 0.01  # ~1km buffer at equator
+                        bounds = {
+                            'north': metadata_center['lat'] + buffer,
+                            'south': metadata_center['lat'] - buffer,
+                            'east': metadata_center['lng'] + buffer,
+                            'west': metadata_center['lng'] - buffer,
+                            'center_lat': metadata_center['lat'],
+                            'center_lng': metadata_center['lng'],
+                            'source': 'metadata.txt + fixed_buffer'
+                        }
+                        print(f"✅ Using metadata center with fixed buffer: {bounds}")
+                        
+        else:
+            print("📄 No metadata.txt found, trying other methods...")
             
-            bounds = get_image_bounds_from_world_file(world_path, width, height, epsg_code)
-            if bounds:
-                print(f"✅ Bounds from world file: {bounds}")
-            else:
-                print("❌ Failed to extract bounds from world file")
+            # Fallback: Try to get bounds from GeoTIFF, then world file
+            epsg_code = None
+            
+            if os.path.exists(tiff_path):
+                print("🗺️  Trying to extract bounds from GeoTIFF...")
+                bounds = get_image_bounds_from_geotiff(tiff_path)
+                if bounds:
+                    epsg_code = bounds.get('epsg')
+                    print(f"✅ Bounds from GeoTIFF: {bounds}")
+                else:
+                    print("❌ Failed to extract bounds from GeoTIFF")
+                
+            if not bounds and os.path.exists(world_path):
+                print("🌍 Trying to extract bounds from world file...")
+                # Get image dimensions from PNG
+                from PIL import Image
+                with Image.open(png_path) as img:
+                    width, height = img.size
+                print(f"📏 Image dimensions: {width}x{height}")
+                
+                bounds = get_image_bounds_from_world_file(world_path, width, height, epsg_code)
+                if bounds:
+                    print(f"✅ Bounds from world file: {bounds}")
+                else:
+                    print("❌ Failed to extract bounds from world file")
             
         if not bounds:
             print("❌ No coordinate information found")
@@ -750,6 +802,65 @@ def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, proce
         print(f"❌ Error processing overlay files: {e}")
         import traceback
         traceback.print_exc()
+        return None
+
+def _get_bounds_from_metadata(base_filename: str) -> Optional[Dict]:
+    """
+    Extract bounds from metadata.txt file. This is the most reliable source of coordinates.
+    
+    Args:
+        base_filename: The base name of the region (e.g., 'ANDL2940C9715_2014')
+    
+    Returns:
+        Dictionary with bounds information or None if not found
+    """
+    try:
+        # Look for metadata.txt file in the output directory
+        metadata_path = f"output/{base_filename}/metadata.txt"
+        
+        if not os.path.exists(metadata_path):
+            print(f"📄 Metadata file not found: {metadata_path}")
+            return None
+        
+        print(f"📄 Reading metadata from: {metadata_path}")
+        
+        center_lat = None
+        center_lng = None
+        
+        with open(metadata_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('Center Latitude:'):
+                    center_lat = float(line.split(':')[1].strip())
+                elif line.startswith('Center Longitude:'):
+                    center_lng = float(line.split(':')[1].strip())
+        
+        if center_lat is not None and center_lng is not None:
+            # Create bounds with a small buffer around the center point
+            # This is reasonable since we're dealing with processed LAZ regions
+            buffer = 0.01  # ~1km buffer at equator
+            
+            bounds = {
+                'north': center_lat + buffer,
+                'south': center_lat - buffer,
+                'east': center_lng + buffer,
+                'west': center_lng - buffer,
+                'center_lat': center_lat,
+                'center_lng': center_lng,
+                'source': 'metadata.txt'
+            }
+            
+            print(f"✅ Extracted coordinates from metadata.txt:")
+            print(f"   Center: ({center_lat:.6f}, {center_lng:.6f})")
+            print(f"   Bounds: N={bounds['north']:.6f}, S={bounds['south']:.6f}, E={bounds['east']:.6f}, W={bounds['west']:.6f}")
+            
+            return bounds
+        else:
+            print(f"❌ Could not find both latitude and longitude in metadata.txt")
+            return None
+            
+    except Exception as e:
+        print(f"❌ Error reading metadata.txt for {base_filename}: {e}")
         return None
 
 # Keep original function for backwards compatibility, but route to appropriate new function
@@ -937,3 +1048,144 @@ def correct_coordinate_order(source_srs, epsg_code, sw_lon, sw_lat, ne_lon, ne_l
         print(f"⚠️ Error in coordinate order correction: {e}")
         # Return original coordinates if correction fails
         return sw_lon, sw_lat, ne_lon, ne_lat, nw_lon, nw_lat, se_lon, se_lat
+
+def _get_center_from_metadata(base_filename: str) -> Optional[Dict]:
+    """
+    Extract center coordinates from metadata.txt file.
+    
+    Args:
+        base_filename: The base name of the region (e.g., 'ANDL2940C9715_2014')
+    
+    Returns:
+        Dictionary with center coordinates or None if not found
+    """
+    try:
+        # Look for metadata.txt file in the output directory
+        metadata_path = f"output/{base_filename}/metadata.txt"
+        
+        if not os.path.exists(metadata_path):
+            print(f"📄 Metadata file not found: {metadata_path}")
+            return None
+        
+        print(f"📄 Reading center from metadata: {metadata_path}")
+        
+        center_lat = None
+        center_lng = None
+        
+        with open(metadata_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('Center Latitude:'):
+                    center_lat = float(line.split(':')[1].strip())
+                elif line.startswith('Center Longitude:'):
+                    center_lng = float(line.split(':')[1].strip())
+        
+        if center_lat is not None and center_lng is not None:
+            return {'lat': center_lat, 'lng': center_lng}
+        else:
+            print(f"❌ Could not find both latitude and longitude in metadata.txt")
+            return None
+            
+    except Exception as e:
+        print(f"❌ Error reading metadata.txt for {base_filename}: {e}")
+        return None
+
+def get_image_bounds_from_world_file_with_center_validation(world_file_path: str, image_width: int, image_height: int, expected_center: Dict) -> Optional[Dict]:
+    """
+    Calculate geographic bounds using world file but validate the center matches expected coordinates.
+    If the transformed coordinates are way off, we'll use the expected center with calculated dimensions.
+    """
+    try:
+        world_data = read_world_file(world_file_path)
+        if not world_data:
+            return None
+            
+        # Calculate bounds using world file
+        upper_left_x = world_data['upper_left_x']
+        upper_left_y = world_data['upper_left_y']
+        pixel_size_x = world_data['pixel_size_x']
+        pixel_size_y = world_data['pixel_size_y']  # Usually negative
+        
+        # Calculate corner coordinates in source projection
+        west = upper_left_x
+        east = upper_left_x + (image_width * pixel_size_x)
+        north = upper_left_y
+        south = upper_left_y + (image_height * pixel_size_y)  # pixel_size_y is negative
+        
+        print(f"🗺️  World file bounds in source projection:")
+        print(f"   West: {west}, East: {east}")
+        print(f"   North: {north}, South: {south}")
+        
+        # Check if these coordinates look like they need transformation
+        if (abs(west) > 180 or abs(east) > 180 or abs(north) > 90 or abs(south) > 90):
+            print(f"🌍 Coordinates appear to be in projected system, but using metadata center instead")
+            # Don't try to transform - use the expected center with calculated dimensions
+            
+            # Calculate image dimensions in degrees based on pixel sizes
+            # Approximate conversion: assume pixel sizes are in meters, convert to degrees
+            pixel_size_x_abs = abs(pixel_size_x)
+            pixel_size_y_abs = abs(pixel_size_y)
+            
+            # Convert to degrees (rough approximation: 1 degree ≈ 111,000 meters)
+            width_degrees = (image_width * pixel_size_x_abs) / 111000.0
+            height_degrees = (image_height * pixel_size_y_abs) / 111000.0
+            
+            # Use expected center with calculated dimensions
+            bounds = {
+                'north': expected_center['lat'] + height_degrees / 2,
+                'south': expected_center['lat'] - height_degrees / 2,
+                'east': expected_center['lng'] + width_degrees / 2,
+                'west': expected_center['lng'] - width_degrees / 2,
+                'center_lat': expected_center['lat'],
+                'center_lng': expected_center['lng'],
+                'source': 'metadata_center + world_file_dimensions'
+            }
+            
+            print(f"🎯 Using expected center with world file dimensions:")
+            print(f"   Image size: {width_degrees:.6f}° x {height_degrees:.6f}°")
+            print(f"   Bounds: N={bounds['north']:.6f}, S={bounds['south']:.6f}, E={bounds['east']:.6f}, W={bounds['west']:.6f}")
+            
+            return bounds
+        else:
+            # Coordinates look like they're already in WGS84, use them directly
+            center_calculated = {
+                'lat': (north + south) / 2,
+                'lng': (east + west) / 2
+            }
+            
+            # Validate the calculated center is reasonably close to expected center
+            lat_diff = abs(center_calculated['lat'] - expected_center['lat'])
+            lng_diff = abs(center_calculated['lng'] - expected_center['lng'])
+            
+            if lat_diff < 0.1 and lng_diff < 0.1:  # Within ~10km
+                print(f"✅ World file center matches expected center")
+                return {
+                    'north': north,
+                    'south': south,
+                    'east': east,
+                    'west': west,
+                    'center_lat': center_calculated['lat'],
+                    'center_lng': center_calculated['lng'],
+                    'source': 'world_file_validated'
+                }
+            else:
+                print(f"⚠️ World file center ({center_calculated['lat']:.6f}, {center_calculated['lng']:.6f}) differs from expected ({expected_center['lat']:.6f}, {expected_center['lng']:.6f})")
+                print(f"   Using expected center with world file dimensions")
+                
+                # Use expected center but with world file dimensions
+                width_degrees = abs(east - west)
+                height_degrees = abs(north - south)
+                
+                return {
+                    'north': expected_center['lat'] + height_degrees / 2,
+                    'south': expected_center['lat'] - height_degrees / 2,
+                    'east': expected_center['lng'] + width_degrees / 2,
+                    'west': expected_center['lng'] - width_degrees / 2,
+                    'center_lat': expected_center['lat'],
+                    'center_lng': expected_center['lng'],
+                    'source': 'metadata_center + world_file_dimensions'
+                }
+            
+    except Exception as e:
+        print(f"❌ Error in world file validation: {e}")
+        return None

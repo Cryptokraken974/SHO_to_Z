@@ -12,16 +12,23 @@ async def download_sentinel2(request: Sentinel2Request):
     from ..main import manager, settings
     
     try:
+        # Get coordinates using the helper methods
+        try:
+            lat = request.get_latitude()
+            lng = request.get_longitude()
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        
         # Validate coordinates
-        if not (-90 <= request.lat <= 90):
-            raise HTTPException(status_code=400, detail=f"Invalid latitude: {request.lat}. Must be between -90 and 90.")
-        if not (-180 <= request.lng <= 180):
-            raise HTTPException(status_code=400, detail=f"Invalid longitude: {request.lng}. Must be between -180 and 180.")
+        if not (-90 <= lat <= 90):
+            raise HTTPException(status_code=400, detail=f"Invalid latitude: {lat}. Must be between -90 and 90.")
+        if not (-180 <= lng <= 180):
+            raise HTTPException(status_code=400, detail=f"Invalid longitude: {lng}. Must be between -180 and 180.")
         
         # Check if coordinates are over land (basic validation)
         # Reject obvious ocean areas where no meaningful data exists
-        if abs(request.lat) > 80:  # Arctic/Antarctic regions with limited coverage
-            raise HTTPException(status_code=400, detail=f"Coordinates {request.lat}, {request.lng} are in polar regions with limited Sentinel-2 coverage.")
+        if abs(lat) > 80:  # Arctic/Antarctic regions with limited coverage
+            raise HTTPException(status_code=400, detail=f"Coordinates {lat}, {lng} are in polar regions with limited Sentinel-2 coverage.")
         
         import uuid
         from ..data_acquisition.sources.copernicus_sentinel2 import CopernicusSentinel2Source
@@ -35,7 +42,7 @@ async def download_sentinel2(request: Sentinel2Request):
         async def progress_callback(update):
             await manager.send_progress_update({
                 "source": "copernicus_sentinel2",
-                "coordinates": {"lat": request.lat, "lng": request.lng},
+                "coordinates": {"lat": lat, "lng": lng},
                 "download_id": download_id,
                 **update
             })
@@ -54,17 +61,17 @@ async def download_sentinel2(request: Sentinel2Request):
         # Calculate bounding box from center point and buffer
         lat_delta = request.buffer_km / 111.0  # Rough conversion: 1 degree ≈ 111 km
         # For longitude, adjust for latitude (longitude lines get closer at higher latitudes)
-        lng_delta = request.buffer_km / (111.0 * abs(math.cos(math.radians(request.lat))))
+        lng_delta = request.buffer_km / (111.0 * abs(math.cos(math.radians(lat))))
         
         bbox = BoundingBox(
-            west=request.lng - lng_delta,
-            south=request.lat - lat_delta,
-            east=request.lng + lng_delta,
-            north=request.lat + lat_delta
+            west=lng - lng_delta,
+            south=lat - lat_delta,
+            east=lng + lng_delta,
+            north=lat + lat_delta
         )
         
         print(f"🗺️ Sentinel-2 Request:")
-        print(f"📍 Center: {request.lat}, {request.lng}")
+        print(f"📍 Center: {lat}, {lng}")
         print(f"📏 Buffer: {request.buffer_km}km")
         print(f"🔲 BBox: West={bbox.west:.4f}, South={bbox.south:.4f}, East={bbox.east:.4f}, North={bbox.north:.4f}")
         print(f"📐 Size: {(bbox.east-bbox.west)*111:.2f}km x {(bbox.north-bbox.south)*111:.2f}km")

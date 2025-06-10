@@ -101,11 +101,38 @@ class DataAcquisitionRequest(BaseModel):
     region_name: Optional[str] = None
 
 class Sentinel2Request(BaseModel):
-    lat: float
-    lng: float
+    # Support both coordinate field name formats for compatibility
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    
     buffer_km: float = 2.0  # 2km radius = 4km x 4km box (smaller for better processing)
     bands: Optional[List[str]] = ["B04", "B08"]  # Sentinel-2 red and NIR bands
     region_name: Optional[str] = None
+    
+    # Additional fields for date range and cloud cover
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    cloud_cover_max: Optional[float] = 30.0
+    
+    def get_latitude(self) -> float:
+        """Get latitude from either lat or latitude field"""
+        if self.lat is not None:
+            return self.lat
+        elif self.latitude is not None:
+            return self.latitude
+        else:
+            raise ValueError("Either 'lat' or 'latitude' field must be provided")
+    
+    def get_longitude(self) -> float:
+        """Get longitude from either lng or longitude field"""
+        if self.lng is not None:
+            return self.lng
+        elif self.longitude is not None:
+            return self.longitude
+        else:
+            raise ValueError("Either 'lng' or 'longitude' field must be provided")
 
 class RasterGenerationRequest(BaseModel):
     region_name: str

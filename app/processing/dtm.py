@@ -161,6 +161,38 @@ def create_dtm_fallback_pipeline(input_file: str, output_file: str, resolution: 
     }
 
 
+def create_dtm_adaptive_pipeline(input_file: str, output_file: str, resolution: float = 1.0) -> Dict[str, Any]:
+    """
+    Create adaptive DTM pipeline that works with files that may not have ground classification
+    Uses all points if no ground points are available
+    """
+    return {
+        "pipeline": [
+            {
+                "type": "readers.las",
+                "filename": input_file
+            },
+            {
+                "type": "filters.outlier",
+                "method": "statistical",
+                "multiplier": 3,
+                "mean_k": 8
+            },
+            {
+                "type": "filters.range",
+                "limits": "Z[-1000:10000]"  # Basic elevation filter instead of classification
+            },
+            {
+                "type": "writers.gdal",
+                "filename": output_file,
+                "resolution": resolution,
+                "output_type": "min",  # Use minimum for better terrain representation
+                "nodata": -9999
+            }
+        ]
+    }
+
+
 def dtm(input_file: str, region_name: str = None) -> str:
     """
     Convert LAZ file to DTM (Digital Terrain Model) - Ground points only
@@ -344,7 +376,7 @@ def convert_las_to_dtm(input_file: str, output_file: str, resolution: float = 1.
     # Fall back to hardcoded pipeline if JSON failed or doesn't exist
     if not success:
         try:
-            print(f"🔄 Using hardcoded DTM pipeline...")
+            print(f"🔄 Using hardcoded DTM pipeline (ground points only)...")
             pipeline_config = create_dtm_fallback_pipeline(input_file, output_file, resolution)
             
             # Create temporary pipeline file for subprocess execution with timeout
@@ -376,11 +408,16 @@ def convert_las_to_dtm(input_file: str, output_file: str, resolution: float = 1.
                     else:
                         raise Exception("Output file was not created")
                 else:
-                    raise Exception(f"PDAL failed with return code {result.returncode}: {result.stderr}")
+                    # Check if error is due to no points after filtering
+                    if "no points for output" in result.stderr.lower() or "unable to write gdal data with no points" in result.stderr.lower():
+                        print(f"⚠️ No ground points found, trying adaptive pipeline...")
+                        raise Exception("No ground points available")
+                    else:
+                        raise Exception(f"PDAL failed with return code {result.returncode}: {result.stderr}")
                     
             except subprocess.TimeoutExpired:
-                print(f"⏰ Fallback PDAL pipeline also timed out after 300 seconds")
-                raise Exception("Both JSON and fallback PDAL pipelines timed out")
+                print(f"⏰ Fallback PDAL pipeline timed out after 300 seconds")
+                raise Exception("Fallback PDAL pipeline execution timed out")
             finally:
                 # Clean up temporary file
                 try:
@@ -389,9 +426,63 @@ def convert_las_to_dtm(input_file: str, output_file: str, resolution: float = 1.
                     pass
                 
         except Exception as e:
-            success = False
-            message = f"Both JSON and hardcoded pipelines failed: {str(e)}"
-            print(f"❌ {message}")
+            print(f"⚠️ Ground classification pipeline failed: {str(e)}")
+            
+            # Try adaptive pipeline as last resort
+            if "no ground points" in str(e).lower() or "no points for output" in str(e).lower():
+                try:
+                    print(f"🔄 Using adaptive DTM pipeline (all points)...")
+                    pipeline_config = create_dtm_adaptive_pipeline(input_file, output_file, resolution)
+                    
+                    # Create temporary pipeline file for subprocess execution with timeout
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
+                        json.dump(pipeline_config, temp_file, indent=2)
+                        temp_pipeline_path = temp_file.name
+                    
+                    try:
+                        # Execute PDAL pipeline with timeout using subprocess
+                        print(f"🔄 Executing adaptive PDAL pipeline with 300 second timeout...")
+                        start_time = time.time()
+                        
+                        result = subprocess.run(
+                            ['pdal', 'pipeline', temp_pipeline_path],
+                            capture_output=True,
+                            text=True,
+                            timeout=300  # 5 minute timeout
+                        )
+                        
+                        execution_time = time.time() - start_time
+                        print(f"⏱️ Adaptive PDAL execution completed in {execution_time:.2f} seconds")
+                        
+                        if result.returncode == 0:
+                            if os.path.exists(output_file):
+                                success = True
+                                message = f"DTM generated successfully using adaptive pipeline (all points): {output_file}"
+                                print(f"✅ {message}")
+                            else:
+                                raise Exception("Output file was not created")
+                        else:
+                            raise Exception(f"PDAL failed with return code {result.returncode}: {result.stderr}")
+                            
+                    except subprocess.TimeoutExpired:
+                        print(f"⏰ Adaptive PDAL pipeline also timed out after 300 seconds")
+                        raise Exception("All PDAL pipelines timed out")
+                    finally:
+                        # Clean up temporary file
+                        try:
+                            os.unlink(temp_pipeline_path)
+                        except:
+                            pass
+                            
+                except Exception as adaptive_e:
+                    success = False
+                    message = f"All DTM pipelines failed. Final error: {str(adaptive_e)}"
+                    print(f"❌ {message}")
+            else:
+                success = False
+                message = f"DTM pipeline failed: {str(e)}"
+                print(f"❌ {message}")
     
     # If processing succeeded, apply additional post-processing
     if success and os.path.exists(output_file):
