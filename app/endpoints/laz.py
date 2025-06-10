@@ -1716,7 +1716,80 @@ async def generate_laz_metadata(
             region_output_dir = BASE_DIR / "output" / region_name
             metadata_path = region_output_dir / "metadata.txt"
             
-            return {
+            # 🛰️ SENTINEL-2 ACQUISITION INTEGRATION
+            # After successful metadata creation, automatically acquire Sentinel-2 imagery
+            sentinel2_result = None
+            try:
+                logger.info(f"🛰️ Starting automatic Sentinel-2 acquisition for region: {region_name}")
+                
+                # Extract coordinates from LAZ bounds
+                bounds = response_data.get("bounds", {})
+                center = response_data.get("center", {})
+                
+                if center.get("lat") and center.get("lng"):
+                    # Import satellite service dependencies
+                    from ..api.satellite_service import SatelliteService
+                    from datetime import datetime, timedelta
+                    
+                    # Create satellite service instance
+                    satellite_service = SatelliteService()
+                    
+                    # Calculate date range (last 2 years for better scene availability)
+                    end_date = datetime.now()
+                    start_date = end_date - timedelta(days=730)  # 2 years back
+                    
+                    # Prepare Sentinel-2 request
+                    satellite_request = {
+                        "lat": center["lat"],
+                        "lng": center["lng"], 
+                        "buffer_km": 5.0,  # 5km buffer around center point
+                        "start_date": start_date.strftime("%Y-%m-%d"),
+                        "end_date": end_date.strftime("%Y-%m-%d"),
+                        "bands": ["B04", "B08"],  # Red and NIR bands
+                        "region_name": region_name,
+                        "cloud_cover_max": 30
+                    }
+                    
+                    logger.info(f"🛰️ Sentinel-2 request: center=({center['lat']:.6f}, {center['lng']:.6f}), buffer=5km")
+                    
+                    # Download Sentinel-2 data with all required parameters
+                    sentinel2_result = await satellite_service.download_sentinel2_data(
+                        latitude=satellite_request["lat"],
+                        longitude=satellite_request["lng"],
+                        start_date=satellite_request["start_date"],
+                        end_date=satellite_request["end_date"],
+                        bands=satellite_request["bands"],
+                        buffer_km=satellite_request["buffer_km"],
+                        region_name=region_name  # Pass region name for proper file organization
+                    )
+                    
+                    if sentinel2_result and sentinel2_result.get("success"):
+                        logger.info(f"✅ Sentinel-2 acquisition completed successfully")
+                        
+                        # Auto-convert to PNG if we have a region name
+                        try:
+                            conversion_result = await satellite_service.convert_sentinel2_images(region_name)
+                            if conversion_result and conversion_result.get("success"):
+                                logger.info(f"✅ Sentinel-2 PNG conversion completed")
+                            else:
+                                logger.warning(f"⚠️ Sentinel-2 PNG conversion failed: {conversion_result}")
+                        except Exception as conv_error:
+                            logger.warning(f"⚠️ Sentinel-2 PNG conversion error: {conv_error}")
+                            # Don't fail the entire process for conversion errors
+                        
+                    else:
+                        logger.warning(f"⚠️ Sentinel-2 acquisition failed: {sentinel2_result}")
+                        
+                else:
+                    logger.warning(f"⚠️ No valid coordinates found for Sentinel-2 acquisition")
+                    
+            except Exception as satellite_error:
+                logger.error(f"❌ Sentinel-2 acquisition error: {satellite_error}")
+                # Don't fail the metadata generation for satellite acquisition errors
+                sentinel2_result = {"success": False, "error": str(satellite_error)}
+            
+            # Return comprehensive response including satellite acquisition status
+            response = {
                 "message": "Metadata file generated successfully",
                 "region": region_name,
                 "file": file_name,
@@ -1725,8 +1798,15 @@ async def generate_laz_metadata(
                     "bounds_wgs84": response_data.get("bounds"),
                     "center_wgs84": response_data.get("center"),
                     "source_crs": response_data.get("_debug_info", {}).get("source_crs_wkt")
+                },
+                "sentinel2_acquisition": {
+                    "attempted": True,
+                    "success": sentinel2_result.get("success", False) if sentinel2_result else False,
+                    "result": sentinel2_result
                 }
             }
+            
+            return response
         else:
             raise HTTPException(status_code=500, detail="Failed to create metadata file")
             

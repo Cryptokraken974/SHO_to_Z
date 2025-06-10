@@ -1068,7 +1068,7 @@ class GeoTiffLeftPanel {
             if (successCount > 0) {
                 try {
                     console.log('📄 Generating metadata.txt file...');
-                    this.updateLazRasterProcessingStep('Generating Metadata', processingQueue.length, processingQueue.length + 1);
+                    this.updateLazRasterProcessingStep('Generating Metadata', processingQueue.length, processingQueue.length + 2);
                     
                     const selectedRegion = window.FileManager?.getSelectedRegion();
                     const processingRegion = window.FileManager?.getProcessingRegion();
@@ -1101,18 +1101,51 @@ class GeoTiffLeftPanel {
                             console.log('✅ Metadata generated successfully:', metadataResult);
                             
                             // Update UI to show metadata generation completed
-                            this.updateLazRasterProcessingStep('Metadata Generated', processingQueue.length + 1, processingQueue.length + 1);
+                            this.updateLazRasterProcessingStep('Metadata Generated', processingQueue.length + 1, processingQueue.length + 2);
                             this.markLazQueueItemComplete('metadata', 'success');
+                            
+                            // 🛰️ SENTINEL-2 ACQUISITION INTEGRATION
+                            // Check if Sentinel-2 acquisition was attempted and show status
+                            const sentinel2Status = metadataResult.sentinel2_acquisition;
+                            if (sentinel2Status && sentinel2Status.attempted) {
+                                console.log('🛰️ Processing Sentinel-2 acquisition results...');
+                                this.updateLazRasterProcessingStep('Processing Sentinel-2 Data', processingQueue.length + 2, processingQueue.length + 2);
+                                
+                                if (sentinel2Status.success) {
+                                    console.log('✅ Sentinel-2 acquisition completed successfully');
+                                    this.markLazQueueItemComplete('sentinel2', 'success');
+                                    
+                                    // Show success notification
+                                    if (window.Utils && window.Utils.showNotification) {
+                                        window.Utils.showNotification('🛰️ Sentinel-2 satellite imagery acquired successfully!', 'success');
+                                    }
+                                } else {
+                                    console.warn('⚠️ Sentinel-2 acquisition failed:', sentinel2Status.result);
+                                    this.markLazQueueItemComplete('sentinel2', 'error');
+                                    
+                                    // Show warning notification
+                                    if (window.Utils && window.Utils.showNotification) {
+                                        window.Utils.showNotification('⚠️ Sentinel-2 acquisition failed - continuing with LiDAR processing', 'warning');
+                                    }
+                                }
+                            } else {
+                                console.log('ℹ️ Sentinel-2 acquisition was not attempted');
+                                this.updateLazRasterProcessingStep('Sentinel-2 Skipped', processingQueue.length + 2, processingQueue.length + 2);
+                                this.markLazQueueItemComplete('sentinel2', 'skipped');
+                            }
+                            
                         } else {
                             console.warn('⚠️ Metadata generation failed:', metadataResponse.statusText);
-                            this.updateLazRasterProcessingStep('Metadata Generation Failed', processingQueue.length + 1, processingQueue.length + 1);
+                            this.updateLazRasterProcessingStep('Metadata Generation Failed', processingQueue.length + 1, processingQueue.length + 2);
                             this.markLazQueueItemComplete('metadata', 'error');
+                            this.markLazQueueItemComplete('sentinel2', 'skipped');
                         }
                     }
                 } catch (error) {
                     console.error('❌ Metadata generation error:', error);
-                    this.updateLazRasterProcessingStep('Metadata Generation Error', processingQueue.length + 1, processingQueue.length + 1);
+                    this.updateLazRasterProcessingStep('Metadata Generation Error', processingQueue.length + 1, processingQueue.length + 2);
                     this.markLazQueueItemComplete('metadata', 'error');
+                    this.markLazQueueItemComplete('sentinel2', 'skipped');
                 }
             }
 

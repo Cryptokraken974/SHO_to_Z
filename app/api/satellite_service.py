@@ -13,19 +13,20 @@ class SatelliteService(BaseService, SyncServiceMixin):
     
     async def download_sentinel2_data(self, latitude: float, longitude: float, start_date: str, 
                                      end_date: str, bands: Optional[List[str]] = None, 
-                                     cloud_cover_max: Optional[float] = None) -> Dict[str, Any]:
+                                     cloud_cover_max: Optional[float] = None,
+                                     buffer_km: Optional[float] = None,
+                                     region_name: Optional[str] = None) -> Dict[str, Any]:
         """Download Sentinel-2 data for specified coordinates and date range"""
         data = {
-            'latitude': latitude,
-            'longitude': longitude,
-            'start_date': start_date,
-            'end_date': end_date
+            'lat': latitude,  # API expects 'lat', not 'latitude'
+            'lng': longitude,  # API expects 'lng', not 'longitude' 
+            'buffer_km': buffer_km or 2.0  # Default buffer if not specified
         }
         
         if bands:
             data['bands'] = bands
-        if cloud_cover_max is not None:
-            data['cloud_cover_max'] = cloud_cover_max
+        if region_name is not None:
+            data['region_name'] = region_name
         
         return await self._post('/api/download-sentinel2', json_data=data)
     
