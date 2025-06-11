@@ -15,6 +15,12 @@ from .satellite_service import SatelliteService
 from .elevation_service import ElevationService
 from .region_analysis_service import RegionAnalysisService
 from .laz_service import LAZService
+from .cache_service import CacheService
+from .data_acquisition_service import DataAcquisitionService
+from .lidar_acquisition_service import LidarAcquisitionService
+from .pipeline_service import PipelineService
+from .chat_service import ChatService
+from .core_service import CoreService
 
 
 class ServiceFactory:
@@ -77,6 +83,42 @@ class ServiceFactory:
         if 'laz' not in self._services:
             self._services['laz'] = LAZService(self.base_url)
         return self._services['laz']
+    
+    def get_cache_service(self) -> CacheService:
+        """Get or create CacheService instance"""
+        if 'cache' not in self._services:
+            self._services['cache'] = CacheService(self.base_url)
+        return self._services['cache']
+    
+    def get_data_acquisition_service(self) -> DataAcquisitionService:
+        """Get or create DataAcquisitionService instance"""
+        if 'data_acquisition' not in self._services:
+            self._services['data_acquisition'] = DataAcquisitionService(self.base_url)
+        return self._services['data_acquisition']
+    
+    def get_lidar_acquisition_service(self) -> LidarAcquisitionService:
+        """Get or create LidarAcquisitionService instance"""
+        if 'lidar_acquisition' not in self._services:
+            self._services['lidar_acquisition'] = LidarAcquisitionService(self.base_url)
+        return self._services['lidar_acquisition']
+    
+    def get_pipeline_service(self) -> PipelineService:
+        """Get or create PipelineService instance"""
+        if 'pipeline' not in self._services:
+            self._services['pipeline'] = PipelineService(self.base_url)
+        return self._services['pipeline']
+    
+    def get_chat_service(self) -> ChatService:
+        """Get or create ChatService instance"""
+        if 'chat' not in self._services:
+            self._services['chat'] = ChatService(self.base_url)
+        return self._services['chat']
+    
+    def get_core_service(self) -> CoreService:
+        """Get or create CoreService instance"""
+        if 'core' not in self._services:
+            self._services['core'] = CoreService(self.base_url)
+        return self._services['core']
 
     async def close_all(self):
         """Close all service connections"""
@@ -144,6 +186,30 @@ def create_laz_service(base_url: str = "http://localhost:8000") -> LAZService:
     """Create a LAZService instance"""
     return LAZService(base_url)
 
+def create_cache_service(base_url: str = "http://localhost:8000") -> CacheService:
+    """Create a CacheService instance"""
+    return CacheService(base_url)
+
+def create_data_acquisition_service(base_url: str = "http://localhost:8000") -> DataAcquisitionService:
+    """Create a DataAcquisitionService instance"""
+    return DataAcquisitionService(base_url)
+
+def create_lidar_acquisition_service(base_url: str = "http://localhost:8000") -> LidarAcquisitionService:
+    """Create a LidarAcquisitionService instance"""
+    return LidarAcquisitionService(base_url)
+
+def create_pipeline_service(base_url: str = "http://localhost:8000") -> PipelineService:
+    """Create a PipelineService instance"""
+    return PipelineService(base_url)
+
+def create_chat_service(base_url: str = "http://localhost:8000") -> ChatService:
+    """Create a ChatService instance"""
+    return ChatService(base_url)
+
+def create_core_service(base_url: str = "http://localhost:8000") -> CoreService:
+    """Create a CoreService instance"""
+    return CoreService(base_url)
+
 
 # Global service factory instance
 default_factory = ServiceFactory()
@@ -157,4 +223,11 @@ overlays = default_factory.get_overlay_service
 saved_places = default_factory.get_saved_places_service
 geotiff = default_factory.get_geotiff_service
 analysis = default_factory.get_region_analysis_service
+laz = default_factory.get_laz_service
+cache = default_factory.get_cache_service
+data_acquisition = default_factory.get_data_acquisition_service
+lidar_acquisition = default_factory.get_lidar_acquisition_service
+pipelines = default_factory.get_pipeline_service
+chat = default_factory.get_chat_service
+core = default_factory.get_core_service
 laz = default_factory.get_laz_service
