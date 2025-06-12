@@ -17,6 +17,7 @@ import sys
 import time
 import glob
 import asyncio
+import json
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -29,7 +30,12 @@ try:
     # Import TIFF-native processing functions
     from app.processing.tiff_processing import (
         process_hillshade_tiff,
+        process_multi_hillshade_tiff,
+        create_rgb_hillshade,
+        create_tint_overlay,
+        create_slope_overlay,
         process_slope_tiff,
+        process_slope_relief_tiff,
         process_aspect_tiff,
         process_tpi_tiff,
         process_color_relief_tiff
@@ -50,16 +56,29 @@ class RasterTestGenerator:
         self.output_base_dir = Path(output_base_dir)
         self.output_base_dir.mkdir(parents=True, exist_ok=True)
         
-        # Processing functions mapping (TIFF-native functions)
-        self.processors = {
-            'hillshade_standard': process_hillshade_tiff,
-            'hillshade_315_45_08': process_hillshade_tiff,
-            'hillshade_225_45_08': process_hillshade_tiff,
+        # Load hillshade definitions from JSON
+        hillshade_path = Path(__file__).resolve().parent.parent / 'app/processing/pipelines_json/hillshade.json'
+        try:
+            with open(hillshade_path, 'r') as f:
+                hillshade_defs = json.load(f)
+        except Exception:
+            hillshade_defs = []
+
+        self.processors = {}
+        for hs in hillshade_defs:
+            if hs.get('multi'):
+                self.processors[hs['name']] = process_multi_hillshade_tiff
+            else:
+                self.processors[hs['name']] = process_hillshade_tiff
+
+        # Add other processors
+        self.processors.update({
             'slope': process_slope_tiff,
+            'slope_relief': process_slope_relief_tiff,
             'aspect': process_aspect_tiff,
             'tpi': process_tpi_tiff,
             'color_relief': process_color_relief_tiff
-        }
+        })
         
         self.results = {
             'processed_files': [],
@@ -144,27 +163,42 @@ class RasterTestGenerator:
         
         total_start = time.time()
         
-        # Define processing parameters for different products
-        processing_params = {
-            'hillshade_standard': {'azimuth': 315, 'altitude': 45, 'z_factor': 1.0},
-            'hillshade_315_45_08': {'azimuth': 315, 'altitude': 45, 'z_factor': 0.8},
-            'hillshade_225_45_08': {'azimuth': 225, 'altitude': 45, 'z_factor': 0.8},
+        # Load hillshade parameters from JSON
+        hillshade_path = Path(__file__).resolve().parent.parent / 'app/processing/pipelines_json/hillshade.json'
+        try:
+            with open(hillshade_path, 'r') as f:
+                hillshade_defs = json.load(f)
+        except Exception:
+            hillshade_defs = []
+
+        processing_params = {}
+        for hs in hillshade_defs:
+            params = {
+                'azimuth': hs.get('azimuth'),
+                'altitude': hs.get('altitude'),
+                'azimuths': hs.get('azimuths'),
+                'z_factor': hs.get('z_factor', 1.0),
+                'output_filename': hs.get('output')
+            }
+            processing_params[hs['name']] = params
+
+        processing_params.update({
             'slope': {},
+            'slope_relief': {},
             'aspect': {},
             'tpi': {'radius': 3},
             'color_relief': {}
-        }
+        })
         
         # Define output directories for different product types
-        output_dirs = {
-            'hillshade_standard': output_folder / 'Hillshade',
-            'hillshade_315_45_08': output_folder / 'Hillshade',
-            'hillshade_225_45_08': output_folder / 'Hillshade',
+        output_dirs = {name: output_folder / 'Hillshade' for name in processing_params if name not in ['slope', 'aspect', 'tpi', 'color_relief']}
+        output_dirs.update({
             'slope': output_folder / 'Terrain_Analysis',
-            'aspect': output_folder / 'Terrain_Analysis', 
+            'slope_relief': output_folder / 'Visualization',
+            'aspect': output_folder / 'Terrain_Analysis',
             'tpi': output_folder / 'Terrain_Analysis',
             'color_relief': output_folder / 'Visualization'
-        }
+        })
         
         for product_name, processor_func in self.processors.items():
             print(f"\n🔄 Processing: {product_name}")
@@ -202,11 +236,38 @@ class RasterTestGenerator:
                 error_msg = f"{tiff_file.name}: {product_name} - {str(e)}"
                 print(f"❌ {product_name} failed after {product_time:.2f}s: {str(e)}")
                 self.results['errors'].append(error_msg)
-        
+
+        # Create RGB composite if all channels were generated
+        rgb_required = ['hs_red', 'hs_green', 'hs_blue']
+        if all(name in products for name in rgb_required):
+            rgb_output = output_folder / 'HillshadeRgb' / 'hillshade_rgb.tif'
+            hs_paths = {
+                'R': products['hs_red'],
+                'G': products['hs_green'],
+                'B': products['hs_blue']
+            }
+            rgb_result = await create_rgb_hillshade(hs_paths, str(rgb_output))
+            if rgb_result['status'] == 'success':
+                products['hillshade_rgb'] = rgb_result['output_file']
+
+                # Create tint overlay using color relief
+                if 'color_relief' in products:
+                    tint_output = output_folder / 'HillshadeRgb' / 'tint_overlay.tif'
+                    tint_res = await create_tint_overlay(products['color_relief'], rgb_result['output_file'], str(tint_output))
+                    if tint_res['status'] == 'success':
+                        products['tint_overlay'] = tint_res['output_file']
+
+                        # Blend tint overlay with slope relief if available
+                        if 'slope_relief' in products:
+                            boosted_output = output_folder / 'HillshadeRgb' / 'boosted_hillshade.tif'
+                            slope_res = await create_slope_overlay(str(tint_output), products['slope_relief'], str(boosted_output))
+                            if slope_res['status'] == 'success':
+                                products['boosted_hillshade'] = slope_res['output_file']
+
         total_time = time.time() - total_start
         print(f"\n⏱️ Total processing time for {tiff_file.name}: {total_time:.2f} seconds")
         print(f"✅ Generated {len(products)} products successfully")
-        
+
         return products
     
     def convert_to_png(self, products: Dict[str, str], output_folder: Path) -> Dict[str, str]:
@@ -297,10 +358,14 @@ class RasterTestGenerator:
         
         # Mapping of product types to subdirectories
         organization_map = {
-            'hillshade_standard': 'Hillshade',
-            'hillshade_315_45_08': 'Hillshade', 
-            'hillshade_225_45_08': 'Hillshade',
+            'hs_red': 'Hillshade',
+            'hs_green': 'Hillshade',
+            'hs_blue': 'Hillshade',
+            'hillshade_rgb': 'HillshadeRgb',
+            'tint_overlay': 'HillshadeRgb',
+            'boosted_hillshade': 'HillshadeRgb',
             'slope': 'Terrain_Analysis',
+            'slope_relief': 'Visualization',
             'aspect': 'Terrain_Analysis',
             'tpi': 'Terrain_Analysis',
             'color_relief': 'Visualization'

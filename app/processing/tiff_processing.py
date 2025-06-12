@@ -5,10 +5,11 @@ These functions work directly with elevation TIFF files without requiring LAZ co
 
 import os
 import time
+import json
 import logging
 import numpy as np
 from osgeo import gdal, gdalconst
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, List
 from pathlib import Path
 import asyncio
 
@@ -146,9 +147,11 @@ async def process_hillshade_tiff(tiff_path: str, output_dir: str, parameters: Di
         
         print(f"⚙️ Parameters: azimuth={azimuth}°, altitude={altitude}°, z_factor={z_factor}")
         
-        # Create output filename
+        # Create output filename, allow override via parameters
         base_name = os.path.splitext(os.path.basename(tiff_path))[0]
-        output_filename = f"{base_name}_hillshade.tif"
+        output_filename = parameters.get("output_filename")
+        if not output_filename:
+            output_filename = f"{base_name}_hillshade.tif"
         output_path = os.path.join(output_dir, output_filename)
         
         # Read elevation data
@@ -183,7 +186,7 @@ async def process_hillshade_tiff(tiff_path: str, output_dir: str, parameters: Di
             "processing_time": time.time() - start_time
         }
 
-def calculate_hillshade(elevation: np.ndarray, azimuth: float, altitude: float, 
+def calculate_hillshade(elevation: np.ndarray, azimuth: float, altitude: float,
                        z_factor: float, metadata: Dict[str, Any]) -> np.ndarray:
     """
     Calculate hillshade from elevation array
@@ -223,8 +226,69 @@ def calculate_hillshade(elevation: np.ndarray, azimuth: float, altitude: float,
     
     # Convert to 0-255 range
     hillshade = np.clip(hillshade * 255, 0, 255).astype(np.uint8)
-    
+
     return hillshade
+
+
+def calculate_multi_hillshade(elevation: np.ndarray, azimuths: List[float], altitude: float,
+                              z_factor: float, metadata: Dict[str, Any]) -> np.ndarray:
+    """Calculate composite hillshade from multiple azimuth angles."""
+    shades = []
+    for az in azimuths:
+        shades.append(calculate_hillshade(elevation, az, altitude, z_factor, metadata).astype(np.float32))
+    composite = np.mean(shades, axis=0)
+    return np.clip(composite, 0, 255).astype(np.uint8)
+
+
+async def process_multi_hillshade_tiff(tiff_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate composite hillshade using multiple azimuth directions."""
+    start_time = time.time()
+    print(f"\n🌄 MULTI HILLSHADE PROCESSING (TIFF)")
+    print(f"📁 Input: {os.path.basename(tiff_path)}")
+    print(f"📂 Output: {output_dir}")
+
+    try:
+        altitude = parameters.get("altitude", 30)
+        azimuths = parameters.get("azimuths", [])
+        z_factor = parameters.get("z_factor", 1.0)
+
+        if not azimuths:
+            raise ValueError("azimuths list required for multi hillshade")
+
+        print(f"⚙️ Parameters: altitude={altitude}°, azimuths={azimuths}, z_factor={z_factor}")
+
+        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
+        output_filename = parameters.get("output_filename") or f"{base_name}_multi_hillshade.tif"
+        output_path = os.path.join(output_dir, output_filename)
+
+        elevation_array, metadata = read_elevation_tiff(tiff_path)
+
+        print("🔄 Calculating multi-direction hillshade...")
+        hillshade_array = calculate_multi_hillshade(elevation_array, azimuths, altitude, z_factor, metadata)
+
+        save_raster(hillshade_array, output_path, metadata, gdal.GDT_Byte, enhanced_quality=True)
+
+        processing_time = time.time() - start_time
+
+        result = {
+            "status": "success",
+            "output_file": output_path,
+            "processing_time": processing_time,
+            "parameters": parameters,
+        }
+
+        print(f"✅ Multi hillshade completed in {processing_time:.2f} seconds")
+        return result
+
+    except Exception as e:
+        error_msg = f"Multi hillshade processing failed: {str(e)}"
+        print(f"❌ {error_msg}")
+        logger.error(error_msg)
+        return {
+            "status": "error",
+            "error": error_msg,
+            "processing_time": time.time() - start_time,
+        }
 
 async def process_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -532,6 +596,51 @@ async def process_color_relief_tiff(tiff_path: str, output_dir: str, parameters:
             "processing_time": time.time() - start_time
         }
 
+async def process_slope_relief_tiff(tiff_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate a colorized slope relief raster from an elevation TIFF."""
+    start_time = time.time()
+
+    print(f"\n🌈 SLOPE RELIEF PROCESSING (TIFF)")
+    print(f"📁 Input: {os.path.basename(tiff_path)}")
+
+    try:
+        # Read elevation data
+        elevation_array, metadata = read_elevation_tiff(tiff_path)
+
+        # Calculate slope first
+        print(f"🔄 Calculating slope for relief...")
+        slope_array = calculate_slope(elevation_array, metadata)
+
+        # Apply color relief to the slope values
+        print(f"🔄 Applying color relief to slope values...")
+        slope_relief = apply_color_relief(slope_array)
+
+        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
+        output_filename = parameters.get("output_filename") or f"{base_name}_slope_relief.tif"
+        output_path = os.path.join(output_dir, output_filename)
+
+        save_color_raster(slope_relief, output_path, metadata, enhanced_quality=True)
+
+        processing_time = time.time() - start_time
+
+        result = {
+            "status": "success",
+            "output_file": output_path,
+            "processing_time": processing_time
+        }
+
+        print(f"✅ Slope relief completed in {processing_time:.2f} seconds")
+        return result
+
+    except Exception as e:
+        error_msg = f"Slope relief processing failed: {str(e)}"
+        print(f"❌ {error_msg}")
+        return {
+            "status": "error",
+            "error": error_msg,
+            "processing_time": time.time() - start_time
+        }
+
 def apply_color_relief(elevation: np.ndarray) -> np.ndarray:
     """
     Apply color relief mapping to elevation data
@@ -614,6 +723,189 @@ def save_color_raster(rgb_array: np.ndarray, output_path: str, metadata: Dict[st
     else:
         print(f"✅ Color raster saved successfully")
 
+
+async def create_rgb_hillshade(hs_files: Dict[str, str], output_path: str) -> Dict[str, Any]:
+    """Create an RGB composite from three hillshade TIFFs."""
+    start_time = time.time()
+
+    print(f"\n🌈 RGB HILLSHADE COMPOSITE")
+    print(f"📂 Output: {output_path}")
+
+    try:
+        arrays: Dict[str, np.ndarray] = {}
+        geo = proj = None
+
+        for band, path in hs_files.items():
+            ds = gdal.Open(path)
+            if ds is None:
+                raise FileNotFoundError(f"Hillshade file not found: {path}")
+
+            arr = ds.ReadAsArray().astype(np.float32)
+            arrays[band] = arr
+
+            if geo is None:
+                geo = ds.GetGeoTransform()
+                proj = ds.GetProjection()
+
+            ds = None
+
+        def norm(a: np.ndarray) -> np.ndarray:
+            return ((a - a.min()) / (a.max() - a.min()) * 255.0).astype(np.uint8)
+
+        rgb = np.stack([norm(arrays['R']), norm(arrays['G']), norm(arrays['B'])], axis=-1)
+
+        metadata = {
+            'geotransform': geo,
+            'projection': proj
+        }
+
+        save_color_raster(rgb, output_path, metadata, enhanced_quality=True)
+
+        processing_time = time.time() - start_time
+
+        print(f"✅ RGB composite created in {processing_time:.2f} seconds")
+        return {
+            'status': 'success',
+            'output_file': output_path,
+            'processing_time': processing_time
+        }
+
+    except Exception as e:
+        error_msg = f"RGB hillshade creation failed: {e}"
+        print(f"❌ {error_msg}")
+        return {
+            'status': 'error',
+            'error': error_msg,
+            'processing_time': time.time() - start_time
+        }
+
+
+async def create_tint_overlay(color_relief_path: str, hillshade_path: str, output_path: str) -> Dict[str, Any]:
+    """Create a color-relief tinted by hillshade intensity."""
+    start_time = time.time()
+
+    print(f"\n🌄 TINT OVERLAY")
+    print(f"📂 Output: {output_path}")
+
+    try:
+        # Read color relief (RGB)
+        ds_color = gdal.Open(color_relief_path)
+        if ds_color is None:
+            raise FileNotFoundError(f"Color relief not found: {color_relief_path}")
+
+        color = ds_color.ReadAsArray().astype(np.float32)  # shape (bands, H, W)
+        geo = ds_color.GetGeoTransform()
+        proj = ds_color.GetProjection()
+        ds_color = None
+
+        # Ensure 3-band format
+        if color.ndim == 2:
+            color = np.stack([color, color, color])
+
+        # Read hillshade (grayscale or RGB)
+        ds_hs = gdal.Open(hillshade_path)
+        if ds_hs is None:
+            raise FileNotFoundError(f"Hillshade not found: {hillshade_path}")
+
+        hs = ds_hs.ReadAsArray().astype(np.float32)
+        ds_hs = None
+
+        # Reduce to single intensity band
+        if hs.ndim == 3:
+            hs = np.mean(hs, axis=0)
+
+        # Normalize hillshade to 0-1
+        if hs.max() > hs.min():
+            hs_norm = (hs - hs.min()) / (hs.max() - hs.min())
+        else:
+            hs_norm = np.zeros_like(hs)
+
+        # Apply tint by multiplying each color band by hillshade intensity
+        tinted = color * hs_norm
+        tinted = np.clip(tinted, 0, 255).astype(np.uint8)
+
+        rgb = np.transpose(tinted, (1, 2, 0))  # (H, W, 3)
+
+        metadata = {
+            'geotransform': geo,
+            'projection': proj
+        }
+
+
+async def create_slope_overlay(base_path: str, slope_relief_path: str, output_path: str, beta: float = 0.5) -> Dict[str, Any]:
+    """Blend a tint overlay with a slope relief to enhance contrast."""
+    start_time = time.time()
+
+    print(f"\n🌄 SLOPE OVERLAY")
+    print(f"📂 Output: {output_path}")
+
+    try:
+        ds_base = gdal.Open(base_path)
+        if ds_base is None:
+            raise FileNotFoundError(f"Base overlay not found: {base_path}")
+
+        base = ds_base.ReadAsArray().astype(np.float32) / 255.0
+        geo = ds_base.GetGeoTransform()
+        proj = ds_base.GetProjection()
+        ds_base = None
+
+        ds_slope = gdal.Open(slope_relief_path)
+        if ds_slope is None:
+            raise FileNotFoundError(f"Slope relief not found: {slope_relief_path}")
+
+        slope = ds_slope.ReadAsArray().astype(np.float32) / 255.0
+        ds_slope = None
+
+        if base.shape != slope.shape:
+            raise ValueError("Slope relief dimensions do not match base overlay")
+
+        final = base * (1 - beta) + slope * beta
+        final = np.clip(final * 255, 0, 255).astype(np.uint8)
+        rgb = np.transpose(final, (1, 2, 0))
+
+        metadata = {
+            'geotransform': geo,
+            'projection': proj
+        }
+
+        save_color_raster(rgb, output_path, metadata, enhanced_quality=True)
+
+        processing_time = time.time() - start_time
+        print(f"✅ Slope overlay created in {processing_time:.2f} seconds")
+        return {
+            'status': 'success',
+            'output_file': output_path,
+            'processing_time': processing_time
+        }
+
+    except Exception as e:
+        error_msg = f"Slope overlay creation failed: {e}"
+        print(f"❌ {error_msg}")
+        return {
+            'status': 'error',
+            'error': error_msg,
+            'processing_time': time.time() - start_time
+        }
+
+        save_color_raster(rgb, output_path, metadata, enhanced_quality=True)
+
+        processing_time = time.time() - start_time
+        print(f"✅ Tint overlay created in {processing_time:.2f} seconds")
+        return {
+            'status': 'success',
+            'output_file': output_path,
+            'processing_time': processing_time
+        }
+
+    except Exception as e:
+        error_msg = f"Tint overlay creation failed: {e}"
+        print(f"❌ {error_msg}")
+        return {
+            'status': 'error',
+            'error': error_msg,
+            'processing_time': time.time() - start_time
+        }
+
 async def process_all_raster_products(tiff_path: str, progress_callback=None, request=None) -> Dict[str, Any]:
     """
     Automatically process all raster products from a downloaded elevation TIFF
@@ -670,14 +962,36 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
     # Create the base output directory if it doesn't exist
     os.makedirs(base_output_dir, exist_ok=True)
     
-    # Define all processing tasks
-    processing_tasks = [
-        ("hillshade_315", process_hillshade_tiff, {"azimuth": 315, "altitude": 45}),
-        ("hillshade_225", process_hillshade_tiff, {"azimuth": 225, "altitude": 45}), 
+    # Load hillshade definitions from JSON
+    hillshade_path = Path(__file__).parent / "pipelines_json" / "hillshade.json"
+    try:
+        with open(hillshade_path, "r") as f:
+            hillshade_defs = json.load(f)
+    except Exception as e:
+        print(f"⚠️ Failed to load hillshade definitions: {e}")
+        hillshade_defs = []
+
+    processing_tasks = []
+    for hs in hillshade_defs:
+        params = {
+            "altitude": hs.get("altitude", 30),
+            "azimuth": hs.get("azimuth"),
+            "z_factor": hs.get("z_factor", 1.0),
+            "azimuths": hs.get("azimuths"),
+            "output_filename": hs.get("output")
+        }
+        if hs.get("multi"):
+            processing_tasks.append((hs["name"], process_multi_hillshade_tiff, params))
+        else:
+            processing_tasks.append((hs["name"], process_hillshade_tiff, params))
+
+    # Add other raster tasks
+    processing_tasks.extend([
         ("slope", process_slope_tiff, {}),
         ("aspect", process_aspect_tiff, {}),
-        ("color_relief", process_color_relief_tiff, {})
-    ]
+        ("color_relief", process_color_relief_tiff, {}),
+        ("slope_relief", process_slope_relief_tiff, {})
+    ])
     
     results = {}
     total_tasks = len(processing_tasks)
@@ -784,7 +1098,86 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                 "status": "error",
                 "error": error_msg
             }
-    
+
+    # Create RGB composite if all required hillshades were generated
+    required_hs = ["hs_red", "hs_green", "hs_blue"]
+    if all(results.get(name, {}).get("status") == "success" for name in required_hs):
+        hs_paths = {
+            "R": results["hs_red"]["output_file"],
+            "G": results["hs_green"]["output_file"],
+            "B": results["hs_blue"]["output_file"],
+        }
+        rgb_dir = os.path.join(base_output_dir, "HillshadeRgb")
+        os.makedirs(rgb_dir, exist_ok=True)
+        rgb_output = os.path.join(rgb_dir, "hillshade_rgb.tif")
+        rgb_result = await create_rgb_hillshade(hs_paths, rgb_output)
+        results["hillshade_rgb"] = rgb_result
+
+        if rgb_result["status"] == "success":
+            try:
+                import sys
+                from pathlib import Path
+                app_dir = Path(__file__).parent.parent
+                if str(app_dir) not in sys.path:
+                    sys.path.insert(0, str(app_dir))
+
+                from convert import convert_geotiff_to_png
+
+                png_output_dir = os.path.join(base_output_dir, "png_outputs")
+                os.makedirs(png_output_dir, exist_ok=True)
+
+                png_name = os.path.splitext(os.path.basename(rgb_output))[0] + ".png"
+                png_path = os.path.join(png_output_dir, png_name)
+                converted_png = convert_geotiff_to_png(rgb_output, png_path)
+                if converted_png and os.path.exists(converted_png):
+                    rgb_result["png_file"] = converted_png
+                    print(f"🖼️ PNG created: {os.path.basename(converted_png)}")
+            except Exception as e:
+                print(f"⚠️ PNG conversion failed for hillshade_rgb: {e}")
+
+            # Create tint overlay using color relief
+            color_relief_res = results.get("color_relief")
+            if color_relief_res and color_relief_res.get("status") == "success":
+                try:
+                    tint_output = os.path.join(rgb_dir, "tint_overlay.tif")
+                    tint_result = await create_tint_overlay(
+                        color_relief_res["output_file"], rgb_output, tint_output)
+                    results["tint_overlay"] = tint_result
+
+                    if tint_result["status"] == "success":
+                        png_output_dir = os.path.join(base_output_dir, "png_outputs")
+                        os.makedirs(png_output_dir, exist_ok=True)
+                        png_name = os.path.splitext(os.path.basename(tint_output))[0] + ".png"
+                        png_path = os.path.join(png_output_dir, png_name)
+                        converted_png = convert_geotiff_to_png(tint_output, png_path)
+                        if converted_png and os.path.exists(converted_png):
+                            tint_result["png_file"] = converted_png
+                            print(f"🖼️ PNG created: {os.path.basename(converted_png)}")
+
+                        # Create slope overlay if slope relief is available
+                        slope_relief_res = results.get("slope_relief")
+                        if slope_relief_res and slope_relief_res.get("status") == "success":
+                            try:
+                                boosted_output = os.path.join(rgb_dir, "boosted_hillshade.tif")
+                                slope_overlay_res = await create_slope_overlay(
+                                    tint_output,
+                                    slope_relief_res["output_file"],
+                                    boosted_output,
+                                )
+                                results["boosted_hillshade"] = slope_overlay_res
+
+                                if slope_overlay_res["status"] == "success":
+                                    png_name = os.path.splitext(os.path.basename(boosted_output))[0] + ".png"
+                                    png_path = os.path.join(png_output_dir, png_name)
+                                    converted_png = convert_geotiff_to_png(boosted_output, png_path)
+                                    if converted_png and os.path.exists(converted_png):
+                                        slope_overlay_res["png_file"] = converted_png
+                                        print(f"🖼️ PNG created: {os.path.basename(converted_png)}")
+                            except Exception as e:
+                                print(f"⚠️ Slope overlay generation failed: {e}")
+                except Exception as e:
+                    print(f"⚠️ Tint overlay generation failed: {e}")
+
     # Final progress update
     if progress_callback:
         await progress_callback({

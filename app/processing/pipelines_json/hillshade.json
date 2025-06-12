@@ -1,0 +1,26 @@
+[
+  {
+    "name": "hs_red",
+    "azimuth": 315,
+    "altitude": 30,
+    "multi": false,
+    "output": "hillshade_315_30_z1.tif",
+    "description": "Hillshade for red channel (315° azimuth, 30° altitude)"
+  },
+  {
+    "name": "hs_green",
+    "azimuth": 45,
+    "altitude": 25,
+    "multi": false,
+    "output": "hillshade_45_25_z1.tif",
+    "description": "Hillshade for green channel (45° azimuth, 25° altitude)"
+  },
+  {
+    "name": "hs_blue",
+    "azimuth": 135,
+    "altitude": 30,
+    "multi": false,
+    "output": "hillshade_135_30_z1.tif",
+    "description": "Hillshade for blue channel (135° azimuth, 30° altitude)"
+  }
+]
