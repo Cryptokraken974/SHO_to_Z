@@ -5,10 +5,11 @@ These functions work directly with elevation TIFF files without requiring LAZ co
 
 import os
 import time
+import json
 import logging
 import numpy as np
 from osgeo import gdal, gdalconst
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, List
 from pathlib import Path
 import asyncio
 
@@ -146,9 +147,11 @@ async def process_hillshade_tiff(tiff_path: str, output_dir: str, parameters: Di
         
         print(f"⚙️ Parameters: azimuth={azimuth}°, altitude={altitude}°, z_factor={z_factor}")
         
-        # Create output filename
+        # Create output filename, allow override via parameters
         base_name = os.path.splitext(os.path.basename(tiff_path))[0]
-        output_filename = f"{base_name}_hillshade.tif"
+        output_filename = parameters.get("output_filename")
+        if not output_filename:
+            output_filename = f"{base_name}_hillshade.tif"
         output_path = os.path.join(output_dir, output_filename)
         
         # Read elevation data
@@ -183,7 +186,7 @@ async def process_hillshade_tiff(tiff_path: str, output_dir: str, parameters: Di
             "processing_time": time.time() - start_time
         }
 
-def calculate_hillshade(elevation: np.ndarray, azimuth: float, altitude: float, 
+def calculate_hillshade(elevation: np.ndarray, azimuth: float, altitude: float,
                        z_factor: float, metadata: Dict[str, Any]) -> np.ndarray:
     """
     Calculate hillshade from elevation array
@@ -223,8 +226,69 @@ def calculate_hillshade(elevation: np.ndarray, azimuth: float, altitude: float,
     
     # Convert to 0-255 range
     hillshade = np.clip(hillshade * 255, 0, 255).astype(np.uint8)
-    
+
     return hillshade
+
+
+def calculate_multi_hillshade(elevation: np.ndarray, azimuths: List[float], altitude: float,
+                              z_factor: float, metadata: Dict[str, Any]) -> np.ndarray:
+    """Calculate composite hillshade from multiple azimuth angles."""
+    shades = []
+    for az in azimuths:
+        shades.append(calculate_hillshade(elevation, az, altitude, z_factor, metadata).astype(np.float32))
+    composite = np.mean(shades, axis=0)
+    return np.clip(composite, 0, 255).astype(np.uint8)
+
+
+async def process_multi_hillshade_tiff(tiff_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate composite hillshade using multiple azimuth directions."""
+    start_time = time.time()
+    print(f"\n🌄 MULTI HILLSHADE PROCESSING (TIFF)")
+    print(f"📁 Input: {os.path.basename(tiff_path)}")
+    print(f"📂 Output: {output_dir}")
+
+    try:
+        altitude = parameters.get("altitude", 30)
+        azimuths = parameters.get("azimuths", [])
+        z_factor = parameters.get("z_factor", 1.0)
+
+        if not azimuths:
+            raise ValueError("azimuths list required for multi hillshade")
+
+        print(f"⚙️ Parameters: altitude={altitude}°, azimuths={azimuths}, z_factor={z_factor}")
+
+        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
+        output_filename = parameters.get("output_filename") or f"{base_name}_multi_hillshade.tif"
+        output_path = os.path.join(output_dir, output_filename)
+
+        elevation_array, metadata = read_elevation_tiff(tiff_path)
+
+        print("🔄 Calculating multi-direction hillshade...")
+        hillshade_array = calculate_multi_hillshade(elevation_array, azimuths, altitude, z_factor, metadata)
+
+        save_raster(hillshade_array, output_path, metadata, gdal.GDT_Byte, enhanced_quality=True)
+
+        processing_time = time.time() - start_time
+
+        result = {
+            "status": "success",
+            "output_file": output_path,
+            "processing_time": processing_time,
+            "parameters": parameters,
+        }
+
+        print(f"✅ Multi hillshade completed in {processing_time:.2f} seconds")
+        return result
+
+    except Exception as e:
+        error_msg = f"Multi hillshade processing failed: {str(e)}"
+        print(f"❌ {error_msg}")
+        logger.error(error_msg)
+        return {
+            "status": "error",
+            "error": error_msg,
+            "processing_time": time.time() - start_time,
+        }
 
 async def process_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -670,14 +734,35 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
     # Create the base output directory if it doesn't exist
     os.makedirs(base_output_dir, exist_ok=True)
     
-    # Define all processing tasks
-    processing_tasks = [
-        ("hillshade_315", process_hillshade_tiff, {"azimuth": 315, "altitude": 45}),
-        ("hillshade_225", process_hillshade_tiff, {"azimuth": 225, "altitude": 45}), 
+    # Load hillshade definitions from JSON
+    hillshade_path = Path(__file__).parent / "pipelines_json" / "hillshade.json"
+    try:
+        with open(hillshade_path, "r") as f:
+            hillshade_defs = json.load(f)
+    except Exception as e:
+        print(f"⚠️ Failed to load hillshade definitions: {e}")
+        hillshade_defs = []
+
+    processing_tasks = []
+    for hs in hillshade_defs:
+        params = {
+            "altitude": hs.get("altitude", 30),
+            "azimuth": hs.get("azimuth"),
+            "z_factor": hs.get("z_factor", 1.0),
+            "azimuths": hs.get("azimuths"),
+            "output_filename": hs.get("output")
+        }
+        if hs.get("multi"):
+            processing_tasks.append((hs["name"], process_multi_hillshade_tiff, params))
+        else:
+            processing_tasks.append((hs["name"], process_hillshade_tiff, params))
+
+    # Add other raster tasks
+    processing_tasks.extend([
         ("slope", process_slope_tiff, {}),
         ("aspect", process_aspect_tiff, {}),
         ("color_relief", process_color_relief_tiff, {})
-    ]
+    ])
     
     results = {}
     total_tasks = len(processing_tasks)
