@@ -257,6 +257,7 @@ class RasterTestGenerator:
                     if tint_res['status'] == 'success':
                         products['tint_overlay'] = tint_res['output_file']
 
+
                         # Blend tint overlay with slope relief if available
                         if 'slope_relief' in products:
                             boosted_output = output_folder / 'HillshadeRgb' / 'boosted_hillshade.tif'

@@ -831,7 +831,6 @@ async def create_tint_overlay(color_relief_path: str, hillshade_path: str, outpu
             'projection': proj
         }
 
-
 async def create_slope_overlay(base_path: str, slope_relief_path: str, output_path: str, beta: float = 0.5) -> Dict[str, Any]:
     """Blend a tint overlay with a slope relief to enhance contrast."""
     start_time = time.time()
@@ -1175,6 +1174,7 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                                         print(f"🖼️ PNG created: {os.path.basename(converted_png)}")
                             except Exception as e:
                                 print(f"⚠️ Slope overlay generation failed: {e}")
+
                 except Exception as e:
                     print(f"⚠️ Tint overlay generation failed: {e}")
 
