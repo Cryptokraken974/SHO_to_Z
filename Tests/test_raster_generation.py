@@ -33,7 +33,9 @@ try:
         process_multi_hillshade_tiff,
         create_rgb_hillshade,
         create_tint_overlay,
+        create_slope_overlay,
         process_slope_tiff,
+        process_slope_relief_tiff,
         process_aspect_tiff,
         process_tpi_tiff,
         process_color_relief_tiff
@@ -72,6 +74,7 @@ class RasterTestGenerator:
         # Add other processors
         self.processors.update({
             'slope': process_slope_tiff,
+            'slope_relief': process_slope_relief_tiff,
             'aspect': process_aspect_tiff,
             'tpi': process_tpi_tiff,
             'color_relief': process_color_relief_tiff
@@ -181,6 +184,7 @@ class RasterTestGenerator:
 
         processing_params.update({
             'slope': {},
+            'slope_relief': {},
             'aspect': {},
             'tpi': {'radius': 3},
             'color_relief': {}
@@ -190,6 +194,7 @@ class RasterTestGenerator:
         output_dirs = {name: output_folder / 'Hillshade' for name in processing_params if name not in ['slope', 'aspect', 'tpi', 'color_relief']}
         output_dirs.update({
             'slope': output_folder / 'Terrain_Analysis',
+            'slope_relief': output_folder / 'Visualization',
             'aspect': output_folder / 'Terrain_Analysis',
             'tpi': output_folder / 'Terrain_Analysis',
             'color_relief': output_folder / 'Visualization'
@@ -244,13 +249,21 @@ class RasterTestGenerator:
             rgb_result = await create_rgb_hillshade(hs_paths, str(rgb_output))
             if rgb_result['status'] == 'success':
                 products['hillshade_rgb'] = rgb_result['output_file']
-                
+
                 # Create tint overlay using color relief
                 if 'color_relief' in products:
                     tint_output = output_folder / 'HillshadeRgb' / 'tint_overlay.tif'
                     tint_res = await create_tint_overlay(products['color_relief'], rgb_result['output_file'], str(tint_output))
                     if tint_res['status'] == 'success':
                         products['tint_overlay'] = tint_res['output_file']
+
+
+                        # Blend tint overlay with slope relief if available
+                        if 'slope_relief' in products:
+                            boosted_output = output_folder / 'HillshadeRgb' / 'boosted_hillshade.tif'
+                            slope_res = await create_slope_overlay(str(tint_output), products['slope_relief'], str(boosted_output))
+                            if slope_res['status'] == 'success':
+                                products['boosted_hillshade'] = slope_res['output_file']
 
         total_time = time.time() - total_start
         print(f"\n⏱️ Total processing time for {tiff_file.name}: {total_time:.2f} seconds")
@@ -351,8 +364,9 @@ class RasterTestGenerator:
             'hs_blue': 'Hillshade',
             'hillshade_rgb': 'HillshadeRgb',
             'tint_overlay': 'HillshadeRgb',
-
+            'boosted_hillshade': 'HillshadeRgb',
             'slope': 'Terrain_Analysis',
+            'slope_relief': 'Visualization',
             'aspect': 'Terrain_Analysis',
             'tpi': 'Terrain_Analysis',
             'color_relief': 'Visualization'

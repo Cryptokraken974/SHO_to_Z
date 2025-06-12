@@ -596,6 +596,51 @@ async def process_color_relief_tiff(tiff_path: str, output_dir: str, parameters:
             "processing_time": time.time() - start_time
         }
 
+async def process_slope_relief_tiff(tiff_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate a colorized slope relief raster from an elevation TIFF."""
+    start_time = time.time()
+
+    print(f"\n🌈 SLOPE RELIEF PROCESSING (TIFF)")
+    print(f"📁 Input: {os.path.basename(tiff_path)}")
+
+    try:
+        # Read elevation data
+        elevation_array, metadata = read_elevation_tiff(tiff_path)
+
+        # Calculate slope first
+        print(f"🔄 Calculating slope for relief...")
+        slope_array = calculate_slope(elevation_array, metadata)
+
+        # Apply color relief to the slope values
+        print(f"🔄 Applying color relief to slope values...")
+        slope_relief = apply_color_relief(slope_array)
+
+        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
+        output_filename = parameters.get("output_filename") or f"{base_name}_slope_relief.tif"
+        output_path = os.path.join(output_dir, output_filename)
+
+        save_color_raster(slope_relief, output_path, metadata, enhanced_quality=True)
+
+        processing_time = time.time() - start_time
+
+        result = {
+            "status": "success",
+            "output_file": output_path,
+            "processing_time": processing_time
+        }
+
+        print(f"✅ Slope relief completed in {processing_time:.2f} seconds")
+        return result
+
+    except Exception as e:
+        error_msg = f"Slope relief processing failed: {str(e)}"
+        print(f"❌ {error_msg}")
+        return {
+            "status": "error",
+            "error": error_msg,
+            "processing_time": time.time() - start_time
+        }
+
 def apply_color_relief(elevation: np.ndarray) -> np.ndarray:
     """
     Apply color relief mapping to elevation data
@@ -786,6 +831,61 @@ async def create_tint_overlay(color_relief_path: str, hillshade_path: str, outpu
             'projection': proj
         }
 
+async def create_slope_overlay(base_path: str, slope_relief_path: str, output_path: str, beta: float = 0.5) -> Dict[str, Any]:
+    """Blend a tint overlay with a slope relief to enhance contrast."""
+    start_time = time.time()
+
+    print(f"\n🌄 SLOPE OVERLAY")
+    print(f"📂 Output: {output_path}")
+
+    try:
+        ds_base = gdal.Open(base_path)
+        if ds_base is None:
+            raise FileNotFoundError(f"Base overlay not found: {base_path}")
+
+        base = ds_base.ReadAsArray().astype(np.float32) / 255.0
+        geo = ds_base.GetGeoTransform()
+        proj = ds_base.GetProjection()
+        ds_base = None
+
+        ds_slope = gdal.Open(slope_relief_path)
+        if ds_slope is None:
+            raise FileNotFoundError(f"Slope relief not found: {slope_relief_path}")
+
+        slope = ds_slope.ReadAsArray().astype(np.float32) / 255.0
+        ds_slope = None
+
+        if base.shape != slope.shape:
+            raise ValueError("Slope relief dimensions do not match base overlay")
+
+        final = base * (1 - beta) + slope * beta
+        final = np.clip(final * 255, 0, 255).astype(np.uint8)
+        rgb = np.transpose(final, (1, 2, 0))
+
+        metadata = {
+            'geotransform': geo,
+            'projection': proj
+        }
+
+        save_color_raster(rgb, output_path, metadata, enhanced_quality=True)
+
+        processing_time = time.time() - start_time
+        print(f"✅ Slope overlay created in {processing_time:.2f} seconds")
+        return {
+            'status': 'success',
+            'output_file': output_path,
+            'processing_time': processing_time
+        }
+
+    except Exception as e:
+        error_msg = f"Slope overlay creation failed: {e}"
+        print(f"❌ {error_msg}")
+        return {
+            'status': 'error',
+            'error': error_msg,
+            'processing_time': time.time() - start_time
+        }
+
         save_color_raster(rgb, output_path, metadata, enhanced_quality=True)
 
         processing_time = time.time() - start_time
@@ -888,7 +988,8 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
     processing_tasks.extend([
         ("slope", process_slope_tiff, {}),
         ("aspect", process_aspect_tiff, {}),
-        ("color_relief", process_color_relief_tiff, {})
+        ("color_relief", process_color_relief_tiff, {}),
+        ("slope_relief", process_slope_relief_tiff, {})
     ])
     
     results = {}
@@ -1051,6 +1152,29 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                         if converted_png and os.path.exists(converted_png):
                             tint_result["png_file"] = converted_png
                             print(f"🖼️ PNG created: {os.path.basename(converted_png)}")
+
+                        # Create slope overlay if slope relief is available
+                        slope_relief_res = results.get("slope_relief")
+                        if slope_relief_res and slope_relief_res.get("status") == "success":
+                            try:
+                                boosted_output = os.path.join(rgb_dir, "boosted_hillshade.tif")
+                                slope_overlay_res = await create_slope_overlay(
+                                    tint_output,
+                                    slope_relief_res["output_file"],
+                                    boosted_output,
+                                )
+                                results["boosted_hillshade"] = slope_overlay_res
+
+                                if slope_overlay_res["status"] == "success":
+                                    png_name = os.path.splitext(os.path.basename(boosted_output))[0] + ".png"
+                                    png_path = os.path.join(png_output_dir, png_name)
+                                    converted_png = convert_geotiff_to_png(boosted_output, png_path)
+                                    if converted_png and os.path.exists(converted_png):
+                                        slope_overlay_res["png_file"] = converted_png
+                                        print(f"🖼️ PNG created: {os.path.basename(converted_png)}")
+                            except Exception as e:
+                                print(f"⚠️ Slope overlay generation failed: {e}")
+
                 except Exception as e:
                     print(f"⚠️ Tint overlay generation failed: {e}")
 
