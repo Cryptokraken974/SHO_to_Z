@@ -32,6 +32,7 @@ try:
         process_hillshade_tiff,
         process_multi_hillshade_tiff,
         create_rgb_hillshade,
+        create_tint_overlay,
         process_slope_tiff,
         process_aspect_tiff,
         process_tpi_tiff,
@@ -243,6 +244,13 @@ class RasterTestGenerator:
             rgb_result = await create_rgb_hillshade(hs_paths, str(rgb_output))
             if rgb_result['status'] == 'success':
                 products['hillshade_rgb'] = rgb_result['output_file']
+                
+                # Create tint overlay using color relief
+                if 'color_relief' in products:
+                    tint_output = output_folder / 'HillshadeRgb' / 'tint_overlay.tif'
+                    tint_res = await create_tint_overlay(products['color_relief'], rgb_result['output_file'], str(tint_output))
+                    if tint_res['status'] == 'success':
+                        products['tint_overlay'] = tint_res['output_file']
 
         total_time = time.time() - total_start
         print(f"\n⏱️ Total processing time for {tiff_file.name}: {total_time:.2f} seconds")
@@ -342,6 +350,8 @@ class RasterTestGenerator:
             'hs_green': 'Hillshade',
             'hs_blue': 'Hillshade',
             'hillshade_rgb': 'HillshadeRgb',
+            'tint_overlay': 'HillshadeRgb',
+
             'slope': 'Terrain_Analysis',
             'aspect': 'Terrain_Analysis',
             'tpi': 'Terrain_Analysis',

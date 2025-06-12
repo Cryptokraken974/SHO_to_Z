@@ -734,6 +734,77 @@ async def create_rgb_hillshade(hs_files: Dict[str, str], output_path: str) -> Di
             'processing_time': time.time() - start_time
         }
 
+
+async def create_tint_overlay(color_relief_path: str, hillshade_path: str, output_path: str) -> Dict[str, Any]:
+    """Create a color-relief tinted by hillshade intensity."""
+    start_time = time.time()
+
+    print(f"\n🌄 TINT OVERLAY")
+    print(f"📂 Output: {output_path}")
+
+    try:
+        # Read color relief (RGB)
+        ds_color = gdal.Open(color_relief_path)
+        if ds_color is None:
+            raise FileNotFoundError(f"Color relief not found: {color_relief_path}")
+
+        color = ds_color.ReadAsArray().astype(np.float32)  # shape (bands, H, W)
+        geo = ds_color.GetGeoTransform()
+        proj = ds_color.GetProjection()
+        ds_color = None
+
+        # Ensure 3-band format
+        if color.ndim == 2:
+            color = np.stack([color, color, color])
+
+        # Read hillshade (grayscale or RGB)
+        ds_hs = gdal.Open(hillshade_path)
+        if ds_hs is None:
+            raise FileNotFoundError(f"Hillshade not found: {hillshade_path}")
+
+        hs = ds_hs.ReadAsArray().astype(np.float32)
+        ds_hs = None
+
+        # Reduce to single intensity band
+        if hs.ndim == 3:
+            hs = np.mean(hs, axis=0)
+
+        # Normalize hillshade to 0-1
+        if hs.max() > hs.min():
+            hs_norm = (hs - hs.min()) / (hs.max() - hs.min())
+        else:
+            hs_norm = np.zeros_like(hs)
+
+        # Apply tint by multiplying each color band by hillshade intensity
+        tinted = color * hs_norm
+        tinted = np.clip(tinted, 0, 255).astype(np.uint8)
+
+        rgb = np.transpose(tinted, (1, 2, 0))  # (H, W, 3)
+
+        metadata = {
+            'geotransform': geo,
+            'projection': proj
+        }
+
+        save_color_raster(rgb, output_path, metadata, enhanced_quality=True)
+
+        processing_time = time.time() - start_time
+        print(f"✅ Tint overlay created in {processing_time:.2f} seconds")
+        return {
+            'status': 'success',
+            'output_file': output_path,
+            'processing_time': processing_time
+        }
+
+    except Exception as e:
+        error_msg = f"Tint overlay creation failed: {e}"
+        print(f"❌ {error_msg}")
+        return {
+            'status': 'error',
+            'error': error_msg,
+            'processing_time': time.time() - start_time
+        }
+
 async def process_all_raster_products(tiff_path: str, progress_callback=None, request=None) -> Dict[str, Any]:
     """
     Automatically process all raster products from a downloaded elevation TIFF
@@ -961,6 +1032,27 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                     print(f"🖼️ PNG created: {os.path.basename(converted_png)}")
             except Exception as e:
                 print(f"⚠️ PNG conversion failed for hillshade_rgb: {e}")
+
+            # Create tint overlay using color relief
+            color_relief_res = results.get("color_relief")
+            if color_relief_res and color_relief_res.get("status") == "success":
+                try:
+                    tint_output = os.path.join(rgb_dir, "tint_overlay.tif")
+                    tint_result = await create_tint_overlay(
+                        color_relief_res["output_file"], rgb_output, tint_output)
+                    results["tint_overlay"] = tint_result
+
+                    if tint_result["status"] == "success":
+                        png_output_dir = os.path.join(base_output_dir, "png_outputs")
+                        os.makedirs(png_output_dir, exist_ok=True)
+                        png_name = os.path.splitext(os.path.basename(tint_output))[0] + ".png"
+                        png_path = os.path.join(png_output_dir, png_name)
+                        converted_png = convert_geotiff_to_png(tint_output, png_path)
+                        if converted_png and os.path.exists(converted_png):
+                            tint_result["png_file"] = converted_png
+                            print(f"🖼️ PNG created: {os.path.basename(converted_png)}")
+                except Exception as e:
+                    print(f"⚠️ Tint overlay generation failed: {e}")
 
     # Final progress update
     if progress_callback:
