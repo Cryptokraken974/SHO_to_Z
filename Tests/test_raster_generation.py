@@ -17,6 +17,7 @@ import sys
 import time
 import glob
 import asyncio
+import json
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -29,6 +30,7 @@ try:
     # Import TIFF-native processing functions
     from app.processing.tiff_processing import (
         process_hillshade_tiff,
+        process_multi_hillshade_tiff,
         process_slope_tiff,
         process_aspect_tiff,
         process_tpi_tiff,
@@ -50,16 +52,28 @@ class RasterTestGenerator:
         self.output_base_dir = Path(output_base_dir)
         self.output_base_dir.mkdir(parents=True, exist_ok=True)
         
-        # Processing functions mapping (TIFF-native functions)
-        self.processors = {
-            'hillshade_standard': process_hillshade_tiff,
-            'hillshade_315_45_08': process_hillshade_tiff,
-            'hillshade_225_45_08': process_hillshade_tiff,
+        # Load hillshade definitions from JSON
+        hillshade_path = Path(__file__).resolve().parent.parent / 'app/processing/pipelines_json/hillshade.json'
+        try:
+            with open(hillshade_path, 'r') as f:
+                hillshade_defs = json.load(f)
+        except Exception:
+            hillshade_defs = []
+
+        self.processors = {}
+        for hs in hillshade_defs:
+            if hs.get('multi'):
+                self.processors[hs['name']] = process_multi_hillshade_tiff
+            else:
+                self.processors[hs['name']] = process_hillshade_tiff
+
+        # Add other processors
+        self.processors.update({
             'slope': process_slope_tiff,
             'aspect': process_aspect_tiff,
             'tpi': process_tpi_tiff,
             'color_relief': process_color_relief_tiff
-        }
+        })
         
         self.results = {
             'processed_files': [],
@@ -144,27 +158,40 @@ class RasterTestGenerator:
         
         total_start = time.time()
         
-        # Define processing parameters for different products
-        processing_params = {
-            'hillshade_standard': {'azimuth': 315, 'altitude': 45, 'z_factor': 1.0},
-            'hillshade_315_45_08': {'azimuth': 315, 'altitude': 45, 'z_factor': 0.8},
-            'hillshade_225_45_08': {'azimuth': 225, 'altitude': 45, 'z_factor': 0.8},
+        # Load hillshade parameters from JSON
+        hillshade_path = Path(__file__).resolve().parent.parent / 'app/processing/pipelines_json/hillshade.json'
+        try:
+            with open(hillshade_path, 'r') as f:
+                hillshade_defs = json.load(f)
+        except Exception:
+            hillshade_defs = []
+
+        processing_params = {}
+        for hs in hillshade_defs:
+            params = {
+                'azimuth': hs.get('azimuth'),
+                'altitude': hs.get('altitude'),
+                'azimuths': hs.get('azimuths'),
+                'z_factor': hs.get('z_factor', 1.0),
+                'output_filename': hs.get('output')
+            }
+            processing_params[hs['name']] = params
+
+        processing_params.update({
             'slope': {},
             'aspect': {},
             'tpi': {'radius': 3},
             'color_relief': {}
-        }
+        })
         
         # Define output directories for different product types
-        output_dirs = {
-            'hillshade_standard': output_folder / 'Hillshade',
-            'hillshade_315_45_08': output_folder / 'Hillshade',
-            'hillshade_225_45_08': output_folder / 'Hillshade',
+        output_dirs = {name: output_folder / 'Hillshade' for name in processing_params if name not in ['slope', 'aspect', 'tpi', 'color_relief']}
+        output_dirs.update({
             'slope': output_folder / 'Terrain_Analysis',
-            'aspect': output_folder / 'Terrain_Analysis', 
+            'aspect': output_folder / 'Terrain_Analysis',
             'tpi': output_folder / 'Terrain_Analysis',
             'color_relief': output_folder / 'Visualization'
-        }
+        })
         
         for product_name, processor_func in self.processors.items():
             print(f"\n🔄 Processing: {product_name}")
