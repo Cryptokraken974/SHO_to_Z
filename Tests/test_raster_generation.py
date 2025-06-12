@@ -244,7 +244,7 @@ class RasterTestGenerator:
             rgb_result = await create_rgb_hillshade(hs_paths, str(rgb_output))
             if rgb_result['status'] == 'success':
                 products['hillshade_rgb'] = rgb_result['output_file']
-
+                
                 # Create tint overlay using color relief
                 if 'color_relief' in products:
                     tint_output = output_folder / 'HillshadeRgb' / 'tint_overlay.tif'
@@ -351,6 +351,7 @@ class RasterTestGenerator:
             'hs_blue': 'Hillshade',
             'hillshade_rgb': 'HillshadeRgb',
             'tint_overlay': 'HillshadeRgb',
+
             'slope': 'Terrain_Analysis',
             'aspect': 'Terrain_Analysis',
             'tpi': 'Terrain_Analysis',
