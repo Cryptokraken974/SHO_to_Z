@@ -678,6 +678,62 @@ def save_color_raster(rgb_array: np.ndarray, output_path: str, metadata: Dict[st
     else:
         print(f"✅ Color raster saved successfully")
 
+
+async def create_rgb_hillshade(hs_files: Dict[str, str], output_path: str) -> Dict[str, Any]:
+    """Create an RGB composite from three hillshade TIFFs."""
+    start_time = time.time()
+
+    print(f"\n🌈 RGB HILLSHADE COMPOSITE")
+    print(f"📂 Output: {output_path}")
+
+    try:
+        arrays: Dict[str, np.ndarray] = {}
+        geo = proj = None
+
+        for band, path in hs_files.items():
+            ds = gdal.Open(path)
+            if ds is None:
+                raise FileNotFoundError(f"Hillshade file not found: {path}")
+
+            arr = ds.ReadAsArray().astype(np.float32)
+            arrays[band] = arr
+
+            if geo is None:
+                geo = ds.GetGeoTransform()
+                proj = ds.GetProjection()
+
+            ds = None
+
+        def norm(a: np.ndarray) -> np.ndarray:
+            return ((a - a.min()) / (a.max() - a.min()) * 255.0).astype(np.uint8)
+
+        rgb = np.stack([norm(arrays['R']), norm(arrays['G']), norm(arrays['B'])], axis=-1)
+
+        metadata = {
+            'geotransform': geo,
+            'projection': proj
+        }
+
+        save_color_raster(rgb, output_path, metadata, enhanced_quality=True)
+
+        processing_time = time.time() - start_time
+
+        print(f"✅ RGB composite created in {processing_time:.2f} seconds")
+        return {
+            'status': 'success',
+            'output_file': output_path,
+            'processing_time': processing_time
+        }
+
+    except Exception as e:
+        error_msg = f"RGB hillshade creation failed: {e}"
+        print(f"❌ {error_msg}")
+        return {
+            'status': 'error',
+            'error': error_msg,
+            'processing_time': time.time() - start_time
+        }
+
 async def process_all_raster_products(tiff_path: str, progress_callback=None, request=None) -> Dict[str, Any]:
     """
     Automatically process all raster products from a downloaded elevation TIFF
@@ -869,7 +925,43 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                 "status": "error",
                 "error": error_msg
             }
-    
+
+    # Create RGB composite if all required hillshades were generated
+    required_hs = ["hs_red", "hs_green", "hs_blue"]
+    if all(results.get(name, {}).get("status") == "success" for name in required_hs):
+        hs_paths = {
+            "R": results["hs_red"]["output_file"],
+            "G": results["hs_green"]["output_file"],
+            "B": results["hs_blue"]["output_file"],
+        }
+        rgb_dir = os.path.join(base_output_dir, "HillshadeRgb")
+        os.makedirs(rgb_dir, exist_ok=True)
+        rgb_output = os.path.join(rgb_dir, "hillshade_rgb.tif")
+        rgb_result = await create_rgb_hillshade(hs_paths, rgb_output)
+        results["hillshade_rgb"] = rgb_result
+
+        if rgb_result["status"] == "success":
+            try:
+                import sys
+                from pathlib import Path
+                app_dir = Path(__file__).parent.parent
+                if str(app_dir) not in sys.path:
+                    sys.path.insert(0, str(app_dir))
+
+                from convert import convert_geotiff_to_png
+
+                png_output_dir = os.path.join(base_output_dir, "png_outputs")
+                os.makedirs(png_output_dir, exist_ok=True)
+
+                png_name = os.path.splitext(os.path.basename(rgb_output))[0] + ".png"
+                png_path = os.path.join(png_output_dir, png_name)
+                converted_png = convert_geotiff_to_png(rgb_output, png_path)
+                if converted_png and os.path.exists(converted_png):
+                    rgb_result["png_file"] = converted_png
+                    print(f"🖼️ PNG created: {os.path.basename(converted_png)}")
+            except Exception as e:
+                print(f"⚠️ PNG conversion failed for hillshade_rgb: {e}")
+
     # Final progress update
     if progress_callback:
         await progress_callback({

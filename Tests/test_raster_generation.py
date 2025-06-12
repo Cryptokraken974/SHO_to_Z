@@ -31,6 +31,7 @@ try:
     from app.processing.tiff_processing import (
         process_hillshade_tiff,
         process_multi_hillshade_tiff,
+        create_rgb_hillshade,
         process_slope_tiff,
         process_aspect_tiff,
         process_tpi_tiff,
@@ -229,11 +230,24 @@ class RasterTestGenerator:
                 error_msg = f"{tiff_file.name}: {product_name} - {str(e)}"
                 print(f"❌ {product_name} failed after {product_time:.2f}s: {str(e)}")
                 self.results['errors'].append(error_msg)
-        
+
+        # Create RGB composite if all channels were generated
+        rgb_required = ['hs_red', 'hs_green', 'hs_blue']
+        if all(name in products for name in rgb_required):
+            rgb_output = output_folder / 'HillshadeRgb' / 'hillshade_rgb.tif'
+            hs_paths = {
+                'R': products['hs_red'],
+                'G': products['hs_green'],
+                'B': products['hs_blue']
+            }
+            rgb_result = await create_rgb_hillshade(hs_paths, str(rgb_output))
+            if rgb_result['status'] == 'success':
+                products['hillshade_rgb'] = rgb_result['output_file']
+
         total_time = time.time() - total_start
         print(f"\n⏱️ Total processing time for {tiff_file.name}: {total_time:.2f} seconds")
         print(f"✅ Generated {len(products)} products successfully")
-        
+
         return products
     
     def convert_to_png(self, products: Dict[str, str], output_folder: Path) -> Dict[str, str]:
@@ -324,9 +338,10 @@ class RasterTestGenerator:
         
         # Mapping of product types to subdirectories
         organization_map = {
-            'hillshade_standard': 'Hillshade',
-            'hillshade_315_45_08': 'Hillshade', 
-            'hillshade_225_45_08': 'Hillshade',
+            'hs_red': 'Hillshade',
+            'hs_green': 'Hillshade',
+            'hs_blue': 'Hillshade',
+            'hillshade_rgb': 'HillshadeRgb',
             'slope': 'Terrain_Analysis',
             'aspect': 'Terrain_Analysis',
             'tpi': 'Terrain_Analysis',

@@ -1,43 +1,26 @@
 [
   {
-    "name": "NW_light",
+    "name": "hs_red",
     "azimuth": 315,
     "altitude": 30,
     "multi": false,
-    "output": "hillshade_NW_315_30.tif",
-    "description": "Illumination from NW (315°), best for casting shadows SE"
+    "output": "hillshade_315_30_z1.tif",
+    "description": "Hillshade for red channel (315° azimuth, 30° altitude)"
   },
   {
-    "name": "SE_light",
-    "azimuth": 135,
-    "altitude": 30,
-    "multi": false,
-    "output": "hillshade_SE_135_30.tif",
-    "description": "Illumination from SE (135°), complementary to NW lighting"
-  },
-  {
-    "name": "NE_light",
+    "name": "hs_green",
     "azimuth": 45,
     "altitude": 25,
     "multi": false,
-    "output": "hillshade_NE_045_25.tif",
-    "description": "Morning light from NE (45°) with low altitude for long shadows"
+    "output": "hillshade_45_25_z1.tif",
+    "description": "Hillshade for green channel (45° azimuth, 25° altitude)"
   },
   {
-    "name": "SW_light",
-    "azimuth": 225,
-    "altitude": 35,
-    "multi": false,
-    "output": "hillshade_SW_225_35.tif",
-    "description": "Southwest afternoon light, balances other directional biases"
-  },
-  {
-    "name": "Multi_composite",
-    "azimuth": null,
+    "name": "hs_blue",
+    "azimuth": 135,
     "altitude": 30,
-    "multi": true,
-    "azimuths": [0, 45, 90, 135, 180, 225, 270, 315],
-    "output": "hillshade_multi_composite.tif",
-    "description": "Composite hillshade using 8 directions to avoid lighting bias"
+    "multi": false,
+    "output": "hillshade_135_30_z1.tif",
+    "description": "Hillshade for blue channel (135° azimuth, 30° altitude)"
   }
 ]
