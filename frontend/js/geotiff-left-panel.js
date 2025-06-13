@@ -973,95 +973,92 @@ class GeoTiffLeftPanel {
             return false;
         }
 
-        // Define processing queue (same as ProcessingManager)
+        // Define processing queue (matching backend process_all_raster_products)
         const processingQueue = [
-            { type: 'dtm', name: 'DTM', icon: '🏔️' },
-            { type: 'dsm', name: 'DSM', icon: '🏗️' },
-            { type: 'hillshade', name: 'Hillshade', icon: '🌄' },
+            // Individual hillshades (from hillshade.json)
+            { type: 'hs_red', name: 'HS Red', icon: '🔴' },
+            { type: 'hs_green', name: 'HS Green', icon: '🟢' },
+            { type: 'hs_blue', name: 'HS Blue', icon: '🔵' },
+            // Other raster products
             { type: 'slope', name: 'Slope', icon: '📐' },
             { type: 'aspect', name: 'Aspect', icon: '🧭' },
-            { type: 'tpi', name: 'TPI', icon: '📈' },
-            { type: 'roughness', name: 'Roughness', icon: '🪨' },
-            { type: 'chm', name: 'CHM', icon: '🌳' }
+            { type: 'color_relief', name: 'Color Relief', icon: '🎨' },
+            { type: 'slope_relief', name: 'Slope Relief', icon: '🏔️' },
+            // Composite products (generated after individual ones)
+            { type: 'hillshade_rgb', name: 'RGB Hillshade', icon: '🌈' },
+            { type: 'tint_overlay', name: 'Tint Overlay', icon: '🎭' },
+            { type: 'boosted_hillshade', name: 'Boosted HS', icon: '⚡' }
         ];
 
         try {
             // Initialize LAZ modal progress display
             this.updateLazRasterProcessingQueue(processingQueue, -1);
             
-            if (window.Utils) window.Utils.showNotification('Starting sequential raster generation...', 'info');
+            if (window.Utils) window.Utils.showNotification('Starting raster generation...', 'info');
             
-            let successCount = 0;
-            let failedProcesses = [];
-            let lazProcessingCancelled = false;
-
-            // Set up cancel button handler
-            const cancelButton = document.getElementById('cancel-laz-raster-processing');
-            if (cancelButton) {
-                const cancelHandler = () => {
-                    lazProcessingCancelled = true;
-                    console.log('🛑 LAZ raster processing cancelled by user');
-                    if (window.Utils) window.Utils.showNotification('Raster processing cancelled', 'info');
-                };
+            // Instead of processing each raster individually, call the unified backend processing
+            try {
+                this.updateLazRasterProcessingStep('Processing All Rasters', 0, processingQueue.length);
                 
-                cancelButton.addEventListener('click', cancelHandler);
+                // Get region information
+                const regionName = processingRegion || selectedRegion;
+                const regionPath = window.FileManager?.getRegionPath();
+                let lazFileName = regionName + '.laz'; // Default fallback
                 
-                // Clean up event listener when processing completes
-                const cleanup = () => {
-                    cancelButton.removeEventListener('click', cancelHandler);
-                };
-                
-                // Store cleanup function for later use
-                this._lazCancelCleanup = cleanup;
-            }
-
-            // Process each item in the queue sequentially
-            for (let i = 0; i < processingQueue.length; i++) {
-                // Check for cancellation
-                if (lazProcessingCancelled) {
-                    console.log('LAZ processing cancelled by user');
-                    this.showLazRasterProgress(false);
-                    return false;
+                if (regionPath && regionPath.includes('input/LAZ/')) {
+                    // Extract actual filename from path like "input/LAZ/CUI_A01.laz"
+                    const pathParts = regionPath.split('/');
+                    lazFileName = pathParts[pathParts.length - 1];
                 }
-
-                const process = processingQueue[i];
                 
-                try {
-                    // Update LAZ modal UI to show current processing step
-                    this.updateLazRasterProcessingStep(process.name, i, processingQueue.length);
-                    this.updateLazRasterProcessingQueue(processingQueue, i);
-                    
-                    console.log(`Processing ${process.name} (${i + 1}/${processingQueue.length})`);
-                    
-                    // Execute the processing using ProcessingManager
-                    const success = await window.ProcessingManager.sendProcess(process.type);
-                    
-                    if (success) {
-                        successCount++;
-                        this.markLazQueueItemComplete(process.type, 'success');
-                        console.log(`${process.name} completed successfully`);
-                    } else {
-                        failedProcesses.push(process.name);
-                        this.markLazQueueItemComplete(process.type, 'error');
-                        console.log(`${process.name} failed`);
+                console.log(`🚀 Processing all rasters for region: ${regionName}, file: ${lazFileName}`);
+                
+                // Call the unified backend processing endpoint
+                const formData = new FormData();
+                formData.append('region_name', regionName);
+                formData.append('file_name', lazFileName);
+                
+                const response = await fetch('/api/laz/process-all-rasters', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Mark all processing steps as complete
+                    for (let i = 0; i < processingQueue.length; i++) {
+                        const process = processingQueue[i];
+                        this.markLazQueueItemComplete(process.type.replace('_', '-'), 'success');
+                        this.updateLazRasterProcessingStep(process.name, i + 1, processingQueue.length);
+                        
+                        // Small delay for visual effect
+                        if (i < processingQueue.length - 1) {
+                            await new Promise(resolve => setTimeout(resolve, 200));
+                        }
                     }
                     
-                    // Small delay between processes
-                    if (i < processingQueue.length - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                    }
-                    
-                } catch (error) {
-                    failedProcesses.push(process.name);
-                    this.markLazQueueItemComplete(process.type, 'error');
-                    console.log(`${process.name} processing failed:`, error);
+                    console.log('✅ All raster processing completed successfully');
+                    successCount = processingQueue.length;
+                    failedProcesses = [];
+                } else {
+                    throw new Error('Backend processing failed');
                 }
-            }
-
-            // Clean up cancel event listener
-            if (this._lazCancelCleanup) {
-                this._lazCancelCleanup();
-                delete this._lazCancelCleanup;
+                
+            } catch (error) {
+                console.error('❌ Unified raster processing failed:', error);
+                
+                // Mark all as failed
+                for (const process of processingQueue) {
+                    this.markLazQueueItemComplete(process.type.replace('_', '-'), 'error');
+                }
+                
+                failedProcesses = processingQueue.map(p => p.name);
+                successCount = 0;
             }
 
             // Generate metadata.txt file after all rasters are complete

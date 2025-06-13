@@ -870,18 +870,20 @@
             <div class="bg-[#1a1a1a] rounded-lg p-3">
               <div class="text-[#ababab] text-sm mb-2">Processing Queue:</div>
               <div class="grid grid-cols-4 gap-2 text-xs">
-                <div id="laz-queue-dtm" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
-                  <div class="text-[#8e44ad]">🏔️</div>
-                  <div>DTM</div>
+                <!-- Individual Hillshades -->
+                <div id="laz-queue-hs-red" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#e74c3c]">🔴</div>
+                  <div>HS Red</div>
                 </div>
-                <div id="laz-queue-dsm" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
-                  <div class="text-[#fd79a8]">🏗️</div>
-                  <div>DSM</div>
+                <div id="laz-queue-hs-green" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#27ae60]">🟢</div>
+                  <div>HS Green</div>
                 </div>
-                <div id="laz-queue-hillshade" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
-                  <div class="text-[#fdcb6e]">🌄</div>
-                  <div>Hillshade</div>
+                <div id="laz-queue-hs-blue" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#3498db]">🔵</div>
+                  <div>HS Blue</div>
                 </div>
+                <!-- Other Rasters -->
                 <div id="laz-queue-slope" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
                   <div class="text-[#e17055]">📐</div>
                   <div>Slope</div>
@@ -890,18 +892,28 @@
                   <div class="text-[#00b894]">🧭</div>
                   <div>Aspect</div>
                 </div>
-                <div id="laz-queue-tpi" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
-                  <div class="text-[#0984e3]">📈</div>
-                  <div>TPI</div>
+                <div id="laz-queue-color-relief" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#f39c12]">🎨</div>
+                  <div>Color Relief</div>
                 </div>
-                <div id="laz-queue-roughness" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
-                  <div class="text-[#74b9ff]">🪨</div>
-                  <div>Roughness</div>
+                <div id="laz-queue-slope-relief" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#9b59b6]">🏔️</div>
+                  <div>Slope Relief</div>
                 </div>
-                <div id="laz-queue-chm" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
-                  <div class="text-[#00b894]">🌳</div>
-                  <div>CHM</div>
+                <!-- Composite Products -->
+                <div id="laz-queue-hillshade-rgb" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#fdcb6e]">🌈</div>
+                  <div>RGB Hillshade</div>
                 </div>
+                <div id="laz-queue-tint-overlay" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#e84393]">🎭</div>
+                  <div>Tint Overlay</div>
+                </div>
+                <div id="laz-queue-boosted-hillshade" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                  <div class="text-[#00cec9]">⚡</div>
+                  <div>Boosted HS</div>
+                </div>
+                <!-- System Tasks -->
                 <div id="laz-queue-metadata" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
                   <div class="text-[#a29bfe]">📄</div>
                   <div>Metadata</div>

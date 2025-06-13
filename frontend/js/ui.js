@@ -1302,8 +1302,12 @@ window.UIManager = {
     Utils.log('info', `Checking for LIDAR raster images for region: ${regionName}`);
     
     try {
-      // Processing types that might have LIDAR raster results
-      const processingTypes = ['dtm', 'dsm', 'hillshade', 'slope', 'aspect', 'tpi', 'roughness', 'chm'];
+      // Processing types that match the new backend raster products
+      const processingTypes = [
+        'hs_red', 'hs_green', 'hs_blue',           // Individual hillshades
+        'slope', 'aspect', 'color_relief', 'slope_relief',  // Other raster products
+        'hillshade_rgb', 'tint_overlay', 'boosted_hillshade'  // Composite products
+      ];
       const availableRasters = [];
 
       // Check each processing type for available raster data
@@ -1435,22 +1439,27 @@ window.UIManager = {
   resetProcessingGalleryToLabels() {
     const gallery = $('#gallery');
     
-    // Reset to the original text-based gallery structure (no buttons)
+    // Updated gallery items to match actual backend processing results
     const labelItems = [
-      { id: 'dtm', label: 'DTM' },
-      { id: 'dsm', label: 'DSM' },
-      { id: 'hillshade', label: 'Hillshade' },
-      { id: 'slope', label: 'Slope' },
-      { id: 'aspect', label: 'Aspect' },
-      { id: 'tpi', label: 'TPI' },
-      { id: 'roughness', label: 'Roughness' },
-      { id: 'chm', label: 'CHM' }
+      // Individual hillshades
+      { id: 'hs_red', label: 'Hillshade Red', color: '#e74c3c' },
+      { id: 'hs_green', label: 'Hillshade Green', color: '#27ae60' },
+      { id: 'hs_blue', label: 'Hillshade Blue', color: '#3498db' },
+      // Other raster products
+      { id: 'slope', label: 'Slope', color: '#e17055' },
+      { id: 'aspect', label: 'Aspect', color: '#00b894' },
+      { id: 'color_relief', label: 'Color Relief', color: '#f39c12' },
+      { id: 'slope_relief', label: 'Slope Relief', color: '#9b59b6' },
+      // Composite products
+      { id: 'hillshade_rgb', label: 'RGB Hillshade', color: '#fdcb6e' },
+      { id: 'tint_overlay', label: 'Tint Overlay', color: '#e84393' },
+      { id: 'boosted_hillshade', label: 'Boosted Hillshade', color: '#00cec9' }
     ];
 
     const galleryHTML = labelItems.map(item => `
       <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-${item.id}">
         <div class="flex-1 flex items-center justify-center">
-          <div class="text-white text-lg font-medium">${item.label}</div>
+          <div class="text-white text-lg font-medium" style="color: ${item.color}">${item.label}</div>
         </div>
       </div>
     `).join('');
@@ -1461,7 +1470,7 @@ window.UIManager = {
       </div>
     `);
 
-    Utils.log('info', 'Reset Processing Results gallery to text labels');
+    Utils.log('info', 'Reset Processing Results gallery to show new hillshade and raster products');
   },
 
   /**
@@ -1884,6 +1893,7 @@ window.UIManager = {
    */
   getProcessingDisplayName(processingType) {
     const displayNames = {
+      // Legacy processing types
       'laz_to_dem': 'DEM',
       'dtm': 'DTM',
       'dsm': 'DSM',
@@ -1891,8 +1901,24 @@ window.UIManager = {
       'hillshade': 'Hillshade',
       'hillshade_315_45_08': 'Hillshade 315°',
       'hillshade_225_45_08': 'Hillshade 225°',
+      'tpi': 'TPI',
+      'roughness': 'Roughness',
+      
+      // New hillshade products
+      'hs_red': 'Hillshade Red',
+      'hs_green': 'Hillshade Green', 
+      'hs_blue': 'Hillshade Blue',
+      
+      // Raster products
       'slope': 'Slope',
-      'aspect': 'Aspect'
+      'aspect': 'Aspect',
+      'color_relief': 'Color Relief',
+      'slope_relief': 'Slope Relief',
+      
+      // Composite products
+      'hillshade_rgb': 'RGB Hillshade',
+      'tint_overlay': 'Tint Overlay',
+      'boosted_hillshade': 'Boosted Hillshade'
     };
     
     return displayNames[processingType] || processingType.charAt(0).toUpperCase() + processingType.slice(1);
@@ -1905,6 +1931,7 @@ window.UIManager = {
    */
   getProcessingColor(processingType) {
     const colorSchemes = {
+      // Legacy processing types
       'laz_to_dem': '#8B4513',        // Brown for DEM
       'dtm': '#8B4513',               // Brown for DTM
       'dsm': '#228B22',               // Forest Green for DSM
@@ -1912,8 +1939,24 @@ window.UIManager = {
       'hillshade': '#696969',         // Dim Gray for Hillshade
       'hillshade_315_45_08': '#808080', // Gray for Hillshade 315°
       'hillshade_225_45_08': '#A9A9A9', // Dark Gray for Hillshade 225°
-      'slope': '#FF6347',             // Tomato for Slope
-      'aspect': '#4169E1'             // Royal Blue for Aspect
+      'tpi': '#0984e3',               // Blue for TPI
+      'roughness': '#74b9ff',         // Light blue for Roughness
+      
+      // New hillshade products
+      'hs_red': '#e74c3c',            // Red for Red Hillshade
+      'hs_green': '#27ae60',          // Green for Green Hillshade
+      'hs_blue': '#3498db',           // Blue for Blue Hillshade
+      
+      // Raster products
+      'slope': '#e17055',             // Orange for Slope
+      'aspect': '#00b894',            // Teal for Aspect
+      'color_relief': '#f39c12',      // Orange for Color Relief
+      'slope_relief': '#9b59b6',      // Purple for Slope Relief
+      
+      // Composite products
+      'hillshade_rgb': '#fdcb6e',     // Yellow for RGB Hillshade
+      'tint_overlay': '#e84393',      // Pink for Tint Overlay
+      'boosted_hillshade': '#00cec9'  // Cyan for Boosted Hillshade
     };
     
     return colorSchemes[processingType] || '#6c757d'; // Default gray

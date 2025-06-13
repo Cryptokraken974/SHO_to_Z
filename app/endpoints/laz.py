@@ -1815,3 +1815,78 @@ async def generate_laz_metadata(
     except Exception as e:
         logger.error(f"Error generating LAZ metadata: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Metadata generation failed: {str(e)}")
+
+@router.post("/process-all-rasters")
+async def process_all_laz_rasters(
+    region_name: str = Form(...),
+    file_name: str = Form(...)
+):
+    """
+    Process all raster products for a LAZ region using the unified processing system
+    
+    Args:
+        region_name: Name of the region (e.g. "FoxIsland")
+        file_name: Name of the LAZ file (e.g. "FoxIsland.laz")
+        
+    Returns:
+        Processing results for all raster products
+    """
+    try:
+        logger.info(f"🚀 Processing all rasters for LAZ region: {region_name}, file: {file_name}")
+        
+        # Build the path to the elevation TIFF that should have been created from the LAZ
+        # Expected structure: output/<region>/lidar/DTM/<region>_DTM.tiff
+        dtm_tiff_path = BASE_DIR / "output" / region_name / "lidar" / "DTM" / f"{region_name}_DTM.tiff"
+        
+        if not dtm_tiff_path.exists():
+            # Try alternative naming conventions
+            alt_paths = [
+                BASE_DIR / "output" / region_name / "lidar" / f"{region_name}_DTM.tiff",
+                BASE_DIR / "output" / region_name / f"{region_name}_DTM.tiff",
+                BASE_DIR / "input" / region_name / "lidar" / f"{region_name}_DTM.tiff"
+            ]
+            
+            for alt_path in alt_paths:
+                if alt_path.exists():
+                    dtm_tiff_path = alt_path
+                    break
+            else:
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"DTM TIFF not found for region {region_name}. Please generate DTM first."
+                )
+        
+        logger.info(f"Using DTM TIFF: {dtm_tiff_path}")
+        
+        # Import the unified processing function
+        from app.processing.tiff_processing import process_all_raster_products
+        
+        # Create a progress callback for WebSocket updates (optional)
+        async def progress_callback(progress_data):
+            # This could be enhanced to send WebSocket updates to the frontend
+            logger.info(f"Processing progress: {progress_data}")
+        
+        # Process all raster products
+        processing_results = await process_all_raster_products(
+            str(dtm_tiff_path), 
+            progress_callback=progress_callback
+        )
+        
+        logger.info(f"✅ Completed processing all rasters for {region_name}")
+        
+        return {
+            "success": True,
+            "region_name": region_name,
+            "file_name": file_name,
+            "dtm_tiff_path": str(dtm_tiff_path),
+            "processing_results": processing_results
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing all LAZ rasters for {region_name}: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to process rasters: {str(e)}"
+        )
