@@ -112,6 +112,9 @@
       <button class="tab-btn px-6 py-3 text-[#ababab] font-medium border-b-2 border-transparent hover:bg-[#262626] hover:text-white transition-colors" data-tab="analysis">
         Analysis
       </button>
+      <button class="tab-btn px-6 py-3 text-[#ababab] font-medium border-b-2 border-transparent hover:bg-[#262626] hover:text-white transition-colors" data-tab="openai-analysis">
+        OpenAI Analysis
+      </button>
     </div>
   </div>
 
@@ -765,10 +768,125 @@
           </div>
           <div id="chat-log" class="max-h-[120px] overflow-y-auto mb-3 space-y-2 bg-[#262626] rounded-lg p-3"></div>
           <textarea id="chat-input" placeholder="Ask questions about your terrain analysis..." class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-[#ababab] resize-none focus:outline-none focus:border-[#00bfff] text-sm" rows="2"></textarea>
+        </div>        </div>
+      </div>
+    </div>
+
+    <!-- OpenAI Analysis Tab Content -->
+    <div id="openai-analysis-tab" class="tab-content hidden flex flex-1 overflow-hidden">
+      <!-- Main Content Area -->
+      <div class="flex-1 flex flex-col bg-[#141414] overflow-hidden">
+        <!-- Header -->
+        <div class="bg-[#1a1a1a] border-b border-[#303030] p-6">
+          <h1 class="text-white text-2xl font-bold">🤖 OpenAI Analysis</h1>
+          <p class="text-[#ababab] text-sm mt-2">AI-powered analysis of your terrain and satellite data</p>
+        </div>
+        
+        <!-- Main Analysis Area -->
+        <div class="flex-1 p-6 overflow-y-auto">
+          <!-- Image Selection Section -->
+          <div class="mb-6">
+            <div class="flex items-center gap-4 mb-4">
+              <button id="select-images-btn" class="bg-[#00bfff] hover:bg-[#0099cc] text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                📸 Select Images
+              </button>
+              <div id="selected-images-count" class="text-[#ababab] text-sm">
+                No images selected
+              </div>
+            </div>
+            
+            <!-- Selected Images Preview -->
+            <div id="selected-images-preview" class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-4 min-h-[200px]">
+              <div class="text-center text-[#666] py-8">
+                <div class="text-4xl mb-4">📁</div>
+                <p>Click "Select Images" to choose images for analysis</p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Analysis Controls -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Analysis Type Selection -->
+            <div class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-6">
+              <h3 class="text-white text-lg font-semibold mb-4">🎯 Analysis Type</h3>
+              <div class="space-y-3">
+                <label class="flex items-center">
+                  <input type="radio" name="analysis-type" value="terrain" class="mr-3" checked>
+                  <span class="text-white">Terrain Analysis</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="radio" name="analysis-type" value="vegetation" class="mr-3">
+                  <span class="text-white">Vegetation Assessment</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="radio" name="analysis-type" value="change-detection" class="mr-3">
+                  <span class="text-white">Change Detection</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="radio" name="analysis-type" value="custom" class="mr-3">
+                  <span class="text-white">Custom Analysis</span>
+                </label>
+              </div>
+            </div>
+            
+            <!-- Analysis Parameters -->
+            <div class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-6">
+              <h3 class="text-white text-lg font-semibold mb-4">⚙️ Parameters</h3>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-white text-sm mb-2">Analysis Prompt</label>
+                  <textarea id="analysis-prompt" 
+                            class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-[#ababab] resize-none focus:outline-none focus:border-[#00bfff]" 
+                            rows="3" 
+                            placeholder="Describe what you want to analyze..."></textarea>
+                </div>
+                <div class="flex gap-4">
+                  <div class="flex-1">
+                    <label class="block text-white text-sm mb-2">Model</label>
+                    <select id="openai-model" class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#00bfff]">
+                      <option value="gpt-4-vision-preview">GPT-4 Vision</option>
+                      <option value="gpt-4o">GPT-4o</option>
+                      <option value="gpt-4o-mini">GPT-4o Mini</option>
+                    </select>
+                  </div>
+                  <div class="flex-1">
+                    <label class="block text-white text-sm mb-2">Detail Level</label>
+                    <select id="detail-level" class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#00bfff]">
+                      <option value="low">Low</option>
+                      <option value="high" selected>High</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Analysis Controls -->
+          <div class="flex items-center gap-4 mb-6">
+            <button id="start-openai-analysis-btn" class="bg-[#28a745] hover:bg-[#218838] text-white px-6 py-3 rounded-lg font-medium transition-colors">
+              🚀 Start Analysis
+            </button>
+            <button id="stop-openai-analysis-btn" class="bg-[#dc3545] hover:bg-[#c82333] text-white px-6 py-3 rounded-lg font-medium transition-colors hidden">
+              🛑 Stop Analysis
+            </button>
+            <div id="openai-analysis-status" class="text-[#ababab] text-sm">
+              Ready to analyze
+            </div>
+          </div>
+          
+          <!-- Analysis Results -->
+          <div class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-6">
+            <h3 class="text-white text-lg font-semibold mb-4">📋 Analysis Results</h3>
+            <div id="openai-analysis-results" class="min-h-[300px]">
+              <div class="text-center text-[#666] py-8">
+                <div class="text-4xl mb-4">🤖</div>
+                <p>Analysis results will appear here</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
   <!-- Modal for file selection with modern design -->
   <div id="file-modal" class="modal fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center hidden z-50">
@@ -967,6 +1085,69 @@
     </div>
   </div>
 
+  <!-- Image Selection Modal for OpenAI Analysis -->
+  <div id="image-selection-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="modal-content bg-[#1a1a1a] border border-[#303030] rounded-lg w-[95%] max-w-6xl max-h-[90vh] flex flex-col">
+      <div class="modal-header flex justify-between items-center p-6 border-b border-[#303030]">
+        <h3 class="text-white text-lg font-semibold">📸 Select Images for Analysis</h3>
+        <button class="close text-[#ababab] hover:text-white text-xl font-bold" id="image-selection-modal-close">&times;</button>
+      </div>
+      
+      <div class="modal-body flex-1 p-6 overflow-hidden">
+        <div class="flex gap-6 h-full">
+          <!-- Categories -->
+          <div class="w-48 flex-shrink-0">
+            <h4 class="text-white font-medium mb-3">Image Categories</h4>
+            <div class="space-y-2">
+              <button class="category-btn w-full text-left px-3 py-2 rounded bg-[#00bfff] text-white" data-category="all">
+                📁 All Images
+              </button>
+              <button class="category-btn w-full text-left px-3 py-2 rounded bg-[#262626] hover:bg-[#404040] text-[#ababab] hover:text-white transition-colors" data-category="rasters">
+                🏔️ Raster Products
+              </button>
+              <button class="category-btn w-full text-left px-3 py-2 rounded bg-[#262626] hover:bg-[#404040] text-[#ababab] hover:text-white transition-colors" data-category="satellite">
+                🛰️ Satellite Images
+              </button>
+              <button class="category-btn w-full text-left px-3 py-2 rounded bg-[#262626] hover:bg-[#404040] text-[#ababab] hover:text-white transition-colors" data-category="hillshades">
+                🌄 Hillshades
+              </button>
+              <button class="category-btn w-full text-left px-3 py-2 rounded bg-[#262626] hover:bg-[#404040] text-[#ababab] hover:text-white transition-colors" data-category="composites">
+                🌈 Composites
+              </button>
+            </div>
+          </div>
+          
+          <!-- Images Gallery -->
+          <div class="flex-1 flex flex-col overflow-hidden">
+            <div class="flex justify-between items-center mb-4">
+              <div class="text-white font-medium" id="category-title">All Images</div>
+              <div class="flex items-center gap-4">
+                <div class="text-[#ababab] text-sm" id="selection-count">0 selected</div>
+                <button id="select-all-btn" class="bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded text-sm">Select All</button>
+                <button id="clear-selection-btn" class="bg-[#dc3545] hover:bg-[#c82333] text-white px-3 py-1 rounded text-sm">Clear</button>
+              </div>
+            </div>
+            
+            <!-- Gallery Container -->
+            <div id="image-selection-gallery" class="flex-1 overflow-y-auto">
+              <!-- Gallery will be populated by ModularGallery -->
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-footer flex justify-between items-center gap-3 p-6 border-t border-[#303030]">
+        <div class="text-[#ababab] text-sm" id="modal-selection-summary">
+          No images selected
+        </div>
+        <div class="flex gap-3">
+          <button id="cancel-image-selection" class="cancel-btn bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
+          <button id="confirm-image-selection" class="bg-[#00bfff] hover:bg-[#0099cc] text-white px-6 py-2 rounded-lg font-medium transition-colors">Use Selected Images</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- JavaScript files - load in dependency order -->
   <script src="/static/js/utils.js"></script>
   <script src="/static/js/api-client.js"></script>
@@ -980,6 +1161,8 @@
   <script src="/static/js/processing.js"></script>
   <script src="/static/js/saved_places.js"></script>
   <script src="/static/js/analysis.js"></script>
+  <script src="/static/js/modular-gallery.js"></script>
+  <script src="/static/js/openai-analysis.js"></script>
   <script src="/static/js/ui.js"></script>
   <script src="/static/js/geotiff-left-panel.js"></script>
   <script src="/static/js/geotiff-main-canvas.js"></script>

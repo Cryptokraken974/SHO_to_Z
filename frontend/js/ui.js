@@ -34,7 +34,7 @@ window.UIManager = {
 
   /**
    * Switch to a specific tab
-   * @param {string} tabName - Name of the tab to switch to ('map', 'geotiff-tools', or 'analysis')
+   * @param {string} tabName - Name of the tab to switch to ('map', 'geotiff-tools', 'analysis', or 'openai-analysis')
    */
   switchTab(tabName) {
     // Update tab buttons
@@ -57,6 +57,8 @@ window.UIManager = {
       }
     } else if (tabName === 'geotiff-tools') {
       this.initializeGeoTiffTab();
+    } else if (tabName === 'openai-analysis') {
+      this.initializeOpenAIAnalysisTab();
     }
 
     Utils.log('info', `Switched to ${tabName} tab`);
