@@ -131,6 +131,7 @@ from .endpoints.chat import router as chat_router
 from .endpoints.json_pipelines import router as json_pipelines_router
 from .endpoints.laz_processing import router as laz_router
 from .endpoints.overlays import router as overlays_router
+from .endpoints.prompts import router as prompts_router
 # from .endpoints.lidar_acquisition import router as lidar_router
 # from .endpoints.data_acquisition import router as data_router
 from .endpoints.elevation_api import router as elevation_router
@@ -155,6 +156,7 @@ app.include_router(sentinel2_router)
 app.include_router(geotiff_router)
 app.include_router(laz_file_router)
 app.include_router(cache_router)
+app.include_router(prompts_router)
 
 # Global exception handlers to ensure proper JSON responses
 @app.exception_handler(ValueError)

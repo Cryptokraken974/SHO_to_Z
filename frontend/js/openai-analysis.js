@@ -18,6 +18,7 @@ class OpenAIAnalysis {
         console.log('🤖 Initializing OpenAI Analysis module');
         this.setupEventListeners();
         this.initializeGalleries();
+        this.loadPrompts();
     }
     
     setupEventListeners() {
@@ -469,6 +470,15 @@ class OpenAIAnalysis {
             window.UIManager.showImageModal(imageSrc, imageAlt);
         } else {
             console.log('Image modal not available');
+        }
+    }
+
+    async loadPrompts() {
+        try {
+            const data = await prompts().getAllPrompts();
+            document.getElementById('prompt-display').value = data.content;
+        } catch (err) {
+            console.error('Failed to load prompts', err);
         }
     }
 }
