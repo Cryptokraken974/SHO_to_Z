@@ -588,3 +588,26 @@ async def api_roughness(input_file: str = Form(None), region_name: str = Form(No
         print(f"❌ Error in api_roughness: {str(e)}")
         print(f"❌ Error type: {type(e).__name__}")
         raise
+
+@router.post("/api/sky_view_factor")
+async def api_sky_view_factor(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None), display_region_name: str = Form(None)):
+    """Generate Sky View Factor from LAZ file - supports region or file processing"""
+    print(f"\n🎯 API CALL: /api/sky_view_factor")
+
+    if region_name and processing_type:
+        input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not input_file:
+        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+
+    try:
+        from ..processing.sky_view_factor import sky_view_factor
+        output_region = display_region_name if display_region_name else region_name
+        tif_path = sky_view_factor(input_file, output_region)
+        print(f"✅ TIF generated: {tif_path}")
+        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        print(f"✅ Base64 conversion complete")
+        return {"image": image_b64}
+    except Exception as e:
+        print(f"❌ Error in api_sky_view_factor: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
+        raise

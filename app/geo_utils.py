@@ -327,7 +327,8 @@ def get_laz_overlay_data(base_filename: str, processing_type: str, filename_proc
             'ColorRelief': 'ColorRelief',
             'TRI': 'TRI',
             'TPI': 'TPI',
-            'Roughness': 'Roughness'
+            'Roughness': 'Roughness',
+            'Sky_View_Factor': 'SkyViewFactor'
         }
         
         filename_suffix = filename_mapping.get(mapping_key, mapping_key.title())
@@ -909,7 +910,8 @@ def find_png_files(base_filename: str, processing_type: str, filename_processing
             'ColorRelief': 'ColorRelief',
             'TRI': 'TRI',
             'TPI': 'TPI',
-            'Roughness': 'Roughness'
+            'Roughness': 'Roughness',
+            'Sky_View_Factor': 'SkyViewFactor'
         }
         
         filename_suffix = filename_mapping.get(mapping_key, mapping_key.title())

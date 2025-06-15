@@ -15,7 +15,8 @@ window.componentManager.register('gallery', (props = {}) => {
         { id: 'slope', label: 'Slope', target: 'slope' },
         { id: 'aspect', label: 'Aspect', target: 'aspect' },
         { id: 'tpi', label: 'TPI', target: 'tpi' },
-        { id: 'roughness', label: 'Roughness', target: 'roughness' }
+        { id: 'roughness', label: 'Roughness', target: 'roughness' },
+        { id: 'sky_view_factor', label: 'Sky View Factor', target: 'sky_view_factor' }
     ];
     
     const galleryItems = items || defaultItems;

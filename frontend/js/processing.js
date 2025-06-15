@@ -115,6 +115,9 @@ window.ProcessingManager = {
         case 'roughness':
           data = await processing().generateRoughness(processingOptions);
           break;
+        case 'sky_view_factor':
+          data = await processing().generateSkyViewFactor(processingOptions);
+          break;
         default:
           // Fallback to generic method for unknown processing types
           data = await processing().processRegion(processingType, processingOptions);
@@ -323,7 +326,10 @@ window.ProcessingManager = {
       'hillshade_315_45_08': 'Hillshade 315°',
       'hillshade_225_45_08': 'Hillshade 225°',
       'slope': 'Slope',
-      'aspect': 'Aspect'
+      'aspect': 'Aspect',
+      'tpi': 'TPI',
+      'roughness': 'Roughness',
+      'sky_view_factor': 'Sky View Factor'
     };
     
     return displayNames[processingType] || processingType.charAt(0).toUpperCase() + processingType.slice(1);
@@ -527,6 +533,14 @@ window.ProcessingManager = {
   },
 
   /**
+   * Process Sky View Factor
+   * @param {Object} options - SVF processing options
+   */
+  async processSkyViewFactor(options = {}) {
+    return await this.sendProcess('sky_view_factor', options);
+  },
+
+  /**
    * Process TPI (Topographic Position Index)
    * @param {Object} options - TPI processing options
    */
@@ -644,7 +658,8 @@ window.ProcessingManager = {
       { type: 'aspect', name: 'Aspect', icon: '🧭' },
       { type: 'tpi', name: 'TPI', icon: '📈' },
       { type: 'roughness', name: 'Roughness', icon: '🪨' },
-      { type: 'chm', name: 'CHM', icon: '🌳' }
+      { type: 'chm', name: 'CHM', icon: '🌳' },
+      { type: 'sky_view_factor', name: 'Sky View Factor', icon: '☀️' }
     ];
 
     try {

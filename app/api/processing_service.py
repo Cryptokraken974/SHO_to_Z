@@ -222,3 +222,19 @@ class ProcessingService(BaseService, SyncServiceMixin):
             data['file_types'] = file_types
         
         return await self._delete('/api/processing/files', json_data=data)
+    async def generate_sky_view_factor(self, input_file: Optional[str] = None, region_name: Optional[str] = None,
+                                       processing_type: Optional[str] = None, display_region_name: Optional[str] = None) -> Dict[str, Any]:
+        """Generate Sky View Factor raster"""
+        import aiohttp
+        form_data = aiohttp.FormData()
+
+        if input_file:
+            form_data.add_field('input_file', input_file)
+        if region_name:
+            form_data.add_field('region_name', region_name)
+        if processing_type:
+            form_data.add_field('processing_type', processing_type)
+        if display_region_name:
+            form_data.add_field('display_region_name', display_region_name)
+
+        return await self._post('/api/sky_view_factor', form_data=form_data)
