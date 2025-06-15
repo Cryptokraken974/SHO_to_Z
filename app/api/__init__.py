@@ -42,6 +42,7 @@ from .lidar_acquisition_service import LidarAcquisitionService
 from .pipeline_service import PipelineService
 from .chat_service import ChatService
 from .core_service import CoreService
+from .openai_service import OpenAIService
 from .factory import ServiceFactory, default_factory
 
 __all__ = [
@@ -63,6 +64,7 @@ __all__ = [
     'PipelineService',
     'ChatService',
     'CoreService',
+    'OpenAIService',
     'ServiceFactory',
     'default_factory'
 ]
