@@ -25,6 +25,7 @@ from .prompt_service import PromptService
 from .openai_service import OpenAIService
 
 
+
 class ServiceFactory:
     """Factory class for creating and managing API services"""
     
@@ -122,11 +123,13 @@ class ServiceFactory:
             self._services['prompts'] = PromptService(self.base_url)
         return self._services['prompts']
 
+
     def get_openai_service(self) -> OpenAIService:
         """Get or create OpenAIService instance"""
         if 'openai' not in self._services:
             self._services['openai'] = OpenAIService(self.base_url)
         return self._services['openai']
+
     
     def get_core_service(self) -> CoreService:
         """Get or create CoreService instance"""
