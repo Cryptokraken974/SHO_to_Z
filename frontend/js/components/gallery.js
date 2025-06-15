@@ -56,3 +56,16 @@ function generateGalleryItem(item) {
         </div>
     `;
 }
+
+/**
+ * Raster Overlay Gallery Component
+ */
+window.componentManager.register('raster-overlay-gallery', (props = {}) => {
+    const { title = 'Raster Overlays' } = props;
+    return `
+        <div class="mb-4">
+            <h2 class="text-white text-lg font-semibold mb-4">${title}</h2>
+            <div id="raster-overlay-gallery" class="flex gap-4 overflow-x-auto pb-4"></div>
+        </div>
+    `;
+});

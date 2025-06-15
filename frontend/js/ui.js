@@ -1296,61 +1296,8 @@ window.UIManager = {
    * @param {string} regionName - The name of the region.
    */
   async displayLidarRasterForRegion(regionName) {
-    if (!regionName) {
-      Utils.log('info', 'No region selected for LIDAR raster display');
-      return;
-    }
-
-    Utils.log('info', `Checking for LIDAR raster images for region: ${regionName}`);
-    
-    try {
-      // Processing types that match the new backend raster products
-      const processingTypes = [
-        'hs_red', 'hs_green', 'hs_blue',           // Individual hillshades
-        'slope', 'aspect', 'color_relief', 'slope_relief',  // Other raster products
-        'hillshade_rgb', 'tint_overlay', 'boosted_hillshade'  // Composite products
-      ];
-      const availableRasters = [];
-
-      // Check each processing type for available raster data
-      for (const processingType of processingTypes) {
-        try {
-          const overlayData = await overlays().getRasterOverlayData(regionName, processingType);
-          
-          if (overlayData && overlayData.image_data) {
-            availableRasters.push({
-              processingType: processingType,
-              display: this.getProcessingDisplayName(processingType),
-              color: this.getProcessingColor(processingType),
-              overlayData: overlayData,
-              regionName: regionName,
-              filename: overlayData.filename || `${regionName}_${processingType}`
-            });
-            Utils.log('info', `Found ${processingType} raster data for region ${regionName}`);
-          } else {
-            // This is expected - not all processing types may be available
-            Utils.log('debug', `No ${processingType} raster data available for region ${regionName}`);
-          }
-        } catch (error) {
-          Utils.log('debug', `Error checking ${processingType} raster for region ${regionName}:`, error);
-        }
-      }
-
-      if (availableRasters.length === 0) {
-        Utils.log('info', `No LIDAR raster images found for region ${regionName}`);
-        // Reset gallery to show processing buttons instead
-        this.resetProcessingGalleryToLabels();
-        return;
-      }
-
-      // Display available LIDAR raster images in the processing gallery
-      this.displayLidarRasterGallery(availableRasters);
-      Utils.log('info', `Displayed ${availableRasters.length} LIDAR raster images for region ${regionName}`);
-
-    } catch (error) {
-      Utils.log('error', `Error fetching LIDAR raster images for ${regionName}:`, error);
-      // Reset to labels on error
-      this.resetProcessingGalleryToLabels();
+    if (window.rasterOverlayGallery) {
+      window.rasterOverlayGallery.loadRasters(regionName);
     }
   },
 
@@ -1359,80 +1306,15 @@ window.UIManager = {
    * @param {Array} availableRasters - Array of available raster data
    */
   displayLidarRasterGallery(availableRasters) {
-    const gallery = $('#gallery');
-    
-    if (!availableRasters || availableRasters.length === 0) {
-      this.resetProcessingGalleryToLabels();
-      return;
+    if (window.rasterOverlayGallery) {
+      const items = availableRasters.map(r => ({
+        id: r.processingType,
+        imageUrl: `data:image/png;base64,${r.overlayData.image_data}`,
+        title: r.display,
+        status: 'ready'
+      }));
+      window.rasterOverlayGallery.showRasters(items);
     }
-
-    // Start with the base gallery structure (all 8 vignettes)
-    this.resetProcessingGalleryToLabels();
-
-    // Update each vignette that has available data
-    availableRasters.forEach(raster => {
-      const { processingType, display, overlayData, regionName } = raster;
-      const imageDataUrl = `data:image/png;base64,${overlayData.image_data}`;
-      
-      // Find the corresponding gallery cell
-      const cell = $(`#cell-${processingType}`);
-      
-      if (cell.length) {
-        // Update the cell content to show the image
-        const cellContent = cell.find('.flex-1');
-        cellContent.html(`
-          <div class="relative w-full h-full">
-            <img src="${imageDataUrl}" 
-                 alt="${display}" 
-                 class="processing-result-image cursor-pointer w-full h-full object-cover"
-                 title="Click to view larger image">
-            <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-              ${display}
-            </div>
-            <div class="absolute top-2 right-2 bg-green-600 bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-              ✓ Ready
-            </div>
-          </div>
-        `);
-
-        // Add the "Add to Map" button below the image
-        cell.append(`
-          <button class="add-to-map-btn bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded-b-lg text-sm font-medium transition-colors mt-1" 
-                  data-target="${processingType}"
-                  data-region-name="${regionName}">
-            Add to Map
-          </button>
-        `);
-
-        Utils.log('info', `Updated gallery cell for ${processingType}`);
-      }
-    });
-
-    // Add click handlers for image modal view
-    gallery.find('.processing-result-image').on('click', function() {
-      const imageSrc = $(this).attr('src');
-      const imageAlt = $(this).attr('alt');
-      UIManager.showImageModal(imageSrc, imageAlt);
-    });
-
-    // Add click handlers for Add to Map buttons
-    gallery.find('.add-to-map-btn').on('click', function(e) {
-      e.preventDefault();
-      const $button = $(this);
-      const processingType = $button.data('target');
-      
-      if (!processingType) {
-        Utils.log('warn', 'No processing type found in data-target attribute');
-        return;
-      }
-      
-      Utils.log('info', `LIDAR Raster gallery: Add to Map clicked for ${processingType}`);
-      
-      // Handle the add to map functionality for LIDAR raster images
-      UIManager.handleProcessingResultsAddToMap(processingType, $button);
-    });
-
-    Utils.log('info', `Updated ${availableRasters.length} LIDAR raster images in Processing Results gallery`);
   },
 
   /**

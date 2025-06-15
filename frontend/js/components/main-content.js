@@ -19,6 +19,7 @@ window.componentManager.register('main-content', (props = {}) => {
             
             <!-- Galleries will be inserted here -->
             <div id="gallery-container"></div>
+            <div id="raster-overlay-gallery-container"></div>
             <div id="satellite-gallery-container"></div>
         </div>
     `;
@@ -29,7 +30,19 @@ window.componentManager.register('main-content', (props = {}) => {
         
         // Render gallery components
         await window.componentManager.render('gallery', '#gallery-container');
+        await window.componentManager.render('raster-overlay-gallery', '#raster-overlay-gallery-container');
         await window.componentManager.render('satellite-gallery', '#satellite-gallery-container');
+
+        // Instantiate raster overlay gallery wrapper
+        window.rasterOverlayGallery = new window.RasterOverlayGallery('raster-overlay-gallery', {
+            onAddToMap: (processingType) => {
+                const region = window.FileManager?.getSelectedRegion();
+                if (region && window.UIManager?.handleProcessingResultsAddToMap) {
+                    const btn = window.jQuery ? window.jQuery('<button></button>').data('region-name', region) : { data: () => region };
+                    window.UIManager.handleProcessingResultsAddToMap(processingType, btn);
+                }
+            }
+        });
     },
-    dependencies: ['map', 'gallery', 'satellite-gallery']
+    dependencies: ['map', 'gallery', 'raster-overlay-gallery', 'satellite-gallery']
 });
