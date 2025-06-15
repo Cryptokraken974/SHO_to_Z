@@ -641,6 +641,51 @@ async def process_slope_relief_tiff(tiff_path: str, output_dir: str, parameters:
             "processing_time": time.time() - start_time
         }
 
+async def process_lrm_tiff(tiff_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate Local Relief Model (LRM) from an elevation TIFF."""
+    start_time = time.time()
+
+    print(f"\n🌄 LRM PROCESSING (TIFF)")
+    print(f"📁 Input: {os.path.basename(tiff_path)}")
+
+    try:
+        window_size = parameters.get("window_size", 11)
+
+        elevation_array, metadata = read_elevation_tiff(tiff_path)
+
+        print(f"🔄 Calculating Local Relief Model (window={window_size})...")
+        from scipy.ndimage import uniform_filter
+
+        smooth = uniform_filter(elevation_array.astype(np.float32), size=window_size)
+        lrm_array = elevation_array.astype(np.float32) - smooth
+
+        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
+        output_filename = f"{base_name}_LRM.tif"
+        output_path = os.path.join(output_dir, output_filename)
+
+        save_raster(lrm_array, output_path, metadata, enhanced_quality=True)
+
+        processing_time = time.time() - start_time
+
+        result = {
+            "status": "success",
+            "output_file": output_path,
+            "processing_time": processing_time,
+            "parameters": {"window_size": window_size}
+        }
+
+        print(f"✅ LRM completed in {processing_time:.2f} seconds")
+        return result
+
+    except Exception as e:
+        error_msg = f"LRM processing failed: {str(e)}"
+        print(f"❌ {error_msg}")
+        return {
+            "status": "error",
+            "error": error_msg,
+            "processing_time": time.time() - start_time
+        }
+
 def apply_color_relief(elevation: np.ndarray) -> np.ndarray:
     """
     Apply color relief mapping to elevation data
@@ -989,7 +1034,8 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
         ("slope", process_slope_tiff, {}),
         ("aspect", process_aspect_tiff, {}),
         ("color_relief", process_color_relief_tiff, {}),
-        ("slope_relief", process_slope_relief_tiff, {})
+        ("slope_relief", process_slope_relief_tiff, {}),
+        ("lrm", process_lrm_tiff, {})
     ])
     
     results = {}

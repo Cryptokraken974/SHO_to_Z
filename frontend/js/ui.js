@@ -1072,6 +1072,7 @@ window.UIManager = {
       { id: 'aspect', label: 'Aspect', color: '#00b894' },
       { id: 'color_relief', label: 'Color Relief', color: '#f39c12' },
       { id: 'slope_relief', label: 'Slope Relief', color: '#9b59b6' },
+      { id: 'lrm', label: 'Local Relief Model', color: '#1abc9c' },
       // Composite products
       { id: 'hillshade_rgb', label: 'RGB Hillshade', color: '#fdcb6e' },
       { id: 'tint_overlay', label: 'Tint Overlay', color: '#e84393' },
@@ -1536,6 +1537,7 @@ window.UIManager = {
       'aspect': 'Aspect',
       'color_relief': 'Color Relief',
       'slope_relief': 'Slope Relief',
+      'lrm': 'Local Relief Model',
       
       // Composite products
       'hillshade_rgb': 'RGB Hillshade',
@@ -1574,6 +1576,7 @@ window.UIManager = {
       'aspect': '#00b894',            // Teal for Aspect
       'color_relief': '#f39c12',      // Orange for Color Relief
       'slope_relief': '#9b59b6',      // Purple for Slope Relief
+      'lrm': '#1abc9c',              // Teal for LRM
       
       // Composite products
       'hillshade_rgb': '#fdcb6e',     // Yellow for RGB Hillshade

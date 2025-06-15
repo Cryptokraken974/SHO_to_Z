@@ -152,7 +152,7 @@ class OpenAIAnalysis {
     async loadRasterImages(regionName) {
         const rasterTypes = [
             'hs_red', 'hs_green', 'hs_blue',
-            'slope', 'aspect', 'color_relief', 'slope_relief',
+            'slope', 'aspect', 'color_relief', 'slope_relief', 'lrm',
             'hillshade_rgb', 'tint_overlay', 'boosted_hillshade'
         ];
         
@@ -214,6 +214,7 @@ class OpenAIAnalysis {
             'aspect': 'Aspect',
             'color_relief': 'Color Relief',
             'slope_relief': 'Slope Relief',
+            'lrm': 'Local Relief Model',
             'hillshade_rgb': 'RGB Hillshade',
             'tint_overlay': 'Tint Overlay',
             'boosted_hillshade': 'Boosted Hillshade'
