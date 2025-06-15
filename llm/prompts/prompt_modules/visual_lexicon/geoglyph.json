@@ -1,0 +1,10 @@
+{
+  "module_type": "visual_lexicon_entry",
+  "anomaly_name": "Geoglyph",
+  "description": "Large-scale geometric (circles, squares) or figurative designs etched into the landscape.",
+  "phenomenological_signatures": {
+    "required": ["negative_relief"],
+    "expected": ["subtle_topographic_pattern"],
+    "secondary": ["soil_moisture_pattern", "uniform_regrowth_area"]
+  }
+}

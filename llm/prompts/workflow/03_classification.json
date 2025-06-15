@@ -1,0 +1,6 @@
+{
+  "module_type": "workflow_step",
+  "step_number": 3,
+  "step_name": "Classification via Dynamic Signature Mapping",
+  "content": "Now, classify each anomaly. This is the most critical reasoning step. For each anomaly, perform the following: \n1. Select a candidate classification from the `visual_lexicon` (e.g., 'Settlement Platform').\n2. Identify the `required` phenomenon from its `phenomenological_signatures` (e.g., 'positive_relief').\n3. For each `input_image` you have, look up the detailed description for that specific phenomenon in the image's `phenomenon_signatures` object.\n4. Compare the evidence you gathered in the previous step against this detailed, image-specific description.\n5. If the evidence strongly matches the description for a `required` signature, you have a positive match. The best classification is the one with the strongest matches, especially for `required` signatures. If no good match is found, classify as 'Unidentified Anomaly'."
+}

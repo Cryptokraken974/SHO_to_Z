@@ -1,0 +1,10 @@
+{
+  "module_type": "visual_lexicon_entry",
+  "anomaly_name": "Settlement Platform",
+  "description": "Raised earthen platforms for dwellings, sometimes arranged in a circle.",
+  "phenomenological_signatures": {
+    "required": ["positive_relief"],
+    "expected": ["vegetation_height_difference"],
+    "secondary": ["vegetation_health_anomaly"]
+  }
+}

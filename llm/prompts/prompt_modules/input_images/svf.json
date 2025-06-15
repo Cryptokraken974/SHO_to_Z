@@ -1,0 +1,11 @@
+{
+  "module_type": "input_image_definition",
+  "image_name": "svf",
+  "full_name": "Sky-View Factor",
+  "analysis_stage": "primary_detection",
+  "phenomenon_signatures": {
+    "positive_relief": "Shows as an area with a very high Sky-View Factor, particularly on its top surface, indicating it is raised and open to the sky.",
+    "negative_relief": "Shows as an area with a very low Sky-View Factor, indicating it is a depression or trench with obscured sky visibility.",
+    "subtle_topographic_pattern": "Reveals fine-grained patterns as a high-contrast texture of low and high SVF values."
+  }
+}
