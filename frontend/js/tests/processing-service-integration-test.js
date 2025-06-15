@@ -27,6 +27,7 @@ window.ProcessingServiceIntegrationTest = {
       'generateColorRelief',
       'generateTPI',
       'generateRoughness',
+      'generateSkyViewFactor',
       'generateAllRasters',
       'getProcessingStatus',
       'cancelProcessing',

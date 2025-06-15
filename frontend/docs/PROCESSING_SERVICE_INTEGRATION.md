@@ -27,6 +27,7 @@ Successfully updated the frontend to use the services in `ProcessingService.py` 
 - `generateColorRelief(options)` - Generate color relief visualization
 - `generateTPI(options)` - Generate Topographic Position Index
 - `generateRoughness(options)` - Generate terrain roughness analysis
+- `generateSkyViewFactor(options)` - Generate Sky View Factor raster
 
 #### Unified Operations
 - `generateAllRasters(regionName, batchSize)` - Generate all raster products

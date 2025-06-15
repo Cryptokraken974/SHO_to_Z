@@ -407,6 +407,26 @@ class ProcessingAPIClient extends BaseAPIClient {
     return this.postForm('roughness', formData);
   }
 
+  /**
+   * Generate Sky View Factor raster
+   * @param {Object} options - Processing options
+   * @param {string} options.inputFile - Input LAZ file path
+   * @param {string} options.regionName - Region name
+   * @param {string} options.processingType - Processing type
+   * @param {string} options.displayRegionName - Display region name
+   * @returns {Promise<Object>} Sky View Factor result
+   */
+  async generateSkyViewFactor(options = {}) {
+    const formData = new FormData();
+
+    if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
+    if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
+    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
+
+    return this.postForm('sky_view_factor', formData);
+  }
+
   // Unified Raster Generation
   
   /**
@@ -496,7 +516,8 @@ class ProcessingAPIClient extends BaseAPIClient {
       'aspect': this.generateAspect,
       'color-relief': this.generateColorRelief,
       'tpi': this.generateTPI,
-      'roughness': this.generateRoughness
+      'roughness': this.generateRoughness,
+      'sky_view_factor': this.generateSkyViewFactor
     };
 
     const method = methodMap[processingType];
