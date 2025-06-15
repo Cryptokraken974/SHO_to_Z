@@ -935,136 +935,32 @@ window.UIManager = {
    * @param {Array} files - Array of converted image file objects
    */
   displaySentinel2Images(files, regionName) {
-    const gallery = $('#satellite-gallery');
-    if (!gallery.length) {
-      Utils.log('error', 'Satellite gallery not found');
+    if (!window.satelliteOverlayGallery) {
+      Utils.log('error', 'SatelliteOverlayGallery not initialized');
       return;
     }
-    
-    // Clear previous images and loading message
-    gallery.empty(); 
-    Utils.log('info', '🗑️ Cleared satellite gallery before displaying converted images');
 
-    // Create image items with the same styling as Analysis tab
-    const imageItems = files.map(fileObj => {
-      Utils.log('info', `Processing satellite image file: ${JSON.stringify(fileObj)} for region: ${regionName}`);
-      
-      const band = fileObj.band; // e.g., 'RED_B04', 'NIR_B08'
-      const pngPath = fileObj.png_path;
-      const imageB64 = fileObj.image;
-      const sizeMb = fileObj.size_mb;
-      
-      let bandType = 'Unknown';
-      let bandColor = '#666';
-      if (band.includes('NIR_B08')) {
-        bandType = 'NIR (B08)';
-        bandColor = '#8B4513'; // Brown for NIR
-      } else if (band.includes('RED_B04')) {
-        bandType = 'Red (B04)';
-        bandColor = '#DC143C'; // Crimson for Red
-      } else if (band === 'NDVI') {
-        bandType = 'NDVI';
-        bandColor = '#228B22'; // Forest green for NDVI (vegetation index)
+    const items = (files || []).map(fileObj => {
+      const band = fileObj.band;
+      let apiRegionName = regionName;
+      if (!regionName.startsWith('region_')) {
+        apiRegionName = `region_${regionName.replace(/\./g, '_')}`;
       }
-      
-      // Extract filename from png_path for display
-      const fileName = pngPath.split('/').pop();
-      Utils.log('info', `Image file: ${fileName}, Band: ${bandType}`);
-
-      return `
-        <div class="gallery-item w-64 bg-[#1a1a1a] border border-[#303030] rounded-lg overflow-hidden hover:border-[#404040] transition-colors">
-          <div class="relative h-48">
-            <img src="data:image/png;base64,${imageB64}" 
-                 alt="${bandType} - ${regionName}" 
-                 class="w-full h-full object-cover cursor-pointer"
-                 title="Click to view larger image">
-            <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-              ${bandType}
-            </div>
-            <div class="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-              ${(sizeMb || 0).toFixed(1)} MB
-            </div>
-            <div class="absolute top-2 right-2 bg-blue-600 bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-              Sentinel-2
-            </div>
-          </div>
-          <div class="p-3">
-            <div class="text-white text-sm font-medium mb-2">${regionName}</div>
-            <button class="add-to-map-btn w-full bg-[#28a745] hover:bg-[#218838] text-white px-3 py-2 text-sm font-medium rounded transition-colors" 
-                    data-image-file="${fileName}" 
-                    data-region-name="${regionName}" 
-                    data-band-type="${bandType}"
-                    data-band="${band}">
-              Add ${bandType} to Map
-            </button>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    // Display in a responsive grid layout like Analysis tab
-    gallery.html(`
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        ${imageItems}
-      </div>
-    `);
-
-    // Add event handlers after rendering
-    gallery.find('.gallery-item img').on('click', function() {
-      const imageSrc = $(this).attr('src');
-      const imageAlt = $(this).attr('alt');
-      UIManager.showImageModal(imageSrc, imageAlt);
-    });
-
-    // Handle add to map click for satellite images
-    gallery.find('.add-to-map-btn').on('click', function() {
-      const $button = $(this);
-      const imgFile = $button.data('image-file');
-      const rName = $button.data('region-name');
-      const bType = $button.data('band-type');
-      const band = $button.data('band');
-      
-      // Ensure proper API region name format for overlay calls
-      let apiRegionName = rName;
-      if (!rName.startsWith('region_')) {
-        apiRegionName = `region_${rName.replace(/\./g, '_')}`;
-      }
-      
-      // Create overlay key to check if it's already active
       const regionBand = `${apiRegionName}_${band}`;
-      const overlayKey = `SENTINEL2_${regionBand}`;
-      
-      // Check if overlay is already active
-      const isActive = OverlayManager.mapOverlays[overlayKey] !== undefined;
-      
-      if (isActive) {
-        // Remove overlay
-        Utils.log('info', `Removing ${bType} overlay from map for region ${rName}`);
-        OverlayManager.removeOverlay(overlayKey);
-        
-        // Update button state to "Add to Map"
-        $button.text(`Add ${bType} to Map`)
-               .removeClass('bg-[#dc3545] hover:bg-[#c82333]')
-               .addClass('bg-[#28a745] hover:bg-[#218838]');
-        
-        Utils.showNotification(`Removed ${bType} overlay from map`, 'success');
-      } else {
-        // Add overlay
-        Utils.log('info', `Adding ${bType} overlay to map for region ${rName}`);
-        
-        // Use the Sentinel-2 overlay API to get the image with proper bounds
-        UIManager.addSentinel2OverlayToMap(regionBand, bType).then((success) => {
-          if (success) {
-            // Update button state to "Remove from Map"
-            $button.text(`Remove ${bType} from Map`)
-                   .removeClass('bg-[#28a745] hover:bg-[#218838]')
-                   .addClass('bg-[#dc3545] hover:bg-[#c82333]');
-          }
-        });
-      }
+      const title = window.satelliteOverlayGallery.getBandDisplayName
+        ? window.satelliteOverlayGallery.getBandDisplayName(band)
+        : band;
+      return {
+        id: regionBand,
+        imageUrl: `data:image/png;base64,${fileObj.image}`,
+        title,
+        subtitle: regionName,
+        status: 'ready',
+        bandType: title
+      };
     });
 
-    Utils.log('info', `Displayed ${files.length} Sentinel-2 images in gallery for region ${regionName}`);
+    window.satelliteOverlayGallery.showImages(items);
   },
 
   /**
@@ -1073,84 +969,11 @@ window.UIManager = {
    * @param {string} regionName - The name of the region.
    */
   async displaySentinel2ImagesForRegion(regionName) {
-    // Add comprehensive debugging to track all calls
-    const caller = (new Error()).stack.split('\n')[2]?.trim() || 'unknown';
-    Utils.log('info', `🛰️ === DISPLAY SENTINEL-2 IMAGES CALLED ===`);
-    Utils.log('info', `📍 Region Name: ${regionName}`);
-    Utils.log('info', `📞 Called from: ${caller}`);
-    Utils.log('info', `📊 Current FileManager state:`, {
-      selectedRegion: FileManager.getSelectedRegion(),
-      processingRegion: FileManager.getProcessingRegion(),
-      regionPath: FileManager.getRegionPath()
-    });
-    
-    Utils.log('info', `Checking for Sentinel-2 images for region: ${regionName}`);
-
-    // Clear the satellite gallery at the start to ensure fresh display
-    const gallery = $('#satellite-gallery');
-    if (gallery.length) {
-      gallery.empty();
-      // Add a loading message to provide visual feedback
-      gallery.html('<div class="loading-message text-center text-[#666] p-8">🛰️ Loading Sentinel-2 images...</div>');
-      Utils.log('info', '🗑️ Cleared satellite gallery and added loading message');
+    if (!window.satelliteOverlayGallery) {
+      Utils.log('error', 'SatelliteOverlayGallery not initialized');
+      return;
     }
-
-    try {
-      // Check for available Sentinel-2 bands (RED, NIR, NDVI)
-      const availableBands = [];
-      const sentinel2Bands = ['RED_B04', 'NIR_B08', 'NDVI'];
-
-      for (const band of sentinel2Bands) {
-        try {
-          // Use the overlay API to check if the band data exists
-          let apiRegionName = regionName;
-          if (!regionName.startsWith('region_')) {
-            apiRegionName = `region_${regionName.replace(/\./g, '_')}`;
-          }
-
-          const regionBand = `${apiRegionName}_${band}`;
-          const overlayData = await satellite().getSentinel2Overlay(regionBand);
-
-          if (overlayData && overlayData.image_data) {
-            availableBands.push({
-              band: band,
-              bandType: this.getSentinel2BandDisplayName(band),
-              overlayData: overlayData,
-              regionName: regionName,
-              filename: overlayData.filename || `${regionName}_${band}`
-            });
-            Utils.log('info', `Found ${band} data for region ${regionName}`);
-          } else {
-            // This is expected - not all bands may be available
-            Utils.log('debug', `No ${band} data available for region ${regionName}`);
-          }
-        } catch (error) {
-          Utils.log('debug', `Error checking ${band} for region ${regionName}:`, error);
-        }
-      }
-
-      if (availableBands.length === 0) {
-        Utils.log('info', `No Sentinel-2 images found for region ${regionName}`);
-        // Clear the satellite gallery and show a message
-        const gallery = $('#satellite-gallery');
-        if (gallery.length) {
-          gallery.empty().html('<div class="no-files text-center text-[#666] p-8">No satellite images available for this region.</div>');
-        }
-        return;
-      }
-
-      // Display available Sentinel-2 images in the satellite gallery
-      this.displaySentinel2BandsGallery(availableBands);
-      Utils.log('info', `Displayed ${availableBands.length} Sentinel-2 images for region ${regionName}`);
-
-    } catch (error) {
-      Utils.log('error', `Error fetching Sentinel-2 images for region ${regionName}:`, error);
-      // Clear the satellite gallery and show an error message
-      const gallery = $('#satellite-gallery');
-      if (gallery.length) {
-        gallery.empty().html('<div class="no-files text-center text-[#666] p-8">Error loading satellite images for this region.</div>');
-      }
-    }
+    await window.satelliteOverlayGallery.loadImages(regionName);
   },
 
   /**
@@ -1158,120 +981,35 @@ window.UIManager = {
    * @param {Array} availableBands - Array of available band data
    */
   displaySentinel2BandsGallery(availableBands) {
-    const gallery = $('#satellite-gallery');
-    if (!gallery.length) {
-      Utils.log('error', 'Satellite gallery not found');
+    if (!window.satelliteOverlayGallery) {
+      Utils.log('error', 'SatelliteOverlayGallery not initialized');
       return;
     }
-    
-    // Clear previous images and loading message
-    gallery.empty(); 
-    Utils.log('info', '🗑️ Cleared satellite gallery before displaying band images');
 
-    // Create image items with the same styling as the converted images
-    const imageItems = availableBands.map(bandData => {
-      const { band, bandType, overlayData, regionName } = bandData;
+    const items = (availableBands || []).map(bandData => {
+      const { band, overlayData, regionName } = bandData;
       const imageB64 = overlayData.image_data;
-      
-      // Get band color for styling
-      let bandColor = '#666';
-      if (band.includes('NIR')) {
-        bandColor = '#8B4513'; // Brown for NIR
-      } else if (band.includes('RED')) {
-        bandColor = '#DC143C'; // Crimson for Red
-      } else if (band === 'NDVI') {
-        bandColor = '#228B22'; // Forest green for NDVI
+
+      let apiRegionName = regionName;
+      if (!regionName.startsWith('region_')) {
+        apiRegionName = `region_${regionName.replace(/\./g, '_')}`;
       }
-
-      return `
-        <div class="gallery-item w-64 bg-[#1a1a1a] border border-[#303030] rounded-lg overflow-hidden hover:border-[#404040] transition-colors">
-          <div class="relative h-48">
-            <img src="data:image/png;base64,${imageB64}" 
-                 alt="${bandType} - ${regionName}" 
-                 class="w-full h-full object-cover cursor-pointer"
-                 title="Click to view larger image">
-            <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-              ${bandType}
-            </div>
-            <div class="absolute top-2 right-2 bg-blue-600 bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-              Sentinel-2
-            </div>
-          </div>
-          <div class="p-3">
-            <div class="text-white text-sm font-medium mb-2">${regionName}</div>
-            <button class="add-to-map-btn w-full bg-[#28a745] hover:bg-[#218838] text-white px-3 py-2 text-sm font-medium rounded transition-colors" 
-                    data-region-name="${regionName}" 
-                    data-band-type="${bandType}"
-                    data-band="${band}">
-              Add ${bandType} to Map
-            </button>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    // Display in a responsive grid layout
-    gallery.html(`
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        ${imageItems}
-      </div>
-    `);
-
-    // Add event handlers after rendering
-    gallery.find('.gallery-item img').on('click', function() {
-      const imageSrc = $(this).attr('src');
-      const imageAlt = $(this).attr('alt');
-      UIManager.showImageModal(imageSrc, imageAlt);
-    });
-
-    // Handle add to map click for satellite images
-    gallery.find('.add-to-map-btn').on('click', function() {
-      const $button = $(this);
-      const rName = $button.data('region-name');
-      const bType = $button.data('band-type');
-      const band = $button.data('band');
-      
-      // Ensure proper API region name format for overlay calls
-      let apiRegionName = rName;
-      if (!rName.startsWith('region_')) {
-        apiRegionName = `region_${rName.replace(/\./g, '_')}`;
-      }
-      
-      // Create overlay key to check if it's already active
       const regionBand = `${apiRegionName}_${band}`;
-      const overlayKey = `SENTINEL2_${regionBand}`;
-      
-      // Check if overlay is already active
-      const isActive = OverlayManager.mapOverlays[overlayKey] !== undefined;
-      
-      if (isActive) {
-        // Remove overlay
-        Utils.log('info', `Removing ${bType} overlay from map for region ${rName}`);
-        OverlayManager.removeOverlay(overlayKey);
-        
-        // Update button state to "Add to Map"
-        $button.text(`Add ${bType} to Map`)
-               .removeClass('bg-[#dc3545] hover:bg-[#c82333]')
-               .addClass('bg-[#28a745] hover:bg-[#218838]');
-        
-        Utils.showNotification(`Removed ${bType} overlay from map`, 'success');
-      } else {
-        // Add overlay
-        Utils.log('info', `Adding ${bType} overlay to map for region ${rName}`);
-        
-        // Use the Sentinel-2 overlay API to get the image with proper bounds
-        UIManager.addSentinel2OverlayToMap(regionBand, bType).then((success) => {
-          if (success) {
-            // Update button state to "Remove from Map"
-            $button.text(`Remove ${bType} from Map`)
-                   .removeClass('bg-[#28a745] hover:bg-[#218838]')
-                   .addClass('bg-[#dc3545] hover:bg-[#c82333]');
-          }
-        });
-      }
+      const title = window.satelliteOverlayGallery.getBandDisplayName
+        ? window.satelliteOverlayGallery.getBandDisplayName(band)
+        : band;
+
+      return {
+        id: regionBand,
+        imageUrl: `data:image/png;base64,${imageB64}`,
+        title,
+        subtitle: regionName,
+        status: 'ready',
+        bandType: title
+      };
     });
 
-    Utils.log('info', `Displayed ${availableBands.length} Sentinel-2 bands in gallery`);
+    window.satelliteOverlayGallery.showImages(items);
   },
 
   /**
