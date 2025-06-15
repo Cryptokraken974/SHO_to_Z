@@ -984,6 +984,7 @@ class GeoTiffLeftPanel {
             { type: 'aspect', name: 'Aspect', icon: '🧭' },
             { type: 'color_relief', name: 'Color Relief', icon: '🎨' },
             { type: 'slope_relief', name: 'Slope Relief', icon: '🏔️' },
+            { type: 'lrm', name: 'LRM', icon: '📏' },
             // Composite products (generated after individual ones)
             { type: 'hillshade_rgb', name: 'RGB Hillshade', icon: '🌈' },
             { type: 'tint_overlay', name: 'Tint Overlay', icon: '🎭' },

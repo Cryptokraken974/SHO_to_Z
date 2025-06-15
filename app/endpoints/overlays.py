@@ -138,6 +138,7 @@ async def get_overlay_data(processing_type: str, filename: str):
             'slope': 'Slope',
             'aspect': 'Aspect',
             'color_relief': 'ColorRelief',
+            'lrm': 'LRM',
             'tpi': 'TPI',
             'roughness': 'Roughness'
         }

@@ -4,7 +4,7 @@ class RasterOverlayGallery {
         this.options = Object.assign({
             processingTypes: [
                 'hs_red', 'hs_green', 'hs_blue',
-                'slope', 'aspect', 'color_relief', 'slope_relief',
+                'slope', 'aspect', 'color_relief', 'slope_relief', 'lrm',
                 'hillshade_rgb', 'tint_overlay', 'boosted_hillshade'
             ],
             onAddToMap: (type) => this.defaultAddToMap(type)
