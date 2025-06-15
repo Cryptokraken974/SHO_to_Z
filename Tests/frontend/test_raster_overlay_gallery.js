@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const vm = require('vm');
 const assert = require('assert');
 
@@ -16,9 +17,10 @@ const context = {
 };
 vm.createContext(context);
 
-const modularGalleryCode = fs.readFileSync('frontend/js/modular-gallery.js', 'utf8');
+const rootDir = path.resolve(__dirname, '../..');
+const modularGalleryCode = fs.readFileSync(path.join(rootDir, 'frontend/js/modular-gallery.js'), 'utf8');
 vm.runInContext(modularGalleryCode, context);
-const rasterCode = fs.readFileSync('frontend/js/raster-overlay-gallery.js', 'utf8');
+const rasterCode = fs.readFileSync(path.join(rootDir, 'frontend/js/raster-overlay-gallery.js'), 'utf8');
 context.overlays = () => ({ getRasterOverlayData: async () => ({ image_data: 'AA==' }) });
 context.window.UIManager = { getProcessingDisplayName: (t) => t };
 vm.runInContext(rasterCode, context);

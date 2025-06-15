@@ -1,11 +1,13 @@
 const fs = require('fs');
+const path = require('path');
 const vm = require('vm');
 const assert = require('assert');
 
+// Minimal DOM stub
 const container = {
   innerHTML: '',
   classList: { add() {} },
-  addEventListener() {},
+  addEventListener(event, handler) { this.handler = handler; },
   querySelectorAll() { return []; }
 };
 
@@ -15,9 +17,10 @@ const context = {
 };
 vm.createContext(context);
 
-const modularGalleryCode = fs.readFileSync('frontend/js/modular-gallery.js', 'utf8');
+const rootDir = path.resolve(__dirname, '../..');
+const modularGalleryCode = fs.readFileSync(path.join(rootDir, 'frontend/js/modular-gallery.js'), 'utf8');
 vm.runInContext(modularGalleryCode, context);
-const satCode = fs.readFileSync('frontend/js/satellite-overlay-gallery.js', 'utf8');
+const satCode = fs.readFileSync(path.join(rootDir, 'frontend/js/satellite-overlay-gallery.js'), 'utf8');
 context.satellite = () => ({ getSentinel2Overlay: async () => ({ image_data: 'AA==' }) });
 context.window.UIManager = { addSentinel2OverlayToMap: () => {} };
 vm.runInContext(satCode, context);

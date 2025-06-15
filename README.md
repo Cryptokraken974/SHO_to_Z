@@ -13,3 +13,12 @@ uvicorn app.main:app --reload
 ```
 
 Open `http://localhost:8000` in a browser.
+
+## Frontend Tests
+
+To run the small unit tests for the gallery components:
+
+```bash
+cd frontend
+npm test
+```
