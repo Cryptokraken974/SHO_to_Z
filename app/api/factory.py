@@ -21,6 +21,7 @@ from .lidar_acquisition_service import LidarAcquisitionService
 from .pipeline_service import PipelineService
 from .chat_service import ChatService
 from .core_service import CoreService
+from .prompt_service import PromptService
 
 
 class ServiceFactory:
@@ -113,6 +114,12 @@ class ServiceFactory:
         if 'chat' not in self._services:
             self._services['chat'] = ChatService(self.base_url)
         return self._services['chat']
+
+    def get_prompt_service(self) -> PromptService:
+        """Get or create PromptService instance"""
+        if 'prompts' not in self._services:
+            self._services['prompts'] = PromptService(self.base_url)
+        return self._services['prompts']
     
     def get_core_service(self) -> CoreService:
         """Get or create CoreService instance"""
@@ -231,3 +238,4 @@ pipelines = default_factory.get_pipeline_service
 chat = default_factory.get_chat_service
 core = default_factory.get_core_service
 laz = default_factory.get_laz_service
+prompts = default_factory.get_prompt_service

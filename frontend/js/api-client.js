@@ -1668,6 +1668,19 @@ class CacheManagementAPIClient extends BaseAPIClient {
 }
 
 /**
+ * Prompt Service
+ */
+class PromptAPIClient extends BaseAPIClient {
+  /**
+   * Get concatenated prompts string
+   * @returns {Promise<Object>} Prompt data
+   */
+  async getAllPrompts() {
+    return this.get('prompts/all');
+  }
+}
+
+/**
  * API Client Factory
  */
 class APIClientFactory {
@@ -1715,6 +1728,9 @@ class APIClientFactory {
           break;
         case 'cacheManagement':
           this._clients[clientType] = new CacheManagementAPIClient();
+          break;
+        case 'prompts':
+          this._clients[clientType] = new PromptAPIClient();
           break;
         default:
           throw new Error(`Unknown client type: ${clientType}`);
@@ -1799,6 +1815,13 @@ class APIClientFactory {
   get cacheManagement() {
     return this.getClient('cacheManagement');
   }
+
+  /**
+   * Get prompts client
+   */
+  get prompts() {
+    return this.getClient('prompts');
+  }
 }
 
 // Global API client factory instance
@@ -1818,6 +1841,7 @@ window.GeotiffAPIClient = GeotiffAPIClient;
 window.LAZAPIClient = LAZAPIClient;
 window.DataAcquisitionAPIClient = DataAcquisitionAPIClient;
 window.CacheManagementAPIClient = CacheManagementAPIClient;
+window.PromptAPIClient = PromptAPIClient;
 window.APIClientFactory = APIClientFactory;
 
 Utils.log('info', 'API Client system initialized successfully');
