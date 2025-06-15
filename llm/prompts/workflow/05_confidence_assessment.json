@@ -1,0 +1,6 @@
+{
+  "module_type": "workflow_step",
+  "step_number": 5,
+  "step_name": "Confidence Assessment",
+  "content": "Assign a confidence score (0.0 to 1.0) to each classification based on the hierarchy of evidence.\n- **High Confidence (0.8-1.0):** The feature is unambiguously visible in multiple `primary_detection` layers AND is clearly corroborated by evidence from a `secondary_confirmation` layer.\n- **Medium Confidence (0.5-0.7):** The feature is clearly visible in `primary_detection` layers but has weak, ambiguous, or no corroborating evidence in `secondary_confirmation` layers.\n- **Low Confidence (0.1-0.4):** The feature is subtle or ambiguous even in the `primary_detection` layers."
+}

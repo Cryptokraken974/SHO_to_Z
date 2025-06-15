@@ -1,0 +1,10 @@
+{
+  "module_type": "input_image_definition",
+  "image_name": "ndvi",
+  "full_name": "Sentinel-2 NDVI",
+  "analysis_stage": "secondary_confirmation",
+  "phenomenon_signatures": {
+    "vegetation_health_anomaly": "Shows as a distinct pattern of higher or lower greenness (e.g., a linear feature or geometric shape) that contrasts with the surrounding vegetation.",
+    "soil_moisture_pattern": "May be inferred from vegetation health; wetter soil from an ancient ditch could support greener vegetation, appearing as a higher NDVI value."
+  }
+}

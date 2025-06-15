@@ -1,0 +1,6 @@
+{
+  "module_type": "workflow_step",
+  "step_number": 4,
+  "step_name": "Archaeological Interpretation",
+  "content": "Based on your classification, synthesize your findings into a plausible archaeological interpretation for each anomaly. Describe its form, potential function, and its relationship to the surrounding landscape and any other identified features."
+}

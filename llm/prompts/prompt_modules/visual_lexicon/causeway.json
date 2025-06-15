@@ -1,0 +1,10 @@
+{
+  "module_type": "visual_lexicon_entry",
+  "anomaly_name": "Causeway",
+  "description": "Linear, raised earthen features that connect settlements, ceremonial sites, or resource areas.",
+  "phenomenological_signatures": {
+    "required": ["positive_relief"],
+    "expected": ["vegetation_height_difference"],
+    "secondary": ["vegetation_health_anomaly"]
+  }
+}

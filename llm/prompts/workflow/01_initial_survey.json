@@ -1,0 +1,6 @@
+{
+  "module_type": "workflow_step",
+  "step_number": 1,
+  "step_name": "Primary Detection Survey",
+  "content": "Your first task is to perform a systematic survey for potential anomalies. You must **only** use the images designated with \"analysis_stage\": \"primary_detection\". Scan these LiDAR-derived rasters for any topographic features that appear anthropogenic (e.g., unnatural geometric shapes, linear features, regular patterns). Create an internal list of these 'potential anomalies'. **Do not analyze any other images at this stage.**"
+}

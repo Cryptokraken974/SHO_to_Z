@@ -1,0 +1,11 @@
+{
+  "module_type": "input_image_definition",
+  "image_name": "chm",
+  "full_name": "Canopy Height Model",
+  "analysis_stage": "secondary_confirmation",
+  "phenomenon_signatures": {
+    "vegetation_height_difference": "Shows as a clear pattern of contrasting values (e.g., lower canopy on an old settlement vs. higher canopy of the surrounding primary forest).",
+    "uniform_regrowth_area": "Identified as a zone where the canopy height is consistently lower and more homogenous than the surrounding, more varied, mature forest.",
+    "canopy_texture_anomaly": "A regular, grid-like, or geometric pattern in the canopy texture that may correspond to underlying agricultural works or settlement patterns."
+  }
+}

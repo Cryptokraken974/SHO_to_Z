@@ -1,0 +1,6 @@
+{
+  "module_type": "workflow_step",
+  "step_number": 2,
+  "step_name": "Hierarchical Evidence Gathering",
+  "content": "For each 'potential anomaly' you identified in the previous step, follow this strict two-part evidence gathering procedure:\n\n**Part A: Primary Evidence Documentation.**\nFirst, document the anomaly's appearance across ALL images designated as \"analysis_stage\": \"primary_detection\". Describe the visual evidence from each of these primary layers in neutral, factual terms.\n\n**Part B: Secondary Confirmation Check.**\nAfter you have documented the primary evidence, you will now perform a check for corroboration. For each anomaly, look at its precise location in the images designated as \"analysis_stage\": \"secondary_confirmation\". Document whether a corresponding visual pattern exists. State clearly if evidence is present or absent (e.g., 'In the NDVI image, a faint linear pattern of higher greenness directly corresponds with the feature identified in the LRM.' or 'In the NDVI image, there is no discernible pattern at the feature's location.')."
+}

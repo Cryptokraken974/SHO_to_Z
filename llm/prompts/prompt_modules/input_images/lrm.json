@@ -1,0 +1,11 @@
+{
+  "module_type": "input_image_definition",
+  "image_name": "lrm",
+  "full_name": "Local Relief Model",
+  "analysis_stage": "primary_detection",
+  "phenomenon_signatures": {
+    "positive_relief": "Appears as a distinct, bright or light-colored area relative to its immediate surroundings, indicating it is topographically higher.",
+    "negative_relief": "Appears as a distinct, dark or shadowed area relative to its immediate surroundings, indicating it is topographically lower.",
+    "subtle_topographic_pattern": "Manifests as a faint but discernible geometric or organized texture that stands out from the natural terrain."
+  }
+}
