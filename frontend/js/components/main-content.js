@@ -31,7 +31,7 @@ window.componentManager.register('main-content', (props = {}) => {
         // Render gallery components
         await window.componentManager.render('gallery', '#gallery-container');
         await window.componentManager.render('raster-overlay-gallery', '#raster-overlay-gallery-container');
-        await window.componentManager.render('satellite-gallery', '#satellite-gallery-container');
+        await window.componentManager.render('satellite-overlay-gallery', '#satellite-gallery-container');
 
         // Instantiate raster overlay gallery wrapper
         window.rasterOverlayGallery = new window.RasterOverlayGallery('raster-overlay-gallery', {
@@ -43,6 +43,15 @@ window.componentManager.register('main-content', (props = {}) => {
                 }
             }
         });
+
+        // Instantiate satellite overlay gallery wrapper
+        window.satelliteOverlayGallery = new window.SatelliteOverlayGallery('satellite-gallery', {
+            onAddToMap: (regionBand, bandType) => {
+                if (window.UIManager?.addSentinel2OverlayToMap) {
+                    window.UIManager.addSentinel2OverlayToMap(regionBand, bandType);
+                }
+            }
+        });
     },
-    dependencies: ['map', 'gallery', 'raster-overlay-gallery', 'satellite-gallery']
+    dependencies: ['map', 'gallery', 'raster-overlay-gallery', 'satellite-overlay-gallery']
 });

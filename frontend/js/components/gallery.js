@@ -47,6 +47,20 @@ window.componentManager.register('satellite-gallery', (props = {}) => {
     `;
 });
 
+/**
+ * Satellite Overlay Gallery Component
+ */
+window.componentManager.register('satellite-overlay-gallery', (props = {}) => {
+    const { title = 'Satellite Overlays' } = props;
+
+    return `
+        <div class="mb-4">
+            <h2 class="text-white text-lg font-semibold mb-4">${title}</h2>
+            <div id="satellite-gallery" class="flex gap-4 overflow-x-auto pb-4"></div>
+        </div>
+    `;
+});
+
 function generateGalleryItem(item) {
     return `
         <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-${item.id}">
