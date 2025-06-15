@@ -18,6 +18,7 @@ class OpenAIAnalysis {
         console.log('🤖 Initializing OpenAI Analysis module');
         this.setupEventListeners();
         this.initializeGalleries();
+        this.loadPrompts();
     }
     
     setupEventListeners() {
@@ -63,6 +64,11 @@ class OpenAIAnalysis {
         
         document.getElementById('stop-openai-analysis-btn')?.addEventListener('click', () => {
             this.stopAnalysis();
+        });
+
+        // Send prompt to OpenAI
+        document.getElementById('send-to-openai')?.addEventListener('click', () => {
+            this.sendPromptToOpenAI();
         });
         
         // Analysis type change handler
@@ -469,6 +475,38 @@ class OpenAIAnalysis {
             window.UIManager.showImageModal(imageSrc, imageAlt);
         } else {
             console.log('Image modal not available');
+        }
+    }
+
+    async sendPromptToOpenAI() {
+        const prompt = document.getElementById('prompt-display').value.trim();
+        if (!prompt) {
+            window.Utils?.showNotification('No prompt loaded', 'warning');
+            return;
+        }
+        const lazName = window.FileManager?.getSelectedRegion() || null;
+        const lat = parseFloat(document.getElementById('lat-input').value);
+        const lng = parseFloat(document.getElementById('lng-input').value);
+        const coords = (!isNaN(lat) && !isNaN(lng)) ? { lat, lng } : null;
+        const images = this.selectedImages.map(img => img.imageUrl);
+
+        try {
+            const payload = { prompt, images, laz_name: lazName, coordinates: coords };
+            const data = await openai().sendPrompt(payload);
+            console.log('OpenAI response', data);
+            window.Utils?.showNotification('Prompt sent to OpenAI', 'success');
+        } catch (err) {
+            console.error('Failed to send to OpenAI', err);
+            window.Utils?.showNotification('Failed to send to OpenAI', 'error');
+        }
+    }
+
+    async loadPrompts() {
+        try {
+            const data = await prompts().getAllPrompts();
+            document.getElementById('prompt-display').value = data.content;
+        } catch (err) {
+            console.error('Failed to load prompts', err);
         }
     }
 }

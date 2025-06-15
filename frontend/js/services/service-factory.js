@@ -115,6 +115,28 @@ class ServiceFactory {
   }
 
   /**
+   * Get or create PromptService instance
+   * @returns {PromptAPIClient} PromptService instance
+   */
+  getPromptService() {
+    if (!this._services.prompts) {
+      this._services.prompts = new PromptAPIClient();
+    }
+    return this._services.prompts;
+  }
+
+  /**
+   * Get or create OpenAIService instance
+   * @returns {OpenAIAPIClient} OpenAIService instance
+   */
+  getOpenAIService() {
+    if (!this._services.openai) {
+      this._services.openai = new OpenAIAPIClient();
+    }
+    return this._services.openai;
+  }
+
+  /**
    * Clear all service instances
    */
   clearAll() {
@@ -170,6 +192,14 @@ function createLAZService() {
   return new LAZAPIClient();
 }
 
+function createPromptService() {
+  return new PromptAPIClient();
+}
+
+function createOpenAIService() {
+  return new OpenAIAPIClient();
+}
+
 // Global service factory instance
 const defaultFactory = new ServiceFactory();
 
@@ -183,6 +213,8 @@ const savedPlaces = () => defaultFactory.getSavedPlacesService();
 const geotiff = () => defaultFactory.getGeotiffService();
 const regionAnalysis = () => defaultFactory.getRegionAnalysisService();
 const laz = () => defaultFactory.getLAZService();
+const prompts = () => defaultFactory.getPromptService();
+const openai = () => defaultFactory.getOpenAIService();
 
 // Export for use in modules or global access
 window.ServiceFactory = ServiceFactory;
@@ -198,6 +230,8 @@ window.createGeotiffService = createGeotiffService;
 window.createSavedPlacesService = createSavedPlacesService;
 window.createRegionAnalysisService = createRegionAnalysisService;
 window.createLAZService = createLAZService;
+window.createPromptService = createPromptService;
+window.createOpenAIService = createOpenAIService;
 
 // Export convenience aliases
 window.regions = regions;
@@ -209,3 +243,5 @@ window.savedPlaces = savedPlaces;
 window.geotiff = geotiff;
 window.regionAnalysis = regionAnalysis;
 window.laz = laz;
+window.prompts = prompts;
+window.openai = openai;

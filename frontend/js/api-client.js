@@ -1668,6 +1668,40 @@ class CacheManagementAPIClient extends BaseAPIClient {
 }
 
 /**
+ * Prompt Service
+ */
+class PromptAPIClient extends BaseAPIClient {
+  /**
+   * Get concatenated prompts string
+   * @returns {Promise<Object>} Prompt data
+   */
+  async getAllPrompts() {
+    return this.get('prompts/all');
+  }
+}
+
+/**
+ * OpenAI interaction client
+ */
+class OpenAIAPIClient extends BaseAPIClient {
+  /**
+   * Send prompt and images to OpenAI
+   * @param {Object} payload Request payload
+   */
+  async send(payload) {
+    return this.post('openai/send', payload);
+  }
+
+  /**
+   * Create log entry for OpenAI request
+   * @param {Object} payload Log payload
+   */
+  async createLog(payload) {
+    return this.post('openai/log', payload);
+  }
+}
+
+/**
  * API Client Factory
  */
 class APIClientFactory {
@@ -1715,6 +1749,12 @@ class APIClientFactory {
           break;
         case 'cacheManagement':
           this._clients[clientType] = new CacheManagementAPIClient();
+          break;
+        case 'prompts':
+          this._clients[clientType] = new PromptAPIClient();
+          break;
+        case 'openai':
+          this._clients[clientType] = new OpenAIAPIClient();
           break;
         default:
           throw new Error(`Unknown client type: ${clientType}`);
@@ -1799,6 +1839,20 @@ class APIClientFactory {
   get cacheManagement() {
     return this.getClient('cacheManagement');
   }
+
+  /**
+   * Get prompts client
+   */
+  get prompts() {
+    return this.getClient('prompts');
+  }
+
+  /**
+   * Get OpenAI client
+   */
+  get openai() {
+    return this.getClient('openai');
+  }
 }
 
 // Global API client factory instance
@@ -1818,6 +1872,8 @@ window.GeotiffAPIClient = GeotiffAPIClient;
 window.LAZAPIClient = LAZAPIClient;
 window.DataAcquisitionAPIClient = DataAcquisitionAPIClient;
 window.CacheManagementAPIClient = CacheManagementAPIClient;
+window.PromptAPIClient = PromptAPIClient;
+window.OpenAIAPIClient = OpenAIAPIClient;
 window.APIClientFactory = APIClientFactory;
 
 Utils.log('info', 'API Client system initialized successfully');
