@@ -29,5 +29,10 @@ class OpenAIService(BaseService, SyncServiceMixin):
             "images": log_images,
             "prompt": prompt,
         }
-        await self._post("/api/openai/log", json_data=log_payload)
+        log_result = await self._post("/api/openai/log", json_data=log_payload)
+        response_payload = {
+            "log_file": log_result.get("log_file"),
+            "response": response.get("response"),
+        }
+        await self._post("/api/openai/response", json_data=response_payload)
         return response
