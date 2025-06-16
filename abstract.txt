@@ -1,0 +1,11 @@
+### Final Abstract (Expanded)
+
+**Title:** A Scalable Open-Source Platform for AI-Assisted Archaeological Feature Detection in Large-Scale Geospatial Datasets
+
+**Abstract:**
+
+Analyzing vast LiDAR and satellite datasets is fundamentally hindered by time-consuming manual scanning and the immense difficulty of scaling local discoveries across entire regions. We introduce a novel open-source application that synergizes automated image processing with Large Language Model (LLM) analysis through a unified web interface. The platform automates the on-demand generation of key analytical rasters from user data or the Copernicus database for any global location. Its core innovation is a modular prompting engine, which allows researchers to design, save, and execute repeatable, fine-tuned AI-driven searches with unprecedented scientific rigor and transparency.
+
+To validate its power, the tool was applied to a 500 km² section of the Amazonian forest, processing a large batch of `.laz` files. It automatically generated and analyzed over 2,000 image tiles, identifying 15 high-probability anomalies—including previously uncatalogued geoglyphs and raised-field farming systems—in mere hours. This powerful workflow, which traditionally takes weeks of manual labor, dramatically accelerates the research lifecycle. Ultimately, the platform empowers professionals to bypass tedious data preparation, shifting their valuable time and expertise directly to high-level interpretation and discovery.
+
+**Word Count: 199**
