@@ -37,8 +37,15 @@ class GeoTiffLeftPanel {
             loadLazBtn.addEventListener('click', () => this.openLazFileModal());
         }
 
+        // LAZ folder loader
+        const loadLazFolderBtn = document.getElementById('load-laz-folder-btn');
+        if (loadLazFolderBtn) {
+            loadLazFolderBtn.addEventListener('click', () => this.openLazFolderModal());
+        }
+
         // Setup LAZ modal events
         this.setupLazModalEvents();
+        this.setupLazFolderModalEvents();
     }
 
     async loadFileTree() {
@@ -528,13 +535,15 @@ class GeoTiffLeftPanel {
         }
     }
 
-    openLazFileModal() {
+    openLazFileModal(clear = true) {
         console.log('📂 Opening LAZ file browser modal');
         const modal = document.getElementById('laz-file-modal');
         if (modal) {
             modal.classList.remove('hidden');
-            // Reset modal state
-            this.clearLazFiles();
+            if (clear) {
+                // Reset modal state
+                this.clearLazFiles();
+            }
         }
     }
 
@@ -635,6 +644,148 @@ class GeoTiffLeftPanel {
             const hasFiles = this.selectedLazFiles && this.selectedLazFiles.length > 0;
             loadBtn.disabled = !hasFiles;
         }
+    }
+
+    // ---------- Folder Modal Logic ----------
+
+    static countLazFilesByFolder(fileList) {
+        const counts = {};
+        Array.from(fileList).forEach(file => {
+            const ext = file.name.toLowerCase().split('.').pop();
+            if (ext !== 'laz') return;
+            const rel = file.webkitRelativePath || file.name;
+            const folder = rel.split('/')[0];
+            counts[folder] = (counts[folder] || 0) + 1;
+        });
+        return counts;
+    }
+
+    setupLazFolderModalEvents() {
+        const modal = document.getElementById('laz-folder-modal');
+        const closeBtn = document.getElementById('laz-folder-modal-close');
+        const cancelBtn = document.getElementById('cancel-laz-folder-modal');
+        const browseBtn = document.getElementById('browse-laz-folder-btn');
+        const folderInput = document.getElementById('laz-folder-input');
+        const dropZone = document.getElementById('laz-folder-drop-zone');
+        const clearBtn = document.getElementById('clear-laz-folders');
+        const doneBtn = document.getElementById('done-laz-folder');
+
+        [closeBtn, cancelBtn].forEach(btn => {
+            if (btn) btn.addEventListener('click', () => this.closeLazFolderModal());
+        });
+
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) this.closeLazFolderModal();
+            });
+        }
+
+        if (browseBtn) {
+            browseBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (folderInput) folderInput.click();
+            });
+        }
+
+        if (folderInput) {
+            folderInput.addEventListener('change', (e) => {
+                this.handleLazFolderSelection(e.target.files);
+            });
+        }
+
+        if (dropZone) {
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-[#5e60ce]');
+            });
+            dropZone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-[#5e60ce]');
+            });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-[#5e60ce]');
+                this.handleLazFolderSelection(e.dataTransfer.files);
+            });
+            dropZone.addEventListener('click', (e) => {
+                if (e.target === dropZone || (e.target.closest('#laz-folder-drop-zone') && !e.target.closest('#browse-laz-folder-btn'))) {
+                    if (folderInput) folderInput.click();
+                }
+            });
+        }
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => this.clearLazFolders());
+        }
+
+        if (doneBtn) {
+            doneBtn.addEventListener('click', () => {
+                const hasFiles = this.selectedLazFiles && this.selectedLazFiles.length > 0;
+                this.closeLazFolderModal();
+                if (hasFiles) {
+                    this.openLazFileModal(false);
+                    this.updateLazFilesList();
+                    this.updateLoadButton();
+                    this.loadLazFiles();
+                } else {
+                    this.showError('No LAZ files found in selected folder');
+                }
+            });
+        }
+    }
+
+    openLazFolderModal() {
+        const modal = document.getElementById('laz-folder-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            this.clearLazFolders();
+        }
+    }
+
+    closeLazFolderModal() {
+        const modal = document.getElementById('laz-folder-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+            this.clearLazFolders();
+        }
+    }
+
+    handleLazFolderSelection(files) {
+        this.selectedLazFolders = [];
+        this.selectedLazFiles = [];
+        const counts = GeoTiffLeftPanel.countLazFilesByFolder(files);
+        Object.entries(counts).forEach(([folder, count]) => {
+            this.selectedLazFolders.push({ name: folder, count });
+        });
+        this.selectedLazFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.laz'));
+        this.updateLazFolderList();
+    }
+
+    updateLazFolderList() {
+        const list = document.getElementById('laz-folders-list');
+        if (!list) return;
+        if (!this.selectedLazFolders || this.selectedLazFolders.length === 0) {
+            list.innerHTML = '<div class="text-[#666] text-sm text-center py-4">No folders selected</div>';
+            return;
+        }
+        const html = this.selectedLazFolders.map(f => `
+            <div class="flex items-center justify-between bg-[#1a1a1a] p-3 rounded-lg border border-[#404040]">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-folder text-[#5e60ce]"></i>
+                    <div class="text-white text-sm font-medium">${f.name}</div>
+                </div>
+                <div class="text-[#ababab] text-sm">${f.count} .laz files</div>
+            </div>
+        `).join('');
+        list.innerHTML = html;
+    }
+
+    clearLazFolders() {
+        this.selectedLazFolders = [];
+        this.selectedLazFiles = [];
+        const input = document.getElementById('laz-folder-input');
+        if (input) input.value = '';
+        this.updateLazFolderList();
     }
 
     async loadLazFiles() {
