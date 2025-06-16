@@ -432,6 +432,7 @@
             </h3>
           </div>
           <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="geotiff-load-files-content">
+<<<<<<< api79n-codex/add--load-folder--button-with-folder-browsing-modal
             <div class="space-y-2">
               <button id="load-laz-btn" class="w-full bg-[#8e44ad] hover:bg-[#7d3c98] text-white px-4 py-3 rounded-lg font-medium transition-colors">
                 🗂️ Load LAZ
@@ -444,8 +445,22 @@
               <button id="load-tiff-btn" class="w-full bg-[#27ae60] hover:bg-[#229954] text-white px-4 py-3 rounded-lg font-medium transition-colors">
                 🗺️ Load TIFF
               </button>
+=======
+              <div class="space-y-2">
+                <button id="load-laz-btn" class="w-full bg-[#8e44ad] hover:bg-[#7d3c98] text-white px-4 py-3 rounded-lg font-medium transition-colors">
+                  🗂️ Load LAZ
+                </button>
+
+                <button id="load-folder-btn" class="w-full bg-[#5578ab] hover:bg-[#4a6c9a] text-white px-4 py-3 rounded-lg font-medium transition-colors">
+                  📁 Load Folder
+                </button>
+
+                <button id="load-tiff-btn" class="w-full bg-[#27ae60] hover:bg-[#229954] text-white px-4 py-3 rounded-lg font-medium transition-colors">
+                  🗺️ Load TIFF
+                </button>
+              </div>
+>>>>>>> main
             </div>
-          </div>
         </div>
 
         <!-- Tool Actions Section -->
@@ -1085,6 +1100,7 @@
 
   <!-- LAZ Folder Browser Modal -->
   <div id="laz-folder-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+<<<<<<< api79n-codex/add--load-folder--button-with-folder-browsing-modal
     <div class="modal-content bg-[#1a1a1a] border border-[#303030] rounded-lg w-[90%] max-w-xl">
       <div class="modal-header flex justify-between items-center p-6 border-b border-[#303030]">
         <h3 class="text-white text-lg font-semibold">Browse for LAZ Folder</h3>
@@ -1118,6 +1134,29 @@
           <button id="cancel-laz-folder-modal" class="cancel-btn bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
           <button id="done-laz-folder" class="bg-[#5e60ce] hover:bg-[#4b4db8] text-white px-6 py-2 rounded-lg font-medium transition-colors">Done</button>
         </div>
+=======
+    <div class="modal-content bg-[#1a1a1a] border border-[#303030] rounded-lg w-[90%] max-w-md">
+      <div class="modal-header flex justify-between items-center p-6 border-b border-[#303030]">
+        <h3 class="text-white text-lg font-semibold">Select Folder</h3>
+        <button class="close text-[#ababab] hover:text-white text-xl font-bold" id="laz-folder-modal-close">&times;</button>
+      </div>
+      <div class="modal-body p-6">
+        <div class="border-2 border-dashed border-[#404040] rounded-lg p-6 mb-4 text-center hover:border-[#00bfff] transition-colors" id="laz-folder-drop-zone">
+          <div class="text-[#ababab] mb-4">
+            <i class="fas fa-folder-open text-4xl mb-2"></i>
+            <p class="text-lg">Drop folder here or click to browse</p>
+            <p class="text-sm mt-2">Only .laz files will be counted</p>
+          </div>
+          <input type="file" id="laz-folder-input" webkitdirectory directory multiple class="hidden">
+          <button id="browse-laz-folder-btn" class="bg-[#5578ab] hover:bg-[#4a6c9a] text-white px-6 py-3 rounded-lg font-medium transition-colors">
+            <i class="fas fa-folder-open mr-2"></i>Browse Folder
+          </button>
+        </div>
+        <div id="laz-folder-info" class="text-white text-center">No folder selected</div>
+      </div>
+      <div class="modal-footer flex justify-end gap-3 p-6 border-t border-[#303030]">
+        <button id="cancel-laz-folder-modal" class="cancel-btn bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Close</button>
+>>>>>>> main
       </div>
     </div>
   </div>
