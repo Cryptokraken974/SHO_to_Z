@@ -282,6 +282,26 @@ def convert_sentinel2_to_png(data_dir: str, region_name: str) -> dict:
         # Process only the latest 4-band Sentinel-2 TIF file (RED, GREEN, BLUE, NIR bands)
         tif_file = latest_tif
         try:
+            from .geo_utils import get_image_bounds_from_geotiff, crop_geotiff_to_bbox, intersect_bounding_boxes
+            from app.data_acquisition.utils.coordinates import BoundingBox
+            dtm_path = Path("output") / region_name / "lidar" / "DTM"
+            dtm_candidates = list(dtm_path.glob("*.tif"))
+            if dtm_candidates:
+                dtm_tif = dtm_candidates[0]
+                s2_bounds = get_image_bounds_from_geotiff(str(tif_file))
+                dtm_bounds = get_image_bounds_from_geotiff(str(dtm_tif))
+                if s2_bounds and dtm_bounds:
+                    s2_bb = BoundingBox(**{k: s2_bounds[k] for k in ['north','south','east','west']})
+                    dtm_bb = BoundingBox(**{k: dtm_bounds[k] for k in ['north','south','east','west']})
+                    inter = intersect_bounding_boxes(s2_bb, dtm_bb)
+                    if inter:
+                        print("✂️ Cropping Sentinel-2 to DTM extent")
+                        tmp_crop = tif_file.with_name(tif_file.stem + "_crop.tif")
+                        if crop_geotiff_to_bbox(str(tif_file), str(tmp_crop), inter):
+                            os.replace(tmp_crop, tif_file)
+        except Exception as e:
+            print(f"⚠️ Sentinel-2 cropping failed: {e}")
+        try:
             base_name = tif_file.stem  # Get filename without extension
             print(f"🛰️ Processing 4-band Sentinel-2 TIF: {tif_file}")
             
