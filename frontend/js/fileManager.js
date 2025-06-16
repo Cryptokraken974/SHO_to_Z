@@ -192,6 +192,7 @@ window.FileManager = {
     // Add new location pin
     this.currentLocationPin = MapManager.addMarker(lat, lng, {
       popup: `Selected Region: ${regionName}<br>Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}`, // MODIFIED popup text
+      label: regionName,
       onClick: () => {
         // Re-center on click
         MapManager.setView(lat, lng, 13);
@@ -223,6 +224,7 @@ window.FileManager = {
       if (coords && Utils.isValidCoordinate(coords.lat, coords.lng)) {
         const marker = MapManager.addMarker(coords.lat, coords.lng, {
           popup: `Region: ${regionName}<br>Lat: ${coords.lat.toFixed(4)}<br>Lng: ${coords.lng.toFixed(4)}`, // MODIFIED popup text
+          label: regionName,
           onClick: () => {
             this.selectRegion(regionName, coords, regionInfo.region_name || regionName, filePath); // MODIFIED to selectRegion, pass filePath
           }

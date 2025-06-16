@@ -262,6 +262,10 @@ window.MapManager = {
     if (options.popup) {
       marker.bindPopup(options.popup);
     }
+
+    if (options.label) {
+      marker.bindTooltip(options.label, { permanent: true, direction: 'top', className: 'region-label' });
+    }
     
     if (options.onClick) {
       marker.on('click', options.onClick);
