@@ -6,6 +6,7 @@ import base64
 import re
 from typing import Dict, Tuple, Optional
 from osgeo import gdal, osr
+from app.data_acquisition.utils.coordinates import BoundingBox
 
 def read_world_file(world_file_path: str) -> Optional[Dict]:
     """
@@ -1193,3 +1194,39 @@ def get_image_bounds_from_world_file_with_center_validation(world_file_path: str
     except Exception as e:
         print(f"❌ Error in world file validation: {e}")
         return None
+
+
+def intersect_bounding_boxes(b1: 'BoundingBox', b2: 'BoundingBox') -> Optional['BoundingBox']:
+    """Return the intersection of two bounding boxes or None if they don't overlap."""
+    west = max(b1.west, b2.west)
+    east = min(b1.east, b2.east)
+    south = max(b1.south, b2.south)
+    north = min(b1.north, b2.north)
+
+    if east <= west or north <= south:
+        return None
+
+    return BoundingBox(north=north, south=south, east=east, west=west)
+
+
+def crop_geotiff_to_bbox(input_path: str, output_path: str, bbox: 'BoundingBox') -> bool:
+    """Crop a GeoTIFF file to the specified bounding box using GDAL."""
+    try:
+        translate_options = gdal.TranslateOptions(
+            projWin=[bbox.west, bbox.north, bbox.east, bbox.south],
+            projWinSRS='EPSG:4326',
+            format='GTiff',
+            creationOptions=['COMPRESS=LZW', 'TILED=YES']
+        )
+
+        result = gdal.Translate(output_path, input_path, options=translate_options)
+        if result is None:
+            print(f"❌ GDAL cropping failed for {input_path}")
+            return False
+
+        result.FlushCache()
+        result = None
+        return True
+    except Exception as e:
+        print(f"❌ Error cropping GeoTIFF {input_path}: {e}")
+        return False

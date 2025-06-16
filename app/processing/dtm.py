@@ -271,6 +271,28 @@ def dtm(input_file: str, region_name: str = None) -> str:
     if success:
         print(f"✅ DTM conversion completed successfully in {processing_time:.2f} seconds")
         print(f"📊 Message: {message}")
+        try:
+            from ..geo_utils import get_image_bounds_from_geotiff, crop_geotiff_to_bbox, intersect_bounding_boxes
+            from ..data_acquisition.utils.coordinates import BoundingBox
+            sentinel_dir = Path("input") / output_folder_name / "sentinel2"
+            sentinel_tifs = list(sentinel_dir.glob("*.tif"))
+            if sentinel_tifs:
+                sentinel_tifs.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                sentinel_tif = sentinel_tifs[0]
+
+                dtm_bounds = get_image_bounds_from_geotiff(output_path)
+                s2_bounds = get_image_bounds_from_geotiff(str(sentinel_tif))
+                if dtm_bounds and s2_bounds:
+                    dtm_bb = BoundingBox(north=dtm_bounds['north'], south=dtm_bounds['south'], east=dtm_bounds['east'], west=dtm_bounds['west'])
+                    s2_bb = BoundingBox(north=s2_bounds['north'], south=s2_bounds['south'], east=s2_bounds['east'], west=s2_bounds['west'])
+                    inter = intersect_bounding_boxes(dtm_bb, s2_bb)
+                    if inter:
+                        print("✂️ Cropping DTM to Sentinel-2 footprint")
+                        temp_crop = Path(output_path).with_name(Path(output_path).stem + "_crop.tif")
+                        if crop_geotiff_to_bbox(output_path, str(temp_crop), inter):
+                            os.replace(temp_crop, output_path)
+        except Exception as e:
+            print(f"⚠️ DTM cropping failed: {e}")
         return output_path
     else:
         print(f"❌ DTM conversion failed after {processing_time:.2f} seconds")
