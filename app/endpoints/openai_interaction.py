@@ -10,6 +10,9 @@ router = APIRouter(prefix="/api/openai", tags=["openai"])
 LOG_DIR = Path("llm/logs")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
+RESPONSE_DIR = Path("llm/responses")
+RESPONSE_DIR.mkdir(parents=True, exist_ok=True)
+
 class SendPayload(BaseModel):
     prompt: str
     images: list[str] = []
@@ -21,6 +24,11 @@ class LogPayload(BaseModel):
     coordinates: dict | None = None
     images: list[dict] = []
     prompt: str
+
+
+class ResponsePayload(BaseModel):
+    log_file: str | None = None
+    response: str
 
 @router.post("/send")
 async def send_to_openai(payload: SendPayload):
@@ -48,3 +56,16 @@ async def create_log(payload: LogPayload):
         return {"log_file": str(filename)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to write log: {e}")
+
+
+@router.post("/response")
+async def save_response(payload: ResponsePayload):
+    """Save OpenAI response to file along with associated log file."""
+    try:
+        resp_entry = {"response": payload.response, "log_file": payload.log_file}
+        filename = RESPONSE_DIR / f"{uuid.uuid4().hex}.json"
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(resp_entry, f, indent=2)
+        return {"response_file": str(filename)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to write response: {e}")

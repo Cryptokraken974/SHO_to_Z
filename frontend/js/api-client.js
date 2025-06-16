@@ -1699,6 +1699,44 @@ class OpenAIAPIClient extends BaseAPIClient {
   async createLog(payload) {
     return this.post('openai/log', payload);
   }
+
+  /**
+   * Save OpenAI response entry
+   * @param {Object} payload Response payload
+   */
+  async saveResponse(payload) {
+    return this.post('openai/response', payload);
+  }
+
+  /**
+   * Convenience method: send prompt, log request, and store response
+   * @param {Object} payload Request payload
+   */
+  async sendPrompt(payload) {
+    const sendResp = await this.send(payload);
+    const logImages = (payload.images || []).map((img) => ({
+      path: img,
+      size: typeof img === 'string' ? img.length : 0,
+    }));
+    const logPayload = {
+      laz_name: payload.laz_name,
+      coordinates: payload.coordinates,
+      images: logImages,
+      prompt: payload.prompt,
+    };
+    let logResp = {};
+    try {
+      logResp = await this.createLog(logPayload);
+    } catch (e) {}
+    const responsePayload = {
+      response: sendResp.response,
+      log_file: logResp.log_file || null,
+    };
+    try {
+      await this.saveResponse(responsePayload);
+    } catch (e) {}
+    return sendResp;
+  }
 }
 
 /**
