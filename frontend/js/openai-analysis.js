@@ -10,6 +10,7 @@ class OpenAIAnalysis {
         this.currentCategory = 'all';
         this.galleryInstance = null;
         this.selectedRegions = [];
+        this.regionGalleries = {};
 
         this.init();
     }
@@ -522,6 +523,60 @@ class OpenAIAnalysis {
         } else {
             info.textContent = `Selected: ${this.selectedRegions.join(', ')}`;
         }
+
+        this.updateRegionGalleries();
+    }
+
+    updateRegionGalleries() {
+        const container = document.getElementById('region-galleries');
+        if (!container) return;
+
+        // Remove galleries for deselected regions
+        Object.keys(this.regionGalleries).forEach(region => {
+            if (!this.selectedRegions.includes(region)) {
+                const elem = container.querySelector(`.region-gallery[data-region="${region}"]`);
+                if (elem) elem.remove();
+                delete this.regionGalleries[region];
+            }
+        });
+
+        // Add galleries for new regions
+        this.selectedRegions.forEach(region => {
+            if (!this.regionGalleries[region]) {
+                const safe = region.replace(/[^a-zA-Z0-9_-]/g, '_');
+                const section = document.createElement('div');
+                section.className = 'accordion-section mb-4 region-gallery';
+                section.dataset.region = region;
+                section.innerHTML = `
+                    <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="${safe}-accordion">
+                        <h3 class="text-white font-semibold flex justify-between items-center m-0">
+                            ${region}
+                            <span class="accordion-arrow text-sm transition-transform">▼</span>
+                        </h3>
+                    </div>
+                    <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3 collapsed" id="${safe}-content">
+                        <div id="raster-gallery-${safe}" class="mb-4"></div>
+                        <div id="sentinel-gallery-${safe}" class="mb-4"></div>
+                    </div>`;
+                container.appendChild(section);
+
+                // Toggle behavior
+                const header = section.querySelector('.accordion-header');
+                const content = section.querySelector('.accordion-content');
+                const arrow = section.querySelector('.accordion-arrow');
+                header.addEventListener('click', () => {
+                    const collapsed = content.classList.toggle('collapsed');
+                    arrow.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+                });
+
+                const raster = new RasterOverlayGallery(`raster-gallery-${safe}`);
+                raster.loadRasters(region);
+                const sentinel = new SatelliteOverlayGallery(`sentinel-gallery-${safe}`);
+                sentinel.loadImages(region);
+
+                this.regionGalleries[region] = { raster, sentinel };
+            }
+        });
     }
 }
 
