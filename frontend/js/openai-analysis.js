@@ -9,8 +9,8 @@ class OpenAIAnalysis {
         this.availableImages = [];
         this.currentCategory = 'all';
         this.galleryInstance = null;
-        this.previewGallery = null;
-        
+        this.selectedRegions = [];
+
         this.init();
     }
     
@@ -19,6 +19,7 @@ class OpenAIAnalysis {
         this.setupEventListeners();
         this.initializeGalleries();
         this.loadPrompts();
+        this.loadRegions();
     }
     
     setupEventListeners() {
@@ -77,6 +78,12 @@ class OpenAIAnalysis {
                 this.updateAnalysisPrompt();
             });
         });
+
+        const regionSelect = document.getElementById('region-multi-select');
+        regionSelect?.addEventListener('change', () => {
+            this.selectedRegions = Array.from(regionSelect.selectedOptions).map(o => o.value);
+            this.updateSelectedRegionsInfo();
+        });
     }
     
     initializeGalleries() {
@@ -95,17 +102,7 @@ class OpenAIAnalysis {
             }
         });
         
-        // Initialize preview gallery
-        this.previewGallery = new ModularGallery('selected-images-preview', {
-            allowSelection: false,
-            multipleSelection: false,
-            showAddToMap: false,
-            itemWidth: 'w-32',
-            itemHeight: 'h-24',
-            onImageClick: (itemId, imageSrc, imageAlt) => {
-                this.showImageModal(imageSrc, imageAlt);
-            }
-        });
+        // Preview gallery removed
     }
     
     async openImageSelectionModal() {
@@ -304,7 +301,6 @@ class OpenAIAnalysis {
         console.log(`✅ Selected ${this.selectedImages.length} images for analysis`);
         
         // Update UI
-        this.updateSelectedImagesPreview();
         this.updateSelectedImagesCount();
         
         // Close modal
@@ -312,17 +308,7 @@ class OpenAIAnalysis {
     }
     
     updateSelectedImagesPreview() {
-        if (this.selectedImages.length === 0) {
-            this.previewGallery.clear();
-            document.getElementById('selected-images-preview').innerHTML = `
-                <div class="text-center text-[#666] py-8">
-                    <div class="text-4xl mb-4">📁</div>
-                    <p>Click "Select Images" to choose images for analysis</p>
-                </div>
-            `;
-        } else {
-            this.previewGallery.setItems(this.selectedImages);
-        }
+        // Preview removed
     }
     
     updateSelectedImagesCount() {
@@ -507,6 +493,34 @@ class OpenAIAnalysis {
             document.getElementById('prompt-display').value = data.content;
         } catch (err) {
             console.error('Failed to load prompts', err);
+        }
+    }
+
+    async loadRegions() {
+        try {
+            const data = await regions().listRegions();
+            const select = document.getElementById('region-multi-select');
+            if (!select) return;
+            select.innerHTML = '';
+            (data.regions || []).forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.name;
+                opt.textContent = r.name;
+                select.appendChild(opt);
+            });
+            this.updateSelectedRegionsInfo();
+        } catch (err) {
+            console.error('Failed to load regions', err);
+        }
+    }
+
+    updateSelectedRegionsInfo() {
+        const info = document.getElementById('selected-region-names');
+        if (!info) return;
+        if (this.selectedRegions.length === 0) {
+            info.textContent = 'No regions selected';
+        } else {
+            info.textContent = `Selected: ${this.selectedRegions.join(', ')}`;
         }
     }
 }
