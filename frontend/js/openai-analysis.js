@@ -465,26 +465,62 @@ class OpenAIAnalysis {
         }
     }
 
+    getImagesForRegion(region) {
+        const galleries = this.regionGalleries[region];
+        if (!galleries) return [];
+
+        const rasterImages =
+            (galleries.raster?.gallery?.items || []).map(i => i.imageUrl);
+        const sentinelImages =
+            (galleries.sentinel?.items || []).map(i => i.imageUrl);
+
+        return [...rasterImages, ...sentinelImages];
+    }
+
     async sendPromptToOpenAI() {
         const prompt = document.getElementById('prompt-display').value.trim();
         if (!prompt) {
             window.Utils?.showNotification('No prompt loaded', 'warning');
             return;
         }
-        const lazName = window.FileManager?.getSelectedRegion() || null;
         const lat = parseFloat(document.getElementById('lat-input').value);
         const lng = parseFloat(document.getElementById('lng-input').value);
         const coords = (!isNaN(lat) && !isNaN(lng)) ? { lat, lng } : null;
-        const images = this.selectedImages.map(img => img.imageUrl);
 
-        try {
-            const payload = { prompt, images, laz_name: lazName, coordinates: coords };
-            const data = await openai().sendPrompt(payload);
-            console.log('OpenAI response', data);
-            window.Utils?.showNotification('Prompt sent to OpenAI', 'success');
-        } catch (err) {
-            console.error('Failed to send to OpenAI', err);
-            window.Utils?.showNotification('Failed to send to OpenAI', 'error');
+        const targetRegions = this.selectedRegions.length > 0
+            ? this.selectedRegions
+            : [window.FileManager?.getSelectedRegion()].filter(Boolean);
+
+        if (targetRegions.length === 0) {
+            window.Utils?.showNotification('No region selected', 'warning');
+            return;
+        }
+
+        for (const region of targetRegions) {
+            const images = this.selectedRegions.length > 0
+                ? this.getImagesForRegion(region)
+                : this.selectedImages.map(img => img.imageUrl);
+
+            try {
+                const payload = {
+                    prompt,
+                    images,
+                    laz_name: region,
+                    coordinates: coords,
+                };
+                const data = await openai().sendPrompt(payload);
+                console.log('OpenAI response', data);
+                window.Utils?.showNotification(
+                    `Prompt sent for ${region}`,
+                    'success'
+                );
+            } catch (err) {
+                console.error('Failed to send to OpenAI', err);
+                window.Utils?.showNotification(
+                    `Failed to send prompt for ${region}`,
+                    'error'
+                );
+            }
         }
     }
 
