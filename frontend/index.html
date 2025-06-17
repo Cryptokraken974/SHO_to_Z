@@ -27,6 +27,7 @@
   <link rel="stylesheet" href="./css/geotiff-tools.css" />
   <link rel="stylesheet" href="./css/cache-management.css" />
   <link rel="stylesheet" href="./css/large-image-optimization.css" />
+  <link rel="stylesheet" href="./css/openai.css" />
   
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   
@@ -806,7 +807,20 @@
             <!-- Region Selection -->
             <div class="mb-4">
               <label class="block text-white text-sm mb-2">Select Regions</label>
-              <select id="region-multi-select" multiple class="w-full bg-[#1a1a1a] border border-[#303030] rounded-lg px-3 py-2 text-white h-48 overflow-y-auto"></select>
+              <div class="flex gap-4">
+                <div class="flex-1">
+                  <div class="text-[#ababab] text-sm mb-1">Available</div>
+                  <ul id="available-region-list" class="region-list"></ul>
+                </div>
+                <div class="flex flex-col justify-center gap-2">
+                  <button id="add-region-btn" class="bg-[#00bfff] hover:bg-[#0099cc] text-white px-2 py-1 rounded">&gt;&gt;</button>
+                  <button id="remove-region-btn" class="bg-[#dc3545] hover:bg-[#c82333] text-white px-2 py-1 rounded">&lt;&lt;</button>
+                </div>
+                <div class="flex-1">
+                  <div class="text-[#ababab] text-sm mb-1">Selected</div>
+                  <ul id="selected-region-list" class="region-list"></ul>
+                </div>
+              </div>
               <div id="selected-region-names" class="text-[#ababab] text-sm mt-2">No regions selected</div>
             </div>
             <textarea id="prompt-display" class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white mt-4 resize-none" rows="6" readonly></textarea>
