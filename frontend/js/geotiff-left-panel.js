@@ -3,7 +3,8 @@ class GeoTiffLeftPanel {
     constructor() {
         this.selectedFile = null;
         this.fileTree = [];
-        this.selectedFolderFiles = [];
+        this.selectedLazFiles = [];
+        this.selectedLazFolders = [];
         this.init();
     }
 
@@ -558,101 +559,7 @@ class GeoTiffLeftPanel {
         }
     }
 
-    setupLazFolderModalEvents() {
-        const modal = document.getElementById('laz-folder-modal');
-        const closeBtn = document.getElementById('laz-folder-modal-close');
-        const cancelBtn = document.getElementById('cancel-laz-folder-modal');
-        const browseBtn = document.getElementById('browse-laz-folder-btn');
-        const folderInput = document.getElementById('laz-folder-input');
-        const dropZone = document.getElementById('laz-folder-drop-zone');
-
-        [closeBtn, cancelBtn].forEach(btn => {
-            if (btn) btn.addEventListener('click', () => this.closeLazFolderModal());
-        });
-
-        if (modal) {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) this.closeLazFolderModal();
-            });
-        }
-
-        if (browseBtn) {
-            browseBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (folderInput) folderInput.click();
-            });
-        }
-
-        if (folderInput) {
-            folderInput.addEventListener('change', (e) => {
-                this.handleLazFolderSelection(e.target.files);
-            });
-        }
-
-        if (dropZone) {
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.classList.add('border-[#00bfff]');
-            });
-
-            dropZone.addEventListener('dragleave', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('border-[#00bfff]');
-            });
-
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('border-[#00bfff]');
-                this.handleLazFolderSelection(e.dataTransfer.files);
-            });
-
-            dropZone.addEventListener('click', (e) => {
-                if (e.target === dropZone || (e.target.closest('#laz-folder-drop-zone') && !e.target.closest('#browse-laz-folder-btn'))) {
-                    if (folderInput) folderInput.click();
-                }
-            });
-        }
-    }
-
-    openLazFolderModal() {
-        console.log('📂 Opening LAZ folder modal');
-        const modal = document.getElementById('laz-folder-modal');
-        if (modal) {
-            modal.classList.remove('hidden');
-            this.clearLazFolderSelection();
-        }
-    }
-
-    closeLazFolderModal() {
-        console.log('📂 Closing LAZ folder modal');
-        const modal = document.getElementById('laz-folder-modal');
-        if (modal) {
-            modal.classList.add('hidden');
-            this.clearLazFolderSelection();
-        }
-    }
-
-    handleLazFolderSelection(files) {
-        const lazFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.laz'));
-        this.selectedFolderFiles = lazFiles;
-
-        const info = document.getElementById('laz-folder-info');
-        if (info) {
-            if (lazFiles.length === 0) {
-                info.textContent = 'No .laz files found';
-            } else {
-                info.textContent = `${lazFiles.length} .laz file${lazFiles.length === 1 ? '' : 's'} found`;
-            }
-        }
-    }
-
-    clearLazFolderSelection() {
-        this.selectedFolderFiles = [];
-        const info = document.getElementById('laz-folder-info');
-        if (info) info.textContent = 'No folder selected';
-        const input = document.getElementById('laz-folder-input');
-        if (input) input.value = '';
-    }
+    /* removed duplicate earlier implementation of LAZ folder modal events */
 
     handleLazFileSelection(files) {
         console.log('📁 LAZ files selected:', files.length);
