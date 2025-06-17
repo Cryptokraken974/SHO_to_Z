@@ -11,6 +11,7 @@ class OpenAIAnalysis {
         this.galleryInstance = null;
         this.selectedRegions = [];
         this.regionGalleries = {};
+        this.availableRegions = [];
 
         this.init();
     }
@@ -80,10 +81,35 @@ class OpenAIAnalysis {
             });
         });
 
-        const regionSelect = document.getElementById('region-multi-select');
-        regionSelect?.addEventListener('change', () => {
-            this.selectedRegions = Array.from(regionSelect.selectedOptions).map(o => o.value);
-            this.updateSelectedRegionsInfo();
+        const addBtn = document.getElementById('add-region-btn');
+        const removeBtn = document.getElementById('remove-region-btn');
+        const availList = document.getElementById('available-region-list');
+        const selList = document.getElementById('selected-region-list');
+
+        addBtn?.addEventListener('click', () => {
+            const selected = Array.from(availList.querySelectorAll('li.selected')).map(li => li.dataset.region);
+            this.moveToSelected(selected);
+        });
+
+        removeBtn?.addEventListener('click', () => {
+            const selected = Array.from(selList.querySelectorAll('li.selected')).map(li => li.dataset.region);
+            this.moveToAvailable(selected);
+        });
+
+        [availList, selList].forEach(list => {
+            list?.addEventListener('dragover', e => e.preventDefault());
+        });
+
+        availList?.addEventListener('drop', e => {
+            e.preventDefault();
+            const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+            if (data.from === 'selected') this.moveToAvailable([data.region]);
+        });
+
+        selList?.addEventListener('drop', e => {
+            e.preventDefault();
+            const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+            if (data.from === 'available') this.moveToSelected([data.region]);
         });
     }
     
@@ -536,15 +562,8 @@ class OpenAIAnalysis {
     async loadRegions() {
         try {
             const data = await regions().listRegions();
-            const select = document.getElementById('region-multi-select');
-            if (!select) return;
-            select.innerHTML = '';
-            (data.regions || []).forEach(r => {
-                const opt = document.createElement('option');
-                opt.value = r.name;
-                opt.textContent = r.name;
-                select.appendChild(opt);
-            });
+            this.availableRegions = (data.regions || []).map(r => r.name);
+            this.renderRegionLists();
             this.updateSelectedRegionsInfo();
         } catch (err) {
             console.error('Failed to load regions', err);
@@ -613,6 +632,56 @@ class OpenAIAnalysis {
                 this.regionGalleries[region] = { raster, sentinel };
             }
         });
+    }
+
+    renderRegionLists() {
+        const availList = document.getElementById('available-region-list');
+        const selList = document.getElementById('selected-region-list');
+        if (!availList || !selList) return;
+
+        const createItem = (region, from) => {
+            const li = document.createElement('li');
+            li.textContent = region;
+            li.dataset.region = region;
+            li.draggable = true;
+            li.addEventListener('click', () => {
+                li.classList.toggle('selected');
+            });
+            li.addEventListener('dragstart', e => {
+                li.classList.add('dragging');
+                e.dataTransfer.setData('text/plain', JSON.stringify({ region, from }));
+            });
+            li.addEventListener('dragend', () => li.classList.remove('dragging'));
+            return li;
+        };
+
+        availList.innerHTML = '';
+        this.availableRegions.forEach(r => availList.appendChild(createItem(r, 'available')));
+
+        selList.innerHTML = '';
+        this.selectedRegions.forEach(r => selList.appendChild(createItem(r, 'selected')));
+    }
+
+    moveToSelected(regions) {
+        regions.forEach(r => {
+            if (!this.selectedRegions.includes(r)) {
+                this.selectedRegions.push(r);
+                this.availableRegions = this.availableRegions.filter(a => a !== r);
+            }
+        });
+        this.renderRegionLists();
+        this.updateSelectedRegionsInfo();
+    }
+
+    moveToAvailable(regions) {
+        regions.forEach(r => {
+            if (!this.availableRegions.includes(r)) {
+                this.availableRegions.push(r);
+                this.selectedRegions = this.selectedRegions.filter(s => s !== r);
+            }
+        });
+        this.renderRegionLists();
+        this.updateSelectedRegionsInfo();
     }
 }
 
