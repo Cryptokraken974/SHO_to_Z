@@ -825,145 +825,57 @@ class GeoTiffLeftPanel {
 
             // Store the loaded files info
             const loadedFiles = result.files || [];
-            
+
             this.loadFileTree();
-            
-            // 🔧 FIX: Automatically select the first uploaded LAZ file as the current region
+
             if (loadedFiles.length > 0 && window.FileManager) {
-                const firstUploadedFile = loadedFiles[0];
-                const fileName = firstUploadedFile.inputFile; // This should be the LAZ filename like "CUI_A01.laz"
-                const regionName = fileName.replace(/\.[^/.]+$/, ''); // Remove extension to get "CUI_A01"
-                
-                console.log('🎯 Automatically selecting uploaded LAZ file as region:', regionName);
-                console.log('📁 Original filename:', fileName);
-                
-                this.updateLazProgress(100, 'Setting up region...');
-                
-                // Set the selected region to use the uploaded LAZ file
-                // This ensures ProcessingManager.processAllRasters() will use this region instead of coordinates
-                window.FileManager.selectRegion(
-                    regionName,                 // displayName: use clean name for output folders (no .laz extension)
-                    null,                       // coords: let it be fetched automatically
-                    regionName,                 // processingRegion: use the name without extension
-                    `input/LAZ/${fileName}`     // regionPath: full path for LAZ file operations
-                );
-                
-                console.log('✅ Region selected:', regionName);
-                
-                // Wait for region setup to complete before triggering raster generation
-                this.updateLazProgress(100, 'Region setup complete. Starting raster generation...');
-                
-                // Show raster generation progress section
-                this.showLazRasterProgress(true);
-                
-                // Give extra time for the region selection and coordinate fetching to complete
-                setTimeout(async () => {
-                    // Verify that the region is properly selected before proceeding
-                    if (window.FileManager.hasSelectedRegion()) {
-                        console.log('🚀 Region setup complete. Triggering automatic raster generation...');
-                        
-                        // Additional delay to ensure backend file is ready
-                        setTimeout(async () => {
-                            console.log('🎯 Calling ProcessingManager.processAllRasters() with LAZ modal progress integration');
-                            try {
-                                // Show notification that rasters are being generated
-                                if (window.Utils && window.Utils.showNotification) {
-                                    window.Utils.showNotification('🚀 Automatic raster generation started! Progress shown in LAZ loading window.', 'info');
-                                }
-                                
-                                // Start raster processing with LAZ modal progress integration
-                                const result = await this.processAllRastersWithLazModalProgress();
-                                
-                                if (result) {
-                                    console.log('✅ Automatic raster generation completed successfully');
-                                    // Keep modal open for a bit to show completion status
-                                    setTimeout(() => {
-                                        this.closeLazFileModal();
-                                    }, 3000);
-                                } else {
-                                    console.warn('⚠️ Automatic raster generation failed');
-                                    if (window.Utils && window.Utils.showNotification) {
-                                        window.Utils.showNotification('Raster generation failed. Please try the "Generate Rasters" button manually.', 'warning');
-                                    }
-                                    // Close modal on failure after a delay
-                                    setTimeout(() => {
-                                        this.closeLazFileModal();
-                                    }, 2000);
-                                }
-                            } catch (error) {
-                                console.error('❌ Error during automatic raster generation:', error);
-                                if (window.Utils && window.Utils.showNotification) {
-                                    window.Utils.showNotification('Error during automatic processing. Please try the "Generate Rasters" button.', 'error');
-                                }
-                                // Close modal on error after a delay
-                                setTimeout(() => {
-                                    this.closeLazFileModal();
-                                }, 2000);
-                            }
-                        }, 1000); // Extra 1 second for backend file availability
-                        
-                    } else {
-                        console.warn('⚠️ Region selection not completed, skipping automatic raster generation');
-                        this.updateLazProgress(100, 'Region setup incomplete - manual processing required');
-                        // Close modal after a delay
-                        setTimeout(() => {
-                            this.closeLazFileModal();
-                        }, 3000);
-                    }
-                }, 3000); // Increased delay for region setup completion
-                
-            } else {
-                // No files loaded or FileManager not available - fallback to original behavior
-                console.log('🚀 Triggering automatic raster generation after LAZ loading...');
-                if (window.ProcessingManager && typeof window.ProcessingManager.processAllRasters === 'function') {
-                    this.updateLazProgress(100, 'Starting automatic raster generation...');
+                for (let i = 0; i < loadedFiles.length; i++) {
+                    const fileInfo = loadedFiles[i];
+                    const fileName = fileInfo.inputFile;
+                    const regionName = fileName.replace(/\.[^/.]+$/, '');
+
+                    console.log(`🎯 Processing uploaded LAZ file as region: ${regionName} (${i + 1}/${loadedFiles.length})`);
+
+                    this.updateLazProgress(100 * (i / loadedFiles.length), `Setting up region ${i + 1} of ${loadedFiles.length}...`);
+
+                    // Set region for processing
+                    window.FileManager.selectRegion(
+                        regionName,
+                        null,
+                        regionName,
+                        `input/LAZ/${fileName}`
+                    );
+
+                    // Wait briefly for region setup
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    this.updateLazProgress(100 * (i / loadedFiles.length), `Processing ${fileName} (${i + 1}/${loadedFiles.length})`);
+
+                    // Show progress UI
                     this.showLazRasterProgress(true);
-                    
-                    setTimeout(async () => {
-                        console.log('🎯 Calling ProcessingManager.processAllRasters() with LAZ modal progress integration');
-                        try {
-                            // Show notification that rasters are being generated  
-                            if (window.Utils && window.Utils.showNotification) {
-                                window.Utils.showNotification('🚀 Automatic raster generation started! Progress shown in LAZ loading window.', 'info');
-                            }
-                            
-                            // Start raster processing with LAZ modal progress integration
-                            const result = await this.processAllRastersWithLazModalProgress();
-                            
-                            if (result) {
-                                console.log('✅ Automatic raster generation completed successfully');
-                                // Keep modal open for a bit to show completion status
-                                setTimeout(() => {
-                                    this.closeLazFileModal();
-                                }, 3000);
-                            } else {
-                                console.warn('⚠️ Automatic raster generation failed');
-                                if (window.Utils && window.Utils.showNotification) {
-                                    window.Utils.showNotification('Raster generation failed. Please try the "Generate Rasters" button manually.', 'warning');
-                                }
-                                // Close modal on failure after a delay
-                                setTimeout(() => {
-                                    this.closeLazFileModal();
-                                }, 2000);
-                            }
-                        } catch (error) {
-                            console.error('❌ Error during automatic raster generation:', error);
-                            if (window.Utils && window.Utils.showNotification) {
-                                window.Utils.showNotification('Error during automatic processing. Please try the "Generate Rasters" button.', 'error');
-                            }
-                            // Close modal on error after a delay
-                            setTimeout(() => {
-                                this.closeLazFileModal();
-                            }, 2000);
-                        }
-                    }, 2000);
-                } else {
-                    console.warn('⚠️ ProcessingManager not available for automatic raster generation');
-                    // Close modal if no processing available
-                    setTimeout(() => {
-                        this.closeLazFileModal();
-                    }, 2000);
+
+                    const success = await this.processAllRastersWithLazModalProgress();
+
+                    if (success) {
+                        console.log(`✅ Completed processing for ${regionName}`);
+                        this.updateLazProgress(100 * ((i + 1) / loadedFiles.length), `Completed ${fileName} (${i + 1}/${loadedFiles.length})`);
+                    } else {
+                        console.warn(`⚠️ Processing failed for ${regionName}`);
+                        this.updateLazProgress(100 * ((i + 1) / loadedFiles.length), `Failed ${fileName} (${i + 1}/${loadedFiles.length})`);
+                    }
                 }
+
+                // Close modal after processing all files
+                setTimeout(() => {
+                    this.closeLazFileModal();
+                }, 3000);
+
+            } else {
+                console.warn('⚠️ No files loaded or FileManager unavailable');
+                this.updateLazProgress(100, 'Upload complete');
+                setTimeout(() => {
+                    this.closeLazFileModal();
+                }, 2000);
             }
 
         } catch (error) {
