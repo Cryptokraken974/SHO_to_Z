@@ -1,0 +1,125 @@
+/* Results Tab Specific Styles */
+
+/* Ensure results-tab fills height if its parent is flex */
+#results-tab {
+    display: flex; /* Already set in index.html, but good to be explicit */
+    flex-grow: 1;
+    overflow: hidden; /* Already set in index.html */
+}
+
+#results-left-panel {
+    width: 25%; /* As set in index.html placeholder */
+    background-color: #1e1e1e; /* Darker shade for the panel */
+    padding: 1rem;
+    overflow-y: auto;
+    border-right: 1px solid #303030; /* Separator line */
+}
+
+#results-left-panel h2 {
+    color: #ffffff;
+    font-size: 1.25rem; /* Tailwind text-lg */
+    font-weight: 600; /* Tailwind font-semibold */
+    margin-bottom: 1rem;
+}
+
+#results-select-all-btn {
+    width: 100%;
+    background-color: #3b82f6; /* Tailwind bg-blue-500 */
+    color: white;
+    font-weight: bold;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    border-radius: 0.375rem; /* Tailwind rounded-md */
+    margin-bottom: 1rem;
+    transition: background-color 0.2s;
+}
+
+#results-select-all-btn:hover {
+    background-color: #2563eb; /* Tailwind hover:bg-blue-700 */
+}
+
+#results-log-list ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+#results-log-list li {
+    padding: 0.75rem 0.5rem;
+    background-color: #2a2a2e; /* Slightly lighter than panel bg */
+    color: #e5e7eb; /* Tailwind text-gray-200 */
+    border-radius: 0.375rem; /* Tailwind rounded-md */
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+    font-size: 0.875rem; /* Tailwind text-sm */
+    border: 1px solid #3a3a3e;
+}
+
+#results-log-list li:hover {
+    background-color: #00bfff; /* Existing theme accent color */
+    color: #ffffff;
+}
+
+#results-log-list li.active { /* Style for selected log item if we implement it */
+    background-color: #00bfff;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+#results-log-list p { /* For loading/error messages */
+    color: #9ca3af; /* Tailwind text-gray-400 */
+}
+
+#results-main-panel {
+    width: 75%; /* As set in index.html placeholder */
+    padding: 1.5rem; /* Tailwind p-6 */
+    overflow-y: auto;
+    background-color: #141414; /* Main content area background */
+}
+
+#results-main-panel h1 { /* Main dashboard title */
+    color: #ffffff;
+    font-size: 1.5rem; /* Tailwind text-xl */
+    font-weight: 700; /* Tailwind font-bold */
+    margin-bottom: 0.5rem;
+}
+
+#results-main-panel h2 { /* Section titles within dashboard */
+    color: #ffffff;
+    font-size: 1.25rem; /* Tailwind text-lg */
+    font-weight: 600; /* Tailwind font-semibold */
+    margin-bottom: 0.75rem; /* Tailwind mb-3 */
+}
+
+#results-main-panel p {
+    color: #d1d5db; /* Tailwind text-gray-300 */
+    margin-bottom: 1rem;
+}
+
+/* Styling for the placeholder boxes within the dashboard */
+#results-main-panel .bg-gray-800 { /* As used in the JS placeholders */
+    background-color: #1f2937; /* Tailwind bg-gray-800 */
+    padding: 1rem;
+    border-radius: 0.375rem; /* Tailwind rounded-md */
+    border: 1px solid #374151; /* Tailwind border-gray-700 */
+}
+
+#results-main-panel .text-sky-400 { /* As used in the JS placeholders */
+    color: #38bdf8; /* Tailwind text-sky-400 */
+}
+
+#results-main-panel ul.list-disc {
+    list-style-type: disc;
+    margin-left: 1.25rem; /* Tailwind ml-5 */
+}
+
+#results-main-panel code { /* For displaying API endpoint names */
+    background-color: #374151; /* bg-gray-700 */
+    color: #e5e7eb; /* text-gray-200 */
+    padding: 0.125rem 0.375rem; /* px-1.5 py-0.5 */
+    border-radius: 0.25rem; /* rounded-sm */
+    font-family: monospace;
+}

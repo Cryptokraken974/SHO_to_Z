@@ -15,6 +15,8 @@ window.UIManager = {
     this.initializeImageModalEventHandlers(); // Specific for image modal
     this.initializeGlobalRegionSelector();
     this.initializeResizablePanels();
+
+    this.resultsTabInitialized = false; // Initialize flag for Results tab
     
     Utils.log('info', 'UI Manager initialized');
   },
@@ -59,6 +61,8 @@ window.UIManager = {
       this.initializeGeoTiffTab();
     } else if (tabName === 'openai-analysis') {
       this.initializeOpenAIAnalysisTab();
+    } else if (tabName === 'results') {
+      this.initializeResultsTab();
     }
 
     Utils.log('info', `Switched to ${tabName} tab`);
@@ -2470,6 +2474,22 @@ window.UIManager = {
       Utils.log('error', 'Error extracting coordinates from bounds', error);
       return null;
     }
+  },
+
+  /**
+   * Initialize the Results tab
+   */
+  initializeResultsTab() {
+    if (!this.resultsTabInitialized) {
+      Utils.log('info', 'Initializing Results tab for the first time.');
+      if (window.ResultsManager && typeof window.ResultsManager.init === 'function') {
+        window.ResultsManager.init();
+      } else {
+        Utils.log('warn', 'ResultsManager not found or init function missing.');
+      }
+      this.resultsTabInitialized = true;
+    }
+    Utils.log('info', 'Results tab switched.');
   },
 
 };
