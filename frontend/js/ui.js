@@ -21,51 +21,183 @@ window.UIManager = {
     Utils.log('info', 'UI Manager initialized');
   },
 
+  // This function will be called after new HTML content is loaded into a part of the page.
+  // contextElement is the DOM element into which content was loaded.
+  // contextName is a string (e.g., tab name or modal name) to identify the content.
+  async initializeDynamicContent(contextElement, contextName) {
+    console.log(`UI: Initializing dynamic content for context: ${contextName} in element:`, contextElement);
+
+    // General initializers
+    // These should ideally accept contextElement to scope their actions or be idempotent
+    // Pass contextElement to UIManager's own methods if they are designed to target specific elements
+    if (typeof this.initializeAccordions === 'function') this.initializeAccordions(contextElement);
+    if (typeof this.initializeResizablePanels === 'function') this.initializeResizablePanels(contextElement);
+    if (typeof this.initializeTooltips === 'function') this.initializeTooltips(contextElement);
+
+    // Tab-specific initializations
+    // Note: contextName here is the modulePath like 'modules/map-tab-content.html'
+    if (contextName.includes('map-tab-content.html')) {
+        if (document.getElementById('map') && window.MapManager) {
+            if (MapManager.map) MapManager.map.invalidateSize();
+            // else MapManager.init(); // MapManager.init() is usually called once in app_new.js.
+        }
+        if (window.SavedPlaces && typeof SavedPlaces.init === 'function') SavedPlaces.init(); // May need context
+
+        // Initialize galleries if they are specific to this tab
+        if (window.RasterOverlayGallery && document.getElementById('gallery')) {
+            // Example: new RasterOverlayGallery('gallery').init();
+        }
+        if (window.SatelliteOverlayGallery && document.getElementById('satellite-gallery')) {
+            // Example: new SatelliteOverlayGallery('satellite-gallery').init();
+        }
+        // this.initializeMapTabEventHandlers(contextElement); // For tab-specific non-delegated event handlers
+
+    } else if (contextName.includes('geotiff-tools-tab-content.html')) {
+        if (window.GeoTiffLeftPanel && document.getElementById('geotiff-sidebar')) {
+            if (!window.geoTiffLeftPanelInstance) window.geoTiffLeftPanelInstance = new GeoTiffLeftPanel();
+            // GeoTiffLeftPanel's constructor calls init. Re-calling init might be needed if DOM is replaced.
+            else window.geoTiffLeftPanelInstance.init();
+        }
+        if (window.GeoTiffMainCanvas && document.getElementById('geotiff-main-canvas')) {
+             if (!window.geoTiffMainCanvasInstance) window.geoTiffMainCanvasInstance = new GeoTiffMainCanvas();
+            else window.geoTiffMainCanvasInstance.init();
+        }
+        // this.initializeGeoTiffTabEventHandlers(contextElement);
+
+    } else if (contextName.includes('analysis-tab-content.html')) {
+        if (window.AnalysisManager && typeof AnalysisManager.init === 'function') AnalysisManager.init(contextElement);
+        else this.initializeAnalysisTab();
+        // this.initializeAnalysisTabEventHandlers(contextElement);
+
+    } else if (contextName.includes('openai-analysis-tab-content.html')) {
+        if (window.OpenAIAnalysis && document.getElementById('openai-analysis-tab')) {
+            if (!window.openAIAnalysisInstance) window.openAIAnalysisInstance = new OpenAIAnalysis();
+            else {
+                window.openAIAnalysisInstance.setupEventListeners();
+                window.openAIAnalysisInstance.initializeGalleries();
+            }
+        }
+        // this.initializeOpenAITabEventHandlers(contextElement);
+
+    } else if (contextName.includes('results-tab-content.html')) {
+        this.initializeResultsTab();
+        // this.initializeResultsTabEventHandlers(contextElement);
+    }
+
+    // Modal-specific initializations
+    // contextElement for modals is 'modals-placeholder'. The actual modal is its first child.
+    if (contextElement && contextElement.id === 'modals-placeholder' && contextElement.firstElementChild && contextElement.firstElementChild.classList.contains('modal')) {
+        const modalElement = contextElement.firstElementChild;
+        const modalId = modalElement.id;
+
+        this.reinitializeModalEventHandlers(`#${modalId}`, contextElement); // Pass placeholder as context for find
+
+        // Specific modal setups after generic handlers
+        if (modalId === 'laz-file-modal' && window.geoTiffLeftPanelInstance) {
+             window.geoTiffLeftPanelInstance.setupLazModalEvents();
+        } else if (modalId === 'laz-folder-modal' && window.geoTiffLeftPanelInstance) {
+             window.geoTiffLeftPanelInstance.setupLazFolderModalEvents();
+        } else if (modalId === 'image-selection-modal' && window.openAIAnalysisInstance) {
+            window.openAIAnalysisInstance.setupEventListeners();
+            window.openAIAnalysisInstance.initializeGalleries();
+        } else if (modalId === 'image-modal') {
+            this.initializeImageModalEventHandlers(); // This might need to target elements within the loaded modal
+        }
+        // Ensure the newly loaded modal is made visible
+        $(modalElement).filter(':hidden').fadeIn();
+    }
+
+    console.log(`UI: Dynamic content initialization attempt complete for ${contextName}`);
+  },
+
+  // Placeholder for more granular event handler initialization (if needed beyond component init methods)
+  initializeMapTabEventHandlers(contextElement) { Utils.log('debug', `TODO: MapTabEventHandlers for ${contextElement}`); },
+  initializeGeoTiffTabEventHandlers(contextElement) { Utils.log('debug', `TODO: GeoTiffTabEventHandlers for ${contextElement}`); },
+  initializeAnalysisTabEventHandlers(contextElement) { Utils.log('debug', `TODO: AnalysisTabEventHandlers for ${contextElement}`); },
+  initializeOpenAITabEventHandlers(contextElement) { Utils.log('debug', `TODO: OpenAITabEventHandlers for ${contextElement}`); },
+  initializeResultsTabEventHandlers(contextElement) { Utils.log('debug', `TODO: ResultsTabEventHandlers for ${contextElement}`); },
+
+  reinitializeModalEventHandlers(modalSelector, contextElementPassed) {
+    const contextNode = contextElementPassed || document.getElementById('modals-placeholder') || document;
+    const $modal = modalSelector ? $(contextNode).find(modalSelector) : $(contextNode);
+
+    if (!$modal.length || !$modal.hasClass('modal')) {
+        if(modalSelector) console.warn(`Modal not found with selector ${modalSelector} in reinitializeModalEventHandlers.`);
+        else if(contextNode && !$(contextNode).hasClass('modal')) console.warn('Provided contextElement is not a modal itself for reinitialization.');
+        return;
+    }
+
+    const modalId = $modal.attr('id');
+    Utils.log('info', `Re-initializing generic event handlers for modal: ${modalId || 'unknown modal'}`);
+
+    // Standard close button with class 'modal-close'
+    $modal.find('.modal-close').off('click').on('click', function() {
+        $modal.fadeOut(() => {
+            // if ($modal.parent().is('#modals-placeholder')) { $('#modals-placeholder').empty(); }
+        });
+    });
+  },
+
   /**
    * Initialize tab functionality
    */
   initializeTabs() {
     // Tab switching event handlers
-    $('.tab-btn').on('click', (e) => {
-      const targetTab = $(e.target).data('tab');
-      this.switchTab(targetTab);
+    $('.tab-btn').on('click', async (e) => {
+      const tabName = $(e.currentTarget).data('tab'); // Use currentTarget for reliability
+
+      // Update active button style
+      $('.tab-btn').removeClass('active border-[#00bfff] text-white').addClass('border-transparent text-[#ababab]');
+      $(e.currentTarget).addClass('active border-[#00bfff] text-white').removeClass('border-transparent text-[#ababab]');
+
+      await this.loadTabContent(tabName);
     });
 
     Utils.log('info', 'Tabs initialized');
   },
 
   /**
-   * Switch to a specific tab
-   * @param {string} tabName - Name of the tab to switch to ('map', 'geotiff-tools', 'analysis', or 'openai-analysis')
+   * Load content for a specific tab
+   * @param {string} tabName - Name of the tab to load
    */
-  switchTab(tabName) {
-    // Update tab buttons
-    $('.tab-btn').removeClass('active').addClass('text-[#ababab]').removeClass('text-white').removeClass('border-[#00bfff]').addClass('border-transparent');
-    $(`.tab-btn[data-tab="${tabName}"]`).addClass('active').removeClass('text-[#ababab]').addClass('text-white').removeClass('border-transparent').addClass('border-[#00bfff]');
-
-    // Update tab content
-    $('.tab-content').addClass('hidden');
-    $(`#${tabName}-tab`).removeClass('hidden');
-
-    // Initialize specific tabs if switching to them for the first time
-    if (tabName === 'analysis') {
-      this.initializeAnalysisTab();
-      
-      // Sync region selection if one is selected globally
-      const currentRegion = this.globalSelectedRegion || FileManager.getSelectedRegion();
-      if (currentRegion) {
-        // Load analysis images for the current region
-        this.loadAnalysisImages(currentRegion);
-      }
-    } else if (tabName === 'geotiff-tools') {
-      this.initializeGeoTiffTab();
-    } else if (tabName === 'openai-analysis') {
-      this.initializeOpenAIAnalysisTab();
-    } else if (tabName === 'results') {
-      this.initializeResultsTab();
+  async loadTabContent(tabName) {
+    const mainContentPlaceholder = document.getElementById('main-content-placeholder');
+    if (!mainContentPlaceholder) {
+      console.error('Main content placeholder not found');
+      Utils.showNotification('Error: Main content placeholder missing.', 'error');
+      return;
     }
 
-    Utils.log('info', `Switched to ${tabName} tab`);
+    mainContentPlaceholder.innerHTML = '<div class="loading-message text-center text-[#666] p-8">🔄 Loading tab content...</div>';
+    const modulePath = `modules/${tabName}-tab-content.html`;
+
+    try {
+      // loadModule (in app_new.js) now calls window.initializeDynamicContent itself after success.
+      await loadModule(modulePath, 'main-content-placeholder');
+      Utils.log('info', `Triggered loading for ${tabName} tab. Post-load initialization handled by initializeDynamicContent.`);
+    } catch (error) {
+        mainContentPlaceholder.innerHTML = `<div class="error-message text-center text-red-500 p-8">❌ Error loading ${tabName} tab. Check console for details.</div>`;
+        console.error(`Error in loadTabContent for ${tabName}:`, error);
+        Utils.showNotification(`Error loading ${tabName} tab.`, 'error');
+    }
+  },
+
+  /**
+   * Placeholder for tab-specific accordion initialization.
+   * This might be needed if accordions are dynamically added with tab content.
+   * @param {string} tabName
+   */
+  initializeAccordionsForTab(tabName) {
+    Utils.log('info', `Initializing accordions for tab: ${tabName}`);
+    // Example: if map tab has specific accordions:
+    if (tabName === 'map') {
+        $('#region-accordion').off('click').on('click', () => this.toggleAccordion('region'));
+        $('#get-data-accordion').off('click').on('click', () => this.toggleAccordion('get-data'));
+        $('#generate-rasters-accordion').off('click').on('click', () => this.toggleAccordion('generate-rasters'));
+        $('#go-to-accordion').off('click').on('click', () => this.toggleAccordion('go-to'));
+    }
+    // Add more for other tabs if needed
+    // This ensures event handlers are attached to newly loaded DOM elements.
   },
 
   /**
@@ -106,23 +238,24 @@ window.UIManager = {
    * @param {Object} coords - Coordinates object with lat/lng
    * @param {string} processingRegion - Region name for processing API calls
    */
-  handleGlobalRegionSelection(regionName, coords = null, processingRegion = null, filePath = null) {
+  async handleGlobalRegionSelection(regionName, coords = null, processingRegion = null, filePath = null) {
     // Update global selector
     this.updateGlobalRegionSelector(regionName);
     
     // Update FileManager's selected region
-    // This will also trigger the lat/lon update if it's a LAZ file due to changes in FileManager.selectRegion
-    FileManager.selectRegion(regionName, coords, processingRegion, filePath);
+    if (window.FileManager) {
+        FileManager.selectRegion(regionName, coords, processingRegion, filePath);
+    }
 
-    // Switch to Map tab
-    this.switchTab('map');
-    
+    // Switch to Map tab using the new method
+    await this.loadTabContent('map');
+    // Ensure the 'map' tab button is styled as active after loading
+    $('.tab-btn').removeClass('active border-[#00bfff] text-white').addClass('border-transparent text-[#ababab]');
+    $(`.tab-btn[data-tab="map"]`).addClass('active border-[#00bfff] text-white').removeClass('border-transparent text-[#ababab]');
+
     // Set map view and pin if coordinates are available
-    // Note: FileManager.selectRegion already handles map view and pin if coords are provided.
-    // Redundant calls here might occur but should be harmless or could be optimized.
-    if (coords && Utils.isValidCoordinate(coords.lat, coords.lng)) {
+    if (coords && Utils.isValidCoordinate(coords.lat, coords.lng) && window.MapManager) {
       MapManager.setView(coords.lat, coords.lng, 13);
-      // FileManager.updateLocationPin is called within FileManager.selectRegion
     }
     
     // Clear satellite gallery immediately when switching regions to prevent showing old images
@@ -267,19 +400,33 @@ window.UIManager = {
    */
   initializeEventHandlers() {
     // Global region selector button
-    $('#global-browse-regions-btn').on('click', () => {
+    $('#global-browse-regions-btn').on('click', async () => { // Made async
       console.log('🔍 Select Region button clicked - Looking up folders:');
       console.log('📁 Primary folder: input/');
       console.log('📊 Source filter: input (only input folder will be searched)');
       
+      // Load the modal HTML first
+      await loadModule('modules/modals/file-modal.html', 'modals-placeholder'); // Ensure loadModule is accessible
+
+      // After modal HTML is loaded, then proceed with original logic
+      // Note: Event handlers for elements inside file-modal.html (#cancel-select, #confirm-region-selection, etc.)
+      // should ideally be re-attached here or in a callback after loadModule.
+      // For now, assuming they might be globally attached or need addressing in Step 13.
+
       FileManager.loadFiles('input'); // Only load from input folder
-      $('#file-modal').fadeIn();
-      // Update modal title to indicate input-only selection
-      $('#file-modal h4').text('Select Region (Input Folder)');
-      // Set a flag to indicate this is for global region selection
-      $('#file-modal').data('for-global', true);
-      // Hide the delete button when modal is first opened
-      $('#delete-region-btn').addClass('hidden').prop('disabled', false).text('Delete Region');
+
+      const fileModal = document.getElementById('file-modal');
+      if (fileModal) {
+        $(fileModal).fadeIn(); // Use jQuery if it's still primary for show/hide
+        $('#file-modal h4').text('Select Region (Input Folder)'); // Use jQuery for consistency if fileModal is a jQuery object
+        $(fileModal).data('for-global', true);
+        $('#delete-region-btn').addClass('hidden').prop('disabled', false).text('Delete Region');
+
+        // Re-attach internal modal event handlers if they were part of the loaded HTML fragment
+        this.reinitializeModalEventHandlers('#file-modal');
+      } else {
+        console.error('File modal not found after loading.');
+      }
     });
 
     // Processing buttons
@@ -401,121 +548,102 @@ window.UIManager = {
       this.showHelpModal();
     });
 
-    // File modal close buttons
-    $('.close, #cancel-select').on('click', function() {
-      $('#file-modal').fadeOut();
-      // Reset modal title to default
-      $('#file-modal h4').text('Select Region');
-      // Hide the delete button when modal is closed
-      $('#delete-region-btn').addClass('hidden').prop('disabled', false).text('Delete Region');
+    // File modal close buttons - These might need to be delegated if modals-placeholder is emptied often
+    // or re-attached in reinitializeModalEventHandlers
+    // For now, assume they are handled if reinitializeModalEventHandlers is effective.
+    // Original direct bindings:
+    // $('.close, #cancel-select').on('click', function() { ... });
+    // $('#delete-region-btn').on('click', function() { ... });
+    // $('#confirm-region-selection').on('click', function() { ... });
+
+    // Delegate event handlers for elements within dynamically loaded modals
+    // This is a more robust way than re-attaching if the modal content is frequently replaced.
+    $(document).on('click', '#modals-placeholder .modal-close', function() {
+        $(this).closest('.modal').fadeOut();
+        // Potentially clear #modals-placeholder or specific modal content here
+        // $('#modals-placeholder').empty(); // Or target specific modal ID
     });
 
-    // File item selection is now handled in FileManager.displayRegions()
+    $(document).on('click', '#modals-placeholder #cancel-select', function() {
+        $(this).closest('.modal').fadeOut();
+        // $('#modals-placeholder').empty();
+    });
     
-    // Delete region button in modal
-    $('#delete-region-btn').on('click', function() {
-      const selectedItem = $('.file-item.selected');
+    $(document).on('click', '#modals-placeholder #delete-region-btn', function() {
+      const selectedItem = $('#modals-placeholder .file-item.selected'); // Ensure targeting within placeholder
       if (selectedItem.length === 0) {
         Utils.showNotification('Please select a region first', 'warning');
         return;
       }
       
       const regionName = selectedItem.data('region-name');
-      
-      // Confirm deletion
+      const $deleteButton = $(this); // Reference to the delete button itself
+
       if (confirm(`Are you sure you want to delete the region "${regionName}"? This will permanently delete all files in input/${regionName} and output/${regionName}.`)) {
-        // Show loading state
-        $(this).prop('disabled', true).text('Deleting...');
+        $deleteButton.prop('disabled', true).text('Deleting...');
         
-        // Use FileManager's deleteRegion method
         FileManager.deleteRegion(regionName)
           .then(result => {
             if (result.success) {
               Utils.showNotification(`Region "${regionName}" deleted successfully`, 'success');
-              
-              // Remove from UI
               selectedItem.remove();
-              
-              // Reset button
-              $('#delete-region-btn').addClass('hidden').prop('disabled', false).text('Delete Region');
-              
-              // If this was the currently selected region, reset the selection UI
+              $deleteButton.addClass('hidden').prop('disabled', false).text('Delete Region');
               if (FileManager.getSelectedRegion() === regionName) {
                 $('#selected-region-name').text('No region selected').removeClass('text-[#00bfff]').addClass('text-[#666]');
               }
             } else {
               Utils.showNotification(`Failed to delete region: ${result.message}`, 'error');
-              $('#delete-region-btn').prop('disabled', false).text('Delete Region');
+              $deleteButton.prop('disabled', false).text('Delete Region');
             }
           })
           .catch(error => {
             console.error('Error deleting region:', error);
             Utils.showNotification(`Error deleting region: ${error.message}`, 'error');
-            $('#delete-region-btn').prop('disabled', false).text('Delete Region');
+            $deleteButton.prop('disabled', false).text('Delete Region');
           });
       }
     });
 
-    // Select region button in modal
-    $('#confirm-region-selection').on('click', function() {
-      const selectedItem = $('.file-item.selected');
-      if (selectedItem.length === 0) {
-        Utils.showNotification('Please select a region first', 'warning');
-        return;
-      }
+    $(document).on('click', '#modals-placeholder #confirm-region-selection', function() {
+        const selectedItem = $('#modals-placeholder .file-item.selected');
+        if (selectedItem.length === 0) {
+            Utils.showNotification('Please select a region first', 'warning');
+            return;
+        }
 
-      const regionName = selectedItem.data('region-name'); // Display name
-      let processingRegion = selectedItem.data('processing-region'); // Processing region name
-      const filePath = selectedItem.data('file-path'); // Get file path
+        const regionName = selectedItem.data('region-name');
+        let processingRegion = selectedItem.data('processing-region');
+        const filePath = selectedItem.data('file-path');
+        const coords = selectedItem.data('coords');
 
-      // Get coordinates from the stored data
-      const coords = selectedItem.data('coords');
-      
-      // Make sure processing region is not just "LAZ" (which would cause problems)
-      if (processingRegion === "LAZ") {
-        console.warn("⚠️ Processing region is 'LAZ', which is likely incorrect. Using display name instead.");
-        processingRegion = regionName;
-      }
+        if (processingRegion === "LAZ") {
+            console.warn("⚠️ Processing region is 'LAZ', using display name instead.");
+            processingRegion = regionName;
+        }
 
-      // Check which type of selection this is
-      const isForGlobal = $('#file-modal').data('for-global');
-      const isForAnalysis = $('#file-modal').data('for-analysis');
-      
-      if (isForGlobal) {
-        // Handle global region selection - this includes API calls
-        // UIManager.handleGlobalRegionSelection(regionName, coords, processingRegion); // Original
-        // For now, let's assume handleGlobalRegionSelection will internally call selectRegion or be updated separately
-        // to handle filePath if it needs to directly trigger the lat/lon display.
-        // The primary goal here is to ensure selectRegion gets the path.
-        FileManager.selectRegion(regionName, coords, processingRegion, filePath); 
-        // If handleGlobalRegionSelection itself needs the filePath for other reasons, it should be updated.
-        // For now, we ensure that if it *results* in a selection that should show lat/lon,
-        // the underlying selectRegion call (if made by handleGlobalRegionSelection or directly) has the path.
-        // A more direct approach for global selection might be:
-        UIManager.handleGlobalRegionSelection(regionName, coords, processingRegion, filePath);
+        // Access data attribute from the modal itself, not the placeholder
+        const fileModalElement = document.getElementById('file-modal'); // Get the actual modal element
+        const isForGlobal = $(fileModalElement).data('for-global');
+        const isForAnalysis = $(fileModalElement).data('for-analysis');
 
+        if (isForGlobal) {
+            UIManager.handleGlobalRegionSelection(regionName, coords, processingRegion, filePath);
+            $(fileModalElement).removeData('for-global');
+        } else if (isForAnalysis) {
+            UIManager.updateAnalysisSelectedRegion(regionName);
+            $(fileModalElement).removeData('for-analysis');
+        } else {
+            FileManager.selectRegion(regionName, coords, processingRegion, filePath);
+        }
 
-        // Clear the flag
-        $('#file-modal').removeData('for-global');
-      } else if (isForAnalysis) {
-        // Update Analysis tab
-        UIManager.updateAnalysisSelectedRegion(regionName); // This likely doesn't need filePath for lat/lon inputs
-        // Clear the flag
-        $('#file-modal').removeData('for-analysis');
-      } else {
-        // Select the region using FileManager for Map tab - this includes API calls
-        FileManager.selectRegion(regionName, coords, processingRegion, filePath);
-      }
-      
-      // Close the modal
-      $('#file-modal').fadeOut();
-      // Reset modal title to default
-      $('#file-modal h4').text('Select Region');
+        $(this).closest('.modal').fadeOut();
+        // Optionally clear the placeholder if modals are always reloaded:
+        // $('#modals-placeholder').empty();
     });
 
-    // Progress modal close buttons
-    $('#progress-close, #cancel-progress').on('click', () => {
-      this.hideProgress();
+    // Progress modal close buttons - delegate if it's also loaded into modals-placeholder
+    $(document).on('click', '#modals-placeholder #progress-close, #modals-placeholder #cancel-progress', () => {
+        this.hideProgress(); // Assumes hideProgress targets #progress-modal correctly even if nested
     });
 
     // Coordinate input field event handlers for region name generation
@@ -567,26 +695,66 @@ window.UIManager = {
    * Initialize modals
    */
   initializeModals() {
-    // Close modal on background click
-    $('.modal').on('click', function(e) {
-      if (e.target === this) {
-        $(this).fadeOut();
-      }
+    // General modal close logic (background click, Escape key)
+    // This should ideally target modals within #modals-placeholder if they are dynamically loaded there.
+    // However, the original was global, so keeping it global for now, but might need refinement.
+    $(document).on('click', '.modal', function(e) { // Changed to document to catch dynamically loaded modals
+        if (e.target === this) { // Ensure it's the modal background, not content
+            $(this).fadeOut();
+            // Consider $('#modals-placeholder').empty(); if modals are always reloaded
+        }
     });
 
-    // Close modal on X button click
-    $('.modal-close').on('click', function() {
-      $(this).closest('.modal').fadeOut();
-    });
-
-    // Close modal on Escape key
     $(document).on('keydown', function(e) {
-      if (e.key === 'Escape') {
-        $('.modal:visible').fadeOut();
-      }
+        if (e.key === 'Escape') {
+            $('#modals-placeholder .modal:visible').fadeOut(); // Target visible modals in placeholder
+            // Consider $('#modals-placeholder').empty();
+        }
     });
 
-    Utils.log('info', 'Modals initialized');
+    Utils.log('info', 'Delegated modal event handlers initialized');
+  },
+
+  /**
+   * Re-initializes event handlers for a specific modal after it's loaded.
+   * This is a helper to keep internal modal logic working.
+   * @param {string} modalSelector - The CSS selector for the modal (e.g., '#file-modal') or null if contextElement is the modal.
+   * @param {HTMLElement} contextElement - The DOM element where the modal was loaded (usually 'modals-placeholder').
+   */
+  reinitializeModalEventHandlers(modalSelector, contextElementPassed) {
+    // If contextElementPassed is not given, default to #modals-placeholder or document
+    const contextNode = contextElementPassed || document.getElementById('modals-placeholder') || document;
+    const $modal = modalSelector ? $(contextNode).find(modalSelector) : $(contextNode); // If no selector, contextNode might be the modal itself.
+
+    if (!$modal.length || !$modal.hasClass('modal')) { // Check if a modal was actually found or passed
+        // If modalSelector was null and contextNode was modals-placeholder, this is not an error.
+        // If modalSelector was provided, then it's an issue.
+        if(modalSelector) console.warn(`Modal not found with selector ${modalSelector} in reinitializeModalEventHandlers.`);
+        return;
+    }
+
+    const modalId = $modal.attr('id');
+    Utils.log('info', `Re-initializing event handlers for modal: ${modalId || 'unknown modal'}`);
+
+    // General close buttons if not already covered by global delegation
+    // This ensures that if a modal's HTML is simple and relies on a common '.modal-close' class, it works.
+    $modal.find('.modal-close').off('click').on('click', function() {
+        $modal.fadeOut(() => {
+            if ($modal.parent().is('#modals-placeholder')) {
+                // $modal.remove(); // Or $('#modals-placeholder').empty(); if only one modal at a time
+            }
+        });
+    });
+
+    // Specific re-initializations based on modal ID
+    // This is where you'd call specific setup functions for each modal's unique interactions
+    // if they are not handled by broader delegated event listeners or class initializations.
+    // For example, if 'laz-file-modal' has complex internal event logic not covered by its class's init:
+    // if (modalId === 'laz-file-modal' && window.geoTiffLeftPanelInstance) {
+    //    window.geoTiffLeftPanelInstance.setupSpecificLazModalInteractions($modal);
+    // }
+    // Most of our modal-specific JS is now called from initializeDynamicContent via class init methods.
+    // This function can serve as a fallback or for very generic re-bindings.
   },
 
   /**
@@ -2199,20 +2367,35 @@ window.UIManager = {
    * Show progress modal with a message
    * @param {string} message - Progress message to display
    */
-  showProgress(message) {
-    const modal = $('#progress-modal');
-    const title = $('#progress-title');
-    const status = $('#progress-status');
-    const progressBar = $('#progress-bar');
-    const details = $('#progress-details');
+  async showProgress(message) { // Made async
+    // Load the modal HTML first into the placeholder
+    await loadModule('modules/modals/progress-modal.html', 'modals-placeholder'); // Ensure loadModule is accessible
+
+    // After modal HTML is loaded, then proceed with original logic
+    // Note: The modal ID is #progress-modal as defined in progress-modal.html
+    const modal = $('#modals-placeholder #progress-modal'); // Target within placeholder
+    if (!modal.length) {
+      console.error('Progress modal not found after loading.');
+      return;
+    }
+
+    const title = modal.find('#progress-title');
+    const status = modal.find('#progress-status');
+    const progressBar = modal.find('#progress-bar');
+    const details = modal.find('#progress-details');
 
     if (title.length) title.text('Processing...');
     if (status.length) status.text(message || 'Initializing...');
     if (progressBar.length) progressBar.css('width', '0%');
     if (details.length) details.text('');
 
-    modal.fadeIn();
+    modal.fadeIn(); // Show the loaded modal
     Utils.log('info', `Progress modal shown: ${message}`);
+
+    // It's good practice to re-initialize specific handlers if not fully covered by delegation,
+    // especially if there are complex interactions within this modal beyond just close.
+    // this.reinitializeModalEventHandlers('#modals-placeholder #progress-modal');
+    // For now, existing delegation for close buttons should work.
   },
 
   /**
@@ -2245,32 +2428,203 @@ window.UIManager = {
    * Hide progress modal
    */
   hideProgress() {
-    const modal = $('#progress-modal');
-    modal.fadeOut();
+    // Ensure we are targeting the modal within the placeholder if it's loaded there
+    const modal = $('#modals-placeholder #progress-modal');
+    if (modal.length) {
+        modal.fadeOut(() => {
+            // Optional: remove the specific modal from placeholder to keep DOM clean
+            // modal.remove();
+            // Or if modals-placeholder should only ever hold one modal at a time:
+            // $('#modals-placeholder').empty();
+        });
+    } else {
+        // Fallback for modals not in placeholder (if any are left)
+        $('#progress-modal').fadeOut();
+    }
     Utils.log('info', 'Progress modal hidden');
   },
+
+  // This function will be called after new HTML content is loaded into a part of the page.
+  // contextElement is the DOM element into which content was loaded.
+  // contextName is a string (e.g., tab name or modal name) to identify the content.
+  async initializeDynamicContent(contextElement, contextName) {
+    console.log(`UI: Initializing dynamic content for context: ${contextName} in element:`, contextElement);
+
+    // General initializers that look for specific classes/elements within the contextElement
+    // These should be written to safely operate on a sub-tree of the DOM (contextElement)
+    // or be smart enough not to re-initialize global things if called multiple times.
+
+    if (typeof this.initializeAccordions === 'function') {
+        // Make sure initializeAccordions can run on a specific context or is idempotent
+        // For now, assuming it re-binds based on classes within the entire document or needs adjustment.
+        // A better approach is to pass contextElement to such initializers if they support it.
+        // e.g., this.initializeAccordions(contextElement);
+        this.initializeAccordions(); // Re-running for now
+    }
+    if (typeof this.initializeResizablePanels === 'function') {
+        // Similar to accordions, this might need to target contextElement or be idempotent.
+        this.initializeResizablePanels(); // Re-running for now
+    }
+    if (typeof this.initializeTooltips === 'function') {
+        this.initializeTooltips(); // Re-running for now
+    }
+     if (typeof this.initializeEventHandlers === 'function') {
+        // This is broad. Many event handlers are initialized here.
+        // Re-calling it might lead to duplicate bindings if not careful.
+        // Ideally, specific handlers relevant to the contextName should be called.
+        // For now, this is a placeholder for more granular calls.
+        // Consider breaking down initializeEventHandlers or using more event delegation.
+        // this.initializeEventHandlers(); // BE CAREFUL WITH THIS
+    }
+
+
+    // Tab-specific initializations
+    if (contextName.includes('map-tab-content')) {
+        if (document.getElementById('map') && window.MapManager && typeof MapManager.init === 'function') {
+            // MapManager.init(); // Usually, map should be initialized once.
+            // If map instance persists, just ensure its view is correct.
+            if (MapManager.map) MapManager.map.invalidateSize();
+        }
+        if (window.SavedPlaces && typeof SavedPlaces.init === 'function') {
+            // SavedPlaces.init(); // Might need to be idempotent or target context
+        }
+        // Initialize galleries if they are specific to this tab and within contextElement
+        if (window.RasterOverlayGallery && document.getElementById('gallery')) { // Assuming 'gallery' is for rasters
+            // This assumes RasterOverlayGallery is a class or object with an init method or similar setup.
+            // new RasterOverlayGallery('gallery').init(); // Or however it's structured
+        }
+        if (window.SatelliteOverlayGallery && document.getElementById('satellite-gallery')) {
+            // new SatelliteOverlayGallery('satellite-gallery').init();
+        }
+        // Re-attach specific event handlers for map tab elements if not delegated
+        this.initializeMapTabEventHandlers(contextElement);
+
+    } else if (contextName.includes('geotiff-tools-tab-content')) {
+        if (window.GeoTiffLeftPanel && document.getElementById('geotiff-sidebar')) {
+            // Assuming GeoTiffLeftPanel is a class that needs instantiation or a static init.
+            // If it's already instantiated, it might need a method to refresh/rebind to new DOM.
+            if (!window.geoTiffLeftPanelInstance) window.geoTiffLeftPanelInstance = new GeoTiffLeftPanel();
+            else if (typeof window.geoTiffLeftPanelInstance.reinit === 'function') window.geoTiffLeftPanelInstance.reinit(contextElement);
+            else window.geoTiffLeftPanelInstance.init(); // Fallback
+        }
+        if (window.GeoTiffMainCanvas && document.getElementById('geotiff-main-canvas')) {
+            // Similar for GeoTiffMainCanvas
+            if (!window.geoTiffMainCanvasInstance) window.geoTiffMainCanvasInstance = new GeoTiffMainCanvas();
+            else if (typeof window.geoTiffMainCanvasInstance.reinit === 'function') window.geoTiffMainCanvasInstance.reinit(contextElement);
+            else window.geoTiffMainCanvasInstance.init(); // Fallback
+        }
+        this.initializeGeoTiffTabEventHandlers(contextElement);
+
+    } else if (contextName.includes('analysis-tab-content')) {
+        if (window.AnalysisManager && typeof AnalysisManager.init === 'function') {
+            AnalysisManager.init(contextElement); // Pass context if it supports it
+        } else {
+          this.initializeAnalysisTab(); // Fallback to existing UIManager method
+        }
+         if (window.Chat && typeof window.Chat.init === 'function' && document.getElementById('chat-log')) {
+            // window.Chat.init(); // Or pass contextElement
+        }
+        this.initializeAnalysisTabEventHandlers(contextElement);
+
+    } else if (contextName.includes('openai-analysis-tab-content')) {
+        if (window.OpenAIAnalysis && document.getElementById('openai-analysis-tab')) { // Check for a root element of the tab
+            if (!window.openAIAnalysisInstance) window.openAIAnalysisInstance = new OpenAIAnalysis();
+            else if (typeof window.openAIAnalysisInstance.reinit === 'function') window.openAIAnalysisInstance.reinit(contextElement);
+            else window.openAIAnalysisInstance.init(); // Fallback
+        }
+        this.initializeOpenAITabEventHandlers(contextElement);
+
+
+    } else if (contextName.includes('results-tab-content')) {
+        if (window.ResultsManager && typeof ResultsManager.init === 'function' && document.getElementById('results-tab')) {
+            ResultsManager.init(); // Or pass contextElement
+        } else {
+          this.initializeResultsTab();
+        }
+        this.initializeResultsTabEventHandlers(contextElement);
+    }
+
+    // Modal-specific initializations based on the modulePath (contextName)
+    // These ensure that JavaScript behavior tied to modal content is enabled after loading.
+    if (contextName.includes('file-modal.html')) {
+        // Specific setup for file-modal, e.g., initializing search, list population, button events.
+        // This might be calling a method on FileManager or UIManager itself.
+        // UIManager.setupFileModal(contextElement);
+        this.reinitializeModalEventHandlers('#file-modal'); // General re-init for close etc.
+        if(window.FileManager) {
+            // FileManager.displayRegions(contextElement.querySelector('#file-list')); // Example
+        }
+    } else if (contextName.includes('progress-modal.html')) {
+        // UIManager.setupProgressModal(contextElement);
+        this.reinitializeModalEventHandlers('#progress-modal');
+    } else if (contextName.includes('laz-file-modal.html')) {
+        if(window.geoTiffLeftPanelInstance) { // Assuming it's created when geotiff tab loads
+            window.geoTiffLeftPanelInstance.setupLazModalEvents(); // Re-bind internal events
+        }
+        this.reinitializeModalEventHandlers('#laz-file-modal');
+    } else if (contextName.includes('laz-folder-modal.html')) {
+        if(window.geoTiffLeftPanelInstance) {
+            window.geoTiffLeftPanelInstance.setupLazFolderModalEvents();
+        }
+        this.reinitializeModalEventHandlers('#laz-folder-modal');
+    } else if (contextName.includes('image-modal.html')) {
+        // UIManager.setupImageModal(contextElement);
+         this.reinitializeModalEventHandlers('#image-modal'); // Handles close
+         this.initializeImageModalEventHandlers(); // Sets up specific behaviors
+    } else if (contextName.includes('image-selection-modal.html')) {
+        if(window.openAIAnalysisInstance) { // Assuming instance from openai-analysis.js
+            // openAIAnalysisInstance.setupImageSelectionModalEvents(contextElement);
+            // The OpenAIAnalysis class's setupEventListeners likely covers this.
+            // We might need to ensure it's called or parts of it are.
+            window.openAIAnalysisInstance.initializeGalleries(); // Re-init gallery in new modal DOM
+            window.openAIAnalysisInstance.setupEventListeners(); // Re-bind events
+        }
+        this.reinitializeModalEventHandlers('#image-selection-modal');
+    }
+
+    console.log(`UI: Dynamic content initialization complete for ${contextName}`);
+  },
+
+  // Placeholder for more granular event handler initialization
+  initializeMapTabEventHandlers(contextElement) { /* TODO */ },
+  initializeGeoTiffTabEventHandlers(contextElement) { /* TODO */ },
+  initializeAnalysisTabEventHandlers(contextElement) { /* TODO */ },
+  initializeOpenAITabEventHandlers(contextElement) { /* TODO */ },
+  initializeResultsTabEventHandlers(contextElement) { /* TODO */ },
+
 
   /**
    * Show image modal
    * @param {string} imageSrc - Source URL of the image
    * @param {string} imageAlt - Alt text for the image (used as caption)
    */
-  showImageModal(imageSrc, imageAlt) {
-    const modal = $('#image-modal');
-    const imgElement = $('#image-modal-img');
-    const captionElement = $('#image-modal-caption');
-    const titleElement = $('#image-modal-title');
+  async showImageModal(imageSrc, imageAlt) { // Made async
+    await loadModule('modules/modals/image-modal.html', 'modals-placeholder');
 
-    if (modal.length && imgElement.length && captionElement.length && titleElement.length) {
+    const modal = $('#modals-placeholder #image-modal'); // Target within placeholder
+    if (!modal.length) {
+        console.error('Image modal not found after loading.');
+        Utils.log('error', 'Image modal elements not found after loading.');
+        return;
+    }
+
+    const imgElement = modal.find('#image-modal-img');
+    const captionElement = modal.find('#image-modal-caption');
+    const titleElement = modal.find('#image-modal-title');
+
+    if (imgElement.length && captionElement.length && titleElement.length) {
       imgElement.attr('src', imageSrc);
       imgElement.attr('alt', imageAlt);
       captionElement.text(imageAlt);
-      titleElement.text(imageAlt || 'Image Preview'); // Use alt text as title or default
+      titleElement.text(imageAlt || 'Image Preview');
       
       modal.fadeIn();
       Utils.log('info', `Image modal shown for: ${imageAlt}`);
+
+      // Re-attach specific handlers if needed, though close is delegated
+      // this.reinitializeModalEventHandlers('#modals-placeholder #image-modal');
     } else {
-      Utils.log('error', 'Image modal elements not found');
+      Utils.log('error', 'Image modal internal elements not found after loading.');
     }
   },
 
@@ -2278,11 +2632,13 @@ window.UIManager = {
    * Hide image modal
    */
   hideImageModal() {
-    const modal = $('#image-modal');
+    const modal = $('#modals-placeholder #image-modal'); // Target within placeholder
     if (modal.length) {
-      modal.fadeOut();
-      // Optional: Clear image source to free memory
-      // $('#image-modal-img').attr('src', ''); 
+      modal.fadeOut(() => {
+        // Optional: Clear image source to free memory
+        // modal.find('#image-modal-img').attr('src', '');
+        // $('#modals-placeholder').empty(); // Or modal.remove();
+      });
       Utils.log('info', 'Image modal hidden');
     }
   },
@@ -2489,7 +2845,150 @@ window.UIManager = {
       }
       this.resultsTabInitialized = true;
     }
-    Utils.log('info', 'Results tab switched.');
+    // This log might be redundant if called from initializeDynamicContent as well
+    // Utils.log('info', 'Results tab switched or initialized.');
   },
 
+  // This function will be called after new HTML content is loaded into a part of the page.
+  // contextElement is the DOM element into which content was loaded.
+  // contextName is a string (e.g., tab name or modal name) to identify the content.
+  async initializeDynamicContent(contextElement, contextName) {
+    console.log(`UI: Initializing dynamic content for context: ${contextName} in element:`, contextElement);
+
+    // General initializers
+    // These should ideally accept contextElement to scope their actions or be idempotent
+    if (typeof this.initializeAccordions === 'function') this.initializeAccordions(contextElement);
+    if (typeof this.initializeResizablePanels === 'function') this.initializeResizablePanels(contextElement);
+    if (typeof this.initializeTooltips === 'function') this.initializeTooltips(contextElement);
+
+    // Tab-specific initializations
+    // Note: contextName here is the modulePath like 'modules/map-tab-content.html'
+    if (contextName.includes('map-tab-content.html')) {
+        if (document.getElementById('map') && window.MapManager) {
+            if (MapManager.map) MapManager.map.invalidateSize();
+            // else MapManager.init(); // Consider if init() should be called if map doesn't exist.
+                                     // Usually MapManager.init() is called once in app_new.js.
+        }
+        if (window.SavedPlaces && typeof SavedPlaces.init === 'function') SavedPlaces.init();
+
+        // Assuming galleries are part of map-tab-content.html and need re-initialization
+        // These might need to be classes instantiated here or have static init methods.
+        if (window.RasterOverlayGallery && document.getElementById('gallery')) {
+            // Example: if RasterOverlayGallery is a class: new RasterOverlayGallery('gallery', {/* options */});
+            // Or if it has a static init: RasterOverlayGallery.init('gallery');
+        }
+        if (window.SatelliteOverlayGallery && document.getElementById('satellite-gallery')) {
+            // Similar for SatelliteOverlayGallery
+        }
+        // this.initializeMapTabEventHandlers(contextElement); // For tab-specific non-delegated event handlers
+
+    } else if (contextName.includes('geotiff-tools-tab-content.html')) {
+        if (window.GeoTiffLeftPanel && document.getElementById('geotiff-sidebar')) {
+            if (!window.geoTiffLeftPanelInstance) window.geoTiffLeftPanelInstance = new GeoTiffLeftPanel();
+            // GeoTiffLeftPanel's constructor calls init, which calls setupEventListeners.
+            // If elements are now in contextElement, ensure listeners are bound to them.
+            // This might mean GeoTiffLeftPanel.init needs to be callable again or take contextElement.
+            else window.geoTiffLeftPanelInstance.init();
+        }
+        if (window.GeoTiffMainCanvas && document.getElementById('geotiff-main-canvas')) {
+             if (!window.geoTiffMainCanvasInstance) window.geoTiffMainCanvasInstance = new GeoTiffMainCanvas();
+            else window.geoTiffMainCanvasInstance.init();
+        }
+        // this.initializeGeoTiffTabEventHandlers(contextElement);
+
+    } else if (contextName.includes('analysis-tab-content.html')) {
+        // Assuming AnalysisManager is a global object or class with a static init or instance method
+        if (window.AnalysisManager && typeof AnalysisManager.init === 'function') AnalysisManager.init(contextElement);
+        else this.initializeAnalysisTab(); // Fallback to UIManager's own method
+        // this.initializeAnalysisTabEventHandlers(contextElement);
+
+    } else if (contextName.includes('openai-analysis-tab-content.html')) {
+        if (window.OpenAIAnalysis && document.getElementById('openai-analysis-tab')) {
+            if (!window.openAIAnalysisInstance) window.openAIAnalysisInstance = new OpenAIAnalysis();
+            else {
+                // OpenAIAnalysis constructor calls init, which calls setupEventListeners.
+                // If UI is reloaded, these need to be re-established.
+                window.openAIAnalysisInstance.setupEventListeners();
+                window.openAIAnalysisInstance.initializeGalleries(); // If galleries are within the tab
+            }
+        }
+        // this.initializeOpenAITabEventHandlers(contextElement);
+
+    } else if (contextName.includes('results-tab-content.html')) {
+        this.initializeResultsTab(); // This has its own check for one-time init.
+        // this.initializeResultsTabEventHandlers(contextElement);
+    }
+
+    // Modal-specific initializations are triggered after loadModule in the functions that show modals.
+    // However, reinitializeModalEventHandlers is a general helper that can be called.
+    if (contextName.includes('-modal.html')) {
+        const modalId = contextElement.firstElementChild ? `#${contextElement.firstElementChild.id}` : null;
+        if (modalId) {
+            this.reinitializeModalEventHandlers(modalId, contextElement);
+            // Specific modal JS re-initialization if needed beyond generic handlers:
+            if (modalId === '#laz-file-modal' && window.geoTiffLeftPanelInstance) {
+                 window.geoTiffLeftPanelInstance.setupLazModalEvents();
+            } else if (modalId === '#laz-folder-modal' && window.geoTiffLeftPanelInstance) {
+                 window.geoTiffLeftPanelInstance.setupLazFolderModalEvents();
+            } else if (modalId === '#image-selection-modal' && window.openAIAnalysisInstance) {
+                window.openAIAnalysisInstance.setupEventListeners();
+                window.openAIAnalysisInstance.initializeGalleries();
+            }
+            // Ensure the modal becomes visible if it was loaded on demand to be shown
+            $(modalId).filter(':hidden').fadeIn();
+        }
+    }
+
+    console.log(`UI: Dynamic content initialization attempt complete for ${contextName}`);
+  },
+
+  // Placeholder for more granular event handler initialization (if needed beyond component init methods)
+  initializeMapTabEventHandlers(contextElement) { /* TODO */ },
+  initializeGeoTiffTabEventHandlers(contextElement) { /* TODO */ },
+  initializeAnalysisTabEventHandlers(contextElement) { /* TODO */ },
+  initializeOpenAITabEventHandlers(contextElement) { /* TODO */ },
+  initializeResultsTabEventHandlers(contextElement) { /* TODO */ },
+
+  /**
+   * Re-initializes event handlers for a specific modal after it's loaded.
+   * @param {string} modalSelector - The CSS selector for the modal (e.g., '#file-modal') or null if contextElement is the modal.
+   * @param {HTMLElement} contextElementPassed - The DOM element where the modal was loaded (usually 'modals-placeholder').
+   */
+  reinitializeModalEventHandlers(modalSelector, contextElementPassed) {
+    const contextNode = contextElementPassed || document.getElementById('modals-placeholder') || document;
+    const $modal = modalSelector ? $(contextNode).find(modalSelector) : $(contextNode);
+
+    if (!$modal.length || !$modal.hasClass('modal')) {
+        if(modalSelector) console.warn(`Modal not found with selector ${modalSelector} in reinitializeModalEventHandlers.`);
+        else if(!$(contextNode).hasClass('modal')) console.warn('Provided contextElement is not a modal itself for reinitialization.');
+        return;
+    }
+
+    const modalId = $modal.attr('id');
+    Utils.log('info', `Re-initializing generic event handlers for modal: ${modalId || 'unknown modal'}`);
+
+    // General close button with class 'modal-close'
+    // This re-binds to ensure it works for the newly loaded modal.
+    // Note: Global delegated handlers in initializeModals() might also catch this,
+    // but direct re-binding here is more specific to the just-loaded modal.
+    $modal.find('.modal-close').off('click').on('click', function() {
+        $modal.fadeOut(() => {
+            // Optional: Clean up placeholder if modals are loaded one at a time and then removed.
+            // if ($modal.parent().is('#modals-placeholder')) { $('#modals-placeholder').empty(); }
+        });
+    });
+
+    // Add any other generic modal behaviors here, e.g., cancel buttons with a common class.
+    // $modal.find('.cancel-btn').off('click').on('click', () => $modal.fadeOut());
+  },
 };
+
+// Make initializeDynamicContent globally available so app_new.js/loadModule can call it
+if (window.UIManager && typeof window.UIManager.initializeDynamicContent === 'function') {
+    window.initializeDynamicContent = window.UIManager.initializeDynamicContent.bind(window.UIManager);
+}
+
+// Make initializeDynamicContent globally available so app_new.js/loadModule can call it
+if (window.UIManager && typeof window.UIManager.initializeDynamicContent === 'function') {
+    window.initializeDynamicContent = window.UIManager.initializeDynamicContent.bind(window.UIManager);
+}

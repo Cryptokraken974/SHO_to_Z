@@ -1,0 +1,269 @@
+<div id="map-tab" class="tab-content flex flex-1 overflow-hidden">
+  <!-- Sidebar -->
+  <div id="sidebar" class="bg-[#1a1a1a] border-r border-[#303030] w-64 p-6 flex flex-col overflow-y-auto resizable-panel">
+    <div class="resize-handle"></div>
+  <!-- Region Section -->
+  <div class="accordion-section mb-6">
+    <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="region-accordion">
+      <h3 class="text-white font-semibold flex justify-between items-center m-0">
+        Region
+        <span class="accordion-arrow text-sm transition-transform">▼</span>
+      </h3>
+    </div>
+    <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="region-content">
+      <div class="space-y-3">
+        <!-- Coordinate Input Fields -->
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label for="lat-input" class="block text-xs text-[#ababab] mb-1">Latitude</label>
+            <input type="text" id="lat-input" placeholder="Click map to capture" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm placeholder-[#666] focus:outline-none focus:border-[#00bfff] font-mono">
+          </div>
+          <div>
+            <label for="lng-input" class="block text-xs text-[#ababab] mb-1">Longitude</label>
+            <input type="text" id="lng-input" placeholder="Click map to capture" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm placeholder-[#666] focus:outline-none focus:border-[#00bfff] font-mono">
+          </div>
+        </div>
+
+        <!-- Region Name Field -->
+        <div class="mt-2">
+          <label for="region-name-input" class="block text-xs text-[#ababab] mb-1">Region Name</label>
+          <input type="text" id="region-name-input" placeholder="Auto-generated from coordinates" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm placeholder-[#666] focus:outline-none focus:border-[#00bfff] font-mono">
+        </div>
+
+        <!-- Save Current Location button will be added here by SavedPlaces system -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Get Data Section -->
+  <div class="accordion-section mb-6">
+    <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="get-data-accordion">
+      <h3 class="text-white font-semibold flex justify-between items-center m-0">
+        Get Data
+        <span class="accordion-arrow text-sm transition-transform">▼</span>
+      </h3>
+    </div>
+    <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="get-data-content">
+      <div class="space-y-3">
+        <!-- Sentinel-2 Test Button -->
+        <button id="test-sentinel2-btn" class="w-full bg-[#6c757d] hover:bg-[#5a6268] text-white px-4 py-3 rounded-lg font-medium transition-colors text-sm">🧪 Test Sentinel-2 Download (Debug)</button>
+
+        <!-- Get LIDAR Data Button -->
+        <button id="get-lidar-btn" class="w-full bg-[#6c5ce7] hover:bg-[#5a4fcf] text-white px-4 py-3 rounded-lg font-medium transition-colors">🏔️ Get Elevation Data</button>
+
+        <!-- Get Data Button (Combined) -->
+        <button id="get-data-btn" class="w-full bg-[#28a745] hover:bg-[#218838] text-white px-4 py-3 rounded-lg font-medium transition-colors">📊 Get Data (Elevation + Satellite)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generate Rasters Section -->
+  <div class="accordion-section mb-6">
+    <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="generate-rasters-accordion">
+      <h3 class="text-white font-semibold flex justify-between items-center m-0">
+        Generate Rasters
+        <span class="accordion-arrow text-sm transition-transform">▼</span>
+      </h3>
+    </div>
+    <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="generate-rasters-content">
+      <div class="space-y-3">
+        <!-- Single Generate All Rasters Button -->
+        <button id="generate-all-rasters-btn" class="w-full bg-[#8e44ad] hover:bg-[#7d3c98] text-white px-4 py-3 rounded-lg font-medium transition-colors">
+          🏔️ Generate Rasters (DTM + All Terrain Analysis)
+        </button>
+
+        <!-- Cancel Button (hidden by default) -->
+        <button id="cancel-all-rasters-btn" class="w-full bg-[#dc3545] hover:bg-[#c82333] text-white px-4 py-2 rounded-lg font-medium transition-colors hidden">
+          ❌ Cancel Processing
+        </button>
+
+        <!-- Progress Indicator -->
+        <div id="raster-generation-progress" class="hidden">
+          <div class="bg-[#1a1a1a] rounded-lg p-3 space-y-2">
+            <div class="flex justify-between items-center">
+              <span id="current-processing-step" class="text-[#ababab] text-sm">Initializing...</span>
+              <span id="processing-progress-text" class="text-[#ababab] text-sm">0%</span>
+            </div>
+            <div class="w-full bg-[#333] rounded-full h-2">
+              <div id="processing-progress-bar" class="bg-[#8e44ad] h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Processing Queue Display -->
+        <div id="processing-queue" class="hidden">
+          <div class="text-[#ababab] text-xs mb-2">Processing Queue:</div>
+          <div class="grid grid-cols-4 gap-1 text-xs">
+            <div id="queue-dtm" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+              <div class="text-[#8e44ad]">🏔️</div>
+              <div>DTM</div>
+            </div>
+            <div id="queue-dsm" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+              <div class="text-[#2d3436]">🏗️</div>
+              <div>DSM</div>
+            </div>
+            <div id="queue-hillshade" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+              <div class="text-[#e17055]">🌄</div>
+              <div>Hillshade</div>
+            </div>
+            <div id="queue-slope" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+              <div class="text-[#00cec9]">📐</div>
+              <div>Slope</div>
+            </div>
+            <div id="queue-aspect" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+              <div class="text-[#fdcb6e]">🧭</div>
+              <div>Aspect</div>
+            </div>
+            <div id="queue-tpi" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+              <div class="text-[#a29bfe]">📈</div>
+              <div>TPI</div>
+            </div>
+            <div id="queue-roughness" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+              <div class="text-[#74b9ff]">🪨</div>
+              <div>Roughness</div>
+            </div>
+            <div id="queue-chm" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+              <div class="text-[#00b894]">🌳</div>
+              <div>CHM</div>
+            </div>
+            <div id="queue-sky-view-factor" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+              <div class="text-[#ffeaa7]">☀️</div>
+              <div>Sky View Factor</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Indicator -->
+        <div id="raster-generation-status" class="text-xs text-[#666] mt-2 hidden">
+          <i class="fas fa-info-circle mr-1"></i>
+          <span id="raster-status-text">Ready to generate all rasters</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Go to Section -->
+  <div class="accordion-section mb-6">
+    <div class="accordion-header bg-[#303030] hover:bg-[#404040] cursor-pointer p-3 rounded-lg transition-colors" id="go-to-accordion">
+      <h3 class="text-white font-semibold flex justify-between items-center m-0">
+        Go to
+        <span class="accordion-arrow text-sm transition-transform">▼</span>
+      </h3>
+    </div>
+    <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="go-to-content">
+      <div class="space-y-3">
+        <!-- Coordinate Input Field -->
+        <div>
+          <label for="goto-coordinates-input" class="block text-xs text-[#ababab] mb-1">Coordinates</label>
+          <input type="text" id="goto-coordinates-input" placeholder="e.g., 10°42′05″S, 67°52′36″W" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm placeholder-[#666] focus:outline-none focus:border-[#00bfff] font-mono">
+          <div class="text-xs text-[#666] mt-1">Formats: 10°42′05″S, 67°52′36″W • 8.845°S, 67.255°W • -8.845, -67.255</div>
+        </div>
+
+        <!-- Parsed Coordinates Display -->
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label for="goto-lat-input" class="block text-xs text-[#ababab] mb-1">Latitude</label>
+            <input type="number" id="goto-lat-input" placeholder="Parsed latitude" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm placeholder-[#666] focus:outline-none focus:border-[#00bfff] font-mono" step="any" readonly>
+          </div>
+          <div>
+            <label for="goto-lng-input" class="block text-xs text-[#ababab] mb-1">Longitude</label>
+            <input type="number" id="goto-lng-input" placeholder="Parsed longitude" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm placeholder-[#666] focus:outline-none focus:border-[#00bfff] font-mono" step="any" readonly>
+          </div>
+        </div>
+
+        <!-- Region Name Display -->
+        <div>
+          <label for="goto-region-name" class="block text-xs text-[#ababab] mb-1">Region Name</label>
+          <input type="text" id="goto-region-name" placeholder="Generated region name" class="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm placeholder-[#666] focus:outline-none focus:border-[#00bfff] font-mono" readonly>
+        </div>
+
+        <!-- Go Button -->
+        <button id="go-to-coordinates-btn" class="w-full bg-[#17a2b8] hover:bg-[#138496] text-white px-4 py-3 rounded-lg font-medium transition-colors">🎯 Go to Coordinates</button>
+
+        <!-- Preset Locations -->
+        <div class="mt-4">
+          <label class="block text-xs text-[#ababab] mb-2">Quick Locations</label>
+          <div class="space-y-2">
+            <button class="preset-location w-full bg-[#495057] hover:bg-[#6c757d] text-white px-3 py-2 rounded text-sm transition-colors" data-lat="40.7128" data-lng="-74.0060">📍 New York City</button>
+            <button class="preset-location w-full bg-[#495057] hover:bg-[#6c757d] text-white px-3 py-2 rounded text-sm transition-colors" data-lat="34.0522" data-lng="-118.2437">📍 Los Angeles</button>
+            <button class="preset-location w-full bg-[#495057] hover:bg-[#6c757d] text-white px-3 py-2 rounded text-sm transition-colors" data-lat="51.5074" data-lng="-0.1278">📍 London</button>
+            <button class="preset-location w-full bg-[#495057] hover:bg-[#6c757d] text-white px-3 py-2 rounded text-sm transition-colors" data-lat="35.6762" data-lng="139.6503">📍 Tokyo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main processing area with map and gallery -->
+<div id="main" class="flex-1 p-6 bg-[#141414] overflow-y-auto">
+  <div class="mb-6">
+    <h1 class="text-white text-2xl font-bold">Terrain Analysis Results</h1>
+    <p class="text-[#ababab] text-sm mt-2">Select a region and click on a processing button to generate terrain analysis</p>
+  </div>
+
+  <!-- World Map Canvas -->
+  <div class="mb-6 relative">
+    <div id="map" class="w-full h-[800px] bg-[#1a1a1a] border border-[#303030] rounded-lg"></div>
+    <!-- Coordinate Display Overlay -->
+    <div id="coordinate-display" class="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded font-mono pointer-events-none z-[1000]">
+      Lat: ---, Lng: ---
+    </div>
+  </div>
+
+  <!-- Processing Results Gallery -->
+  <div class="mb-4">
+    <h2 class="text-white text-lg font-semibold mb-4">Processing Results</h2>
+    <div id="gallery" class="flex gap-4 overflow-x-auto pb-4">
+      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-dtm">
+        <div class="flex-1 flex items-center justify-center">
+          <div class="text-white text-lg font-medium">DTM</div>
+        </div>
+      </div>
+      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-dsm">
+        <div class="flex-1 flex items-center justify-center">
+          <div class="text-white text-lg font-medium">DSM</div>
+        </div>
+      </div>
+      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-hillshade">
+        <div class="flex-1 flex items-center justify-center">
+          <div class="text-white text-lg font-medium">Hillshade</div>
+        </div>
+      </div>
+      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-slope">
+        <div class="flex-1 flex items-center justify-center">
+          <div class="text-white text-lg font-medium">Slope</div>
+        </div>
+      </div>
+      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-aspect">
+        <div class="flex-1 flex items-center justify-center">
+          <div class="text-white text-lg font-medium">Aspect</div>
+        </div>
+      </div>
+      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-tpi">
+        <div class="flex-1 flex items-center justify-center">
+          <div class="text-white text-lg font-medium">TPI</div>
+        </div>
+      </div>
+      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-roughness">
+        <div class="flex-1 flex items-center justify-center">
+          <div class="text-white text-lg font-medium">Roughness</div>
+        </div>
+      </div>
+      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-chm">
+        <div class="flex-1 flex items-center justify-center">
+          <div class="text-white text-lg font-medium">CHM</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Downloaded Satellite Images -->
+  <div class="mb-4">
+    <h2 class="text-white text-lg font-semibold mb-4">Downloaded Satellite Images</h2>
+    <div id="satellite-gallery" class="flex gap-4 overflow-x-auto pb-4">
+      <!-- Downloaded satellite images will be displayed here -->
+    </div>
+  </div>
+</div>
+</div>

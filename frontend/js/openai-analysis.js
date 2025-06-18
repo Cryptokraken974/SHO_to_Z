@@ -134,22 +134,53 @@ class OpenAIAnalysis {
     
     async openImageSelectionModal() {
         console.log('📸 Opening image selection modal');
+
+        // Load the modal HTML first
+        await loadModule('modules/modals/image-selection-modal.html', 'modals-placeholder');
         
-        // Show loading state
-        this.galleryInstance.showLoading();
+        const modalElement = document.getElementById('image-selection-modal');
+        if (!modalElement) {
+            console.error('Image selection modal element not found after loading.');
+            return;
+        }
+
+        // Re-run event listener setup for the modal's content
+        // This assumes setupEventListeners can be safely called or is idempotent,
+        // or a more specific function for modal events should be called.
+        this.setupEventListeners(); // Critical to re-bind events to new DOM
+
+        // Initialize gallery if it's part of this modal and not globally persistent
+        // If galleryInstance is tied to elements inside the modal, it needs re-init.
+        // this.initializeGalleries(); // Assuming gallery is inside the modal.
+
+        // Show loading state in gallery (if galleryInstance is valid)
+        if (this.galleryInstance) {
+            this.galleryInstance.showLoading();
+        } else {
+            // If gallery is inside the modal, it needs to be re-initialized first.
+            // This might involve creating a new ModularGallery instance targeting the new DOM.
+            this.initializeGalleries(); // Ensure gallery is ready
+            this.galleryInstance.showLoading();
+        }
         
         // Load available images
         await this.loadAvailableImages();
         
         // Show modal
-        document.getElementById('image-selection-modal').classList.remove('hidden');
+        // modalElement.classList.remove('hidden');
+        $(modalElement).fadeIn();
         
         // Filter and display images
-        this.filterImagesByCategory(this.currentCategory);
+        this.filterImagesByCategory(this.currentCategory); // This should target galleryInstance.setItems
     }
     
     closeImageSelectionModal() {
-        document.getElementById('image-selection-modal').classList.add('hidden');
+        const modalElement = document.getElementById('image-selection-modal');
+        if (modalElement) {
+            // modalElement.classList.add('hidden');
+            $(modalElement).fadeOut();
+            // $('#modals-placeholder').empty(); // Or modalElement.remove();
+        }
     }
     
     async loadAvailableImages() {

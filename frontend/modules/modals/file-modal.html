@@ -1,0 +1,23 @@
+<!-- Modal for file selection with modern design -->
+<div id="file-modal" class="modal fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center hidden z-50">
+  <div class="modal-content bg-[#2c2c2c] p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+    <div class="flex justify-between items-center mb-4">
+      <h4 class="text-white text-lg font-semibold m-0">Select Region</h4>
+      <button class="modal-close text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+    <div class="mb-4">
+      <input type="text" id="file-search-input" placeholder="Search files..." class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-[#ababab] focus:outline-none focus:border-[#00bfff]">
+    </div>
+    <div class="file-list max-h-[400px] overflow-y-auto" id="file-list">
+      <!-- Files will be populated here by FileManager.js -->
+      <p class="text-gray-400 text-center py-4">Loading regions...</p>
+    </div>
+    <div class="flex justify-between gap-3 mt-4">
+      <button id="delete-region-btn" class="px-4 py-2 bg-[#dc3545] hover:bg-[#c82333] text-white rounded-lg font-medium transition-colors hidden">Delete Region</button>
+      <div class="flex gap-3">
+        <button id="cancel-select" class="cancel-btn bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
+        <button id="confirm-region-selection" class="px-6 py-2.5 bg-[#007bff] hover:bg-[#0056b3] text-white rounded-lg font-medium transition-colors">Select Region</button>
+      </div>
+    </div>
+  </div>
+</div>

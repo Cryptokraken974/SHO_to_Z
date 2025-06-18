@@ -1,0 +1,63 @@
+<!-- Image Selection Modal for OpenAI Analysis -->
+<div id="image-selection-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+  <div class="modal-content bg-[#1a1a1a] border border-[#303030] rounded-lg w-[95%] max-w-6xl max-h-[90vh] flex flex-col">
+    <div class="modal-header flex justify-between items-center p-6 border-b border-[#303030]">
+      <h3 class="text-white text-lg font-semibold">📸 Select Images for Analysis</h3>
+      <button class="modal-close text-[#ababab] hover:text-white text-xl font-bold" id="image-selection-modal-close">&times;</button>
+    </div>
+
+    <div class="modal-body flex-1 p-6 overflow-hidden">
+      <div class="flex gap-6 h-full">
+        <!-- Categories -->
+        <div class="w-48 flex-shrink-0">
+          <h4 class="text-white font-medium mb-3">Image Categories</h4>
+          <div class="space-y-2">
+            <button class="category-btn w-full text-left px-3 py-2 rounded bg-[#00bfff] text-white" data-category="all">
+              📁 All Images
+            </button>
+            <button class="category-btn w-full text-left px-3 py-2 rounded bg-[#262626] hover:bg-[#404040] text-[#ababab] hover:text-white transition-colors" data-category="rasters">
+              🏔️ Raster Products
+            </button>
+            <button class="category-btn w-full text-left px-3 py-2 rounded bg-[#262626] hover:bg-[#404040] text-[#ababab] hover:text-white transition-colors" data-category="satellite">
+              🛰️ Satellite Images
+            </button>
+            <button class="category-btn w-full text-left px-3 py-2 rounded bg-[#262626] hover:bg-[#404040] text-[#ababab] hover:text-white transition-colors" data-category="hillshades">
+              🌄 Hillshades
+            </button>
+            <button class="category-btn w-full text-left px-3 py-2 rounded bg-[#262626] hover:bg-[#404040] text-[#ababab] hover:text-white transition-colors" data-category="composites">
+              🌈 Composites
+            </button>
+          </div>
+        </div>
+
+        <!-- Images Gallery -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+          <div class="flex justify-between items-center mb-4">
+            <div class="text-white font-medium" id="category-title">All Images</div>
+            <div class="flex items-center gap-4">
+              <div class="text-[#ababab] text-sm" id="selection-count">0 selected</div>
+              <button id="select-all-btn" class="bg-[#28a745] hover:bg-[#218838] text-white px-3 py-1 rounded text-sm">Select All</button>
+              <button id="clear-selection-btn" class="bg-[#dc3545] hover:bg-[#c82333] text-white px-3 py-1 rounded text-sm">Clear</button>
+            </div>
+          </div>
+
+          <!-- Gallery Container -->
+          <div id="image-selection-gallery" class="flex-1 overflow-y-auto">
+            <!-- Gallery will be populated by ModularGallery -->
+            <p class="text-center text-gray-500 py-4">Loading gallery...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer flex justify-between items-center gap-3 p-6 border-t border-[#303030]">
+      <div class="text-[#ababab] text-sm" id="modal-selection-summary">
+        No images selected
+      </div>
+      <div class="flex gap-3">
+        <button id="cancel-image-selection" class="cancel-btn modal-close bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
+        <button id="confirm-image-selection" class="bg-[#00bfff] hover:bg-[#0099cc] text-white px-6 py-2 rounded-lg font-medium transition-colors">Use Selected Images</button>
+      </div>
+    </div>
+  </div>
+</div>

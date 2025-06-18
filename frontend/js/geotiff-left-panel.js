@@ -537,23 +537,46 @@ class GeoTiffLeftPanel {
         }
     }
 
-    openLazFileModal(clear = true) {
+    async openLazFileModal(clear = true) { // Made async
         console.log('📂 Opening LAZ file browser modal');
-        const modal = document.getElementById('laz-file-modal');
+
+        // Load the modal HTML first into the placeholder
+        // Ensure loadModule is globally accessible (defined in app_new.js)
+        await loadModule('modules/modals/laz-file-modal.html', 'modals-placeholder');
+
+        const modal = document.getElementById('laz-file-modal'); // Get from placeholder after loading
         if (modal) {
-            modal.classList.remove('hidden');
+            // Call setup for its internal events AFTER it's in the DOM
+            this.setupLazModalEvents(); // This function binds events to elements within #laz-file-modal
+
+            modal.classList.remove('hidden'); // Show the modal
+            $(modal).fadeIn(); // Or use jQuery if preferred for consistency
+
             if (clear) {
                 // Reset modal state
-                this.clearLazFiles();
+                this.clearLazFiles(); // This updates elements within #laz-file-modal
             }
+
+            // If UIManager has a generic modal re-initializer, call it.
+            // This is mainly for standard close buttons or behaviors.
+            if (window.UIManager && typeof window.UIManager.reinitializeModalEventHandlers === 'function') {
+                window.UIManager.reinitializeModalEventHandlers('#laz-file-modal');
+            }
+        } else {
+            console.error('LAZ File Modal not found after loading.');
         }
     }
 
     closeLazFileModal() {
         console.log('📂 Closing LAZ file browser modal');
-        const modal = document.getElementById('laz-file-modal');
+        const modal = document.getElementById('laz-file-modal'); // Target directly if it's always unique
+                                                                    // Or use '#modals-placeholder #laz-file-modal'
         if (modal) {
-            modal.classList.add('hidden');
+            // modal.classList.add('hidden');
+            $(modal).fadeOut(() => {
+                 // Optional: if modals-placeholder should only hold one modal at a time
+                // $('#modals-placeholder').empty();
+            });
             // Clear any selected files
             this.clearLazFiles();
         }
@@ -738,18 +761,37 @@ class GeoTiffLeftPanel {
         }
     }
 
-    openLazFolderModal() {
-        const modal = document.getElementById('laz-folder-modal');
+    async openLazFolderModal() { // Made async
+        console.log('📂 Opening LAZ Folder browser modal');
+
+        // Load the modal HTML first into the placeholder
+        await loadModule('modules/modals/laz-folder-modal.html', 'modals-placeholder');
+
+        const modal = document.getElementById('laz-folder-modal'); // Get from placeholder
         if (modal) {
+            // Call setup for its internal events AFTER it's in the DOM
+            this.setupLazFolderModalEvents();
+
             modal.classList.remove('hidden');
-            this.clearLazFolders();
+            $(modal).fadeIn();
+
+            this.clearLazFolders(); // Reset state
+
+            if (window.UIManager && typeof window.UIManager.reinitializeModalEventHandlers === 'function') {
+                window.UIManager.reinitializeModalEventHandlers('#laz-folder-modal');
+            }
+        } else {
+            console.error('LAZ Folder Modal not found after loading.');
         }
     }
 
     closeLazFolderModal() {
-        const modal = document.getElementById('laz-folder-modal');
+        const modal = document.getElementById('laz-folder-modal'); // Target directly or via placeholder
         if (modal) {
-            modal.classList.add('hidden');
+            // modal.classList.add('hidden');
+            $(modal).fadeOut(() => {
+                // $('#modals-placeholder').empty();
+            });
             this.clearLazFolders();
         }
     }
