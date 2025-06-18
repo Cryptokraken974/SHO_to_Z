@@ -4,7 +4,7 @@ import os
 import logging
 import subprocess
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional # Added Optional
 from osgeo import gdal
 from .dtm import dtm
 
@@ -176,7 +176,16 @@ async def process_hillshade(laz_file_path: str, output_dir: str, parameters: Dic
             "input_file": laz_file_path
         }
 
-def generate_hillshade_with_params(input_file: str, azimuth: float, altitude: float, z_factor: float, suffix: str = "", region_name: str = None) -> str:
+def generate_hillshade_with_params(
+    input_file: str,
+    azimuth: float,
+    altitude: float,
+    z_factor: float,
+    suffix: str = "",
+    region_name: str = None,
+    dtm_resolution: float = 1.0,
+    dtm_csf_cloth_resolution: Optional[float] = None
+) -> str:
     """
     Generate hillshade with comprehensive logging of all file/folder operations.
     """
@@ -188,199 +197,223 @@ def generate_hillshade_with_params(input_file: str, azimuth: float, altitude: fl
     print(f"📂 Input file: {input_file}")
     print(f"⚙️ Parameters: azimuth={azimuth}°, altitude={altitude}°, z_factor={z_factor}")
     print(f"🏷️ Suffix: '{suffix}' (empty = default naming)")
-    
+    print(f"⚙️ DTM Params: Resolution={dtm_resolution}m, CSF Cloth Resolution={dtm_csf_cloth_resolution if dtm_csf_cloth_resolution is not None else dtm_resolution}m")
+    logger.info(f"Generate hillshade for {input_file}. DTM Res: {dtm_resolution}m, CSF Res: {dtm_csf_cloth_resolution}. Hillshade: az={azimuth},alt={altitude},z={z_factor},suffix='{suffix}'")
+
     # Use provided region_name or extract from file path if not provided
     print(f"\n🔍 [REGION EXTRACTION] Determining region name...")
     input_path = Path(input_file)
     print(f"   📂 Full input path: {input_path}")
     print(f"   🧩 Path parts: {input_path.parts}")
     
-    if region_name is None:
-        print(f"   ⚠️ No region_name provided, extracting from file path...")
-        if "lidar" in input_path.parts:
-            # File is in lidar subfolder: extract parent's parent as region name
-            region_name = input_path.parts[input_path.parts.index("input") + 1]
-            print(f"   🎯 Found 'lidar' subfolder structure")
-            print(f"   📍 Region name from parent directory: {region_name}")
+    # This logic for determining region_name should be robust.
+    # If region_name is explicitly passed, use it. Otherwise, derive it.
+    effective_region_name = region_name
+    if effective_region_name is None:
+        print(f"   ⚠️ No explicit region_name provided, extracting from file path...")
+        if "lidar" in input_path.parts and "input" in input_path.parts:
+            try:
+                effective_region_name = input_path.parts[input_path.parts.index("input") + 1]
+                print(f"   🎯 Found 'input/.../region_name/.../lidar' structure. Region: {effective_region_name}")
+            except (ValueError, IndexError):
+                effective_region_name = input_path.stem # Fallback to stem if path is unusual
+                print(f"   ⚠️ Path structure unexpected, falling back to input file stem for region: {effective_region_name}")
         else:
-            # File is directly in input folder: extract parent as region name
-            region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
-            print(f"   🎯 Direct input folder structure")
-            print(f"   📍 Region name extracted: {region_name}")
+            effective_region_name = input_path.stem # Fallback if not standard project structure
+            print(f"   🎯 Non-standard path structure, using input file stem for region: {effective_region_name}")
     else:
-        print(f"   ✅ Using provided region_name: {region_name}")
+        print(f"   ✅ Using provided region_name: {effective_region_name}")
         
-    print(f"   ✅ [REGION IDENTIFIED] Final region name: {region_name}")
+    print(f"   ✅ [REGION IDENTIFIED] Final effective region name for path construction: {effective_region_name}")
 
-    # Extract file stem for consistent directory structure
-    file_stem = input_path.stem  # Get filename without extension (e.g., "OR_WizardIsland")
-    
-    # Create output directory structure: output/<file_stem>/lidar/Hillshade/
+    # Create output directory structure using the effective_region_name
     print(f"\n📁 [FOLDER CREATION] Setting up output directory structure...")
-    
-    # Use provided region_name for output directory if available, otherwise use file_stem
-    output_folder_name = region_name if region_name else file_stem
-    print(f"📁 Using output folder name: {output_folder_name} (from region_name: {region_name})")
-    
-    output_dir = os.path.join("output", output_folder_name, "lidar", "Hillshade")
+    output_dir = os.path.join("output", effective_region_name, "lidar", "Hillshade")
     print(f"   🏗️ Target directory: {output_dir}")
-    print(f"   🔍 Checking if directory exists...")
-    
-    if os.path.exists(output_dir):
-        print(f"   ✅ Directory already exists: {output_dir}")
-    else:
-        print(f"   🆕 Directory doesn't exist, creating...")
-        print(f"   📂 Creating path: {output_dir}")
-    
     os.makedirs(output_dir, exist_ok=True)
-    print(f"   ✅ [FOLDER CREATED] Output directory ready: {output_dir}")
+    print(f"   ✅ [FOLDER CREATED/VERIFIED] Output directory ready: {output_dir}")
 
-    # Generate output filename with suffix if provided
+    # Generate output filename
+    # Filename should incorporate DTM resolution for clarity and cache differentiation
     print(f"\n📄 [FILE NAMING] Generating output filename...")
-    if suffix:
-        output_filename = f"{region_name}_Hillshade_{suffix}.tif"
-        print(f"   🏷️ Using suffix pattern: <region_name>_Hillshade_<suffix>.tif")
-    else:
-        output_filename = f"{region_name}_Hillshade.tif"
-        print(f"   🏷️ Using default pattern: <region_name>_Hillshade.tif")
-        
+    laz_file_stem = Path(input_file).stem
+    actual_csf_res = dtm_csf_cloth_resolution if dtm_csf_cloth_resolution is not None else dtm_resolution
+
+    base_name_for_hillshade = f"{laz_file_stem}_dtm{dtm_resolution}m_csf{actual_csf_res}m_Hillshade"
+    output_filename = f"{base_name_for_hillshade}_{suffix}.tif" if suffix else f"{base_name_for_hillshade}.tif"
+
     output_path = os.path.join(output_dir, output_filename)
     print(f"   📄 Generated filename: {output_filename}")
     print(f"   📂 Full output path: {output_path}")
     
-    print(f"\n📊 [FILE ANALYSIS] Analyzing input and output files...")
-    print(f"   📂 Input file location: {input_file}")
-    print(f"   📂 Output directory: {output_dir}")
-    print(f"   📄 Output file: {output_path}")
+    # DTM Generation Call
+    # The dtm() function is called with region_name=effective_region_name to ensure its outputs also follow this.
+    print(f"\n🏔️ [STEP 1] DTM Generation/Location using DTM Resolution: {dtm_resolution}m, CSF Cloth Res: {dtm_csf_cloth_resolution if dtm_csf_cloth_resolution is not None else dtm_resolution}m...")
+    dtm_path = dtm(
+        input_file,
+        region_name=effective_region_name, # Pass the determined region name
+        resolution=dtm_resolution,
+        csf_cloth_resolution=dtm_csf_cloth_resolution
+    )
+    if not dtm_path or "failed" in dtm_path.lower() or not os.path.exists(dtm_path): # dtm() returns path or error string
+        logger.error(f"DTM generation failed. Returned path: {dtm_path}")
+        raise FileNotFoundError(f"DTM generation failed or DTM file not found: {dtm_path}")
+    print(f"   ✅ [DTM READY] DTM available at: {dtm_path}")
+    logger.info(f"DTM for hillshade generated at: {dtm_path}")
 
-    # Check if hillshade already exists and is up-to-date (caching optimization)
-    print(f"\n🗄️ [CACHE CHECK] Checking for existing hillshade file...")
-    if os.path.exists(output_path) and os.path.exists(input_file):
-        print(f"   📄 Found existing file: {output_path}")
+    # Caching Check (after DTM generation, as DTM itself is cached)
+    print(f"\n🗄️ [CACHE CHECK] Checking for existing hillshade file {output_path}...")
+    if os.path.exists(output_path) and os.path.exists(dtm_path): # dtm_path must exist here
+        print(f"   📄 Found existing hillshade file: {output_path}")
         try:
-            # Compare modification times
             hillshade_mtime = os.path.getmtime(output_path)
-            laz_mtime = os.path.getmtime(input_file)
+            dtm_file_mtime = os.path.getmtime(dtm_path) # Compare against the DTM file used
             
             print(f"   ⏰ Hillshade modified: {time.ctime(hillshade_mtime)}")
-            print(f"   ⏰ LAZ file modified: {time.ctime(laz_mtime)}")
+            print(f"   ⏰ DTM file modified: {time.ctime(dtm_file_mtime)}")
             
-            if hillshade_mtime > laz_mtime:
-                processing_time = time.time() - start_time
-                print(f"   🚀 [CACHE HIT] Using existing file (newer than source)")
-                print(f"   ✅ Cache validation successful in {processing_time:.3f} seconds")
+            if hillshade_mtime > dtm_file_mtime:
+                processing_time_cache = time.time() - start_time
+                print(f"   🚀 [CACHE HIT] Using existing hillshade file (newer than source DTM).")
+                print(f"   ✅ Hillshade ready in {processing_time_cache:.3f} seconds (cached).")
                 print(f"{'='*70}\n")
+                logger.info(f"Cache hit for hillshade: {output_path}")
                 return output_path
             else:
-                print(f"   ⚠️ [CACHE MISS] Hillshade is outdated")
-                print(f"   🔄 LAZ modified: {time.ctime(laz_mtime)}")
-                print(f"   🔄 Hillshade created: {time.ctime(hillshade_mtime)}")
-                print(f"   ♻️ Will regenerate hillshade...")
+                print(f"   ⚠️ [CACHE MISS] Hillshade is outdated or DTM is newer. Will regenerate hillshade.")
+                logger.info(f"Cache miss for hillshade {output_path}, DTM is newer or hillshade outdated.")
         except OSError as e:
-            print(f"   ⚠️ Error checking file timestamps: {e}")
-            print(f"   🔄 Proceeding with regeneration...")
-    elif os.path.exists(output_path):
-        print(f"   ⚠️ Hillshade exists but input LAZ file not found")
-        print(f"   🔄 Will regenerate hillshade")
+            print(f"   ⚠️ Error checking file timestamps: {e}. Proceeding with regeneration.")
+            logger.warning(f"Error checking timestamps for hillshade {output_path}: {e}. Regenerating.")
     else:
-        print(f"   📝 No existing hillshade found")
-        print(f"   🆕 Will generate new hillshade")
+        if os.path.exists(output_path): # Exists, but DTM path might have had an issue (though checked above)
+             print(f"   ⚠️ Hillshade exists but DTM path invalid or DTM missing. Will attempt regeneration.")
+             logger.warning(f"Hillshade {output_path} exists but DTM path {dtm_path} was problematic. Regenerating.")
+        else:
+            print(f"   📝 No existing hillshade found. Will generate new hillshade at {output_path}.")
+            logger.info(f"No existing hillshade {output_path}. Generating.")
 
     try:
-        # Step 1: Generate or locate DTM
-        print(f"\n🏔️ [STEP 1] DTM Generation/Location...")
-        print(f"   🔍 Checking for DTM as source for hillshade...")
-        dtm_path = dtm(input_file, region_name)
-        print(f"   ✅ [DTM READY] DTM available at: {dtm_path}")
-
         # Step 2: Generate hillshade using GDAL DEMProcessing
-        print(f"\n🌄 Step 2: Generating hillshade using GDAL DEMProcessing...")
-        print(f"📁 Source DTM: {dtm_path}")
-        print(f"📁 Target hillshade: {output_path}")
+        print(f"\n🌄 [STEP 2] Generating hillshade using GDAL DEMProcessing...")
+        print(f"   📁 Source DTM: {dtm_path}")
+        print(f"   📁 Target hillshade: {output_path}")
         
-        print(f"⚙️ Hillshade parameters:")
-        print(f"   🧭 Azimuth: {azimuth}°")
-        print(f"   📐 Altitude: {altitude}°")
-        print(f"   📏 Z-factor: {z_factor}")
-        print(f"   📊 Scale: 1.0")
+        print(f"   ⚙️ Hillshade parameters: Azimuth={azimuth}°, Altitude={altitude}°, Z-factor={z_factor}, Scale=1.0")
         
-        # Use GDAL DEMProcessing for hillshade generation
-        processing_start = time.time()
-        
-        result = gdal.DEMProcessing(
-            destName=output_path,
-            srcDS=dtm_path,
-            processing="hillshade",
+        gdal_processing_start_time = time.time()
+        gdal_options = gdal.DEMProcessingOptions(
             azimuth=azimuth,
             altitude=altitude,
             zFactor=z_factor,
-            scale=1.0,
-            computeEdges=True,  # Essential for edge pixels - prevents missing pixels
-            format="GTiff"
+            scale=1.0, # Default scale, can be parameterized if needed
+            computeEdges=True,
+            format="GTiff",
+            creationOptions=['COMPRESS=LZW', 'TILED=YES', 'PREDICTOR=2', 'BIGTIFF=IF_SAFER']
+        )
+
+        result_ds = gdal.DEMProcessing(
+            destName=output_path,
+            srcDS=dtm_path, # Can be path or GDAL Dataset object
+            processing="hillshade",
+            options=gdal_options
         )
         
-        processing_time = time.time() - processing_start
+        gdal_processing_time = time.time() - gdal_processing_start_time
         
-        if result is None:
-            raise RuntimeError("GDAL DEMProcessing failed to generate hillshade")
+        if result_ds is None: # DEMProcessing returns None on failure with older GDAL, or raises exception with newer.
+            logger.error(f"GDAL DEMProcessing failed to generate hillshade for {dtm_path}. Result was None.")
+            raise RuntimeError(f"GDAL DEMProcessing failed to generate hillshade for {dtm_path}. Output may not be valid.")
         
-        print(f"✅ Hillshade generation completed in {processing_time:.2f} seconds")
+        result_ds = None # Close the dataset
+        print(f"   ✅ GDAL DEMProcessing completed in {gdal_processing_time:.2f} seconds.")
         
         # Step 3: Validate output file
-        print(f"\n🔍 Validating output file...")
-        if os.path.exists(output_path):
+        print(f"\n🔍 [STEP 3] Validating output file {output_path}...")
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0: # Basic check
             output_size = os.path.getsize(output_path)
-            print(f"✅ Output file created successfully")
-            print(f"📊 Output file size: {output_size:,} bytes ({output_size / (1024**2):.2f} MB)")
-            print(f"📄 Output file path: {os.path.abspath(output_path)}")
+            print(f"   ✅ Output file created successfully.")
+            print(f"   📊 Output file size: {output_size:,} bytes ({output_size / (1024**2):.2f} MB).")
+            print(f"   📄 Output file path: {os.path.abspath(output_path)}")
+            logger.info(f"Hillshade successfully generated: {output_path}, Size: {output_size_mb:.2f} MB")
         else:
-            raise FileNotFoundError(f"Hillshade output file was not created: {output_path}")
+            logger.error(f"Hillshade output file {output_path} was not created or is empty.")
+            raise FileNotFoundError(f"Hillshade output file was not created or is empty: {output_path}")
         
-        total_time = time.time() - start_time
-        print(f"✅ HILLSHADE generation completed successfully in {total_time:.2f} seconds")
+        total_processing_time = time.time() - start_time
+        print(f"\n✅ TOTAL HILLSHADE generation completed successfully in {total_processing_time:.2f} seconds.")
         print(f"🌄 Hillshade file: {output_path}")
+        print(f"{'='*70}\n")
         
         return output_path
         
     except Exception as e:
-        total_time = time.time() - start_time
-        error_msg = f"Hillshade generation failed: {str(e)}"
+        total_processing_time = time.time() - start_time
+        error_msg = f"Hillshade generation for {input_file} failed after {total_processing_time:.2f} seconds: {str(e)}"
         print(f"❌ {error_msg}")
-        print(f"❌ Failed after {total_time:.2f} seconds")
-        raise Exception(error_msg)
+        logger.error(error_msg, exc_info=True)
+        print(f"{'='*70}\n")
+        raise Exception(error_msg) # Re-raise to be caught by calling functions / API endpoints
 
-def hillshade(input_file: str, region_name: str = None) -> str:
+def hillshade(
+    input_file: str,
+    region_name: str = None,
+    dtm_resolution: float = 1.0,
+    dtm_csf_cloth_resolution: Optional[float] = None
+) -> str:
     """
-    Generate standard hillshade from LAZ file (default parameters)
-    
-    Args:
-        input_file: Path to the input LAZ file
-        region_name: Optional region name to use for output directory (instead of extracted from filename)
-        Returns:
-        Path to the generated hillshade TIF file
+    Generate standard hillshade from LAZ file (default parameters: Az315, Alt45, Z1).
     """
-    return generate_hillshade_with_params(input_file, 315.0, 45.0, 1.0, "standard", region_name)
+    logger.info(f"Standard hillshade called for {input_file}, DTM Res: {dtm_resolution}m, CSF Res: {dtm_csf_cloth_resolution}")
+    return generate_hillshade_with_params(
+        input_file,
+        315.0,
+        45.0,
+        1.0,
+        "standard_az315_alt45_z1",
+        region_name,
+        dtm_resolution=dtm_resolution,
+        dtm_csf_cloth_resolution=dtm_csf_cloth_resolution
+    )
 
-def hillshade_315_45_08(input_file: str, region_name: str = None) -> str:
+def hillshade_315_45_08(
+    input_file: str,
+    region_name: str = None,
+    dtm_resolution: float = 1.0,
+    dtm_csf_cloth_resolution: Optional[float] = None
+) -> str:
     """
-    Generate hillshade with 315° azimuth, 45° altitude, 0.8 z-factor
-    
-    Args:
-        input_file: Path to the input LAZ file
-        region_name: Optional region name to use for output directory (instead of extracted from filename)
-        Returns:
-        Path to the generated hillshade TIF file
+    Generate hillshade with 315° azimuth, 45° altitude, 0.8 z-factor.
     """
-    return generate_hillshade_with_params(input_file, 315.0, 45.0, 0.8, "315_45_08", region_name)
+    logger.info(f"Hillshade Az315 Alt45 Z0.8 called for {input_file}, DTM Res: {dtm_resolution}m, CSF Res: {dtm_csf_cloth_resolution}")
+    return generate_hillshade_with_params(
+        input_file,
+        315.0,
+        45.0,
+        0.8,
+        "az315_alt45_z0p8",
+        region_name,
+        dtm_resolution=dtm_resolution,
+        dtm_csf_cloth_resolution=dtm_csf_cloth_resolution
+    )
 
-def hillshade_225_45_08(input_file: str, region_name: str = None) -> str:
+def hillshade_225_45_08(
+    input_file: str,
+    region_name: str = None,
+    dtm_resolution: float = 1.0,
+    dtm_csf_cloth_resolution: Optional[float] = None
+) -> str:
     """
-    Generate hillshade with 225° azimuth, 45° altitude, 0.8 z-factor
-    
-    Args:
-        input_file: Path to the input LAZ file
-        region_name: Optional region name to use for output directory (instead of extracted from filename)
-        Returns:
-        Path to the generated hillshade TIF file
+    Generate hillshade with 225° azimuth, 45° altitude, 0.8 z-factor.
     """
-    return generate_hillshade_with_params(input_file, 225.0, 45.0, 0.8, "225_45_08", region_name)
+    logger.info(f"Hillshade Az225 Alt45 Z0.8 called for {input_file}, DTM Res: {dtm_resolution}m, CSF Res: {dtm_csf_cloth_resolution}")
+    return generate_hillshade_with_params(
+        input_file,
+        225.0,
+        45.0,
+        0.8,
+        "225_45_08",
+        region_name,
+        dtm_resolution=dtm_resolution,
+        dtm_csf_cloth_resolution=dtm_csf_cloth_resolution
+    )

@@ -1,613 +1,661 @@
 from fastapi import APIRouter, HTTPException, Form
 from fastapi.responses import JSONResponse
+from typing import Optional, Dict
+import json
 from ..convert import convert_geotiff_to_png_base64
-from ..processing import dtm, dsm, chm, hillshade, hillshade_315_45_08, hillshade_225_45_08, slope, aspect, color_relief, tpi, roughness
+from ..processing.dtm import dtm
+from ..processing.dsm import dsm
+from ..processing.chm import chm
+from ..processing.hillshade import hillshade, hillshade_315_45_08, hillshade_225_45_08, generate_hillshade_with_params
+from ..processing.slope import slope
+from ..processing.aspect import aspect
+from ..processing.color_relief import color_relief
+from ..processing.tpi import tpi
+from ..processing.roughness import roughness
+from ..processing.sky_view_factor import sky_view_factor
+from ..processing.composites import generate_dtm_hillshade_blend
+from ..processing.laz_processing_utils import resolve_laz_file_from_region
 import os
 import re
 from pathlib import Path
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 def is_coordinate_based_region(region_name: str) -> bool:
-    """
-    Check if a region name follows coordinate-based pattern (e.g., '3.48N_61.36W')
-    These regions are typically created from elevation data acquisition and contain GeoTIFF files, not LAZ files.
-    
-    Args:
-        region_name: The region name to check
-        
-    Returns:
-        bool: True if this is a coordinate-based region, False otherwise
-    """
-    # Pattern: {lat}{N|S}_{lng}{E|W} (e.g., "3.48N_61.36W", "23.46S_45.99W")
     coordinate_pattern = r'^\d+\.\d+[NS]_\d+\.\d+[EW]$'
     return bool(re.match(coordinate_pattern, region_name))
 
-def resolve_laz_file_from_region(region_name: str, processing_type: str) -> str:
-    """
-    Utility function to resolve LAZ file path from region name using the region mapping system.
-    Enhanced to detect coordinate-based regions and provide appropriate error handling.
-    
-    Args:
-        region_name: The region name provided by the user
-        processing_type: The type of processing being requested
-        
-    Returns:
-        str: Path to the LAZ file
-        
-    Raises:
-        ValueError: If no LAZ file can be found for the region
-    """
-    print(f"📍 Region-based processing: {region_name}")
-    print(f"🔧 Processing type: {processing_type}")
-    
-    # Check if this is a coordinate-based region (elevation-only)
-    if is_coordinate_based_region(region_name):
-        print(f"🌍 Detected coordinate-based region: {region_name}")
-        print(f"⚠️  Coordinate-based regions contain elevation GeoTIFF files, not LAZ point cloud data")
-        
-        # Check if elevation files exist in this region
-        elevation_dir = Path("input") / region_name
-        if elevation_dir.exists():
-            elevation_files = list(elevation_dir.glob("*.tif")) + list(elevation_dir.glob("*.tiff"))
-            if elevation_files:
-                print(f"📄 Found {len(elevation_files)} elevation file(s) in {elevation_dir}")
-                print(f"💡 Suggestion: Consider using elevation data processing instead of LAZ-based terrain processing")
-            else:
-                print(f"📁 Region directory exists but no elevation files found")
-        else:
-            print(f"📁 Region directory does not exist: {elevation_dir}")
-        
-        raise ValueError(
-            f"Region '{region_name}' is a coordinate-based region created from elevation data acquisition. "
-            f"These regions contain elevation GeoTIFF files, not LAZ point cloud data required for terrain processing. "
-            f"LAZ-based terrain processing (DTM, DSM, hillshade, slope, etc.) is not available for coordinate-based regions."
-        )
-    
-    # Import region mapping system for LAZ-based regions
-    from ..region_config.region_mapping import region_mapper
-    
-    # Use region mapper to find the correct LAZ file
-    input_file = region_mapper.find_laz_file_for_region(region_name)
-    
-    if not input_file:
-        # List available regions for debugging
-        available_regions = region_mapper.get_available_regions()
-        print(f"❌ Available regions: {available_regions}")
-        raise ValueError(f"No LAZ files found for region '{region_name}'. Available regions: {available_regions}")
-    
-    print(f"📥 Using LAZ file: {input_file}")
-    return input_file
+def _parse_stretch_params(stretch_params_json: Optional[str]) -> Optional[Dict[str, float]]:
+    parsed_stretch_params = None
+    if stretch_params_json:
+        try:
+            parsed_stretch_params = json.loads(stretch_params_json)
+            if not isinstance(parsed_stretch_params, dict):
+                logger.warning(f"stretch_params_json did not decode to a dict. Got: {type(parsed_stretch_params)}. Using None.")
+                parsed_stretch_params = None
+        except json.JSONDecodeError as e:
+            logger.warning(f"Invalid JSON in stretch_params_json: {stretch_params_json}. Error: {e}. Using None.")
+    return parsed_stretch_params
 
 @router.post("/api/laz_to_dem")
-async def api_laz_to_dem(input_file: str = Form(...)):
-    """Convert LAZ to DEM"""
+async def api_laz_to_dem(
+    input_file: str = Form(...),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Convert LAZ to DEM (uses DSM processing internally for now)."""
     print(f"\n🎯 API CALL: /api/laz_to_dem")
-    print(f"📥 Input file: {input_file}")
+    logger.info(f"/api/laz_to_dem called with input_file: {input_file}, stretch_type: {stretch_type}, stretch_params_json: {stretch_params_json}")
     
     try:
-        # Import the synchronous function
-        from ..processing.laz_to_dem import laz_to_dem
-        
-        # Call the synchronous function directly
-        tif_path = laz_to_dem(input_file)
-        print(f"✅ TIF generated: {tif_path}")
-        
-        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        from ..processing.dsm import dsm
+        tif_path = dsm(input_file)
+        print(f"✅ DEM (DSM) TIF generated: {tif_path}")
+
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
         print(f"✅ Base64 conversion complete")
-        
         return {"image": image_b64}
-            
+    except FileNotFoundError as e:
+        logger.error(f"FileNotFoundError in api_laz_to_dem: {e}", exc_info=True)
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        print(f"❌ Error in api_laz_to_dem: {str(e)}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise
-        print(f"❌ Error type: {type(e).__name__}")
-        raise
+        logger.error(f"Error in api_laz_to_dem: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"DEM processing failed: {str(e)}")
 
 @router.post("/api/dtm")
-async def api_dtm(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None), display_region_name: str = Form(None)):
-    """Convert LAZ to DTM (ground points only) - supports both region-based and LAZ file processing"""
+async def api_dtm(
+    input_file: str = Form(None),
+    region_name: str = Form(None),
+    processing_type: str = Form(None),
+    display_region_name: str = Form(None),
+    dtm_resolution: float = Form(1.0),
+    dtm_csf_cloth_resolution: Optional[float] = Form(None),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Convert LAZ to DTM (ground points only)"""
     print(f"\n🎯 API CALL: /api/dtm")
-    print(f"📥 Received parameters:")
-    print(f"   input_file: {input_file}")
-    print(f"   region_name: {region_name}")
-    print(f"   processing_type: {processing_type}")
-    print(f"   display_region_name: {display_region_name}")
+    logger.info(f"/api/dtm called with: region_name={region_name}, input_file={input_file}, dtm_res={dtm_resolution}, csf_res={dtm_csf_cloth_resolution}, stretch={stretch_type}")
     
-    # Determine processing mode: region-based or LAZ file-based
+    effective_input_file = input_file
     if region_name and processing_type:
-        # Region-based processing: find LAZ file in region using proper mapping
-        input_file = resolve_laz_file_from_region(region_name, processing_type)
-        
-    elif input_file:
-        # LAZ file-based processing (legacy support)
-        print(f"📥 LAZ file-based processing: {input_file}")
-        
-    else:
-        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not input_file:
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
 
     try:
-        # Use display_region_name for output directory if provided, otherwise use original region_name
-        output_region = display_region_name if display_region_name else region_name
-        tif_path = dtm(input_file, output_region)
-        print(f"✅ TIF generated: {tif_path}")
+        output_region_for_path = display_region_name if display_region_name else region_name
+        tif_path = dtm(
+            effective_input_file,
+            output_region_for_path,
+            resolution=dtm_resolution,
+            csf_cloth_resolution=dtm_csf_cloth_resolution
+        )
+        print(f"✅ DTM TIF generated: {tif_path}")
         
-        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
         print(f"✅ Base64 conversion complete")
-        
         return {"image": image_b64}
     except FileNotFoundError as e:
-        error_msg = f"File not found: {str(e)}"
-        print(f"❌ Error in api_dtm: {error_msg}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise HTTPException(status_code=404, detail=error_msg)
+        logger.error(f"FileNotFoundError in api_dtm: {e}", exc_info=True)
+        raise HTTPException(status_code=404, detail=str(e))
     except (ValueError, PermissionError) as e:
-        error_msg = f"Invalid input: {str(e)}"
-        print(f"❌ Error in api_dtm: {error_msg}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise HTTPException(status_code=400, detail=error_msg)
+        logger.error(f"ValueError/PermissionError in api_dtm: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        error_msg = f"DTM processing failed: {str(e)}"
-        print(f"❌ Error in api_dtm: {error_msg}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise HTTPException(status_code=500, detail=error_msg)
+        logger.error(f"Error in api_dtm: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"DTM processing failed: {str(e)}")
 
 @router.post("/api/dsm")
-async def api_dsm(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None), display_region_name: str = Form(None)):
-    """Convert LAZ to DSM (surface points) - supports both region-based and LAZ file processing"""
+async def api_dsm(
+    input_file: str = Form(None),
+    region_name: str = Form(None),
+    processing_type: str = Form(None),
+    display_region_name: str = Form(None),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Convert LAZ to DSM (surface points)"""
     print(f"\n🎯 API CALL: /api/dsm")
-    
-    # Determine processing mode: region-based or LAZ file-based
+    logger.info(f"/api/dsm called with: region_name={region_name}, input_file={input_file}, stretch={stretch_type}")
+    effective_input_file = input_file
     if region_name and processing_type:
-        # Region-based processing: find LAZ file in region using proper mapping
-        input_file = resolve_laz_file_from_region(region_name, processing_type)
-        
-    elif input_file:
-        # LAZ file-based processing (legacy support)
-        print(f"📥 LAZ file-based processing: {input_file}")
-        
-    else:
-        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not input_file:
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
 
     try:
-        # Use display_region_name for output directory if provided, otherwise use original region_name
         output_region = display_region_name if display_region_name else region_name
-        
-        # Check if dsm function accepts region_name parameter
-        try:
-            from inspect import signature
-            sig = signature(dsm)
-            if 'region_name' in sig.parameters:
-                tif_path = dsm(input_file, output_region)
-            else:
-                tif_path = dsm(input_file)
-        except:
-            # Fallback to original function call if anything goes wrong
-            tif_path = dsm(input_file)
-        print(f"✅ TIF generated: {tif_path}")
-        
-        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        tif_path = dsm(effective_input_file, output_region)
+        print(f"✅ DSM TIF generated: {tif_path}")
+
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
         print(f"✅ Base64 conversion complete")
-        
         return {"image": image_b64}
     except FileNotFoundError as e:
-        error_msg = f"File not found: {str(e)}"
-        print(f"❌ Error in api_dsm: {error_msg}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise HTTPException(status_code=404, detail=error_msg)
+        logger.error(f"FileNotFoundError in api_dsm: {e}", exc_info=True)
+        raise HTTPException(status_code=404, detail=str(e))
     except (ValueError, PermissionError) as e:
-        error_msg = f"Invalid input: {str(e)}"
-        print(f"❌ Error in api_dsm: {error_msg}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise HTTPException(status_code=400, detail=error_msg)
+        logger.error(f"ValueError/PermissionError in api_dsm: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        error_msg = f"DSM processing failed: {str(e)}"
-        print(f"❌ Error in api_dsm: {error_msg}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise HTTPException(status_code=500, detail=error_msg)
+        logger.error(f"Error in api_dsm: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"DSM processing failed: {str(e)}")
 
 @router.post("/api/chm")
-async def api_chm(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None), display_region_name: str = Form(None)):
-    """Generate CHM (Canopy Height Model) from LAZ file - supports both region-based and LAZ file processing"""
+async def api_chm(
+    input_file: str = Form(None),
+    region_name: str = Form(None),
+    processing_type: str = Form(None),
+    display_region_name: str = Form(None),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Generate CHM (Canopy Height Model) from LAZ file"""
     print(f"\n🎯 API CALL: /api/chm")
-    
-    # Determine processing mode: region-based or LAZ file-based
+    logger.info(f"/api/chm called with: region_name={region_name}, input_file={input_file}, stretch={stretch_type}")
+    effective_input_file = input_file
     if region_name and processing_type:
-        # Region-based processing: find LAZ file in region using proper mapping
-        input_file = resolve_laz_file_from_region(region_name, processing_type)
-        
-    elif input_file:
-        # LAZ file-based processing (legacy support)
-        print(f"📥 LAZ file-based processing: {input_file}")
-        
-    else:
-        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not input_file:
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
 
     try:
-        # Use display_region_name for output directory if provided, otherwise use original region_name
         output_region = display_region_name if display_region_name else region_name
-        
-        # Check if chm function accepts region_name parameter
-        try:
-            from inspect import signature
-            sig = signature(chm)
-            if 'region_name' in sig.parameters:
-                tif_path = chm(input_file, output_region)
-            else:
-                tif_path = chm(input_file)
-        except:
-            # Fallback to original function call if anything goes wrong
-            tif_path = chm(input_file)
-        print(f"✅ TIF generated: {tif_path}")
-        
-        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        tif_path = chm(effective_input_file, output_region)
+        print(f"✅ CHM TIF generated: {tif_path}")
+
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
         print(f"✅ Base64 conversion complete")
-        
         return {"image": image_b64}
     except Exception as e:
-        print(f"❌ Error in api_chm: {str(e)}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise
+        logger.error(f"Error in api_chm: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"CHM processing failed: {str(e)}")
 
 @router.post("/api/hillshade")
-async def api_hillshade(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None), display_region_name: str = Form(None)):
-    """Generate hillshade from LAZ file - supports both region-based and LAZ file processing"""
+async def api_hillshade(
+    input_file: str = Form(None),
+    region_name: str = Form(None),
+    processing_type: str = Form(None),
+    display_region_name: str = Form(None),
+    dtm_resolution: float = Form(1.0),
+    dtm_csf_cloth_resolution: Optional[float] = Form(None),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Generate standard hillshade from LAZ file"""
     print(f"\n🎯 API CALL: /api/hillshade")
-    
-    # Determine processing mode: region-based or LAZ file-based
+    logger.info(f"/api/hillshade called for region: {region_name}, file: {input_file}, dtm_res: {dtm_resolution}, csf_res: {dtm_csf_cloth_resolution}, stretch: {stretch_type}")
+    effective_input_file = input_file
     if region_name and processing_type:
-        # Region-based processing: find LAZ file in region using proper mapping
-        input_file = resolve_laz_file_from_region(region_name, processing_type)
-        
-    elif input_file:
-        # LAZ file-based processing (legacy support)
-        print(f"📥 LAZ file-based processing: {input_file}")
-        
-    else:
-        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not input_file:
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
 
     try:
-        # Use display_region_name for output directory if provided, otherwise use original region_name
-        output_region = display_region_name if display_region_name else region_name
+        output_region_for_path = display_region_name if display_region_name else region_name
+        tif_path = hillshade(
+            effective_input_file,
+            output_region_for_path,
+            dtm_resolution=dtm_resolution,
+            dtm_csf_cloth_resolution=dtm_csf_cloth_resolution
+        )
+        print(f"✅ Standard Hillshade TIF generated: {tif_path}")
         
-        # Check if hillshade function accepts region_name parameter
-        try:
-            from inspect import signature
-            sig = signature(hillshade)
-            if 'region_name' in sig.parameters:
-                tif_path = hillshade(input_file, output_region)
-            else:
-                tif_path = hillshade(input_file)
-        except:
-            # Fallback to original function call if anything goes wrong
-            tif_path = hillshade(input_file)
-        output_region = display_region_name if display_region_name else region_name
-        
-        # Check if hillshade function accepts region_name parameter
-        try:
-            from inspect import signature
-            sig = signature(hillshade)
-            if 'region_name' in sig.parameters:
-                tif_path = hillshade(input_file, output_region)
-            else:
-                tif_path = hillshade(input_file)
-        except:
-            # Fallback to original function call if anything goes wrong
-            tif_path = hillshade(input_file)
-            
-        print(f"✅ TIF generated: {tif_path}")
-        
-        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
         print(f"✅ Base64 conversion complete")
-        
         return {"image": image_b64}
+    except FileNotFoundError as e:
+        logger.error(f"FileNotFoundError in api_hillshade: {e}", exc_info=True)
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        logger.error(f"ValueError in api_hillshade: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        print(f"❌ Error in api_hillshade: {str(e)}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise
+        logger.error(f"Error in api_hillshade: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Standard hillshade processing failed: {str(e)}")
 
 @router.post("/api/hillshade_315_45_08")
-async def api_hillshade_315_45_08(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None), display_region_name: str = Form(None)):
-    """Generate hillshade with 315° azimuth, 45° altitude, 0.8 z-factor - supports both region-based and LAZ file processing"""
+async def api_hillshade_315_45_08(
+    input_file: str = Form(None),
+    region_name: str = Form(None),
+    processing_type: str = Form(None),
+    display_region_name: str = Form(None),
+    dtm_resolution: float = Form(1.0),
+    dtm_csf_cloth_resolution: Optional[float] = Form(None),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Generate hillshade (Az315, Alt45, Z0.8)"""
     print(f"\n🎯 API CALL: /api/hillshade_315_45_08")
-    
-    # Determine processing mode: region-based or LAZ file-based
+    logger.info(f"/api/hillshade_315_45_08 called for region: {region_name}, file: {input_file}, dtm_res: {dtm_resolution}, csf_res: {dtm_csf_cloth_resolution}, stretch: {stretch_type}")
+    effective_input_file = input_file
     if region_name and processing_type:
-        # Region-based processing: find LAZ file in region using proper mapping
-        input_file = resolve_laz_file_from_region(region_name, processing_type)
-        
-    elif input_file:
-        # LAZ file-based processing (legacy support)
-        print(f"📥 LAZ file-based processing: {input_file}")
-        
-    else:
-        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not input_file:
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
 
     try:
-        # Use display_region_name for output directory if provided, otherwise use original region_name
-        output_region = display_region_name if display_region_name else region_name
-        tif_path = hillshade_315_45_08(input_file, output_region)
-        print(f"✅ TIF generated: {tif_path}")
+        output_region_for_path = display_region_name if display_region_name else region_name
+        tif_path = hillshade_315_45_08(
+            effective_input_file,
+            output_region_for_path,
+            dtm_resolution=dtm_resolution,
+            dtm_csf_cloth_resolution=dtm_csf_cloth_resolution
+        )
+        print(f"✅ Hillshade Az315 Alt45 Z0.8 TIF generated: {tif_path}")
         
-        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
         print(f"✅ Base64 conversion complete")
-        
         return {"image": image_b64}
+    except FileNotFoundError as e:
+        logger.error(f"FileNotFoundError in api_hillshade_315_45_08: {e}", exc_info=True)
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        logger.error(f"ValueError in api_hillshade_315_45_08: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        print(f"❌ Error in api_hillshade_315_45_08: {str(e)}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise
+        logger.error(f"Error in api_hillshade_315_45_08: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Hillshade 315_45_08 processing failed: {str(e)}")
 
 @router.post("/api/hillshade_225_45_08")
-async def api_hillshade_225_45_08(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None), display_region_name: str = Form(None)):
-    """Generate hillshade with 225° azimuth, 45° altitude, 0.8 z-factor - supports both region-based and LAZ file processing"""
+async def api_hillshade_225_45_08(
+    input_file: str = Form(None),
+    region_name: str = Form(None),
+    processing_type: str = Form(None),
+    display_region_name: str = Form(None),
+    dtm_resolution: float = Form(1.0),
+    dtm_csf_cloth_resolution: Optional[float] = Form(None),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Generate hillshade (Az225, Alt45, Z0.8)"""
     print(f"\n🎯 API CALL: /api/hillshade_225_45_08")
-    
-    # Determine processing mode: region-based or LAZ file-based
+    logger.info(f"/api/hillshade_225_45_08 called for region: {region_name}, file: {input_file}, dtm_res: {dtm_resolution}, csf_res: {dtm_csf_cloth_resolution}, stretch: {stretch_type}")
+    effective_input_file = input_file
     if region_name and processing_type:
-        # Region-based processing: find LAZ file in region
-        print(f"📍 Region-based processing: {region_name}")
-        print(f"🔧 Processing type: {processing_type}")
-        
-        # Region-based processing: find LAZ file in region using proper mapping
-        input_file = resolve_laz_file_from_region(region_name, processing_type)
-        
-    elif input_file:
-        # LAZ file-based processing (legacy support)
-        print(f"📥 LAZ file-based processing: {input_file}")
-        
-    else:
-        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not input_file:
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
 
     try:
-        # Use display_region_name for output directory if provided, otherwise use original region_name
-        output_region = display_region_name if display_region_name else region_name
-        tif_path = hillshade_225_45_08(input_file, output_region)
-        print(f"✅ TIF generated: {tif_path}")
+        output_region_for_path = display_region_name if display_region_name else region_name
+        tif_path = hillshade_225_45_08(
+            effective_input_file,
+            output_region_for_path,
+            dtm_resolution=dtm_resolution,
+            dtm_csf_cloth_resolution=dtm_csf_cloth_resolution
+        )
+        print(f"✅ Hillshade Az225 Alt45 Z0.8 TIF generated: {tif_path}")
         
-        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
         print(f"✅ Base64 conversion complete")
-        
         return {"image": image_b64}
+    except FileNotFoundError as e:
+        logger.error(f"FileNotFoundError in api_hillshade_225_45_08: {e}", exc_info=True)
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        logger.error(f"ValueError in api_hillshade_225_45_08: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        print(f"❌ Error in api_hillshade_225_45_08: {str(e)}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise
+        logger.error(f"Error in api_hillshade_225_45_08: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Hillshade 225_45_08 processing failed: {str(e)}")
+
+@router.post("/api/hillshade_custom")
+async def api_hillshade_custom(
+    input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None),
+    display_region_name: str = Form(None), azimuth: float = Form(315.0),
+    altitude: float = Form(45.0), z_factor: float = Form(1.0),
+    dtm_resolution: float = Form(1.0), dtm_csf_cloth_resolution: Optional[float] = Form(None),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Generate hillshade with custom azimuth, altitude, z-factor, and DTM resolution."""
+    print(f"\n🎯 API CALL: /api/hillshade_custom")
+    logger.info(f"/api/hillshade_custom called for region: {region_name}, file: {input_file}, az: {azimuth}, alt: {altitude}, z: {z_factor}, dtm_res: {dtm_resolution}, csf_res: {dtm_csf_cloth_resolution}, stretch: {stretch_type}")
+    effective_input_file = input_file
+    if region_name and processing_type:
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not effective_input_file:
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+
+    try:
+        output_region_name_for_path = display_region_name if display_region_name else region_name
+        custom_suffix = f"custom_az{int(azimuth)}_alt{int(altitude)}_z{str(z_factor).replace('.', 'p')}"
+        tif_path = generate_hillshade_with_params(
+            input_file=effective_input_file, azimuth=azimuth, altitude=altitude, z_factor=z_factor,
+            suffix=custom_suffix, region_name=output_region_name_for_path,
+            dtm_resolution=dtm_resolution, dtm_csf_cloth_resolution=dtm_csf_cloth_resolution
+        )
+        print(f"✅ Custom Hillshade TIF generated: {tif_path}")
+        
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
+        print(f"✅ Base64 conversion complete")
+        return {"image": image_b64}
+    except FileNotFoundError as e:
+        logger.error(f"FileNotFoundError in api_hillshade_custom: {e}", exc_info=True)
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        logger.error(f"ValueError in api_hillshade_custom: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error in api_hillshade_custom: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Hillshade custom processing failed: {str(e)}")
+
+@router.post("/api/composite_dtm_hillshade_blend")
+async def api_composite_dtm_hillshade_blend(
+    input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None),
+    display_region_name: str = Form(None), dtm_resolution: float = Form(1.0),
+    dtm_csf_cloth_resolution: Optional[float] = Form(None), hillshade_azimuth: float = Form(315.0),
+    hillshade_altitude: float = Form(45.0), hillshade_z_factor: float = Form(1.0),
+    hillshade_suffix: str = Form("standard"), blend_factor: float = Form(0.6),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Generate a blended DTM (color relief) and Hillshade composite."""
+    print(f"\n🎯 API CALL: /api/composite_dtm_hillshade_blend")
+    logger.info(f"/api/composite_dtm_hillshade_blend called for region: {region_name}, file: {input_file}, dtm_res: {dtm_resolution}, csf_res: {dtm_csf_cloth_resolution}, hs_az: {hillshade_azimuth}, blend: {blend_factor}, stretch: {stretch_type}")
+    effective_input_file = input_file
+    if region_name and processing_type:
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not effective_input_file:
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+
+    try:
+        output_region_name_for_path = display_region_name if display_region_name else region_name
+        tif_path = generate_dtm_hillshade_blend(
+            laz_input_file=effective_input_file, region_name_for_output=output_region_name_for_path,
+            dtm_resolution=dtm_resolution, dtm_csf_cloth_resolution=dtm_csf_cloth_resolution,
+            hillshade_azimuth=hillshade_azimuth, hillshade_altitude=hillshade_altitude,
+            hillshade_z_factor=hillshade_z_factor, hillshade_suffix=hillshade_suffix,
+            blend_factor=blend_factor
+        )
+        print(f"✅ DTM-Hillshade Blend Composite TIF generated: {tif_path}")
+        
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
+        print(f"✅ Base64 conversion complete for composite")
+        return {"image": image_b64}
+    except FileNotFoundError as e:
+        logger.error(f"FileNotFoundError in api_composite_dtm_hillshade_blend: {e}", exc_info=True)
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        logger.error(f"ValueError in api_composite_dtm_hillshade_blend: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error in api_composite_dtm_hillshade_blend: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"DTM-Hillshade Blend composite processing failed: {str(e)}")
 
 @router.post("/api/slope")
-async def api_slope(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None), display_region_name: str = Form(None)):
-    """Generate slope from LAZ file - supports both region-based and LAZ file processing"""
+async def api_slope(
+    input_file: str = Form(None), region_name: str = Form(None),
+    processing_type: str = Form(None), display_region_name: str = Form(None),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Generate slope from LAZ file"""
     print(f"\n🎯 API CALL: /api/slope")
-    
-    # Determine processing mode: region-based or LAZ file-based
+    logger.info(f"/api/slope called for region: {region_name}, file: {input_file}, stretch: {stretch_type}")
+    effective_input_file = input_file
     if region_name and processing_type:
-        # Region-based processing: find LAZ file in region using proper mapping
-        input_file = resolve_laz_file_from_region(region_name, processing_type)
-        
-    elif input_file:
-        # LAZ file-based processing (legacy support)
-        print(f"📥 LAZ file-based processing: {input_file}")
-        
-    else:
-        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not input_file:
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
 
     try:
-        # Use display_region_name for output directory if provided, otherwise use original region_name
         output_region = display_region_name if display_region_name else region_name
-        
-        # Check if slope function accepts region_name parameter
-        try:
-            from inspect import signature
-            sig = signature(slope)
-            if 'region_name' in sig.parameters:
-                tif_path = slope(input_file, output_region)
-            else:
-                tif_path = slope(input_file)
-        except:
-            # Fallback to original function call if anything goes wrong
-            tif_path = slope(input_file)
-        print(f"✅ TIF generated: {tif_path}")
-        
-        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        tif_path = slope(effective_input_file, output_region)
+        print(f"✅ Slope TIF generated: {tif_path}")
+
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
         print(f"✅ Base64 conversion complete")
-        
         return {"image": image_b64}
     except Exception as e:
-        print(f"❌ Error in api_slope: {str(e)}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise
+        logger.error(f"Error in api_slope: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Slope processing failed: {str(e)}")
 
 @router.post("/api/aspect")
-async def api_aspect(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None), display_region_name: str = Form(None)):
-    """Generate aspect from LAZ file - supports both region-based and LAZ file processing"""
+async def api_aspect(
+    input_file: str = Form(None), region_name: str = Form(None),
+    processing_type: str = Form(None), display_region_name: str = Form(None),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Generate aspect from LAZ file"""
     print(f"\n🎯 API CALL: /api/aspect")
-    
-    # Determine processing mode: region-based or LAZ file-based
+    logger.info(f"/api/aspect called for region: {region_name}, file: {input_file}, stretch: {stretch_type}")
+    effective_input_file = input_file
     if region_name and processing_type:
-        # Region-based processing: find LAZ file in region
-        print(f"📍 Region-based processing: {region_name}")
-        print(f"🔧 Processing type: {processing_type}")
-        
-        # Region-based processing: find LAZ file in region using proper mapping
-        input_file = resolve_laz_file_from_region(region_name, processing_type)
-        
-    elif input_file:
-        # LAZ file-based processing (legacy support)
-        print(f"📥 LAZ file-based processing: {input_file}")
-        
-    else:
-        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not input_file:
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
-        # Use display_region_name for output directory if provided, otherwise use original region_name
         output_region = display_region_name if display_region_name else region_name
-        
-        # Check if aspect function accepts region_name parameter
-        try:
-            from inspect import signature
-            sig = signature(aspect)
-            if 'region_name' in sig.parameters:
-                tif_path = aspect(input_file, output_region)
-            else:
-                tif_path = aspect(input_file)
-        except:
-            # Fallback to original function call if anything goes wrong
-            tif_path = aspect(input_file)
-        print(f"✅ TIF generated: {tif_path}")
-        
-        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        tif_path = aspect(effective_input_file, output_region)
+        print(f"✅ Aspect TIF generated: {tif_path}")
+
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
         print(f"✅ Base64 conversion complete")
-        
         return {"image": image_b64}
     except Exception as e:
-        print(f"❌ Error in api_aspect: {str(e)}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise
+        logger.error(f"Error in api_aspect: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Aspect processing failed: {str(e)}")
 
 @router.post("/api/color_relief")
-async def api_color_relief(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None)):
-    """Generate color relief from LAZ file - supports both region-based and LAZ file processing"""
+async def api_color_relief(
+    input_file: str = Form(None),
+    region_name: str = Form(None),
+    processing_type: str = Form(None),
+    display_region_name: str = Form(None),
+    ramp_name: str = Form("arch_subtle"),
+    dtm_resolution: float = Form(1.0),
+    dtm_csf_cloth_resolution: Optional[float] = Form(None),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Generate color relief from LAZ file"""
     print(f"\n🎯 API CALL: /api/color_relief")
-    
-    # Determine processing mode: region-based or LAZ file-based
+    logger.info(f"/api/color_relief called for region: {region_name}, file: {input_file}, ramp: {ramp_name}, dtm_res: {dtm_resolution}, csf_res: {dtm_csf_cloth_resolution}, stretch: {stretch_type}")
+    effective_input_file = input_file
     if region_name and processing_type:
-        # Region-based processing: find LAZ file in region
-        print(f"📍 Region-based processing: {region_name}")
-        print(f"🔧 Processing type: {processing_type}")
-        
-        # Region-based processing: find LAZ file in region using proper mapping
-        input_file = resolve_laz_file_from_region(region_name, processing_type)
-        
-    elif input_file:
-        # LAZ file-based processing (legacy support)
-        print(f"📥 LAZ file-based processing: {input_file}")
-        
-    else:
-        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not input_file:
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
-        tif_path = color_relief(input_file)
-        print(f"✅ TIF generated: {tif_path}")
-        
-        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        output_region_name_for_path = display_region_name if display_region_name else region_name
+        # Call the underlying async process_color_relief which then calls the sync color_relief
+        # This ensures parameters are passed down correctly as process_color_relief expects a dict
+        from ..processing.color_relief import process_color_relief as process_color_relief_async
+
+        # The process_color_relief async function expects output_dir and parameters dict
+        # output_dir for the async wrapper is typically "output/REGION_NAME"
+        # and it then constructs subdirectories.
+        # For consistency, we'll use the same output_region_name_for_path for the base output_dir.
+        base_output_dir_for_async = os.path.join("output", output_region_name_for_path)
+
+        processing_params = {
+            "ramp_name": ramp_name,
+            "dtm_resolution": dtm_resolution,
+            "dtm_csf_cloth_resolution": dtm_csf_cloth_resolution
+        }
+
+        result_dict = await process_color_relief_async(
+            laz_file_path=effective_input_file,
+            output_dir=base_output_dir_for_async, # Base output directory
+            parameters=processing_params
+        )
+
+        if not result_dict.get("success"):
+            raise Exception(result_dict.get("message", "Color relief processing failed in async wrapper."))
+
+        tif_path = result_dict["output_file"]
+        print(f"✅ Color Relief TIF generated with ramp '{ramp_name}': {tif_path}")
+
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
         print(f"✅ Base64 conversion complete")
-        
         return {"image": image_b64}
     except Exception as e:
-        print(f"❌ Error in api_color_relief: {str(e)}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise
+        logger.error(f"Error in api_color_relief: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Color Relief processing failed: {str(e)}")
 
 @router.post("/api/tpi")
-async def api_tpi(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None), display_region_name: str = Form(None)):
-    """Generate TPI from LAZ file - supports both region-based and LAZ file processing"""
+async def api_tpi(
+    input_file: str = Form(None), region_name: str = Form(None),
+    processing_type: str = Form(None), display_region_name: str = Form(None),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Generate TPI from LAZ file"""
     print(f"\n🎯 API CALL: /api/tpi")
-    
-    # Determine processing mode: region-based or LAZ file-based
+    logger.info(f"/api/tpi called for region: {region_name}, file: {input_file}, stretch: {stretch_type}")
+    effective_input_file = input_file
     if region_name and processing_type:
-        # Region-based processing: find LAZ file in region
-        print(f"📍 Region-based processing: {region_name}")
-        print(f"🔧 Processing type: {processing_type}")
-        
-        # Region-based processing: find LAZ file in region using proper mapping
-        input_file = resolve_laz_file_from_region(region_name, processing_type)
-        
-    elif input_file:
-        # LAZ file-based processing (legacy support)
-        print(f"📥 LAZ file-based processing: {input_file}")
-        
-    else:
-        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not input_file:
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
-        # Use display_region_name for output directory if provided, otherwise use original region_name
         output_region = display_region_name if display_region_name else region_name
-        
-        # Check if tpi function accepts region_name parameter
-        try:
-            from inspect import signature
-            sig = signature(tpi)
-            if 'region_name' in sig.parameters:
-                tif_path = tpi(input_file, output_region)
-            else:
-                tif_path = tpi(input_file)
-        except:
-            # Fallback to original function call if anything goes wrong
-            tif_path = tpi(input_file)
-        print(f"✅ TIF generated: {tif_path}")
-        
-        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        tif_path = tpi(effective_input_file, output_region)
+        print(f"✅ TPI TIF generated: {tif_path}")
+
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
         print(f"✅ Base64 conversion complete")
-        
         return {"image": image_b64}
     except Exception as e:
-        print(f"❌ Error in api_tpi: {str(e)}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise
+        logger.error(f"Error in api_tpi: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"TPI processing failed: {str(e)}")
 
 @router.post("/api/roughness")
-async def api_roughness(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None), display_region_name: str = Form(None)):
-    """Generate roughness from LAZ file - supports both region-based and LAZ file processing"""
+async def api_roughness(
+    input_file: str = Form(None), region_name: str = Form(None),
+    processing_type: str = Form(None), display_region_name: str = Form(None),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Generate roughness from LAZ file"""
     print(f"\n🎯 API CALL: /api/roughness")
-    
-    # Determine processing mode: region-based or LAZ file-based
+    logger.info(f"/api/roughness called for region: {region_name}, file: {input_file}, stretch: {stretch_type}")
+    effective_input_file = input_file
     if region_name and processing_type:
-        # Region-based processing: find LAZ file in region using proper mapping
-        input_file = resolve_laz_file_from_region(region_name, processing_type)
-        
-    elif input_file:
-        # LAZ file-based processing (legacy support)
-        print(f"📥 LAZ file-based processing: {input_file}")
-        
-    else:
-        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not input_file:
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
     
     try:
-        # Use display_region_name for output directory if provided, otherwise use original region_name
         output_region = display_region_name if display_region_name else region_name
-        
-        # Check if roughness function accepts region_name parameter
-        try:
-            from inspect import signature
-            sig = signature(roughness)
-            if 'region_name' in sig.parameters:
-                tif_path = roughness(input_file, output_region)
-            else:
-                tif_path = roughness(input_file)
-        except:
-            # Fallback to original function call if anything goes wrong
-            tif_path = roughness(input_file)
-        print(f"✅ TIF generated: {tif_path}")
+        tif_path = roughness(effective_input_file, output_region)
+        print(f"✅ Roughness TIF generated: {tif_path}")
 
-        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
         print(f"✅ Base64 conversion complete")
-
         return {"image": image_b64}
     except Exception as e:
-        print(f"❌ Error in api_roughness: {str(e)}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise
+        logger.error(f"Error in api_roughness: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Roughness processing failed: {str(e)}")
 
 @router.post("/api/sky_view_factor")
-async def api_sky_view_factor(input_file: str = Form(None), region_name: str = Form(None), processing_type: str = Form(None), display_region_name: str = Form(None)):
-    """Generate Sky View Factor from LAZ file - supports region or file processing"""
+async def api_sky_view_factor(
+    input_file: str = Form(None), region_name: str = Form(None),
+    processing_type: str = Form(None), display_region_name: str = Form(None),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Generate Sky View Factor from LAZ file"""
     print(f"\n🎯 API CALL: /api/sky_view_factor")
-
+    logger.info(f"/api/sky_view_factor called for region: {region_name}, file: {input_file}, stretch: {stretch_type}")
+    effective_input_file = input_file
     if region_name and processing_type:
-        input_file = resolve_laz_file_from_region(region_name, processing_type)
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
     elif not input_file:
-        raise ValueError("Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
 
     try:
-        from ..processing.sky_view_factor import sky_view_factor
         output_region = display_region_name if display_region_name else region_name
-        tif_path = sky_view_factor(input_file, output_region)
-        print(f"✅ TIF generated: {tif_path}")
-        image_b64 = convert_geotiff_to_png_base64(tif_path)
+        tif_path = sky_view_factor(effective_input_file, output_region)
+        print(f"✅ SVF TIF generated: {tif_path}")
+
+        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        image_b64 = convert_geotiff_to_png_base64(
+            tif_path,
+            stretch_type=stretch_type if stretch_type else "stddev",
+            stretch_params=parsed_stretch_params
+        )
         print(f"✅ Base64 conversion complete")
         return {"image": image_b64}
     except Exception as e:
-        print(f"❌ Error in api_sky_view_factor: {str(e)}")
-        print(f"❌ Error type: {type(e).__name__}")
-        raise
+        logger.error(f"Error in api_sky_view_factor: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Sky View Factor processing failed: {str(e)}")
