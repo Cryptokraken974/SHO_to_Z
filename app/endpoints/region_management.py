@@ -1,44 +1,77 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
-from typing import Optional
+from typing import Optional, Tuple, Dict, Union
 import os
 import glob
 import re
 
 router = APIRouter()
 
-def _read_coordinates_from_metadata(region_name: str) -> tuple[float, float] | None:
-    """Read existing coordinates from a region's metadata.txt file if it exists.
-    
+def _read_coordinates_from_metadata(region_name: str) -> Union[Tuple[float, float, Optional[Dict[str, float]]], Tuple[float, float], None]:
+    """Read existing coordinates and bounds from a region's metadata.txt file.
+
     Returns:
-        tuple[float, float] | None: (lat, lng) if found, None if not found or file doesn't exist
+        Union[Tuple[float, float, Optional[Dict[str, float]]], Tuple[float, float], None]:
+        - (lat, lng, bounds_dict) if center coordinates and all bounds are found.
+        - (lat, lng, None) if only center coordinates are found.
+        - None if coordinates are not found or file doesn't exist.
     """
     try:
         metadata_file = os.path.join("output", region_name, "metadata.txt")
         if not os.path.exists(metadata_file):
             return None
-            
+
         with open(metadata_file, 'r') as f:
             content = f.read()
-            
-        # Look for coordinate lines in the metadata
-        for line in content.split('\n'):
+
+        lat = None
+        lng = None
+        bounds: Dict[str, Optional[float]] = {"north": None, "south": None, "east": None, "west": None}
+
+        lines = content.split('\n')
+        for line in lines:
             line = line.strip()
             if line.startswith('Center Latitude:') and 'N/A' not in line:
-                lat_line = line
-                # Find the corresponding longitude line
-                for lng_line in content.split('\n'):
-                    lng_line = lng_line.strip()
-                    if lng_line.startswith('Center Longitude:') and 'N/A' not in lng_line:
-                        try:
-                            lat = float(lat_line.split('Center Latitude:')[1].strip())
-                            lng = float(lng_line.split('Center Longitude:')[1].strip())
-                            print(f"  📍 Found cached coordinates for {region_name}: ({lat}, {lng})")
-                            return (lat, lng)
-                        except (ValueError, IndexError):
-                            continue
-                        break
-                break
+                try:
+                    lat = float(line.split('Center Latitude:')[1].strip())
+                except (ValueError, IndexError):
+                    pass
+            elif line.startswith('Center Longitude:') and 'N/A' not in line:
+                try:
+                    lng = float(line.split('Center Longitude:')[1].strip())
+                except (ValueError, IndexError):
+                    pass
+            elif line.startswith('North Bound:') and 'N/A' not in line:
+                try:
+                    bounds["north"] = float(line.split('North Bound:')[1].strip())
+                except (ValueError, IndexError):
+                    pass
+            elif line.startswith('South Bound:') and 'N/A' not in line:
+                try:
+                    bounds["south"] = float(line.split('South Bound:')[1].strip())
+                except (ValueError, IndexError):
+                    pass
+            elif line.startswith('East Bound:') and 'N/A' not in line:
+                try:
+                    bounds["east"] = float(line.split('East Bound:')[1].strip())
+                except (ValueError, IndexError):
+                    pass
+            elif line.startswith('West Bound:') and 'N/A' not in line:
+                try:
+                    bounds["west"] = float(line.split('West Bound:')[1].strip())
+                except (ValueError, IndexError):
+                    pass
+
+        if lat is not None and lng is not None:
+            if all(bounds[k] is not None for k in bounds):
+                # All bounds are valid floats
+                print(f"  📍 Found cached coordinates and bounds for {region_name}: ({lat}, {lng}), Bounds: {bounds}")
+                return lat, lng, {k: float(v) for k, v in bounds.items() if v is not None} # Ensure type checker is happy
+            else:
+                # Only coordinates found
+                print(f"  📍 Found cached coordinates for {region_name}: ({lat}, {lng}) (no complete bounds)")
+                return lat, lng, None
+
         return None
     except Exception as e:
         print(f"  ⚠️  Error reading cached coordinates for {region_name}: {str(e)}")
@@ -82,9 +115,17 @@ File Path: {file_path}"""
 # Coordinate Information (from {source_type})
 Center Latitude: {center_lat}
 Center Longitude: {center_lng}"""
-        
-        # Add bounds if this was from LAZ analysis
-        if file_path.lower().endswith(('.laz', '.las')):
+
+        # Add bounds information if available in the region dict
+        bounds_info = region.get("bounds")
+        if isinstance(bounds_info, dict) and all(k in bounds_info for k in ["north", "south", "east", "west"]):
+            content += f"""
+North Bound: {bounds_info['north']}
+South Bound: {bounds_info['south']}
+East Bound: {bounds_info['east']}
+West Bound: {bounds_info['west']}"""
+        elif file_path.lower().endswith(('.laz', '.las')):
+            # If it's a LAZ file and specific bounds aren't available yet, keep placeholder
             content += f"""
 
 # Additional Information
@@ -198,9 +239,13 @@ async def list_regions(source: str = None):
             filename = os.path.basename(file_path).lower()
             
             # First, check if coordinates are already cached in metadata.txt
-            cached_coords = _read_coordinates_from_metadata(file_name)
-            if cached_coords:
-                region_info["center_lat"], region_info["center_lng"] = cached_coords
+            cached_data = _read_coordinates_from_metadata(file_name)
+            if cached_data:
+                if len(cached_data) == 3:
+                    region_info["center_lat"], region_info["center_lng"], region_info["bounds"] = cached_data
+                elif len(cached_data) == 2: # Should ideally not happen with the new func, but good for safety
+                    region_info["center_lat"], region_info["center_lng"] = cached_data
+                    region_info["bounds"] = None # Explicitly set to None
             elif "foxisland" in filename:
                 region_info["center_lat"] = 44.4268
                 region_info["center_lng"] = -68.2048
@@ -274,14 +319,43 @@ async def list_regions(source: str = None):
                 should_create_metadata = True
                 print(f"  📄 Metadata file missing for {region_name} - will create")
             else:
-                # File exists, check if it has coordinates
-                existing_coords = _read_coordinates_from_metadata(region_name)
-                if existing_coords is None and region.get("center_lat") and region.get("center_lng"):
-                    should_update_coordinates = True
-                    print(f"  📝 Metadata exists for {region_name} but missing coordinates - will update")
+                # File exists, check if it has coordinates and bounds
+                existing_data = _read_coordinates_from_metadata(region_name)
+                has_existing_coords = False
+                has_existing_bounds = False
+
+                if existing_data:
+                    if len(existing_data) >= 2 and existing_data[0] is not None and existing_data[1] is not None:
+                        has_existing_coords = True
+                    if len(existing_data) == 3 and existing_data[2] is not None:
+                        has_existing_bounds = True
+
+                # Determine if metadata needs update based on current region info vs existing file
+                # Update if:
+                # 1. File has no coords, but region_info has them.
+                # 2. File has no bounds, but region_info has them.
+                # 3. Coords in file don't match region_info (e.g. updated from LAZ analysis).
+                # 4. Bounds in file don't match region_info.
+
+                needs_coord_update = region.get("center_lat") is not None and region.get("center_lng") is not None and \
+                                     (not has_existing_coords or \
+                                      (existing_data and (existing_data[0] != region.get("center_lat") or existing_data[1] != region.get("center_lng"))))
+
+                needs_bounds_update = region.get("bounds") is not None and \
+                                      (not has_existing_bounds or \
+                                       (existing_data and len(existing_data) == 3 and existing_data[2] != region.get("bounds")))
+
+                if needs_coord_update or needs_bounds_update:
+                    should_update_coordinates = True # This variable name is a bit misleading now, it means "update metadata file"
+                    if needs_coord_update and needs_bounds_update:
+                        print(f"  📝 Metadata for {region_name} needs update for coordinates and bounds - will update")
+                    elif needs_coord_update:
+                        print(f"  📝 Metadata for {region_name} needs update for coordinates - will update")
+                    elif needs_bounds_update:
+                         print(f"  📝 Metadata for {region_name} needs update for bounds - will update")
                 else:
                     metadata_skipped_count += 1
-                    print(f"  ✅ Metadata for {region_name} already exists with coordinates - skipping")
+                    print(f"  ✅ Metadata for {region_name} already up-to-date - skipping")
             
             # Only create or update if necessary
             if should_create_metadata or should_update_coordinates:
