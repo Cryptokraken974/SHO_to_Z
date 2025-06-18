@@ -7,6 +7,7 @@ window.FileManager = {
   processingRegion: null, // Region name to use for API processing calls
   regionPath: null, // Store the full path to the region file
   regionMarkers: [], // Changed from lazFileMarkers
+  regionBoundRectangles: [], // To store Leaflet rectangle layers for bounds
   currentLocationPin: null,
 
   /**
@@ -95,6 +96,9 @@ window.FileManager = {
       if (coords) {
         regionItem.data('coords', coords);
       }
+      if (regionInfo.bounds && typeof regionInfo.bounds === 'object') { // Check if bounds is a valid object
+        regionItem.data('bounds', regionInfo.bounds);
+      }
       if (filePath) {
         regionItem.data('filePath', filePath);
       }
@@ -121,8 +125,9 @@ window.FileManager = {
    * @param {Object} coords - Coordinates object with lat/lng
    * @param {string} processingRegion - Region name to use for processing API calls
    * @param {string} regionPath - Full file path of the region (especially for LAZ files)
+   * @param {Object} bounds - Optional bounds object {north, south, east, west}
    */
-  selectRegion(displayName, coords = null, processingRegion = null, regionPath = null) { // MODIFIED to selectRegion, added regionPath
+  selectRegion(displayName, coords = null, processingRegion = null, regionPath = null, bounds = null) { // MODIFIED to selectRegion, added regionPath and bounds
     // Clear satellite gallery immediately when region is selected
     const satelliteGallery = document.getElementById('satellite-gallery');
     if (satelliteGallery) {
@@ -133,6 +138,7 @@ window.FileManager = {
     this.selectedRegion = displayName;
     this.processingRegion = processingRegion || displayName; // Store the processing region separately
     this.regionPath = regionPath; // Store the region path
+    this.selectedRegionBounds = bounds; // Store the bounds
     
     // Update UI to show selected region
     $('.file-item').removeClass('selected');
@@ -172,7 +178,7 @@ window.FileManager = {
       MetadataManager.createRegionMetadata(displayName, coords, this.processingRegion);
     }
 
-    Utils.log('info', `Selected region: ${displayName} (processing region: ${this.processingRegion}, path: ${regionPath})`, { coords });
+    Utils.log('info', `Selected region: ${displayName} (processing region: ${this.processingRegion}, path: ${regionPath})`, { coords, bounds: this.selectedRegionBounds });
     Utils.showNotification(`Selected Region: ${displayName}`, 'success', 2000);
     
   },
@@ -226,7 +232,7 @@ window.FileManager = {
           popup: `Region: ${regionName}<br>Lat: ${coords.lat.toFixed(4)}<br>Lng: ${coords.lng.toFixed(4)}`, // MODIFIED popup text
           label: regionName,
           onClick: () => {
-            this.selectRegion(regionName, coords, regionInfo.region_name || regionName, filePath); // MODIFIED to selectRegion, pass filePath
+            this.selectRegion(regionName, coords, regionInfo.region_name || regionName, filePath, regionInfo.bounds || null); // MODIFIED to selectRegion, pass filePath and bounds
           }
         });
         
@@ -236,19 +242,61 @@ window.FileManager = {
         
         Utils.log('info', `Added marker for region ${regionName} at ${coords.lat}, ${coords.lng}`);
       }
+
+      // Draw bounds rectangle
+      if (regionInfo.bounds &&
+          typeof regionInfo.bounds.min_lat === 'number' &&
+          typeof regionInfo.bounds.min_lng === 'number' &&
+          typeof regionInfo.bounds.max_lat === 'number' &&
+          typeof regionInfo.bounds.max_lng === 'number') {
+
+        const south = regionInfo.bounds.min_lat;
+        const west = regionInfo.bounds.min_lng;
+        const north = regionInfo.bounds.max_lat;
+        const east = regionInfo.bounds.max_lng;
+
+        // Ensure coordinates are valid before creating rectangle
+        // Using a simple check for validity here. Utils.isValidCoordinate typically checks single points.
+        if (isFinite(north) && isFinite(south) && isFinite(east) && isFinite(west) &&
+            north >= -90 && north <= 90 && south >= -90 && south <= 90 &&
+            east >= -180 && east <= 180 && west >= -180 && west <= 180 &&
+            north > south && east > west) { // Basic sanity check for bounds
+
+          const leafletBounds = [[south, west], [north, east]];
+          const rectangle = L.rectangle(leafletBounds, {
+            color: "#3388ff",
+            weight: 1,        // Thinner weight for less visual clutter
+            fillOpacity: 0.05,  // More transparent
+            interactive: false
+          }).addTo(MapManager.getMap());
+
+          this.regionBoundRectangles.push(rectangle);
+        } else {
+          Utils.log('warn', `Invalid or inconsistent bounds for region ${regionInfo.name}:`, regionInfo.bounds);
+        }
+      }
     });
     
-    Utils.log('info', `Created ${this.regionMarkers.length} region markers`); // MODIFIED log
+    Utils.log('info', `Created ${this.regionMarkers.length} region markers and ${this.regionBoundRectangles.length} bound rectangles`); // MODIFIED log
   },
 
   /**
-   * Clear all region markers from the map (previously LAZ file markers)
+   * Clear all region markers and bound rectangles from the map
    */
-  clearRegionMarkers() { // MODIFIED to clearRegionMarkers
-    this.regionMarkers.forEach(marker => { // MODIFIED to regionMarkers
+  clearRegionMarkers() {
+    // Existing code to remove center markers:
+    this.regionMarkers.forEach(marker => {
       MapManager.removeMarker(marker);
     });
-    this.regionMarkers = []; // MODIFIED to regionMarkers
+    this.regionMarkers = [];
+
+    // New code to remove bound rectangles:
+    this.regionBoundRectangles.forEach(rectangle => {
+      if (MapManager.getMap() && MapManager.getMap().hasLayer(rectangle)) {
+        MapManager.getMap().removeLayer(rectangle);
+      }
+    });
+    this.regionBoundRectangles = [];
   },
 
   /**
