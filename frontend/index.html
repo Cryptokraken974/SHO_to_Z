@@ -28,6 +28,7 @@
   <link rel="stylesheet" href="./css/cache-management.css" />
   <link rel="stylesheet" href="./css/large-image-optimization.css" />
   <link rel="stylesheet" href="./css/openai.css" />
+  <link rel="stylesheet" href="./css/results.css" />
   
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   
@@ -115,6 +116,9 @@
       </button>
       <button class="tab-btn px-6 py-3 text-[#ababab] font-medium border-b-2 border-transparent hover:bg-[#262626] hover:text-white transition-colors" data-tab="openai-analysis">
         OpenAI Analysis
+      </button>
+      <button class="tab-btn px-6 py-3 text-[#ababab] font-medium border-b-2 border-transparent hover:bg-[#262626] hover:text-white transition-colors" data-tab="results">
+        Results
       </button>
     </div>
   </div>
@@ -914,6 +918,25 @@
       </div>
     </div>
 
+    <!-- Results Tab Content -->
+    <div id="results-tab" class="tab-content hidden flex flex-1 overflow-hidden">
+      <!-- Left Panel: Log List -->
+      <div id="results-left-panel" class="w-1/4 bg-[#1e1e1e] p-4 overflow-y-auto">
+        <h2 class="text-white text-lg font-semibold mb-4">Result Logs</h2>
+        <button id="results-select-all-btn" class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-4">Select All</button>
+        <div id="results-log-list">
+          <!-- Log items will be populated here -->
+          <p class="text-gray-400">Loading results...</p>
+        </div>
+      </div>
+      <!-- Main Panel: Dashboard -->
+      <div id="results-main-panel" class="w-3/4 p-6 overflow-y-auto">
+        <h1 class="text-white text-xl font-bold">Results Dashboard</h1>
+        <p class="text-gray-300">Select a result from the left panel to view details, or click "Select All" for a summary.</p>
+        <!-- Dashboard content will be populated here -->
+      </div>
+    </div>
+
   <!-- Modal for file selection with modern design -->
   <div id="file-modal" class="modal fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center hidden z-50">
     <div class="modal-content bg-[#2c2c2c] p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
@@ -1235,6 +1258,7 @@
   <script src="/static/js/satellite-overlay-gallery.js"></script>
   <script src="/static/js/openai-analysis.js"></script>
   <script src="/static/js/ui.js"></script>
+  <script src="/static/js/components/results.js"></script>
   <script src="/static/js/geotiff-left-panel.js"></script>
   <script src="/static/js/geotiff-main-canvas.js"></script>
   <script src="/static/js/app_new.js"></script>
