@@ -504,6 +504,10 @@ class OpenAIAnalysis {
     }
 
     async sendPromptToOpenAI() {
+        // Get the selected model name
+        const modelSelect = document.getElementById('openai-model'); // Corrected ID
+        const modelName = modelSelect ? modelSelect.value : 'gpt-4-vision-preview'; // Kept default as 'gpt-4-vision-preview'
+
         const prompt = document.getElementById('prompt-display').value.trim();
         if (!prompt) {
             window.Utils?.showNotification('No prompt loaded', 'warning');
@@ -533,6 +537,7 @@ class OpenAIAnalysis {
                     images,
                     laz_name: region,
                     coordinates: coords,
+                    model_name: modelName, // Add model_name to the payload
                 };
                 const data = await openai().sendPrompt(payload);
                 console.log('OpenAI response', data);

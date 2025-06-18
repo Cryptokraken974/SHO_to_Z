@@ -10,12 +10,14 @@ class OpenAIService(BaseService, SyncServiceMixin):
         images: List[str],
         laz_name: Optional[str] = None,
         coordinates: Optional[Dict[str, float]] = None,
+        model_name: Optional[str] = None,  # Name of the OpenAI model to use
     ) -> Dict[str, Any]:
         data = {
             "prompt": prompt,
             "images": images,
             "laz_name": laz_name,
             "coordinates": coordinates,
+            "model_name": model_name,  # Include selected model name in the payload for /api/openai/send
         }
         response = await self._post("/api/openai/send", json_data=data)
         # prepare log payload with image size info
@@ -28,6 +30,7 @@ class OpenAIService(BaseService, SyncServiceMixin):
             "coordinates": coordinates,
             "images": log_images,
             "prompt": prompt,
+            "model_name": model_name,  # Include selected model name in the log payload
         }
         log_result = await self._post("/api/openai/log", json_data=log_payload)
         response_payload = {
