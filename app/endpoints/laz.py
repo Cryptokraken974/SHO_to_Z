@@ -1752,15 +1752,43 @@ async def generate_laz_metadata(
                     
                     logger.info(f"🛰️ Sentinel-2 request: center=({center['lat']:.6f}, {center['lng']:.6f}), buffer=5km")
                     
-                    # Download Sentinel-2 data with all required parameters
+                    # Extract the WGS84 bounds for Sentinel-2 request
+                    laz_wgs84_bounds_dict = response_data.get("bounds", {}) # This is {"min_lng": ..., "min_lat": ..., ...}
+
+                    from app.data_acquisition.utils.coordinates import BoundingBox # Ensure import
+                    laz_bbox_obj = BoundingBox(
+                        north=laz_wgs84_bounds_dict.get("max_lat"),
+                        south=laz_wgs84_bounds_dict.get("min_lat"),
+                        east=laz_wgs84_bounds_dict.get("max_lng"),
+                        west=laz_wgs84_bounds_dict.get("min_lng")
+                    )
+
+                    if not all([laz_bbox_obj.north, laz_bbox_obj.south, laz_bbox_obj.east, laz_bbox_obj.west]):
+                        logger.error(f"⚠️ Could not extract valid WGS84 bounding box from LAZ metadata for Sentinel-2. Data: {laz_wgs84_bounds_dict}")
+                        raise ValueError("Invalid WGS84 bounding box extracted from LAZ metadata.")
+
+                    laz_area_sq_km = laz_bbox_obj.get_area_sq_km()
+                    MAX_RECOMMENDED_S2_AREA_SQ_KM = 625.0 # approx 25km x 25km
+
+                    if laz_area_sq_km > MAX_RECOMMENDED_S2_AREA_SQ_KM:
+                        logger.warning(f"LAZ file {file_name} has a large bounding box ({laz_area_sq_km:.2f} sq km), which exceeds the recommended max area of {MAX_RECOMMENDED_S2_AREA_SQ_KM:.2f} sq km for Sentinel-2 acquisition. Proceeding with full LAZ extent.")
+
+                    sentinel2_request_bbox_dict = {
+                        "north": laz_bbox_obj.north,
+                        "south": laz_bbox_obj.south,
+                        "east": laz_bbox_obj.east,
+                        "west": laz_bbox_obj.west
+                    }
+                    logger.info(f"🛰️ Sentinel-2 request (using LAZ BBox): North={laz_bbox_obj.north:.4f}, South={laz_bbox_obj.south:.4f}, East={laz_bbox_obj.east:.4f}, West={laz_bbox_obj.west:.4f}")
+
+                    # Download Sentinel-2 data with LAZ bounding box
                     sentinel2_result = await satellite_service.download_sentinel2_data(
-                        latitude=satellite_request["lat"],
-                        longitude=satellite_request["lng"],
-                        start_date=satellite_request["start_date"],
-                        end_date=satellite_request["end_date"],
-                        bands=satellite_request["bands"],
-                        cloud_cover_max=satellite_request["cloud_cover_max"],
-                        region_name=region_name  # Pass region name for proper file organization
+                        bounding_box=sentinel2_request_bbox_dict, # Pass the LAZ BBox
+                        start_date=start_date.strftime("%Y-%m-%d"),
+                        end_date=end_date.strftime("%Y-%m-%d"),
+                        bands=satellite_request.get("bands", ["B04", "B08"]), # Use bands from previous dict or default
+                        cloud_cover_max=satellite_request.get("cloud_cover_max", 30), # Use cloud cover from previous dict or default
+                        region_name=region_name
                     )
                     
                     if sentinel2_result and sentinel2_result.get("success"):

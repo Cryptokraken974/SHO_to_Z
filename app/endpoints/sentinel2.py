@@ -57,28 +57,57 @@ async def download_sentinel2(request: Sentinel2Request):
         
         # Register this download task for cancellation
         manager.add_download_task(download_id, sentinel2_source)
+
+        query_bbox: BoundingBox
+
+        if request.north_bound is not None and \
+           request.south_bound is not None and \
+           request.east_bound is not None and \
+           request.west_bound is not None:
+
+            if request.north_bound <= request.south_bound or \
+               request.east_bound <= request.west_bound:
+                raise HTTPException(status_code=400, detail="Invalid bounding box: North must be > South and East must be > West.")
+
+            query_bbox = BoundingBox(
+                north=request.north_bound,
+                south=request.south_bound,
+                east=request.east_bound,
+                west=request.west_bound
+            )
+            print(f"🗺️ Sentinel-2 Request (using provided BBox):")
+            print(f"🔲 BBox: West={query_bbox.west:.4f}, South={query_bbox.south:.4f}, East={query_bbox.east:.4f}, North={query_bbox.north:.4f}")
+
+        elif lat is not None and lng is not None: # lat, lng should be defined from get_latitude/longitude calls
+            buffer_km = request.buffer_km # buffer_km has a default in Sentinel2Request
+
+            # Calculate bounding box from center point and buffer (existing logic)
+            # Ensure CoordinateConverter is available or calculations are direct
+            # Using direct calculation as before:
+            lat_delta = buffer_km / 111.0  # Rough conversion: 1 degree ≈ 111 km
+            lng_delta = buffer_km / (111.0 * abs(math.cos(math.radians(lat)))) if abs(math.cos(math.radians(lat))) > 1e-9 else buffer_km / 111.0 # Avoid division by zero near poles
+
+            query_bbox = BoundingBox(
+                west=lng - lng_delta,
+                south=lat - lat_delta,
+                east=lng + lng_delta,
+                north=lat + lat_delta
+            )
+            print(f"🗺️ Sentinel-2 Request (using Lat/Lng/Buffer):")
+            print(f"📍 Center: {lat}, {lng}")
+            print(f"📏 Buffer: {buffer_km}km")
+            print(f"🔲 BBox: West={query_bbox.west:.4f}, South={query_bbox.south:.4f}, East={query_bbox.east:.4f}, North={query_bbox.north:.4f}")
+        else:
+            # This case should ideally be caught by Pydantic model validation if lat/lng were required when bounds are not set.
+            # Or by the get_latitude/get_longitude calls if they were made mandatory always.
+            # For now, the Pydantic model makes lat/lng optional, so this check is important.
+            raise HTTPException(status_code=400, detail="Either full bounding box (north_bound, south_bound, east_bound, west_bound) or latitude/longitude must be provided.")
         
-        # Calculate bounding box from center point and buffer
-        lat_delta = request.buffer_km / 111.0  # Rough conversion: 1 degree ≈ 111 km
-        # For longitude, adjust for latitude (longitude lines get closer at higher latitudes)
-        lng_delta = request.buffer_km / (111.0 * abs(math.cos(math.radians(lat))))
-        
-        bbox = BoundingBox(
-            west=lng - lng_delta,
-            south=lat - lat_delta,
-            east=lng + lng_delta,
-            north=lat + lat_delta
-        )
-        
-        print(f"🗺️ Sentinel-2 Request:")
-        print(f"📍 Center: {lat}, {lng}")
-        print(f"📏 Buffer: {request.buffer_km}km")
-        print(f"🔲 BBox: West={bbox.west:.4f}, South={bbox.south:.4f}, East={bbox.east:.4f}, North={bbox.north:.4f}")
-        print(f"📐 Size: {(bbox.east-bbox.west)*111:.2f}km x {(bbox.north-bbox.south)*111:.2f}km")
+        print(f"📐 Approx. Size: {(query_bbox.east-query_bbox.west)*111*math.cos(math.radians((query_bbox.north+query_bbox.south)/2)):.2f}km x {(query_bbox.north-query_bbox.south)*111:.2f}km")
         
         # Create download request
         download_request = DownloadRequest(
-            bbox=bbox,
+            bbox=query_bbox,
             data_type=DataType.IMAGERY,
             resolution=DataResolution.HIGH,
             max_file_size_mb=100.0,

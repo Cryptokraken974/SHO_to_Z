@@ -1,0 +1,37 @@
+[
+  {
+    "endpoint_path": "/api/save-region-metadata",
+    "file": "frontend/js/metadataManager.js",
+    "line": 62,
+    "issue": "Endpoint expects a request body of type 'dict', but no body seems to be passed.",
+    "parameter": "Request Body"
+  },
+  {
+    "endpoint_path": "/api/laz/upload",
+    "file": "frontend/js/geotiff-left-panel.js",
+    "line": 812,
+    "issue": "Endpoint expects a request body of type 'List[UploadFile]', but no body seems to be passed.",
+    "parameter": "Request Body"
+  },
+  {
+    "endpoint_path": "/api/laz/process-all-rasters",
+    "file": "frontend/js/geotiff-left-panel.js",
+    "line": 1089,
+    "issue": "Endpoint expects a request body of type 'str', but no body seems to be passed.",
+    "parameter": "Request Body"
+  },
+  {
+    "endpoint_path": "/api/laz/generate-metadata",
+    "file": "frontend/js/geotiff-left-panel.js",
+    "line": 1159,
+    "issue": "Endpoint expects a request body of type 'str', but no body seems to be passed.",
+    "parameter": "Request Body"
+  },
+  {
+    "endpoint_path": "/api/laz/upload",
+    "file": "Tests/backend/test_multi_upload.py",
+    "line": 15,
+    "issue": "Endpoint expects a request body of type 'List[UploadFile]', but no body seems to be passed.",
+    "parameter": "Request Body"
+  }
+]

@@ -1,0 +1,1443 @@
+[
+  {
+    "file": "cache_management.py",
+    "router_prefix": "/api/cache",
+    "path": "/metadata/stats",
+    "full_path": "/api/cache/metadata/stats",
+    "method": "GET",
+    "function_name": "get_cache_stats",
+    "parameters": []
+  },
+  {
+    "file": "cache_management.py",
+    "router_prefix": "/api/cache",
+    "path": "/metadata/list",
+    "full_path": "/api/cache/metadata/list",
+    "method": "GET",
+    "function_name": "list_cached_files",
+    "parameters": []
+  },
+  {
+    "file": "cache_management.py",
+    "router_prefix": "/api/cache",
+    "path": "/metadata/{file_path:path}",
+    "full_path": "/api/cache/metadata/{file_path:path}",
+    "method": "GET",
+    "function_name": "get_cached_metadata",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "cache_management.py",
+    "router_prefix": "/api/cache",
+    "path": "/metadata/refresh/{file_path:path}",
+    "full_path": "/api/cache/metadata/refresh/{file_path:path}",
+    "method": "POST",
+    "function_name": "refresh_file_cache",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "cache_management.py",
+    "router_prefix": "/api/cache",
+    "path": "/metadata/refresh-all",
+    "full_path": "/api/cache/metadata/refresh-all",
+    "method": "POST",
+    "function_name": "refresh_all_cache",
+    "parameters": []
+  },
+  {
+    "file": "cache_management.py",
+    "router_prefix": "/api/cache",
+    "path": "/metadata/clear",
+    "full_path": "/api/cache/metadata/clear",
+    "method": "DELETE",
+    "function_name": "clear_cache",
+    "parameters": []
+  },
+  {
+    "file": "cache_management.py",
+    "router_prefix": "/api/cache",
+    "path": "/metadata/validate",
+    "full_path": "/api/cache/metadata/validate",
+    "method": "GET",
+    "function_name": "validate_cache",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "Optional[str]",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "chat.py",
+    "router_prefix": "",
+    "path": "/api/chat",
+    "full_path": "/api/chat",
+    "method": "POST",
+    "function_name": "api_chat",
+    "parameters": [
+      {
+        "name": "data",
+        "type": "dict",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "core.py",
+    "router_prefix": "",
+    "path": "/",
+    "full_path": "/",
+    "method": "GET",
+    "function_name": "index",
+    "parameters": []
+  },
+  {
+    "file": "core.py",
+    "router_prefix": "",
+    "path": "/api/list-laz-files",
+    "full_path": "/api/list-laz-files",
+    "method": "GET",
+    "function_name": "list_laz_files",
+    "parameters": []
+  },
+  {
+    "file": "data_acquisition.py",
+    "router_prefix": "",
+    "path": "/api/config",
+    "full_path": "/api/config",
+    "method": "GET",
+    "function_name": "get_configuration",
+    "parameters": []
+  },
+  {
+    "file": "data_acquisition.py",
+    "router_prefix": "",
+    "path": "/api/check-data-availability",
+    "full_path": "/api/check-data-availability",
+    "method": "POST",
+    "function_name": "check_data_availability",
+    "parameters": [
+      {
+        "name": "request",
+        "type": "CoordinateRequest",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "data_acquisition.py",
+    "router_prefix": "",
+    "path": "/api/acquire-data",
+    "full_path": "/api/acquire-data",
+    "method": "POST",
+    "function_name": "acquire_data",
+    "parameters": [
+      {
+        "name": "request",
+        "type": "DataAcquisitionRequest",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "data_acquisition.py",
+    "router_prefix": "",
+    "path": "/api/estimate-download-size",
+    "full_path": "/api/estimate-download-size",
+    "method": "POST",
+    "function_name": "estimate_download_size",
+    "parameters": [
+      {
+        "name": "request",
+        "type": "CoordinateRequest",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "data_acquisition.py",
+    "router_prefix": "",
+    "path": "/api/acquisition-history",
+    "full_path": "/api/acquisition-history",
+    "method": "GET",
+    "function_name": "get_acquisition_history",
+    "parameters": []
+  },
+  {
+    "file": "data_acquisition.py",
+    "router_prefix": "",
+    "path": "/api/cleanup-cache",
+    "full_path": "/api/cleanup-cache",
+    "method": "POST",
+    "function_name": "cleanup_cache",
+    "parameters": [
+      {
+        "name": "older_than_days",
+        "type": "int",
+        "kind": "body",
+        "default": 30
+      }
+    ]
+  },
+  {
+    "file": "data_acquisition.py",
+    "router_prefix": "",
+    "path": "/api/storage-stats",
+    "full_path": "/api/storage-stats",
+    "method": "GET",
+    "function_name": "get_storage_stats",
+    "parameters": []
+  },
+  {
+    "file": "elevation_api.py",
+    "router_prefix": "",
+    "path": "/api/elevation/status",
+    "full_path": "/api/elevation/status",
+    "method": "GET",
+    "function_name": "get_elevation_status",
+    "parameters": []
+  },
+  {
+    "file": "elevation_api.py",
+    "router_prefix": "",
+    "path": "/api/elevation/optimal",
+    "full_path": "/api/elevation/optimal",
+    "method": "POST",
+    "function_name": "get_optimal_elevation_data",
+    "parameters": [
+      {
+        "name": "request",
+        "type": "ElevationRequest",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "elevation_api.py",
+    "router_prefix": "",
+    "path": "/api/elevation/brazilian",
+    "full_path": "/api/elevation/brazilian",
+    "method": "POST",
+    "function_name": "get_brazilian_elevation_data",
+    "parameters": [
+      {
+        "name": "request",
+        "type": "ElevationRequest",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "elevation_api.py",
+    "router_prefix": "",
+    "path": "/api/elevation/datasets",
+    "full_path": "/api/elevation/datasets",
+    "method": "GET",
+    "function_name": "get_elevation_datasets",
+    "parameters": []
+  },
+  {
+    "file": "elevation_api.py",
+    "router_prefix": "",
+    "path": "/api/elevation/terrain-recommendations",
+    "full_path": "/api/elevation/terrain-recommendations",
+    "method": "GET",
+    "function_name": "get_terrain_recommendations",
+    "parameters": []
+  },
+  {
+    "file": "elevation_api.py",
+    "router_prefix": "",
+    "path": "/api/elevation/status",
+    "full_path": "/api/elevation/status",
+    "method": "GET",
+    "function_name": "get_elevation_status",
+    "parameters": []
+  },
+  {
+    "file": "elevation_api.py",
+    "router_prefix": "",
+    "path": "/api/elevation/download",
+    "full_path": "/api/elevation/download",
+    "method": "POST",
+    "function_name": "download_elevation_data",
+    "parameters": [
+      {
+        "name": "request",
+        "type": "ElevationRequest",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "elevation_api.py",
+    "router_prefix": "",
+    "path": "/api/elevation/download-all",
+    "full_path": "/api/elevation/download-all",
+    "method": "POST",
+    "function_name": "download_all_elevation_data",
+    "parameters": []
+  },
+  {
+    "file": "elevation_api.py",
+    "router_prefix": "",
+    "path": "/api/generate-rasters",
+    "full_path": "/api/generate-rasters",
+    "method": "POST",
+    "function_name": "download_elevation_coordinates",
+    "parameters": [
+      {
+        "name": "request",
+        "type": "CoordinateRequest",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "geotiff.py",
+    "router_prefix": "/api/geotiff",
+    "path": "/files",
+    "full_path": "/api/geotiff/files",
+    "method": "GET",
+    "function_name": "get_geotiff_files",
+    "parameters": []
+  },
+  {
+    "file": "geotiff.py",
+    "router_prefix": "/api/geotiff",
+    "path": "/metadata/{file_path:path}",
+    "full_path": "/api/geotiff/metadata/{file_path:path}",
+    "method": "GET",
+    "function_name": "get_file_metadata",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "geotiff.py",
+    "router_prefix": "/api/geotiff",
+    "path": "/upload",
+    "full_path": "/api/geotiff/upload",
+    "method": "POST",
+    "function_name": "upload_geotiff",
+    "parameters": [
+      {
+        "name": "file",
+        "type": "UploadFile",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "geotiff.py",
+    "router_prefix": "/api/geotiff",
+    "path": "/compress",
+    "full_path": "/api/geotiff/compress",
+    "method": "POST",
+    "function_name": "compress_geotiff",
+    "parameters": [
+      {
+        "name": "request",
+        "type": "Dict[str, Any]",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "geotiff.py",
+    "router_prefix": "/api/geotiff",
+    "path": "/download/{file_path:path}",
+    "full_path": "/api/geotiff/download/{file_path:path}",
+    "method": "GET",
+    "function_name": "download_file",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "geotiff.py",
+    "router_prefix": "/api/geotiff",
+    "path": "/files/{file_path:path}",
+    "full_path": "/api/geotiff/files/{file_path:path}",
+    "method": "DELETE",
+    "function_name": "delete_file",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "json_pipelines.py",
+    "router_prefix": "",
+    "path": "/api/pipelines/json",
+    "full_path": "/api/pipelines/json",
+    "method": "GET",
+    "function_name": "list_json_pipelines",
+    "parameters": []
+  },
+  {
+    "file": "json_pipelines.py",
+    "router_prefix": "",
+    "path": "/api/pipelines/json/{pipeline_name}",
+    "full_path": "/api/pipelines/json/{pipeline_name}",
+    "method": "GET",
+    "function_name": "get_json_pipeline_info",
+    "parameters": [
+      {
+        "name": "pipeline_name",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "json_pipelines.py",
+    "router_prefix": "",
+    "path": "/api/pipelines/toggle-json",
+    "full_path": "/api/pipelines/toggle-json",
+    "method": "POST",
+    "function_name": "toggle_json_pipelines",
+    "parameters": [
+      {
+        "name": "data",
+        "type": "dict",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/load",
+    "full_path": "/api/laz/load",
+    "method": "POST",
+    "function_name": "load_laz_file",
+    "parameters": [
+      {
+        "name": "file",
+        "type": "UploadFile",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/upload-and-process",
+    "full_path": "/api/laz/upload-and-process",
+    "method": "POST",
+    "function_name": "upload_and_process_laz",
+    "parameters": [
+      {
+        "name": "file",
+        "type": "UploadFile",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "processingType",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "resolution",
+        "type": "float",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/files",
+    "full_path": "/api/laz/files",
+    "method": "GET",
+    "function_name": "get_laz_files",
+    "parameters": []
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/download/{file_path:path}",
+    "full_path": "/api/laz/download/{file_path:path}",
+    "method": "GET",
+    "function_name": "download_laz_file",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/files/{file_path:path}",
+    "full_path": "/api/laz/files/{file_path:path}",
+    "method": "DELETE",
+    "function_name": "delete_laz_file",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/processing-status/{file_name}",
+    "full_path": "/api/laz/processing-status/{file_name}",
+    "method": "GET",
+    "function_name": "get_processing_status",
+    "parameters": [
+      {
+        "name": "file_name",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/bounds-wgs84/{file_name:path}",
+    "full_path": "/api/laz/bounds-wgs84/{file_name:path}",
+    "method": "GET",
+    "function_name": "get_laz_bounds_wgs84",
+    "parameters": [
+      {
+        "name": "file_name",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/info",
+    "full_path": "/api/laz/info",
+    "method": "GET",
+    "function_name": "get_laz_file_info",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/bounds",
+    "full_path": "/api/laz/bounds",
+    "method": "GET",
+    "function_name": "get_laz_file_bounds",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/bounds-wgs84",
+    "full_path": "/api/laz/bounds-wgs84",
+    "method": "GET",
+    "function_name": "get_laz_file_bounds_wgs84",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "src_epsg",
+        "type": "int",
+        "kind": "body",
+        "default": 31978
+      }
+    ]
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/debug-coordinates/{file_path:path}",
+    "full_path": "/api/laz/debug-coordinates/{file_path:path}",
+    "method": "GET",
+    "function_name": "debug_laz_coordinates",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      },
+      {
+        "name": "src_epsg",
+        "type": "int",
+        "kind": "body",
+        "default": 31978
+      }
+    ]
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/debug-tool",
+    "full_path": "/api/laz/debug-tool",
+    "method": "GET",
+    "function_name": "serve_debug_tool",
+    "parameters": []
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/upload",
+    "full_path": "/api/laz/upload",
+    "method": "POST",
+    "function_name": "upload_multiple_laz_files",
+    "parameters": [
+      {
+        "name": "files",
+        "type": "List[UploadFile]",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/generate-metadata",
+    "full_path": "/api/laz/generate-metadata",
+    "method": "POST",
+    "function_name": "generate_laz_metadata",
+    "parameters": [
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "file_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz.py",
+    "router_prefix": "/api/laz",
+    "path": "/process-all-rasters",
+    "full_path": "/api/laz/process-all-rasters",
+    "method": "POST",
+    "function_name": "process_all_laz_rasters",
+    "parameters": [
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "file_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz_processing.py",
+    "router_prefix": "",
+    "path": "/api/laz_to_dem",
+    "full_path": "/api/laz_to_dem",
+    "method": "POST",
+    "function_name": "api_laz_to_dem",
+    "parameters": [
+      {
+        "name": "input_file",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz_processing.py",
+    "router_prefix": "",
+    "path": "/api/dtm",
+    "full_path": "/api/dtm",
+    "method": "POST",
+    "function_name": "api_dtm",
+    "parameters": [
+      {
+        "name": "input_file",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "processing_type",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "display_region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz_processing.py",
+    "router_prefix": "",
+    "path": "/api/dsm",
+    "full_path": "/api/dsm",
+    "method": "POST",
+    "function_name": "api_dsm",
+    "parameters": [
+      {
+        "name": "input_file",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "processing_type",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "display_region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz_processing.py",
+    "router_prefix": "",
+    "path": "/api/chm",
+    "full_path": "/api/chm",
+    "method": "POST",
+    "function_name": "api_chm",
+    "parameters": [
+      {
+        "name": "input_file",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "processing_type",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "display_region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz_processing.py",
+    "router_prefix": "",
+    "path": "/api/hillshade",
+    "full_path": "/api/hillshade",
+    "method": "POST",
+    "function_name": "api_hillshade",
+    "parameters": [
+      {
+        "name": "input_file",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "processing_type",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "display_region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz_processing.py",
+    "router_prefix": "",
+    "path": "/api/hillshade_315_45_08",
+    "full_path": "/api/hillshade_315_45_08",
+    "method": "POST",
+    "function_name": "api_hillshade_315_45_08",
+    "parameters": [
+      {
+        "name": "input_file",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "processing_type",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "display_region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz_processing.py",
+    "router_prefix": "",
+    "path": "/api/hillshade_225_45_08",
+    "full_path": "/api/hillshade_225_45_08",
+    "method": "POST",
+    "function_name": "api_hillshade_225_45_08",
+    "parameters": [
+      {
+        "name": "input_file",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "processing_type",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "display_region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz_processing.py",
+    "router_prefix": "",
+    "path": "/api/slope",
+    "full_path": "/api/slope",
+    "method": "POST",
+    "function_name": "api_slope",
+    "parameters": [
+      {
+        "name": "input_file",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "processing_type",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "display_region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz_processing.py",
+    "router_prefix": "",
+    "path": "/api/aspect",
+    "full_path": "/api/aspect",
+    "method": "POST",
+    "function_name": "api_aspect",
+    "parameters": [
+      {
+        "name": "input_file",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "processing_type",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "display_region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz_processing.py",
+    "router_prefix": "",
+    "path": "/api/color_relief",
+    "full_path": "/api/color_relief",
+    "method": "POST",
+    "function_name": "api_color_relief",
+    "parameters": [
+      {
+        "name": "input_file",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "processing_type",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz_processing.py",
+    "router_prefix": "",
+    "path": "/api/tpi",
+    "full_path": "/api/tpi",
+    "method": "POST",
+    "function_name": "api_tpi",
+    "parameters": [
+      {
+        "name": "input_file",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "processing_type",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "display_region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz_processing.py",
+    "router_prefix": "",
+    "path": "/api/roughness",
+    "full_path": "/api/roughness",
+    "method": "POST",
+    "function_name": "api_roughness",
+    "parameters": [
+      {
+        "name": "input_file",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "processing_type",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "display_region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "laz_processing.py",
+    "router_prefix": "",
+    "path": "/api/sky_view_factor",
+    "full_path": "/api/sky_view_factor",
+    "method": "POST",
+    "function_name": "api_sky_view_factor",
+    "parameters": [
+      {
+        "name": "input_file",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "processing_type",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      },
+      {
+        "name": "display_region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "lidar_acquisition.py",
+    "router_prefix": "",
+    "path": "/api/acquire-lidar",
+    "full_path": "/api/acquire-lidar",
+    "method": "POST",
+    "function_name": "acquire_lidar_data",
+    "parameters": [
+      {
+        "name": "request",
+        "type": "dict",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "lidar_acquisition.py",
+    "router_prefix": "",
+    "path": "/api/lidar/providers",
+    "full_path": "/api/lidar/providers",
+    "method": "GET",
+    "function_name": "list_lidar_providers",
+    "parameters": []
+  },
+  {
+    "file": "lidar_acquisition.py",
+    "router_prefix": "",
+    "path": "/api/process-lidar",
+    "full_path": "/api/process-lidar",
+    "method": "POST",
+    "function_name": "process_lidar_data",
+    "parameters": [
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "openai_interaction.py",
+    "router_prefix": "/api/openai",
+    "path": "/send",
+    "full_path": "/api/openai/send",
+    "method": "POST",
+    "function_name": "send_to_openai",
+    "parameters": [
+      {
+        "name": "payload",
+        "type": "SendPayload",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "openai_interaction.py",
+    "router_prefix": "/api/openai",
+    "path": "/log",
+    "full_path": "/api/openai/log",
+    "method": "POST",
+    "function_name": "create_log",
+    "parameters": [
+      {
+        "name": "payload",
+        "type": "LogPayload",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "openai_interaction.py",
+    "router_prefix": "/api/openai",
+    "path": "/response",
+    "full_path": "/api/openai/response",
+    "method": "POST",
+    "function_name": "save_response",
+    "parameters": [
+      {
+        "name": "payload",
+        "type": "ResponsePayload",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "overlays.py",
+    "router_prefix": "",
+    "path": "/api/overlay/sentinel2/{region_band}",
+    "full_path": "/api/overlay/sentinel2/{region_band}",
+    "method": "GET",
+    "function_name": "get_sentinel2_overlay_data",
+    "parameters": [
+      {
+        "name": "region_band",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "overlays.py",
+    "router_prefix": "",
+    "path": "/api/overlay/{processing_type}/{filename}",
+    "full_path": "/api/overlay/{processing_type}/{filename}",
+    "method": "GET",
+    "function_name": "get_overlay_data",
+    "parameters": [
+      {
+        "name": "processing_type",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      },
+      {
+        "name": "filename",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "overlays.py",
+    "router_prefix": "",
+    "path": "/api/overlay/raster/{region_name}/{processing_type}",
+    "full_path": "/api/overlay/raster/{region_name}/{processing_type}",
+    "method": "GET",
+    "function_name": "get_raster_overlay_data",
+    "parameters": [
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      },
+      {
+        "name": "processing_type",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "overlays.py",
+    "router_prefix": "",
+    "path": "/api/test-overlay/{filename}",
+    "full_path": "/api/test-overlay/{filename}",
+    "method": "GET",
+    "function_name": "get_test_overlay",
+    "parameters": [
+      {
+        "name": "filename",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "prompts.py",
+    "router_prefix": "",
+    "path": "/api/prompts/all",
+    "full_path": "/api/prompts/all",
+    "method": "GET",
+    "function_name": "get_all_prompts",
+    "parameters": []
+  },
+  {
+    "file": "region_management.py",
+    "router_prefix": "",
+    "path": "/api/list-regions",
+    "full_path": "/api/list-regions",
+    "method": "GET",
+    "function_name": "list_regions",
+    "parameters": [
+      {
+        "name": "source",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "region_management.py",
+    "router_prefix": "",
+    "path": "/api/get_spatial_metadata",
+    "full_path": "/api/get_spatial_metadata",
+    "method": "GET",
+    "function_name": "get_spatial_metadata",
+    "parameters": [
+      {
+        "name": "filePath",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "region_management.py",
+    "router_prefix": "",
+    "path": "/api/delete-region/{region_name}",
+    "full_path": "/api/delete-region/{region_name}",
+    "method": "DELETE",
+    "function_name": "delete_region",
+    "parameters": [
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "region_management.py",
+    "router_prefix": "",
+    "path": "/api/save-region-metadata",
+    "full_path": "/api/save-region-metadata",
+    "method": "POST",
+    "function_name": "save_region_metadata",
+    "parameters": [
+      {
+        "name": "data",
+        "type": "dict",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "saved_places.py",
+    "router_prefix": "",
+    "path": "/api/saved-places",
+    "full_path": "/api/saved-places",
+    "method": "GET",
+    "function_name": "get_saved_places",
+    "parameters": []
+  },
+  {
+    "file": "saved_places.py",
+    "router_prefix": "",
+    "path": "/api/saved-places",
+    "full_path": "/api/saved-places",
+    "method": "POST",
+    "function_name": "save_places",
+    "parameters": []
+  },
+  {
+    "file": "saved_places.py",
+    "router_prefix": "",
+    "path": "/api/saved-places/{place_id}",
+    "full_path": "/api/saved-places/{place_id}",
+    "method": "DELETE",
+    "function_name": "delete_saved_place",
+    "parameters": [
+      {
+        "name": "place_id",
+        "type": "str",
+        "kind": "path",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "saved_places.py",
+    "router_prefix": "",
+    "path": "/api/saved-places/export",
+    "full_path": "/api/saved-places/export",
+    "method": "GET",
+    "function_name": "export_saved_places",
+    "parameters": []
+  },
+  {
+    "file": "sentinel2.py",
+    "router_prefix": "",
+    "path": "/api/download-sentinel2",
+    "full_path": "/api/download-sentinel2",
+    "method": "POST",
+    "function_name": "download_sentinel2",
+    "parameters": [
+      {
+        "name": "request",
+        "type": "Sentinel2Request",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  },
+  {
+    "file": "sentinel2.py",
+    "router_prefix": "",
+    "path": "/api/convert-sentinel2",
+    "full_path": "/api/convert-sentinel2",
+    "method": "POST",
+    "function_name": "convert_sentinel2_images",
+    "parameters": [
+      {
+        "name": "region_name",
+        "type": "str",
+        "kind": "body",
+        "default": null
+      }
+    ]
+  }
+]

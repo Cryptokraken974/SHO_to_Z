@@ -11,18 +11,41 @@ from .base_service import BaseService, SyncServiceMixin
 class SatelliteService(BaseService, SyncServiceMixin):
     """Service for satellite data operations"""
     
-    async def download_sentinel2_data(self, latitude: float, longitude: float, start_date: str, 
-                                     end_date: str, bands: Optional[List[str]] = None, 
+    async def download_sentinel2_data(self,
+                                     start_date: str,
+                                     end_date: str,
+                                     latitude: Optional[float] = None, # Made optional
+                                     longitude: Optional[float] = None, # Made optional
+                                     bounding_box: Optional[Dict[str, float]] = None, # New parameter
+                                     bands: Optional[List[str]] = None,
                                      cloud_cover_max: Optional[float] = None,
                                      region_name: Optional[str] = None) -> Dict[str, Any]:
-        """Download Sentinel-2 data for specified coordinates and date range"""
+        """Download Sentinel-2 data for specified coordinates/bounding box and date range"""
         data = {
-            'latitude': latitude,
-            'longitude': longitude,
             'start_date': start_date,
             'end_date': end_date
         }
-        
+
+        if bounding_box and \
+           all(k in bounding_box for k in ["north", "south", "east", "west"])):
+            data['north_bound'] = bounding_box.get("north")
+            data['south_bound'] = bounding_box.get("south")
+            data['east_bound'] = bounding_box.get("east")
+            data['west_bound'] = bounding_box.get("west")
+        elif latitude is not None and longitude is not None:
+            data['latitude'] = latitude
+            data['longitude'] = longitude
+            # If buffer_km was also part of the Pydantic model and meant to be passed,
+            # it would be added here. Assuming for now it's handled by the endpoint's default
+            # if not part of an explicit bounding_box.
+        else:
+            # This service method now requires either bbox or lat/lng.
+            # The endpoint has primary responsibility for validation,
+            # but this service method could also raise an error.
+            # For now, assume the endpoint ensures one is passed.
+            # Consider raising ValueError here if neither is provided.
+            pass # Or raise ValueError("Either bounding_box or latitude/longitude must be provided to SatelliteService.download_sentinel2_data")
+
         if bands:
             data['bands'] = bands
         if cloud_cover_max is not None:
@@ -30,6 +53,15 @@ class SatelliteService(BaseService, SyncServiceMixin):
         if region_name is not None:
             data['region_name'] = region_name
         
+        # Assuming buffer_km is still part of the Sentinel2Request model on the endpoint
+        # and if not using explicit bounds, the endpoint calculates bbox using lat, lng, buffer_km.
+        # If buffer_km needs to be passed explicitly when lat/lng are used, add it here.
+        # For example, if the endpoint's Sentinel2Request still has buffer_km and it's not used to construct explicit bounds,
+        # it might be passed if lat/long are used:
+        # if 'latitude' in data and 'buffer_km_from_original_request_if_any' in original_params:
+        #    data['buffer_km'] = original_params['buffer_km_from_original_request_if_any']
+
+
         return await self._post('/api/download-sentinel2', json_data=data)
     
     async def convert_sentinel2_images(self, region_name: str) -> Dict[str, Any]:
