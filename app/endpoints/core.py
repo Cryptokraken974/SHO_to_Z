@@ -115,6 +115,12 @@ class Sentinel2Request(BaseModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     cloud_cover_max: Optional[float] = 30.0
+
+    # New fields for explicit bounding box
+    north_bound: Optional[float] = None
+    south_bound: Optional[float] = None
+    east_bound: Optional[float] = None
+    west_bound: Optional[float] = None
     
     def get_latitude(self) -> float:
         """Get latitude from either lat or latitude field"""

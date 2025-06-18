@@ -1,0 +1,32 @@
+[
+  {
+    "endpoint_path_matched": "/api/save-region-metadata",
+    "file": "frontend/js/metadataManager.js",
+    "line_number": 62,
+    "line_content": "const response = await fetch('/api/save-region-metadata', {"
+  },
+  {
+    "endpoint_path_matched": "/api/laz/upload",
+    "file": "frontend/js/geotiff-left-panel.js",
+    "line_number": 812,
+    "line_content": "const response = await fetch('/api/laz/upload', {"
+  },
+  {
+    "endpoint_path_matched": "/api/laz/process-all-rasters",
+    "file": "frontend/js/geotiff-left-panel.js",
+    "line_number": 1089,
+    "line_content": "const response = await fetch('/api/laz/process-all-rasters', {"
+  },
+  {
+    "endpoint_path_matched": "/api/laz/generate-metadata",
+    "file": "frontend/js/geotiff-left-panel.js",
+    "line_number": 1159,
+    "line_content": "const metadataResponse = await fetch('/api/laz/generate-metadata', {"
+  },
+  {
+    "endpoint_path_matched": "/api/laz/upload",
+    "file": "Tests/backend/test_multi_upload.py",
+    "line_number": 15,
+    "line_content": "response = client.post('/api/laz/upload', files=files)"
+  }
+]
