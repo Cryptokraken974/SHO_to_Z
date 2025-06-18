@@ -3,6 +3,32 @@
  * Coordinates all modules and initializes the application
  */
 
+async function loadModule(modulePath, targetElementId) {
+  try {
+    // Adjust path if necessary. Assuming /static/ maps to frontend/
+    const fetchPath = modulePath.startsWith('/') ? modulePath : `/static/${modulePath}`;
+    const response = await fetch(fetchPath);
+    if (!response.ok) {
+      throw new Error(`Failed to load module ${fetchPath}: ${response.statusText}`);
+    }
+    const html = await response.text();
+    const targetElement = document.getElementById(targetElementId);
+    if (targetElement) {
+      targetElement.innerHTML = html;
+      // Call the global initializer function after content is loaded
+      if (typeof window.initializeDynamicContent === 'function') {
+        // modulePath can serve as a hint for what was loaded.
+        // Or, a more specific contextName could be passed from where loadModule is called.
+        window.initializeDynamicContent(targetElement, modulePath);
+      }
+    } else {
+      console.error(`Target element ${targetElementId} not found for module ${fetchPath}`);
+    }
+  } catch (error) {
+    console.error(`Error loading module ${modulePath}:`, error);
+  }
+}
+
 // Import all modules (using script tags in HTML, but documented here for clarity)
 // - utils.js - Utility functions and helpers
 // - map.js - Map initialization and management
@@ -28,6 +54,13 @@ async function initializeApplication() {
   try {
     // Wait for DOM to be ready
     await waitForDOM();
+
+    // Load essential layout modules first
+    await loadModule('modules/header.html', 'header-placeholder');
+    await loadModule('modules/global-region-selector.html', 'global-region-selector-placeholder');
+    await loadModule('modules/tab-navigation.html', 'tab-nav-placeholder');
+    // Add other essential layout modules here if needed, e.g.:
+    // await loadModule('modules/modals.html', 'modals-placeholder');
     
     // Initialize modules in order
     await initializeModules();
@@ -40,6 +73,13 @@ async function initializeApplication() {
     
     // Mark as initialized
     SHOtoZ.initialized = true;
+
+    // Load default tab content (e.g., map tab)
+    if (window.UIManager && typeof UIManager.loadTabContent === 'function') {
+      await UIManager.loadTabContent('map');
+    } else {
+      console.error("UIManager.loadTabContent is not available to load default tab.");
+    }
     
     console.log('*** SHO to Z - Application Initialized Successfully ***');
     Utils.showNotification('Application initialized successfully', 'success', 2000);

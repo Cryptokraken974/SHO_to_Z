@@ -1,0 +1,141 @@
+<!-- LAZ File Browser Modal -->
+<div id="laz-file-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+  <div class="modal-content bg-[#1a1a1a] border border-[#303030] rounded-lg w-[90%] max-w-2xl">
+    <div class="modal-header flex justify-between items-center p-6 border-b border-[#303030]">
+      <h3 class="text-white text-lg font-semibold">Browse for LAZ Files</h3>
+      <button class="modal-close text-[#ababab] hover:text-white text-xl font-bold" id="laz-modal-close">&times;</button>
+    </div>
+    <div class="modal-body p-6">
+      <!-- File Upload Area -->
+      <div class="border-2 border-dashed border-[#404040] rounded-lg p-6 mb-4 text-center hover:border-[#00bfff] transition-colors" id="laz-drop-zone">
+        <div class="text-[#ababab] mb-4">
+          <i class="fas fa-cloud-upload-alt text-4xl mb-2"></i>
+          <p class="text-lg">Drop LAZ files here or click to browse</p>
+          <p class="text-sm mt-2">Supports .laz and .las files</p>
+        </div>
+        <input type="file" id="laz-file-input" accept=".laz,.las" multiple class="hidden">
+        <button id="browse-laz-btn" class="bg-[#8e44ad] hover:bg-[#7d3c98] text-white px-6 py-3 rounded-lg font-medium transition-colors">
+          <i class="fas fa-folder-open mr-2"></i>Browse Files
+        </button>
+      </div>
+
+      <!-- Selected Files List -->
+      <div id="selected-laz-files" class="mb-4">
+        <h4 class="text-white font-medium mb-2">Selected Files:</h4>
+        <div id="laz-files-list" class="space-y-2 max-h-[200px] overflow-y-auto">
+          <div class="text-[#666] text-sm text-center py-4">No files selected</div>
+        </div>
+      </div>
+
+      <!-- Progress Bar (hidden by default) -->
+      <div id="laz-progress-section" class="hidden mb-4">
+        <div class="text-white mb-2" id="laz-progress-status">Loading files...</div>
+        <div class="w-full bg-[#303030] rounded-full h-2">
+          <div class="bg-[#8e44ad] h-2 rounded-full transition-all duration-300" id="laz-progress-bar" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Raster Generation Progress Section (hidden by default) -->
+      <div id="laz-raster-progress-section" class="hidden">
+        <div class="border-t border-[#303030] pt-4 mt-4">
+          <h4 class="text-white font-medium mb-3">🏔️ Raster Generation Progress</h4>
+
+          <!-- Progress Indicator -->
+          <div class="bg-[#1a1a1a] rounded-lg p-3 space-y-2 mb-4">
+            <div class="flex justify-between items-center">
+              <span id="laz-current-processing-step" class="text-[#ababab] text-sm">Initializing...</span>
+              <span id="laz-processing-progress-text" class="text-[#ababab] text-sm">0%</span>
+            </div>
+            <div class="w-full bg-[#333] rounded-full h-2">
+              <div id="laz-processing-progress-bar" class="bg-[#8e44ad] h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Processing Queue Display -->
+          <div class="bg-[#1a1a1a] rounded-lg p-3">
+            <div class="text-[#ababab] text-sm mb-2">Processing Queue:</div>
+            <div class="grid grid-cols-4 gap-2 text-xs">
+              <!-- Individual Hillshades -->
+              <div id="laz-queue-hs-red" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                <div class="text-[#e74c3c]">🔴</div>
+                <div>HS Red</div>
+              </div>
+              <div id="laz-queue-hs-green" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                <div class="text-[#27ae60]">🟢</div>
+                <div>HS Green</div>
+              </div>
+              <div id="laz-queue-hs-blue" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                <div class="text-[#3498db]">🔵</div>
+                <div>HS Blue</div>
+              </div>
+              <!-- Other Rasters -->
+              <div id="laz-queue-slope" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                <div class="text-[#e17055]">📐</div>
+                <div>Slope</div>
+              </div>
+              <div id="laz-queue-aspect" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                <div class="text-[#00b894]">🧭</div>
+                <div>Aspect</div>
+              </div>
+              <div id="laz-queue-color-relief" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                <div class="text-[#f39c12]">🎨</div>
+                <div>Color Relief</div>
+              </div>
+              <div id="laz-queue-slope-relief" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                <div class="text-[#9b59b6]">🏔️</div>
+                <div>Slope Relief</div>
+              </div>
+              <div id="laz-queue-lrm" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                <div class="text-[#1abc9c]">📏</div>
+                <div>LRM</div>
+              </div>
+              <!-- Composite Products -->
+              <div id="laz-queue-hillshade-rgb" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                <div class="text-[#fdcb6e]">🌈</div>
+                <div>RGB Hillshade</div>
+              </div>
+              <div id="laz-queue-tint-overlay" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                <div class="text-[#e84393]">🎭</div>
+                <div>Tint Overlay</div>
+              </div>
+              <div id="laz-queue-boosted-hillshade" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                <div class="text-[#00cec9]">⚡</div>
+                <div>Boosted HS</div>
+              </div>
+              <!-- System Tasks -->
+              <div id="laz-queue-metadata" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                <div class="text-[#a29bfe]">📄</div>
+                <div>Metadata</div>
+              </div>
+              <div id="laz-queue-sentinel2" class="p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]">
+                <div class="text-[#00bfff]">🛰️</div>
+                <div>Sentinel-2</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Status Indicator -->
+          <div id="laz-raster-generation-status" class="text-xs text-[#666] mt-2">
+            <i class="fas fa-info-circle mr-1"></i>
+            <span id="laz-raster-status-text">Starting raster generation...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer flex justify-between gap-3 p-6 border-t border-[#303030]">
+      <button id="clear-laz-files" class="bg-[#dc3545] hover:bg-[#c82333] text-white px-4 py-2 rounded-lg font-medium transition-colors">
+        <i class="fas fa-trash mr-2"></i>Clear Files
+      </button>
+      <div class="flex gap-3">
+        <button id="cancel-laz-modal" class="cancel-btn modal-close bg-[#666] hover:bg-[#555] text-white px-4 py-2 rounded-lg font-medium transition-colors">Cancel</button>
+        <button id="load-laz-files" class="bg-[#8e44ad] hover:bg-[#7d3c98] text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+          <i class="fas fa-download mr-2"></i>Load Files
+        </button>
+        <!-- Cancel Raster Processing button (hidden by default) -->
+        <button id="cancel-laz-raster-processing" class="bg-[#dc3545] hover:bg-[#c82333] text-white px-4 py-2 rounded-lg font-medium transition-colors hidden">
+          ❌ Cancel Processing
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
