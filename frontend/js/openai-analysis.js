@@ -539,9 +539,21 @@ class OpenAIAnalysis {
         const modelSelect = document.getElementById('openai-model'); // Corrected ID
         const modelName = modelSelect ? modelSelect.value : 'gpt-4-vision-preview'; // Kept default as 'gpt-4-vision-preview'
 
-        const prompt = document.getElementById('prompt-display').value.trim();
-        if (!prompt) {
-            window.Utils?.showNotification('No prompt loaded', 'warning');
+        const promptPartsContainer = document.getElementById('dynamic-prompt-parts-container');
+        if (!promptPartsContainer) {
+            window.Utils?.showNotification('Prompt container not found', 'warning');
+            return;
+        }
+
+        const textareas = promptPartsContainer.querySelectorAll('.prompt-part-textarea');
+        let promptParts = [];
+        textareas.forEach(textarea => {
+            promptParts.push(textarea.value);
+        });
+        const prompt = promptParts.join('\n');
+
+        if (!prompt.trim()) {
+            window.Utils?.showNotification('No prompt content loaded or entered', 'warning');
             return;
         }
         const lat = parseFloat(document.getElementById('lat-input').value);
@@ -588,10 +600,58 @@ class OpenAIAnalysis {
 
     async loadPrompts() {
         try {
-            const data = await prompts().getAllPrompts();
-            document.getElementById('prompt-display').value = data.content;
+            const response = await prompts().getAllPrompts(); // Expects {"prompts": [{"title": "...", "content": "..."}, ...]}
+            const promptData = response.prompts;
+
+            const container = document.getElementById('dynamic-prompt-parts-container');
+            if (!container) {
+                console.error('Error: The div with ID "dynamic-prompt-parts-container" was not found in the DOM.');
+                // Attempt to create it dynamically as a fallback, though it should exist in HTML
+                // This is a fallback and ideally the HTML should be fixed.
+                // container = document.createElement('div');
+                // container.id = 'dynamic-prompt-parts-container';
+                // const promptDisplayArea = document.getElementById('prompt-display-area'); // Assuming this is a logical place to append
+                // if (promptDisplayArea) {
+                //     promptDisplayArea.appendChild(container);
+                //     console.warn('Dynamically created "dynamic-prompt-parts-container". Please ensure it exists in the HTML.');
+                // } else {
+                //     console.error('Fallback container creation failed: parent "prompt-display-area" not found.');
+                //     // Show a user-facing error if appropriate
+                //     window.Utils?.showNotification('UI error: Prompt display area not found.', 'error');
+                //     return; // Stop if we can't find/create the container
+                // }
+                // For this task, we assume the HTML will be updated, so we'll proceed as if it exists.
+                // If it doesn't, errors will occur, highlighting the missing HTML element.
+            }
+
+            container.innerHTML = ''; // Clear existing content
+
+            if (promptData && Array.isArray(promptData)) {
+                promptData.forEach((promptPart, index) => {
+                    const titleElement = document.createElement('h3');
+                    titleElement.textContent = promptPart.title;
+                    titleElement.classList.add('text-lg', 'font-semibold', 'mt-2', 'mb-1', 'text-white'); // Added some styling
+
+                    const textareaElement = document.createElement('textarea');
+                    textareaElement.value = promptPart.content;
+                    textareaElement.classList.add('prompt-part-textarea', 'w-full', 'p-2', 'border', 'border-gray-600', 'rounded-md', 'bg-gray-700', 'text-gray-200', 'h-48'); // Added some styling and h-48 for height
+                    textareaElement.dataset.promptTitle = promptPart.title; // Store title for potential future use
+                    textareaElement.id = `prompt-part-${index}`; // Unique ID
+
+                    container.appendChild(titleElement);
+                    container.appendChild(textareaElement);
+                });
+            } else {
+                console.error('Failed to load prompts or prompts data is not in the expected format:', response);
+                container.innerHTML = '<p class="text-red-500">Error loading prompts. See console for details.</p>';
+            }
         } catch (err) {
-            console.error('Failed to load prompts', err);
+            console.error('Failed to load prompts API:', err);
+            const container = document.getElementById('dynamic-prompt-parts-container');
+            if (container) {
+                 container.innerHTML = `<p class="text-red-500">Failed to fetch prompts: ${err.message}. Check API and network.</p>`;
+            }
+             window.Utils?.showNotification(`Failed to load prompts: ${err.message}`, 'error');
         }
     }
 

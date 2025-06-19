@@ -39,7 +39,12 @@
           </div>
           <div id="selected-region-names" class="text-[#ababab] text-sm mt-2">No regions selected</div>
         </div>
-        <textarea id="prompt-display" class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white mt-4 resize-none" rows="6" readonly></textarea>
+
+        <!-- Container for dynamically loaded prompt parts -->
+        <div id="dynamic-prompt-parts-container" class="space-y-4 my-4">
+          <!-- Prompt parts will be dynamically injected here by JavaScript -->
+        </div>
+
         <button id="send-to-openai" class="mt-2 bg-[#007bff] hover:bg-[#0056b3] text-white px-4 py-2 rounded font-medium transition-colors">Send to OpenAI</button>
 
         <!-- Dynamic region galleries -->
