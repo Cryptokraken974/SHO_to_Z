@@ -21,3 +21,39 @@
 .region-list li.dragging {
   opacity: 0.5;
 }
+
+/* Styles for dynamic prompt parts */
+#dynamic-prompt-parts-container {
+  /* The HTML structure uses "space-y-4 my-4" which handles spacing between parts.
+     Additional container-specific styling can be added here if needed. */
+}
+
+#dynamic-prompt-parts-container h3 {
+  color: #e0e0e0; /* Light gray text, consistent with text-white or text-gray-200 */
+  font-size: 1.125rem; /* Tailwind 'text-lg' */
+  font-weight: 600;    /* Tailwind 'font-semibold' */
+  /* margin-bottom: 0.25rem; Tailwind 'mb-1' */
+  /* margin-top: 0.5rem;    Tailwind 'mt-2' */
+  /* Tailwind classes are already applied by JS, these are here for explicitness if CSS is preferred source of truth */
+}
+
+#dynamic-prompt-parts-container .prompt-part-textarea {
+  width: 100%; /* Tailwind 'w-full' */
+  background-color: #374151; /* Tailwind 'bg-gray-700' */
+  border: 1px solid #4B5563; /* Tailwind 'border-gray-600' */
+  border-radius: 0.375rem; /* Tailwind 'rounded-md' (actually rounded-md is 0.375rem, rounded-lg is 0.5rem) */
+  padding: 0.5rem; /* Tailwind 'p-2' */
+  color: #D1D5DB; /* Tailwind 'text-gray-200' */
+  min-height: 120px; /* Overrides Tailwind h-48 (which is 12rem or 192px). Let's use a smaller min-height. e.g. 120px */
+  height: auto; /* Remove fixed height from Tailwind 'h-48' to allow min-height and resize to work properly */
+  resize: vertical; /* Allow vertical resizing */
+  box-sizing: border-box; /* Ensures padding and border don't add to width/height */
+  font-family: inherit; /* Ensures it uses the same font as the rest of the UI */
+  line-height: inherit; /* Ensures consistent line height */
+}
+
+#dynamic-prompt-parts-container .prompt-part-textarea:focus {
+  outline: none;
+  border-color: #00bfff; /* Highlight color on focus - standard for this app */
+  box-shadow: 0 0 0 1px #00bfff; /* Optional focus ring, consistent with other inputs */
+}
