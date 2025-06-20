@@ -2,7 +2,7 @@ class SatelliteOverlayGallery {
     constructor(containerId = 'satellite-gallery', options = {}) {
         this.containerId = containerId;
         this.options = Object.assign({
-            bands: ['RED_B04', 'NIR_B08', 'NDVI'],
+            bands: ['NDVI'], // Only load NDVI, not individual B04/B08 bands
             onAddToMap: (regionBand, bandType) => this.defaultAddToMap(regionBand, bandType)
         }, options);
 
@@ -46,7 +46,8 @@ class SatelliteOverlayGallery {
         const items = [];
 
         let apiRegionName = regionName;
-        if (!regionName.startsWith('region_')) {
+        // Only add region_ prefix for coordinate-based regions (contain dots)
+        if (!regionName.startsWith('region_') && regionName.includes('.')) {
             apiRegionName = `region_${regionName.replace(/\./g, '_')}`;
         }
 

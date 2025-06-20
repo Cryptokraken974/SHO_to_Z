@@ -191,6 +191,7 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
         
         print(f"📂 Region name: {region_name}")
         print(f"🔄 Processing type: {processing_type}")
+        print(f"🔍 Current working directory: {os.getcwd()}")
         
         # Map frontend processing types to backend processing types
         processing_type_mapping = {
@@ -201,6 +202,7 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
             "hillshadergb": "HillshadeRGB",  # Support direct mapping
             "tint_overlay": "TintOverlay",
             "tintoverlay": "TintOverlay",    # Support direct mapping
+            "ndvi": "NDVI",                  # Add NDVI support for Sentinel-2 in raster gallery
             "aspect": "Aspect",
             "dtm": "DTM",
             "dsm": "DSM",
@@ -217,11 +219,27 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
         backend_processing_type = processing_type_mapping.get(processing_type.lower(), processing_type.title())
         print(f"🔄 Mapped processing type: {processing_type} -> {backend_processing_type}")
         
+        # Check if the PNG file exists before calling the function
+        expected_png_path = f"output/{region_name}/lidar/png_outputs/{backend_processing_type}.png"
+        print(f"🔍 Checking expected PNG path: {expected_png_path}")
+        print(f"📁 PNG exists: {os.path.exists(expected_png_path)}")
+        
         # Use the updated geo_utils function that prioritizes metadata.txt
+        print(f"🔄 Calling get_laz_overlay_data({region_name}, {backend_processing_type})")
         overlay_data = get_laz_overlay_data(region_name, backend_processing_type)
+        print(f"🔍 Function returned: {overlay_data is not None}")
         
         if not overlay_data:
             print(f"❌ No overlay data found for {region_name}/{processing_type}")
+            # Debug: List available directories
+            output_base = f"output/{region_name}"
+            if os.path.exists(output_base):
+                available_dirs = [d for d in os.listdir(output_base) if os.path.isdir(os.path.join(output_base, d))]
+                print(f"🔍 Available directories in {output_base}: {available_dirs}")
+                png_dir = f"{output_base}/lidar/png_outputs"
+                if os.path.exists(png_dir):
+                    png_files = [f for f in os.listdir(png_dir) if f.endswith('.png')]
+                    print(f"🔍 Available PNG files in {png_dir}: {png_files}")
             return JSONResponse(
                 status_code=404,
                 content={"success": False, "error": f"No overlay data found for {processing_type} in region {region_name}"}

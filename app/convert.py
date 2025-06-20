@@ -164,29 +164,36 @@ def convert_geotiff_to_png(
                 consolidated_dir = os.path.join("output", region_name, "lidar", "png_outputs")
                 os.makedirs(consolidated_dir, exist_ok=True)
                 
-                base_tif_name = os.path.splitext(os.path.basename(tif_path))[0]
-                consolidated_png_name = f"{base_tif_name}.png"
-                consolidated_png_path = os.path.join(consolidated_dir, consolidated_png_name)
+                # Check if the PNG is already being created directly in png_outputs directory
+                png_normalized = os.path.normpath(png_path)
+                consolidated_normalized = os.path.normpath(consolidated_dir)
+                
+                if consolidated_normalized in png_normalized:
+                    print(f"ℹ️ PNG already in png_outputs directory, skipping duplicate consolidated copy: {png_path}")
+                else:
+                    base_tif_name = os.path.splitext(os.path.basename(tif_path))[0]
+                    consolidated_png_name = f"{base_tif_name}.png"
+                    consolidated_png_path = os.path.join(consolidated_dir, consolidated_png_name)
 
-                import shutil
-                shutil.copy2(png_path, consolidated_png_path)
+                    import shutil
+                    shutil.copy2(png_path, consolidated_png_path)
 
-                worldfile_ext = ".pgw"
-                worldfile_path = os.path.splitext(png_path)[0] + worldfile_ext
-                if not os.path.exists(worldfile_path):
-                    worldfile_ext = ".wld"
+                    worldfile_ext = ".pgw"
                     worldfile_path = os.path.splitext(png_path)[0] + worldfile_ext
+                    if not os.path.exists(worldfile_path):
+                        worldfile_ext = ".wld"
+                        worldfile_path = os.path.splitext(png_path)[0] + worldfile_ext
 
-                if os.path.exists(worldfile_path):
-                    consolidated_worldfile_path = os.path.splitext(consolidated_png_path)[0] + worldfile_ext
-                    shutil.copy2(worldfile_path, consolidated_worldfile_path)
+                    if os.path.exists(worldfile_path):
+                        consolidated_worldfile_path = os.path.splitext(consolidated_png_path)[0] + worldfile_ext
+                        shutil.copy2(worldfile_path, consolidated_worldfile_path)
 
-                consolidated_tiff_path = os.path.splitext(consolidated_png_path)[0] + "_source.tif"
-                if os.path.exists(tif_path) and not os.path.exists(consolidated_tiff_path) :
-                    # shutil.copy2(tif_path, consolidated_tiff_path)
-                    logger.info(f"Copied source TIF to consolidated: {consolidated_tiff_path}")
+                    consolidated_tiff_path = os.path.splitext(consolidated_png_path)[0] + "_source.tif"
+                    if os.path.exists(tif_path) and not os.path.exists(consolidated_tiff_path) :
+                        # shutil.copy2(tif_path, consolidated_tiff_path)
+                        logger.info(f"Copied source TIF to consolidated: {consolidated_tiff_path}")
 
-                print(f"✅ Copied PNG and associated files to consolidated directory: {consolidated_png_path}")
+                    print(f"✅ Copied PNG and associated files to consolidated directory: {consolidated_png_path}")
             except Exception as e_consol:
                 logger.warning(f"Failed to save PNG to consolidated directory for {tif_path}: {e_consol}", exc_info=True)
         
@@ -314,13 +321,10 @@ def convert_sentinel2_to_png(data_dir: str, region_name: str) -> dict:
             try:
                 base_name = latest_tif.stem
                 band_tif_path = output_dir / f"{base_name}_{file_suffix}.tif"
-                band_png_path = output_dir / f"{base_name}_{file_suffix}.png"
+                # Extract band TIF but don't create PNG for individual bands - only NDVI PNG will be generated
                 if extract_sentinel2_band(str(latest_tif), str(band_tif_path), band_num):
                     extracted_band_paths[band_name] = str(band_tif_path)
-                    actual_png_path = convert_geotiff_to_png(str(band_tif_path), str(band_png_path))
-                    if os.path.exists(actual_png_path):
-                        results['files'].append({'band': band_name, 'tif_path': str(band_tif_path), 'png_path': actual_png_path, 'size_mb': os.path.getsize(actual_png_path)/(1024*1024)})
-                    else: results['errors'].append(f"Failed to create PNG for {band_name}")
+                    print(f"✅ Extracted {band_name} band to {band_tif_path} (PNG will not be generated)")
                 else: results['errors'].append(f"Failed to extract {band_name} from {latest_tif.name}")
             except Exception as e_band: results['errors'].append(f"Error processing band {band_name}: {e_band}")
 
@@ -329,7 +333,11 @@ def convert_sentinel2_to_png(data_dir: str, region_name: str) -> dict:
                 from .processing.ndvi_processing import NDVIProcessor
                 ndvi_tif_path = output_dir / f"{latest_tif.stem}_NDVI.tif"
                 if NDVIProcessor().calculate_ndvi(extracted_band_paths["RED_B04"], extracted_band_paths["NIR_B08"], str(ndvi_tif_path)) and os.path.exists(ndvi_tif_path):
-                    ndvi_png_path = output_dir / f"{latest_tif.stem}_NDVI.png"
+                    # Create NDVI PNG in png_outputs directory for consistency
+                    png_outputs_dir = Path("output") / region_name / "lidar" / "png_outputs"
+                    png_outputs_dir.mkdir(parents=True, exist_ok=True)
+                    ndvi_png_path = png_outputs_dir / f"{latest_tif.stem}_NDVI.png"
+                    
                     actual_ndvi_png = convert_geotiff_to_png(str(ndvi_tif_path), str(ndvi_png_path))
                     if os.path.exists(actual_ndvi_png):
                         results['files'].append({'band': 'NDVI', 'tif_path': str(ndvi_tif_path), 'png_path': actual_ndvi_png, 'size_mb': os.path.getsize(actual_ndvi_png)/(1024*1024)})

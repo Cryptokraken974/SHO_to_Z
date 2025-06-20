@@ -210,28 +210,29 @@ def get_image_bounds_from_geotiff(tiff_path: str) -> Optional[Dict]:
                 print(f"🔍 Average transformed coordinates: lon={avg_lon}, lat={avg_lat}")
                 
                 # Check if the coordinate values are in the wrong positions
-                # For Amazon region (NP_T-0066), we expect:
-                # - Latitude around -8.37 (Amazon region, negative because south of equator)
-                # - Longitude around -71.57 (Amazon region, negative because west of Greenwich)
-                # If we're getting lat=-71.57 and lon=-8.37, they're clearly swapped
                 coords_swapped = False
                 
                 # Method 1: Check if longitude values are in typical latitude range while latitude values are extreme
                 if (abs(avg_lon) <= 90 and abs(avg_lat) > 90):
                     print("🔄 Coordinates appear to be swapped (longitude in lat position), correcting...")
                     coords_swapped = True
-                # Method 2: Check for logical geographic inconsistencies
-                # If avg_lon is in typical latitude range (-90 to 90) and avg_lat is in typical longitude range
-                # AND they seem to be in the wrong positions for the expected region
+                    
+                # Method 2: Oregon-specific detection - check if lon/lat are in wrong positions
+                # For Oregon: latitude should be ~42-46°N, longitude should be ~116-125°W
+                elif (40 <= avg_lon <= 50 and -130 <= avg_lat <= -115):
+                    print(f"🔄 Oregon coordinate swap detected: lon={avg_lon} (latitude range), lat={avg_lat} (longitude range)")
+                    print("🔄 Swapping because longitude is in latitude range and latitude is in longitude range")
+                    coords_swapped = True
+                    
+                # Method 3: General geographic inconsistency detection
                 elif (abs(avg_lon) <= 90 and abs(avg_lat) <= 180):
-                    # For regions we expect to be in certain areas, check if coordinates make sense
-                    # Amazon region should have lat around -8 and lon around -71
-                    # If we see "lat" around -71 and "lon" around -8, they're swapped
-                    if abs(avg_lat) > abs(avg_lon) * 5:  # If lat magnitude is much larger than lon magnitude
+                    # Check if lat/lon magnitudes suggest they're swapped
+                    if abs(avg_lat) > abs(avg_lon) * 2:  # If lat magnitude is much larger than lon magnitude
                         print(f"🔄 Geographic inconsistency detected: lat={avg_lat}, lon={avg_lon}")
                         print("🔄 Latitude magnitude much larger than longitude - likely swapped")
                         coords_swapped = True
-                # Method 3: Check for extreme longitude values
+                        
+                # Method 4: Check for extreme longitude values
                 elif (abs(avg_lat) > 180 or abs(avg_lon) > 180):
                     print("🔄 Extreme coordinate values detected, checking for swap...")
                     if abs(avg_lon) <= 90 and abs(avg_lat) > 90:
@@ -342,7 +343,8 @@ def get_laz_overlay_data(base_filename: str, processing_type: str, filename_proc
             'Hillshade': 'HillshadeRGB.png',
             'HillshadeRGB': 'HillshadeRGB.png',  # Support direct mapping
             'Tint_Overlay': 'TintOverlay.png',
-            'TintOverlay': 'TintOverlay.png'     # Support direct mapping
+            'TintOverlay': 'TintOverlay.png',    # Support direct mapping
+            'NDVI': None  # Special handling for NDVI - will use pattern matching
         }
         
         # Map processing types to their actual directory names and TIFF files
@@ -363,16 +365,32 @@ def get_laz_overlay_data(base_filename: str, processing_type: str, filename_proc
             # First check for new consolidated PNG names (LRM.png, SVF.png, etc.)
             if processing_type in consolidated_png_mapping:
                 consolidated_png_name = consolidated_png_mapping[processing_type]
-                consolidated_png_path = f"{png_outputs_dir}/{consolidated_png_name}"
-                if os.path.exists(consolidated_png_path):
-                    base_name = os.path.splitext(consolidated_png_name)[0]
-                    possible_paths.append({
-                        'png': consolidated_png_path,
-                        'tiff': f"{png_outputs_dir}/{base_name}.tif",
-                        'world': f"{png_outputs_dir}/{base_name}.wld",
-                        'desc': f'Consolidated PNG ({consolidated_png_name}) - NEW STANDARD'
-                    })
-                    print(f"✅ Found consolidated PNG: {consolidated_png_path}")
+                if consolidated_png_name is not None:  # Regular consolidated PNG
+                    consolidated_png_path = f"{png_outputs_dir}/{consolidated_png_name}"
+                    if os.path.exists(consolidated_png_path):
+                        base_name = os.path.splitext(consolidated_png_name)[0]
+                        possible_paths.append({
+                            'png': consolidated_png_path,
+                            'tiff': f"{png_outputs_dir}/{base_name}.tif",
+                            'world': f"{png_outputs_dir}/{base_name}.wld",
+                            'desc': f'Consolidated PNG ({consolidated_png_name}) - NEW STANDARD'
+                        })
+                        print(f"✅ Found consolidated PNG: {consolidated_png_path}")
+                elif processing_type == 'NDVI':  # Special NDVI handling
+                    import glob
+                    # Look for Sentinel-2 NDVI files with timestamp pattern
+                    ndvi_pattern = f"{png_outputs_dir}/{base_filename}_*_sentinel2_NDVI.png"
+                    ndvi_files = glob.glob(ndvi_pattern)
+                    if ndvi_files:
+                        ndvi_png_path = ndvi_files[0]  # Use first match
+                        base_name = os.path.splitext(os.path.basename(ndvi_png_path))[0]
+                        possible_paths.append({
+                            'png': ndvi_png_path,
+                            'tiff': f"{png_outputs_dir}/{base_name}.tif",
+                            'world': f"{png_outputs_dir}/{base_name}.wld",
+                            'desc': f'Sentinel-2 NDVI PNG - NEW STANDARD'
+                        })
+                        print(f"✅ Found Sentinel-2 NDVI PNG: {ndvi_png_path}")
             
             # Then check for old elevation pattern
             png_outputs_pattern = f"{png_outputs_dir}/{base_filename}_elevation_{processing_type_lower}.png"
@@ -550,70 +568,92 @@ def get_sentinel2_overlay_data_util(region_name: str, band_name: str) -> Optiona
         
         print(f"🔄 Converted region name: {region_name} -> {folder_region_name}")
         
-        # Construct paths for Sentinel-2 files using the correct folder format
-        # Structure: output/{folder_region_name}/sentinel2/{folder_region_name}_{timestamp}_sentinel2_{band_name}.png
-        output_dir = f"output/{folder_region_name}/sentinel2"
+        # Try multiple directory structures for Sentinel-2 files
+        search_dirs = [
+            f"output/{folder_region_name}/sentinel2",  # Standard Sentinel-2 directory
+            f"output/{folder_region_name}/lidar/png_outputs"  # PNG outputs directory (fallback)
+        ]
         
-        # Find actual files matching the pattern since they include timestamps
-        import glob
-        
-        # Pattern: {folder_region_name}_*_sentinel2_{band_name}.png OR {folder_region_name}_*_{band_name}.png (for NDVI)
-        if band_name == 'NDVI':
-            # NDVI files have pattern: {folder_region_name}_*_NDVI.png
-            png_pattern = f"{output_dir}/{folder_region_name}_*_{band_name}.png"
-            tiff_pattern = f"{output_dir}/{folder_region_name}_*_{band_name}.tif"
-        else:
-            # Regular bands have pattern: {folder_region_name}_*_sentinel2_{band_name}.png
-            png_pattern = f"{output_dir}/{folder_region_name}_*_sentinel2_{band_name}.png"
-            tiff_pattern = f"{output_dir}/{folder_region_name}_*_sentinel2_{band_name}.tif"
-        
-        print(f"📂 Output directory: {output_dir}")
-        print(f"🔍 PNG pattern: {png_pattern}")
-        print(f"🔍 TIFF pattern: {tiff_pattern}")
-        
-        png_files = glob.glob(png_pattern)
-        tiff_files = glob.glob(tiff_pattern)
-        
-        print(f"📁 Found PNG files: {png_files}")
-        print(f"📁 Found TIFF files: {tiff_files}")
-        
-        if png_files:
-            # Sort files by modification time to get the most recent
-            png_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-            png_path = png_files[0]  # Use the most recent file
-            # Derive world file path from PNG (replace .png with .wld)
-            world_path = png_path.replace('.png', '.wld')
-            # Use corresponding TIF file if available
-            if tiff_files:
-                # Find matching TIF file with same timestamp
-                png_basename = os.path.basename(png_path).replace('.png', '')
-                matching_tiff = next((tf for tf in tiff_files if png_basename in tf), tiff_files[0])
-                tiff_path = matching_tiff
-            else:
-                tiff_path = png_path.replace('.png', '.tif')
+        for output_dir in search_dirs:
+            print(f"📂 Checking directory: {output_dir}")
             
-            print(f"📄 Selected files from {len(png_files)} available PNG files")
-        else:
-            print(f"❌ No PNG files found matching pattern: {png_pattern}")
-            # Debug: List what files actually exist
-            if os.path.exists(output_dir):
-                files = os.listdir(output_dir)
-                print(f"🔍 Files in directory: {files}")
-                # Suggest available bands if any sentinel-2 files exist
-                s2_files = [f for f in files if ('sentinel2' in f or 'NDVI' in f) and f.endswith('.png')]
-                if s2_files:
-                    available_bands = set()
-                    for f in s2_files:
-                        if 'NDVI' in f:
-                            available_bands.add('NDVI')
-                        else:
-                            parts = f.split('_')
-                            if len(parts) >= 2:
-                                band = '_'.join(parts[-2:]).replace('.png', '')
-                                available_bands.add(band)
-                    print(f"💡 Available Sentinel-2 bands: {list(available_bands)}")
-            else:
+            if not os.path.exists(output_dir):
                 print(f"📂 Directory doesn't exist: {output_dir}")
+                continue
+            
+            # Find actual files matching the pattern since they include timestamps
+            import glob
+            
+            # Pattern variations for different file naming conventions
+            if band_name == 'NDVI':
+                # NDVI files can have multiple patterns:
+                patterns = [
+                    f"{output_dir}/{folder_region_name}_*_{band_name}.png",  # Standard: PRE_A05-01_20250528_NDVI.png
+                    f"{output_dir}/{folder_region_name}_*_sentinel2_{band_name}.png",  # With sentinel2: PRE_A05-01_20250528_sentinel2_NDVI.png
+                    f"{output_dir}/*_{band_name}.png"  # Fallback: any file ending with _NDVI.png
+                ]
+            else:
+                # Regular bands have pattern: {folder_region_name}_*_sentinel2_{band_name}.png
+                patterns = [
+                    f"{output_dir}/{folder_region_name}_*_sentinel2_{band_name}.png",
+                    f"{output_dir}/{folder_region_name}_*_{band_name}.png"
+                ]
+            
+            png_files = []
+            for pattern in patterns:
+                print(f"🔍 PNG pattern: {pattern}")
+                matches = glob.glob(pattern)
+                if matches:
+                    png_files.extend(matches)
+                    print(f"📁 Found PNG files: {matches}")
+                    break  # Use first successful pattern
+            
+            if png_files:
+                # Sort files by modification time to get the most recent
+                png_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)  
+                png_path = png_files[0]  # Use the most recent file
+                print(f"📄 Selected PNG: {png_path}")
+                
+                # For files in png_outputs, try TIFF in same directory first, then sentinel2 directory
+                if 'png_outputs' in output_dir:
+                    tiff_path = png_path.replace('.png', '.tif')
+                    if not os.path.exists(tiff_path):
+                        # Try sentinel2 directory for TIFF
+                        sentinel2_dir = f"output/{folder_region_name}/sentinel2"
+                        tiff_filename = os.path.basename(png_path).replace('.png', '.tif')
+                        tiff_path = f"{sentinel2_dir}/{tiff_filename}"
+                else:
+                    tiff_path = png_path.replace('.png', '.tif')
+                
+                # World file path
+                world_path = png_path.replace('.png', '.wld')
+                
+                print(f"🖼️  PNG path: {png_path}")
+                print(f"🗺️  TIFF path: {tiff_path}")
+                print(f"🌍 World file path: {world_path}")
+                break  # Found files, exit directory search loop
+                
+        else:
+            # No files found in any directory
+            print(f"❌ No PNG files found for {band_name} in any search directory")
+            # Debug: List what files actually exist
+            for output_dir in search_dirs:
+                if os.path.exists(output_dir):
+                    files = os.listdir(output_dir)
+                    print(f"🔍 Files in {output_dir}: {files}")
+                    # Suggest available bands if any sentinel-2 files exist
+                    s2_files = [f for f in files if ('sentinel2' in f or 'NDVI' in f) and f.endswith('.png')]
+                    if s2_files:
+                        available_bands = set()
+                        for f in s2_files:
+                            if 'NDVI' in f:
+                                available_bands.add('NDVI')
+                            else:
+                                parts = f.split('_')
+                                if len(parts) >= 2:
+                                    band = '_'.join(parts[-2:]).replace('.png', '')
+                                    available_bands.add(band)
+                        print(f"💡 Available Sentinel-2 bands in {output_dir}: {list(available_bands)}")
             return None
         
         print(f"🖼️  PNG path: {png_path}")
@@ -764,40 +804,44 @@ def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, proce
             print(f"✅ Using expected TIFF path: {tiff_path}")
         
         # PRIORITY: Try to get bounds from metadata.txt file first (most reliable)
-        metadata_center = _get_center_from_metadata(base_filename)
-        if metadata_center:
-            print(f"✅ Center coordinates from metadata.txt: {metadata_center}")
-            
-            # Try to get actual image bounds from world file using the correct center
-            bounds = None
-            if os.path.exists(world_path):
-                print("🗺️  Calculating actual image bounds from world file...")
-                # Get image dimensions from PNG
-                from PIL import Image
-                with Image.open(png_path) as img:
-                    width, height = img.size
-                print(f"📏 Image dimensions: {width}x{height}")
+        bounds = _get_bounds_from_metadata(base_filename)
+        if bounds:
+            print(f"✅ Using bounds from metadata.txt: {bounds}")
+        else:
+            # Fallback: Try to get center from metadata and calculate bounds
+            metadata_center = _get_center_from_metadata(base_filename)
+            if metadata_center:
+                print(f"✅ Center coordinates from metadata.txt: {metadata_center}")
                 
-                # Calculate bounds using world file transformation but validate with metadata center
-                bounds = get_image_bounds_from_world_file_with_center_validation(world_path, width, height, metadata_center)
-                if bounds:
-                    print(f"✅ Bounds from world file with metadata validation: {bounds}")
-                else:
-                    print("❌ Failed to extract bounds from world file with validation")
-            
-            # Fallback: use metadata center with reasonable buffer if world file fails
-            if not bounds:
-                print("📄 Using metadata center with image-based buffer...")
-                # Calculate buffer based on image dimensions (assume 1 meter per pixel as default)
+                # Try to get actual image bounds from world file using the correct center
                 if os.path.exists(world_path):
-                    world_data = read_world_file(world_path)
-                    if world_data:
-                        # Use actual pixel size from world file
-                        pixel_size_x = abs(world_data['pixel_size_x'])
-                        pixel_size_y = abs(world_data['pixel_size_y'])
-                        
-                        # Get image dimensions
-                        from PIL import Image
+                    print("🗺️  Calculating actual image bounds from world file...")
+                    # Get image dimensions from PNG
+                    from PIL import Image
+                    with Image.open(png_path) as img:
+                        width, height = img.size
+                    print(f"📏 Image dimensions: {width}x{height}")
+                    
+                    # Calculate bounds using world file transformation but validate with metadata center
+                    bounds = get_image_bounds_from_world_file_with_center_validation(world_path, width, height, metadata_center)
+                    if bounds:
+                        print(f"✅ Bounds from world file with metadata validation: {bounds}")
+                    else:
+                        print("❌ Failed to extract bounds from world file with validation")
+                
+                # Fallback: use metadata center with reasonable buffer if world file fails
+                if not bounds:
+                    print("📄 Using metadata center with image-based buffer...")
+                    # Calculate buffer based on image dimensions (assume 1 meter per pixel as default)
+                    if os.path.exists(world_path):
+                        world_data = read_world_file(world_path)
+                        if world_data:
+                            # Use actual pixel size from world file
+                            pixel_size_x = abs(world_data['pixel_size_x'])
+                            pixel_size_y = abs(world_data['pixel_size_y'])
+                            
+                            # Get image dimensions
+                            from PIL import Image
                         with Image.open(png_path) as img:
                             width, height = img.size
                         
@@ -830,18 +874,8 @@ def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, proce
                         }
                         print(f"✅ Using metadata center with fixed buffer: {bounds}")
                         
-        # Try to get bounds from original TIFF if metadata was found but world file wasn't successful
-        if metadata_center and not bounds and os.path.exists(original_tiff_path):
-            print(f"🗺️  Trying to extract bounds from original TIFF: {original_tiff_path}")
-            tiff_bounds = get_image_bounds_from_geotiff(original_tiff_path)
-            if tiff_bounds:
-                bounds = tiff_bounds
-                bounds['source'] = 'geotiff + metadata_center_validation'
-                print(f"✅ Using bounds from original TIFF: {bounds}")
-            else:
-                print("❌ Failed to extract bounds from original TIFF")
-        
-        else:
+        # Only try to get bounds from original TIFF if metadata was not found at all
+        if not bounds and not metadata_center:
             print("📄 No metadata.txt found, trying other methods...")
             
             # Fallback: Try to get bounds from GeoTIFF, then world file
@@ -878,6 +912,10 @@ def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, proce
                     print(f"✅ Bounds from world file: {bounds}")
                 else:
                     print("❌ Failed to extract bounds from world file")
+        elif bounds:
+            print(f"✅ Skipping TIFF/world file reading - already have bounds from metadata")
+        else:
+            print(f"✅ Skipping TIFF/world file reading - have metadata center, using calculated bounds")
             
         if not bounds:
             print("❌ No coordinate information found")
@@ -1142,6 +1180,10 @@ def correct_coordinate_order(source_srs, epsg_code, sw_lon, sw_lat, ne_lon, ne_l
         # This is common in many projected coordinate systems
         swap_needed = False
         
+        # Check average coordinates to detect swapping
+        avg_lon = (sw_lon + ne_lon + nw_lon + se_lon) / 4
+        avg_lat = (sw_lat + ne_lat + nw_lat + se_lat) / 4
+        
         if epsg_code:
             # EPSG codes that commonly use lat/lon order
             lat_lon_first_epsg = {4326}  # WGS84 geographic can vary by implementation
@@ -1154,6 +1196,17 @@ def correct_coordinate_order(source_srs, epsg_code, sw_lon, sw_lat, ne_lon, ne_l
                         swap_needed = True
                 except:
                     pass
+        
+        # Oregon-specific detection (EPSG:2992 - Oregon State Plane)
+        # For Oregon: latitude should be ~42-46°N, longitude should be ~116-125°W
+        if (40 <= avg_lon <= 50 and -130 <= avg_lat <= -115):
+            print(f"📐 Oregon coordinate swap detected in correction function: lon={avg_lon}, lat={avg_lat}")
+            swap_needed = True
+        
+        # General coordinate swap detection
+        elif (abs(avg_lon) <= 90 and abs(avg_lat) > 90):
+            print(f"📐 General coordinate swap detected: lon={avg_lon}, lat={avg_lat}")
+            swap_needed = True
         
         if swap_needed:
             print(f"📐 Swapping coordinate order for EPSG:{epsg_code}")
