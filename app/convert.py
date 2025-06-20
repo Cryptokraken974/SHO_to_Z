@@ -141,7 +141,7 @@ def convert_geotiff_to_png(
                 logger.error(f"Fatal: Could not ensure src_min < src_max for {tif_path}. Defaulting to 0-255 scale.")
             print(f"   Adjusted scale due to min>=max: Min={src_min:.2f}, Max={src_max:.2f}")
 
-        scale_options_list = ["-scale", str(src_min), str(src_max), "0", "255", "-ot", "Byte", "-co", "WORLDFILE=YES"]
+        scale_options_list = ["-scale", str(src_min), str(src_max), "0", "255", "-ot", "Byte", "-co", "WORLDFILE=NO"]
         if enhanced_resolution:
              print(f"ℹ️ 'enhanced_resolution=True' noted. Scale options already incorporate robust stretching.")
         
@@ -179,7 +179,7 @@ def convert_geotiff_to_png(
 
                 consolidated_tiff_path = os.path.splitext(consolidated_png_path)[0] + "_source.tif"
                 if os.path.exists(tif_path) and not os.path.exists(consolidated_tiff_path) :
-                    shutil.copy2(tif_path, consolidated_tiff_path)
+                    # shutil.copy2(tif_path, consolidated_tiff_path)
                     logger.info(f"Copied source TIF to consolidated: {consolidated_tiff_path}")
 
                 print(f"✅ Copied PNG and associated files to consolidated directory: {consolidated_png_path}")

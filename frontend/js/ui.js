@@ -25,6 +25,7 @@ window.UIManager = {
   // contextElement is the DOM element into which content was loaded.
   // contextName is a string (e.g., tab name or modal name) to identify the content.
   async initializeDynamicContent(contextElement, contextName) {
+    console.log('🔍 DEBUG: initializeDynamicContent called with contextName:', contextName);
     console.log(`UI: Initializing dynamic content for context: ${contextName} in element:`, contextElement);
 
     // General initializers
@@ -87,14 +88,25 @@ window.UIManager = {
         // this.initializeAnalysisTabEventHandlers(contextElement);
 
     } else if (contextName.includes('openai-analysis-tab-content.html')) {
-        if (window.OpenAIAnalysis && document.getElementById('openai-analysis-tab')) {
-            if (!window.openAIAnalysisInstance) window.openAIAnalysisInstance = new OpenAIAnalysis();
-            else {
-                window.openAIAnalysisInstance.setupEventListeners();
-                window.openAIAnalysisInstance.initializeGalleries();
+        console.log('🤖 OpenAI tab content detected - initializing...');
+        
+        // Clear any existing instance to ensure clean state
+        if (window.openAIAnalysisInstance) {
+            console.log('🤖 Clearing existing OpenAI Analysis instance');
+            window.openAIAnalysisInstance = null;
+        }
+        
+        // Always create/recreate the instance when dynamic content loads
+        if (window.OpenAIAnalysis) {
+            console.log('🤖 Creating OpenAI Analysis instance for dynamic content');
+            try {
+                window.openAIAnalysisInstance = new OpenAIAnalysis();
+                console.log('🤖 OpenAI Analysis instance created successfully');
+            } catch (error) {
+                console.error('🤖 Failed to create OpenAI Analysis instance:', error);
+                window.openAIAnalysisInstance = null;
             }
         }
-        // this.initializeOpenAITabEventHandlers(contextElement);
 
     } else if (contextName.includes('results-tab-content.html')) {
         this.initializeResultsTab();
@@ -168,6 +180,29 @@ window.UIManager = {
       $(e.currentTarget).addClass('active border-[#00bfff] text-white').removeClass('border-transparent text-[#ababab]');
 
       await this.loadTabContent(tabName);
+      
+      // Special handling for OpenAI Analysis tab - immediate loading without retries
+      if (tabName === 'openai-analysis') {
+        console.log('🤖 OpenAI Analysis tab activated - loading regions immediately');
+        
+        // Direct, immediate region loading without any delays or retries
+        if (window.openAIAnalysisInstance && typeof window.openAIAnalysisInstance.loadRegions === 'function') {
+          console.log('🤖 Loading regions immediately for OpenAI Analysis tab');
+          window.openAIAnalysisInstance.loadRegions();
+        } else if (window.OpenAIAnalysis) {
+          console.log('🤖 Creating OpenAI Analysis instance and loading regions immediately');
+          try {
+            window.openAIAnalysisInstance = new OpenAIAnalysis();
+            if (window.openAIAnalysisInstance && typeof window.openAIAnalysisInstance.loadRegions === 'function') {
+              window.openAIAnalysisInstance.loadRegions();
+            }
+          } catch (error) {
+            console.error('🤖 Failed to create OpenAI Analysis instance:', error);
+          }
+        } else {
+          console.warn('🤖 OpenAI Analysis class not available - tab will load without regions');
+        }
+      }
     });
 
     Utils.log('info', 'Tabs initialized');
@@ -178,6 +213,8 @@ window.UIManager = {
    * @param {string} tabName - Name of the tab to load
    */
   async loadTabContent(tabName) {
+    console.log('🔍 DEBUG: Loading tab content for:', tabName);
+    
     const mainContentPlaceholder = document.getElementById('main-content-placeholder');
     if (!mainContentPlaceholder) {
       console.error('Main content placeholder not found');
@@ -185,14 +222,29 @@ window.UIManager = {
       return;
     }
 
+    console.log('🔍 DEBUG: Found main content placeholder');
     mainContentPlaceholder.innerHTML = '<div class="loading-message text-center text-[#666] p-8">🔄 Loading tab content...</div>';
     const modulePath = `modules/${tabName}-tab-content.html`;
+    console.log('🔍 DEBUG: Module path:', modulePath);
 
     try {
       // loadModule (in app_new.js) now calls window.initializeDynamicContent itself after success.
+      console.log('🔍 DEBUG: About to call loadModule with path:', modulePath);
       await loadModule(modulePath, 'main-content-placeholder');
+      console.log('🔍 DEBUG: loadModule completed successfully');
+      
+      // Verify the content was loaded
+      const openaiTab = document.getElementById('openai-analysis-tab');
+      console.log('🔍 DEBUG: After loading, openai-analysis-tab found:', !!openaiTab);
+      if (openaiTab) {
+        const availableList = document.getElementById('available-region-list');
+        const selectedList = document.getElementById('selected-region-list');
+        console.log('🔍 DEBUG: Region lists found - available:', !!availableList, 'selected:', !!selectedList);
+      }
+      
       Utils.log('info', `Triggered loading for ${tabName} tab. Post-load initialization handled by initializeDynamicContent.`);
     } catch (error) {
+        console.error('🔍 DEBUG: Error in loadTabContent:', error);
         mainContentPlaceholder.innerHTML = `<div class="error-message text-center text-red-500 p-8">❌ Error loading ${tabName} tab. Check console for details.</div>`;
         console.error(`Error in loadTabContent for ${tabName}:`, error);
         Utils.showNotification(`Error loading ${tabName} tab.`, 'error');

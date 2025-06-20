@@ -18,6 +18,9 @@ class OpenAIAnalysis {
     
     init() {
         console.log('🤖 Initializing OpenAI Analysis module');
+        
+        // Initialize immediately without DOM checks or retries
+        console.log('✅ Proceeding with immediate initialization');
         this.setupEventListeners();
         this.initializeGalleries();
         this.loadPrompts();
@@ -600,33 +603,22 @@ class OpenAIAnalysis {
 
     async loadPrompts() {
         try {
+            console.log('📋 Loading prompts for OpenAI analysis...');
             const response = await prompts().getAllPrompts(); // Expects {"prompts": [{"title": "...", "content": "..."}, ...]}
             const promptData = response.prompts;
 
             const container = document.getElementById('dynamic-prompt-parts-container');
             if (!container) {
-                console.error('Error: The div with ID "dynamic-prompt-parts-container" was not found in the DOM.');
-                // Attempt to create it dynamically as a fallback, though it should exist in HTML
-                // This is a fallback and ideally the HTML should be fixed.
-                // container = document.createElement('div');
-                // container.id = 'dynamic-prompt-parts-container';
-                // const promptDisplayArea = document.getElementById('prompt-display-area'); // Assuming this is a logical place to append
-                // if (promptDisplayArea) {
-                //     promptDisplayArea.appendChild(container);
-                //     console.warn('Dynamically created "dynamic-prompt-parts-container". Please ensure it exists in the HTML.');
-                // } else {
-                //     console.error('Fallback container creation failed: parent "prompt-display-area" not found.');
-                //     // Show a user-facing error if appropriate
-                //     window.Utils?.showNotification('UI error: Prompt display area not found.', 'error');
-                //     return; // Stop if we can't find/create the container
-                // }
-                // For this task, we assume the HTML will be updated, so we'll proceed as if it exists.
-                // If it doesn't, errors will occur, highlighting the missing HTML element.
+                console.error('❌ Error: The div with ID "dynamic-prompt-parts-container" was not found in the DOM.');
+                console.error('❌ This indicates the OpenAI tab content was not properly loaded.');
+                return;
             }
 
             container.innerHTML = ''; // Clear existing content
+            console.log('✅ Prompt container found and cleared');
 
             if (promptData && Array.isArray(promptData)) {
+                console.log(`📋 Loading ${promptData.length} prompt parts...`);
                 promptData.forEach((promptPart, index) => {
                     const titleElement = document.createElement('h3');
                     titleElement.textContent = promptPart.title;
@@ -657,12 +649,26 @@ class OpenAIAnalysis {
 
     async loadRegions() {
         try {
-            const data = await regions().listRegions();
+            console.log('🔄 Loading regions for OpenAI analysis...');
+            
+            // Load regions directly using the input folder API call (matching "Select Region" button)
+            const data = await regions().listRegions('input');
+            console.log('📊 API response:', data);
+            
             this.availableRegions = (data.regions || []).map(r => r.name);
+            console.log('📋 Available regions:', this.availableRegions);
+            
             this.renderRegionLists();
             this.updateSelectedRegionsInfo();
+            
+            console.log('✅ Regions loaded successfully');
         } catch (err) {
-            console.error('Failed to load regions', err);
+            console.error('❌ Failed to load regions:', err);
+            // Show error in UI if elements exist
+            const availList = document.getElementById('available-region-list');
+            if (availList) {
+                availList.innerHTML = '<li class="text-red-400 p-2">Failed to load regions</li>';
+            }
         }
     }
 
@@ -733,7 +739,16 @@ class OpenAIAnalysis {
     renderRegionLists() {
         const availList = document.getElementById('available-region-list');
         const selList = document.getElementById('selected-region-list');
-        if (!availList || !selList) return;
+        
+        if (!availList || !selList) {
+            console.error('❌ Region list elements not found:');
+            console.error('   - available-region-list:', !!availList);
+            console.error('   - selected-region-list:', !!selList);
+            console.error('   - openai-analysis-tab:', !!document.getElementById('openai-analysis-tab'));
+            return;
+        }
+
+        console.log('✅ Found region list elements, rendering...');
 
         const createItem = (region, from) => {
             const li = document.createElement('li');
@@ -752,10 +767,16 @@ class OpenAIAnalysis {
         };
 
         availList.innerHTML = '';
-        this.availableRegions.forEach(r => availList.appendChild(createItem(r, 'available')));
+        this.availableRegions.forEach(r => {
+            availList.appendChild(createItem(r, 'available'));
+        });
 
         selList.innerHTML = '';
-        this.selectedRegions.forEach(r => selList.appendChild(createItem(r, 'selected')));
+        this.selectedRegions.forEach(r => {
+            selList.appendChild(createItem(r, 'selected'));
+        });
+        
+        console.log('✅ Region lists rendered with', this.availableRegions.length, 'available and', this.selectedRegions.length, 'selected regions');
     }
 
     moveToSelected(regions) {
@@ -781,9 +802,19 @@ class OpenAIAnalysis {
     }
 }
 
-// Initialize when DOM is ready
+// Make the class available globally
+window.OpenAIAnalysis = OpenAIAnalysis;
+
+// Initialize when DOM is ready (fallback for static content)
 document.addEventListener('DOMContentLoaded', () => {
-    if (document.getElementById('openai-analysis-tab')) {
-        window.openAIAnalysis = new OpenAIAnalysis();
+    console.log('🚨 DOMContentLoaded fired');
+    const openaiTab = document.getElementById('openai-analysis-tab');
+    console.log('🚨 Found openai-analysis-tab:', !!openaiTab);
+    
+    if (openaiTab) {
+        console.log('🚨 Creating OpenAI Analysis instance (static content)');
+        window.openAIAnalysisInstance = new OpenAIAnalysis();
+    } else {
+        console.log('🚨 No openai-analysis-tab found on DOMContentLoaded - will wait for dynamic loading');
     }
 });

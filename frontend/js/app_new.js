@@ -5,21 +5,38 @@
 
 async function loadModule(modulePath, targetElementId) {
   try {
+    console.log('🔍 DEBUG: loadModule called with:', modulePath, targetElementId);
     // Adjust path if necessary. Assuming /static/ maps to frontend/
     const fetchPath = modulePath.startsWith('/') ? modulePath : `/static/${modulePath}`;
+    console.log('🔍 DEBUG: Final fetch path:', fetchPath);
+    
     const response = await fetch(fetchPath);
+    console.log('🔍 DEBUG: Fetch response status:', response.status, response.statusText);
+    
     if (!response.ok) {
       throw new Error(`Failed to load module ${fetchPath}: ${response.statusText}`);
     }
     const html = await response.text();
+    console.log('🔍 DEBUG: HTML content length:', html.length);
+    console.log('🔍 DEBUG: HTML preview (first 200 chars):', html.substring(0, 200));
+    
     const targetElement = document.getElementById(targetElementId);
     if (targetElement) {
+      console.log('🔍 DEBUG: Found target element, setting innerHTML');
       targetElement.innerHTML = html;
+      
+      // Verify what was actually loaded
+      const openaiTab = document.getElementById('openai-analysis-tab');
+      console.log('🔍 DEBUG: After innerHTML, openai-analysis-tab exists:', !!openaiTab);
+      
       // Call the global initializer function after content is loaded
       if (typeof window.initializeDynamicContent === 'function') {
+        console.log('🔍 DEBUG: Calling initializeDynamicContent');
         // modulePath can serve as a hint for what was loaded.
         // Or, a more specific contextName could be passed from where loadModule is called.
         window.initializeDynamicContent(targetElement, modulePath);
+      } else {
+        console.error('🔍 DEBUG: initializeDynamicContent not available');
       }
     } else {
       console.error(`Target element ${targetElementId} not found for module ${fetchPath}`);
