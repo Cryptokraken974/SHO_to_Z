@@ -12,23 +12,36 @@ async def download_sentinel2(request: Sentinel2Request):
     from ..main import manager, settings
     
     try:
-        # Get coordinates using the helper methods
-        try:
-            lat = request.get_latitude()
-            lng = request.get_longitude()
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+        # Initialize lat/lng as None - they will be set later if needed
+        lat = None
+        lng = None
         
-        # Validate coordinates
-        if not (-90 <= lat <= 90):
-            raise HTTPException(status_code=400, detail=f"Invalid latitude: {lat}. Must be between -90 and 90.")
-        if not (-180 <= lng <= 180):
-            raise HTTPException(status_code=400, detail=f"Invalid longitude: {lng}. Must be between -180 and 180.")
+        # First check if we have bounding box coordinates (priority over lat/lng)
+        has_bbox = all([
+            request.north_bound is not None,
+            request.south_bound is not None,
+            request.east_bound is not None,
+            request.west_bound is not None
+        ])
         
-        # Check if coordinates are over land (basic validation)
-        # Reject obvious ocean areas where no meaningful data exists
-        if abs(lat) > 80:  # Arctic/Antarctic regions with limited coverage
-            raise HTTPException(status_code=400, detail=f"Coordinates {lat}, {lng} are in polar regions with limited Sentinel-2 coverage.")
+        # If no bounding box, try to get coordinates using the helper methods
+        if not has_bbox:
+            try:
+                lat = request.get_latitude()
+                lng = request.get_longitude()
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            
+            # Validate coordinates
+            if not (-90 <= lat <= 90):
+                raise HTTPException(status_code=400, detail=f"Invalid latitude: {lat}. Must be between -90 and 90.")
+            if not (-180 <= lng <= 180):
+                raise HTTPException(status_code=400, detail=f"Invalid longitude: {lng}. Must be between -180 and 180.")
+            
+            # Check if coordinates are over land (basic validation)
+            # Reject obvious ocean areas where no meaningful data exists
+            if abs(lat) > 80:  # Arctic/Antarctic regions with limited coverage
+                raise HTTPException(status_code=400, detail=f"Coordinates {lat}, {lng} are in polar regions with limited Sentinel-2 coverage.")
         
         import uuid
         from ..data_acquisition.sources.copernicus_sentinel2 import CopernicusSentinel2Source
@@ -40,9 +53,20 @@ async def download_sentinel2(request: Sentinel2Request):
         
         # Create progress callback that sends updates via WebSocket
         async def progress_callback(update):
+            coordinates = {}
+            if lat is not None and lng is not None:
+                coordinates = {"lat": lat, "lng": lng}
+            elif has_bbox:
+                coordinates = {
+                    "north": request.north_bound,
+                    "south": request.south_bound,
+                    "east": request.east_bound,
+                    "west": request.west_bound
+                }
+            
             await manager.send_progress_update({
                 "source": "copernicus_sentinel2",
-                "coordinates": {"lat": lat, "lng": lng},
+                "coordinates": coordinates,
                 "download_id": download_id,
                 **update
             })
@@ -60,11 +84,7 @@ async def download_sentinel2(request: Sentinel2Request):
 
         query_bbox: BoundingBox
 
-        if request.north_bound is not None and \
-           request.south_bound is not None and \
-           request.east_bound is not None and \
-           request.west_bound is not None:
-
+        if has_bbox:
             if request.north_bound <= request.south_bound or \
                request.east_bound <= request.west_bound:
                 raise HTTPException(status_code=400, detail="Invalid bounding box: North must be > South and East must be > West.")
@@ -78,7 +98,7 @@ async def download_sentinel2(request: Sentinel2Request):
             print(f"🗺️ Sentinel-2 Request (using provided BBox):")
             print(f"🔲 BBox: West={query_bbox.west:.4f}, South={query_bbox.south:.4f}, East={query_bbox.east:.4f}, North={query_bbox.north:.4f}")
 
-        elif lat is not None and lng is not None: # lat, lng should be defined from get_latitude/longitude calls
+        elif lat is not None and lng is not None:
             buffer_km = request.buffer_km # buffer_km has a default in Sentinel2Request
 
             # Calculate bounding box from center point and buffer (existing logic)

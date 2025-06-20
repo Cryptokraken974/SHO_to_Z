@@ -1,7 +1,7 @@
 """
 Satellite Service
 
-Handles satellite data operations including Sentinel-2 data acquisition and processing.
+Handles all satellite data operations including Sentinel-2 data acquisition and processing.
 """
 
 from typing import Dict, Any, Optional, List
@@ -27,7 +27,7 @@ class SatelliteService(BaseService, SyncServiceMixin):
         }
 
         if bounding_box and \
-           all(k in bounding_box for k in ["north", "south", "east", "west"])):
+           all(k in bounding_box for k in ["north", "south", "east", "west"]):
             data['north_bound'] = bounding_box.get("north")
             data['south_bound'] = bounding_box.get("south")
             data['east_bound'] = bounding_box.get("east")
