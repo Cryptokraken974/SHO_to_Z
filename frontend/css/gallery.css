@@ -6,24 +6,16 @@
   border-radius: 6px;
 }
 
-/* Gallery styling */
-#gallery {
-  scrollbar-width: thin;
-  scrollbar-color: #404040 #262626;
+/* Gallery styling - Grid layout instead of horizontal scroll */
+#gallery, #satellite-gallery, #raster-overlay-gallery {
+  width: 100%;
+  overflow: visible;
 }
-#gallery::-webkit-scrollbar {
-  height: 8px;
-}
-#gallery::-webkit-scrollbar-track {
-  background: #262626;
-  border-radius: 4px;
-}
-#gallery::-webkit-scrollbar-thumb {
-  background: #404040;
-  border-radius: 4px;
-}
-#gallery::-webkit-scrollbar-thumb:hover {
-  background: #555;
+
+/* Ensure gallery containers don't overflow */
+.modular-gallery {
+  width: 100%;
+  overflow: visible;
 }
 
 /* Processing result image styling */

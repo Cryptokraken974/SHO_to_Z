@@ -202,7 +202,6 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
             "hillshadergb": "HillshadeRGB",  # Support direct mapping
             "tint_overlay": "TintOverlay",
             "tintoverlay": "TintOverlay",    # Support direct mapping
-            "ndvi": "NDVI",                  # Add NDVI support for Sentinel-2 in raster gallery
             "aspect": "Aspect",
             "dtm": "DTM",
             "dsm": "DSM",

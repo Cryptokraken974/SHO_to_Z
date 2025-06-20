@@ -657,6 +657,11 @@ async def list_region_png_files(region_name: str):
         for png_file in png_files:
             filename = Path(png_file).name
             
+            # Skip NDVI files - they belong to satellite gallery, not raster overlay gallery
+            if "_NDVI.png" in filename or filename.endswith("_NDVI.png"):
+                print(f"⏭️ Skipping NDVI file (belongs to satellite gallery): {filename}")
+                continue
+            
             # Extract processing type from filename
             # Expected patterns: LRM.png, SVF.png, Slope.png, HillshadeRGB.png, TintOverlay.png
             processing_type = None

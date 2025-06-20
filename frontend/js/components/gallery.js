@@ -24,7 +24,7 @@ window.componentManager.register('gallery', (props = {}) => {
     return `
         <div class="mb-4">
             <h2 class="text-white text-lg font-semibold mb-4">${title}</h2>
-            <div id="gallery" class="flex gap-4 overflow-x-auto pb-4">
+            <div id="gallery" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 pb-4">
                 ${galleryItems.map(item => generateGalleryItem(item)).join('')}
             </div>
         </div>
@@ -40,7 +40,7 @@ window.componentManager.register('satellite-gallery', (props = {}) => {
     return `
         <div class="mb-4">
             <h2 class="text-white text-lg font-semibold mb-4">${title}</h2>
-            <div id="satellite-gallery" class="flex gap-4 overflow-x-auto pb-4">
+            <div id="satellite-gallery" class="pb-4">
                 <!-- Downloaded satellite images will be displayed here -->
             </div>
         </div>
@@ -56,14 +56,14 @@ window.componentManager.register('satellite-overlay-gallery', (props = {}) => {
     return `
         <div class="mb-4">
             <h2 class="text-white text-lg font-semibold mb-4">${title}</h2>
-            <div id="satellite-gallery" class="flex gap-4 overflow-x-auto pb-4"></div>
+            <div id="satellite-gallery" class="pb-4"></div>
         </div>
     `;
 });
 
 function generateGalleryItem(item) {
     return `
-        <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-${item.id}">
+        <div class="gallery-item w-full h-40 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-${item.id}">
             <div class="flex-1 flex items-center justify-center">
                 <div class="text-white text-lg font-medium">${item.label}</div>
             </div>
@@ -79,7 +79,7 @@ window.componentManager.register('raster-overlay-gallery', (props = {}) => {
     return `
         <div class="mb-4">
             <h2 class="text-white text-lg font-semibold mb-4">${title}</h2>
-            <div id="raster-overlay-gallery" class="flex gap-4 overflow-x-auto pb-4"></div>
+            <div id="raster-overlay-gallery" class="pb-4"></div>
         </div>
     `;
 });

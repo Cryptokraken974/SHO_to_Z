@@ -12,8 +12,8 @@ class ModularGallery {
             multipleSelection: options.multipleSelection || false,
             showAddToMap: options.showAddToMap || false,
             itemClass: options.itemClass || 'gallery-item',
-            itemWidth: options.itemWidth || 'w-64',
-            itemHeight: options.itemHeight || 'h-48',
+            itemWidth: options.itemWidth || 'w-full',  // Full width of grid cell
+            itemHeight: options.itemHeight || 'h-40',  // Slightly smaller height for better grid fit
             onSelectionChange: options.onSelectionChange || (() => {}),
             onAddToMap: options.onAddToMap || (() => {}),
             onImageClick: options.onImageClick || null,
@@ -216,8 +216,9 @@ class ModularGallery {
         
         const galleryHTML = this.items.map(item => this.renderItem(item)).join('');
         
+        // Use grid layout for full display without scrolling
         this.container.innerHTML = `
-            <div class="flex gap-4 overflow-x-auto pb-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 pb-4">
                 ${galleryHTML}
             </div>
         `;
@@ -284,7 +285,7 @@ class ModularGallery {
         }
         
         return `
-            <div class="${this.options.itemClass} flex-shrink-0 ${this.options.itemWidth} ${this.options.itemHeight} bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors relative" 
+            <div class="${this.options.itemClass} ${this.options.itemWidth} ${this.options.itemHeight} bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors relative" 
                  data-item-id="${id}">
                 ${this.options.allowSelection ? `
                     <div class="gallery-item-selector absolute top-2 right-2 w-6 h-6 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white text-sm cursor-pointer z-10">
