@@ -13,10 +13,13 @@
           <p class="text-lg">Drop LAZ files here or click to browse</p>
           <p class="text-sm mt-2">Supports .laz and .las files</p>
         </div>
-        <input type="file" id="laz-file-input" accept=".laz,.las" multiple class="hidden">
-        <button id="browse-laz-btn" class="bg-[#8e44ad] hover:bg-[#7d3c98] text-white px-6 py-3 rounded-lg font-medium transition-colors">
+        <!-- File input styled as button -->
+        <label for="laz-file-input" class="inline-block bg-[#8e44ad] hover:bg-[#7d3c98] text-white px-6 py-3 rounded-lg font-medium transition-colors cursor-pointer">
           <i class="fas fa-folder-open mr-2"></i>Browse Files
-        </button>
+        </label>
+        <input type="file" id="laz-file-input" accept=".laz,.las" multiple class="hidden">
+        <!-- Backup button for programmatic access -->
+        <button id="browse-laz-btn" class="hidden">Hidden Browse Button</button>
       </div>
 
       <!-- Selected Files List -->

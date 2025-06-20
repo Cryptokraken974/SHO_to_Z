@@ -459,6 +459,14 @@ class GeoTiffLeftPanel {
     }
 
     setupLazModalEvents() {
+        // Prevent setting up events multiple times
+        if (this.lazModalEventsSetup) {
+            console.log('📂 LAZ modal events already set up, skipping...');
+            return;
+        }
+
+        console.log('📂 Setting up LAZ modal events...');
+        
         const modal = document.getElementById('laz-file-modal');
         const closeBtn = document.getElementById('laz-modal-close');
         const cancelBtn = document.getElementById('cancel-laz-modal');
@@ -468,10 +476,14 @@ class GeoTiffLeftPanel {
         const clearBtn = document.getElementById('clear-laz-files');
         const loadBtn = document.getElementById('load-laz-files');
 
-        // Close modal events
+        // Close modal events - use unique handler to prevent conflicts
         [closeBtn, cancelBtn].forEach(btn => {
             if (btn) {
-                btn.addEventListener('click', () => this.closeLazFileModal());
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.closeLazFileModal();
+                });
             }
         });
 
@@ -479,23 +491,45 @@ class GeoTiffLeftPanel {
         if (modal) {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
+                    e.preventDefault();
+                    e.stopPropagation();
                     this.closeLazFileModal();
                 }
             });
         }
 
-        // Browse button
-        if (browseBtn) {
+        // Browse button - prevent conflicts with drop zone
+        if (browseBtn && fileInput) {
+            console.log('📂 Setting up browse button event listener...');
             browseBtn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent event bubbling to drop zone
-                if (fileInput) fileInput.click();
+                // Don't prevent default for browse button - let it work naturally
+                e.stopPropagation(); // Still stop propagation to prevent conflicts
+                console.log('📂 Browse button clicked, opening file dialog...');
+                console.log('📂 File input element:', fileInput);
+                console.log('📂 File input type:', fileInput.type);
+                console.log('📂 File input accept:', fileInput.accept);
+                try {
+                    fileInput.click();
+                    console.log('📂 File input click() called successfully');
+                } catch (error) {
+                    console.error('📂 Error calling fileInput.click():', error);
+                }
+            });
+            console.log('📂 Browse button event listener set up successfully');
+        } else {
+            console.error('📂 Browse button or file input not found!', {
+                browseBtn: browseBtn,
+                fileInput: fileInput
             });
         }
 
-        // File input change
+        // File input change - this is the critical event
         if (fileInput) {
             fileInput.addEventListener('change', (e) => {
-                this.handleLazFileSelection(e.target.files);
+                console.log('📂 File input changed, files selected:', e.target.files.length);
+                if (e.target.files.length > 0) {
+                    this.handleLazFileSelection(e.target.files);
+                }
             });
         }
 
@@ -513,14 +547,19 @@ class GeoTiffLeftPanel {
 
             dropZone.addEventListener('drop', (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 dropZone.classList.remove('border-[#00bfff]');
+                console.log('📂 Files dropped, processing...');
                 this.handleLazFileSelection(e.dataTransfer.files);
             });
 
-            // Click on drop zone to browse (but not on child elements like the button)
+            // Click on drop zone to browse - but prevent conflicts with browse button
             dropZone.addEventListener('click', (e) => {
-                // Only trigger if clicking directly on the drop zone or its text, not on the button
-                if (e.target === dropZone || (e.target.closest('#laz-drop-zone') && !e.target.closest('#browse-laz-btn'))) {
+                // Only trigger if clicking directly on the drop zone text, not on the button
+                if (e.target === dropZone || (e.target.classList.contains('text-lg') && e.target.textContent.includes('Drop LAZ files'))) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('📂 Drop zone clicked, opening file dialog...');
                     if (fileInput) fileInput.click();
                 }
             });
@@ -528,13 +567,23 @@ class GeoTiffLeftPanel {
 
         // Clear files button
         if (clearBtn) {
-            clearBtn.addEventListener('click', () => this.clearLazFiles());
+            clearBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.clearLazFiles();
+            });
         }
 
         // Load files button
         if (loadBtn) {
-            loadBtn.addEventListener('click', () => this.loadLazFiles());
+            loadBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.loadLazFiles();
+            });
         }
+
+        // Mark as set up to prevent duplicates
+        this.lazModalEventsSetup = true;
+        console.log('📂 LAZ modal events setup complete');
     }
 
     async openLazFileModal(clear = true) { // Made async
@@ -546,8 +595,28 @@ class GeoTiffLeftPanel {
 
         const modal = document.getElementById('laz-file-modal'); // Get from placeholder after loading
         if (modal) {
+            console.log('📂 Modal found, setting up events...');
+            
+            // Reset the flag to allow re-setup since modal was reloaded
+            this.lazModalEventsSetup = false;
+            
             // Call setup for its internal events AFTER it's in the DOM
             this.setupLazModalEvents(); // This function binds events to elements within #laz-file-modal
+
+            // Add a small delay to ensure DOM is fully ready
+            setTimeout(() => {
+                const browseBtn = document.getElementById('browse-laz-btn');
+                const fileInput = document.getElementById('laz-file-input');
+                console.log('📂 After setup - Browse button:', browseBtn);
+                console.log('📂 After setup - File input:', fileInput);
+                
+                // Test the browse button functionality
+                if (browseBtn && fileInput) {
+                    console.log('📂 Browse button and file input are accessible');
+                } else {
+                    console.error('📂 Browse button or file input not found after setup!');
+                }
+            }, 100);
 
             modal.classList.remove('hidden'); // Show the modal
             $(modal).fadeIn(); // Or use jQuery if preferred for consistency
@@ -891,9 +960,20 @@ class GeoTiffLeftPanel {
                     // Wait briefly for region setup
                     await new Promise(resolve => setTimeout(resolve, 1000));
 
-                    this.updateLazProgress(100 * (i / loadedFiles.length), `Processing ${fileName} (${i + 1}/${loadedFiles.length})`);
+                    this.updateLazProgress(100 * (i / loadedFiles.length), `Generating DTM for ${fileName} (${i + 1}/${loadedFiles.length})`);
 
-                    // Show progress UI
+                    // Step 1: Generate DTM from LAZ file
+                    const dtmSuccess = await this.generateDTMFromLAZ(regionName, fileName);
+                    
+                    if (!dtmSuccess) {
+                        console.warn(`⚠️ DTM generation failed for ${regionName}`);
+                        this.updateLazProgress(100 * ((i + 1) / loadedFiles.length), `DTM Failed ${fileName} (${i + 1}/${loadedFiles.length})`);
+                        continue; // Skip to next file
+                    }
+
+                    this.updateLazProgress(100 * (i / loadedFiles.length), `Processing rasters for ${fileName} (${i + 1}/${loadedFiles.length})`);
+
+                    // Step 2: Show progress UI and process all rasters
                     this.showLazRasterProgress(true);
 
                     const success = await this.processAllRastersWithLazModalProgress();
@@ -928,6 +1008,37 @@ class GeoTiffLeftPanel {
             setTimeout(() => {
                 this.closeLazFileModal();
             }, 3000);
+        }
+    }
+
+    async generateDTMFromLAZ(regionName, fileName) {
+        console.log(`🏔️ Generating DTM for region: ${regionName}, file: ${fileName}`);
+        
+        try {
+            const formData = new FormData();
+            formData.append('region_name', regionName);
+            formData.append('processing_type', 'lidar'); // or appropriate processing type
+            formData.append('dtm_resolution', '1.0');
+            formData.append('stretch_type', 'stddev');
+
+            const response = await fetch('/api/dtm', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`DTM generation failed: ${response.status} - ${errorText}`);
+                return false;
+            }
+
+            const result = await response.json();
+            console.log(`✅ DTM generated successfully for ${regionName}`);
+            return true;
+
+        } catch (error) {
+            console.error(`❌ DTM generation error for ${regionName}:`, error);
+            return false;
         }
     }
 
@@ -1099,6 +1210,10 @@ class GeoTiffLeftPanel {
             { type: 'tint_overlay', name: 'Tint Overlay', icon: '🎭' },
             { type: 'boosted_hillshade', name: 'Boosted HS', icon: '⚡' }
         ];
+
+        // Initialize variables for tracking processing results
+        let successCount = 0;
+        let failedProcesses = [];
 
         try {
             // Initialize LAZ modal progress display
@@ -1302,9 +1417,5 @@ class GeoTiffLeftPanel {
     }
 }
 
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    if (document.getElementById('geotiff-tools-tab')) {
-        window.geoTiffLeftPanel = new GeoTiffLeftPanel();
-    }
-});
+// Export for use by other modules
+window.GeoTiffLeftPanel = GeoTiffLeftPanel;

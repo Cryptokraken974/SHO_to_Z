@@ -289,6 +289,7 @@ function restartApplication() {
 window.SHOtoZ = SHOtoZ;
 window.getApplicationStatus = getApplicationStatus;
 window.restartApplication = restartApplication;
+window.loadModule = loadModule; // Make loadModule globally available
 
 // jQuery document ready - start the application
 $(function () {

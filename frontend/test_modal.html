@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Modal Test</title>
+</head>
+<body>
+    <div id="modals-placeholder"></div>
+    <button id="test-btn">Test Load Modal</button>
+    
+    <script>
+        // Mock loadModule function for testing
+        async function loadModule(modulePath, targetElementId) {
+            console.log('Testing loadModule:', modulePath, targetElementId);
+            try {
+                const response = await fetch(`/static/${modulePath}`);
+                const html = await response.text();
+                document.getElementById(targetElementId).innerHTML = html;
+                console.log('Modal loaded successfully');
+                return true;
+            } catch (error) {
+                console.error('Error loading modal:', error);
+                return false;
+            }
+        }
+        
+        // Make it global
+        window.loadModule = loadModule;
+        
+        document.getElementById('test-btn').addEventListener('click', async () => {
+            console.log('Testing modal load...');
+            await loadModule('modules/modals/laz-file-modal.html', 'modals-placeholder');
+            
+            const modal = document.getElementById('laz-file-modal');
+            if (modal) {
+                console.log('Modal found:', modal);
+                modal.classList.remove('hidden');
+                modal.style.display = 'flex';
+            } else {
+                console.error('Modal not found after load');
+            }
+        });
+    </script>
+</body>
+</html>

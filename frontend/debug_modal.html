@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Modal Test</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body { background: #141414; color: white; font-family: Arial; padding: 20px; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: #1a1a1a; border: 1px solid #303030; border-radius: 8px; padding: 20px; max-width: 500px; width: 90%; }
+        .hidden { display: none !important; }
+        .btn { background: #8e44ad; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        .btn:hover { background: #7d3c98; }
+        #drop-zone { border: 2px dashed #404040; padding: 30px; text-align: center; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>Modal Debug Test</h1>
+    <button id="open-modal" class="btn">Open Modal</button>
+
+    <div id="test-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Test Modal</h2>
+            <div id="drop-zone">
+                <p>Drop LAZ files here or click to browse</p>
+                <input type="file" id="file-input" accept=".laz,.las" multiple style="display: none;">
+                <button id="browse-btn" class="btn">Browse Files</button>
+            </div>
+            <div>
+                <button id="close-modal" class="btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('Debug script loaded');
+        
+        document.getElementById('open-modal').addEventListener('click', function() {
+            console.log('Opening modal...');
+            document.getElementById('test-modal').classList.remove('hidden');
+            setupModalEvents();
+        });
+
+        document.getElementById('close-modal').addEventListener('click', function() {
+            console.log('Closing modal...');
+            document.getElementById('test-modal').classList.add('hidden');
+        });
+
+        function setupModalEvents() {
+            console.log('Setting up modal events...');
+            
+            const browseBtn = document.getElementById('browse-btn');
+            const fileInput = document.getElementById('file-input');
+            
+            console.log('Browse button:', browseBtn);
+            console.log('File input:', fileInput);
+            
+            if (browseBtn && fileInput) {
+                // Remove existing listeners first
+                browseBtn.removeEventListener('click', handleBrowseClick);
+                browseBtn.addEventListener('click', handleBrowseClick);
+                
+                fileInput.addEventListener('change', function(e) {
+                    console.log('Files selected:', e.target.files.length);
+                    Array.from(e.target.files).forEach(file => {
+                        console.log('File:', file.name);
+                    });
+                });
+            } else {
+                console.error('Browse button or file input not found!');
+            }
+        }
+        
+        function handleBrowseClick(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Browse button clicked!');
+            
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) {
+                console.log('Triggering file input click...');
+                fileInput.click();
+            } else {
+                console.error('File input not found when trying to click!');
+            }
+        }
+    </script>
+</body>
+</html>

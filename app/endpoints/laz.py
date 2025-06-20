@@ -1863,12 +1863,21 @@ async def process_all_laz_rasters(
         logger.info(f"🚀 Processing all rasters for LAZ region: {region_name}, file: {file_name}")
         
         # Build the path to the elevation TIFF that should have been created from the LAZ
-        # Expected structure: output/<region>/lidar/DTM/<region>_DTM.tiff
-        dtm_tiff_path = BASE_DIR / "output" / region_name / "lidar" / "DTM" / f"{region_name}_DTM.tiff"
+        # Expected structure: output/<region>/lidar/DTM/filled/<file_stem>_DTM_<resolution>m_csf<csf_res>m_filled.tif
+        file_stem = Path(file_name).stem
+        dtm_tiff_path = BASE_DIR / "output" / region_name / "lidar" / "DTM" / "filled" / f"{file_stem}_DTM_1.0m_csf1.0m_filled.tif"
         
         if not dtm_tiff_path.exists():
-            # Try alternative naming conventions
+            # Try alternative naming conventions and locations
             alt_paths = [
+                # Try different resolution patterns
+                BASE_DIR / "output" / region_name / "lidar" / "DTM" / "filled" / f"{file_stem}_DTM_1.0m_csf1.0m_filled.tif",
+                BASE_DIR / "output" / region_name / "lidar" / "DTM" / "raw" / f"{file_stem}_DTM_1.0m_csf1.0m_raw.tif",
+                # Try any DTM file in the DTM directories
+                *list((BASE_DIR / "output" / region_name / "lidar" / "DTM" / "filled").glob("*_DTM_*.tif")),
+                *list((BASE_DIR / "output" / region_name / "lidar" / "DTM" / "raw").glob("*_DTM_*.tif")),
+                # Legacy patterns
+                BASE_DIR / "output" / region_name / "lidar" / "DTM" / f"{region_name}_DTM.tiff",
                 BASE_DIR / "output" / region_name / "lidar" / f"{region_name}_DTM.tiff",
                 BASE_DIR / "output" / region_name / f"{region_name}_DTM.tiff",
                 BASE_DIR / "input" / region_name / "lidar" / f"{region_name}_DTM.tiff"
@@ -1894,10 +1903,18 @@ async def process_all_laz_rasters(
             # This could be enhanced to send WebSocket updates to the frontend
             logger.info(f"Processing progress: {progress_data}")
         
+        # Create a simple request object with region name to ensure proper output folder structure
+        class SimpleRequest:
+            def __init__(self, region_name):
+                self.region_name = region_name
+        
+        request_obj = SimpleRequest(region_name)
+        
         # Process all raster products
         processing_results = await process_all_raster_products(
             str(dtm_tiff_path), 
-            progress_callback=progress_callback
+            progress_callback=progress_callback,
+            request=request_obj
         )
         
         logger.info(f"✅ Completed processing all rasters for {region_name}")

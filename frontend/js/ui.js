@@ -60,9 +60,12 @@ window.UIManager = {
 
     } else if (contextName.includes('geotiff-tools-tab-content.html')) {
         if (window.GeoTiffLeftPanel && document.getElementById('geotiff-sidebar')) {
-            if (!window.geoTiffLeftPanelInstance) window.geoTiffLeftPanelInstance = new GeoTiffLeftPanel();
-            // GeoTiffLeftPanel's constructor calls init. Re-calling init might be needed if DOM is replaced.
-            else window.geoTiffLeftPanelInstance.init();
+            if (!window.geoTiffLeftPanelInstance) {
+                window.geoTiffLeftPanelInstance = new GeoTiffLeftPanel();
+            } else {
+                // Re-initialize event listeners for newly loaded DOM elements
+                window.geoTiffLeftPanelInstance.init();
+            }
         }
         if (window.GeoTiffMainCanvas && document.getElementById('geotiff-main-canvas')) {
              if (!window.geoTiffMainCanvasInstance) window.geoTiffMainCanvasInstance = new GeoTiffMainCanvas();
