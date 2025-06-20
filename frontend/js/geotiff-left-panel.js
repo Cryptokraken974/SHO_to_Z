@@ -5,6 +5,10 @@ class GeoTiffLeftPanel {
         this.fileTree = [];
         this.selectedLazFiles = [];
         this.selectedLazFolders = [];
+        this.fileModalLoading = false;
+        this.folderModalLoading = false;
+        this.lazModalEventsSetup = false;
+        this.lazFolderModalEventsSetup = false;
         this.init();
     }
 
@@ -36,13 +40,41 @@ class GeoTiffLeftPanel {
         // LAZ file loader
         const loadLazBtn = document.getElementById('load-laz-btn');
         if (loadLazBtn) {
-            loadLazBtn.addEventListener('click', () => this.openLazFileModal());
+            loadLazBtn.addEventListener('click', () => {
+                // Prevent double-clicks while modal is loading
+                if (this.fileModalLoading) {
+                    console.log('📂 File modal already loading, ignoring click');
+                    return;
+                }
+                this.fileModalLoading = true;
+                
+                this.openLazFileModal().finally(() => {
+                    // Reset loading flag after a delay
+                    setTimeout(() => {
+                        this.fileModalLoading = false;
+                    }, 1000);
+                });
+            });
         }
 
         // LAZ folder loader
         const loadLazFolderBtn = document.getElementById('load-laz-folder-btn');
         if (loadLazFolderBtn) {
-            loadLazFolderBtn.addEventListener('click', () => this.openLazFolderModal());
+            loadLazFolderBtn.addEventListener('click', () => {
+                // Prevent double-clicks while modal is loading
+                if (this.folderModalLoading) {
+                    console.log('📂 Folder modal already loading, ignoring click');
+                    return;
+                }
+                this.folderModalLoading = true;
+                
+                this.openLazFolderModal().finally(() => {
+                    // Reset loading flag after a delay
+                    setTimeout(() => {
+                        this.folderModalLoading = false;
+                    }, 1000);
+                });
+            });
         }
 
         // Setup LAZ modal events
@@ -476,8 +508,27 @@ class GeoTiffLeftPanel {
         const clearBtn = document.getElementById('clear-laz-files');
         const loadBtn = document.getElementById('load-laz-files');
 
+        // Remove any existing event listeners first to prevent duplicates
+        [closeBtn, cancelBtn, browseBtn, clearBtn, loadBtn].forEach(btn => {
+            if (btn) {
+                // Clone the element to remove all event listeners
+                const newBtn = btn.cloneNode(true);
+                btn.parentNode.replaceChild(newBtn, btn);
+            }
+        });
+
+        // Re-get elements after cloning
+        const modal2 = document.getElementById('laz-file-modal');
+        const closeBtn2 = document.getElementById('laz-modal-close');
+        const cancelBtn2 = document.getElementById('cancel-laz-modal');
+        const browseBtn2 = document.getElementById('browse-laz-btn');
+        const fileInput2 = document.getElementById('laz-file-input');
+        const dropZone2 = document.getElementById('laz-drop-zone');
+        const clearBtn2 = document.getElementById('clear-laz-files');
+        const loadBtn2 = document.getElementById('load-laz-files');
+
         // Close modal events - use unique handler to prevent conflicts
-        [closeBtn, cancelBtn].forEach(btn => {
+        [closeBtn2, cancelBtn2].forEach(btn => {
             if (btn) {
                 btn.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -488,9 +539,9 @@ class GeoTiffLeftPanel {
         });
 
         // Click outside modal to close
-        if (modal) {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
+        if (modal2) {
+            modal2.addEventListener('click', (e) => {
+                if (e.target === modal2) {
                     e.preventDefault();
                     e.stopPropagation();
                     this.closeLazFileModal();
@@ -499,17 +550,17 @@ class GeoTiffLeftPanel {
         }
 
         // Browse button - prevent conflicts with drop zone
-        if (browseBtn && fileInput) {
+        if (browseBtn2 && fileInput2) {
             console.log('📂 Setting up browse button event listener...');
-            browseBtn.addEventListener('click', (e) => {
+            browseBtn2.addEventListener('click', (e) => {
                 // Don't prevent default for browse button - let it work naturally
                 e.stopPropagation(); // Still stop propagation to prevent conflicts
                 console.log('📂 Browse button clicked, opening file dialog...');
-                console.log('📂 File input element:', fileInput);
-                console.log('📂 File input type:', fileInput.type);
-                console.log('📂 File input accept:', fileInput.accept);
+                console.log('📂 File input element:', fileInput2);
+                console.log('📂 File input type:', fileInput2.type);
+                console.log('📂 File input accept:', fileInput2.accept);
                 try {
-                    fileInput.click();
+                    fileInput2.click();
                     console.log('📂 File input click() called successfully');
                 } catch (error) {
                     console.error('📂 Error calling fileInput.click():', error);
@@ -518,14 +569,14 @@ class GeoTiffLeftPanel {
             console.log('📂 Browse button event listener set up successfully');
         } else {
             console.error('📂 Browse button or file input not found!', {
-                browseBtn: browseBtn,
-                fileInput: fileInput
+                browseBtn: browseBtn2,
+                fileInput: fileInput2
             });
         }
 
         // File input change - this is the critical event
-        if (fileInput) {
-            fileInput.addEventListener('change', (e) => {
+        if (fileInput2) {
+            fileInput2.addEventListener('change', (e) => {
                 console.log('📂 File input changed, files selected:', e.target.files.length);
                 if (e.target.files.length > 0) {
                     this.handleLazFileSelection(e.target.files);
@@ -534,48 +585,48 @@ class GeoTiffLeftPanel {
         }
 
         // Drag and drop events
-        if (dropZone) {
-            dropZone.addEventListener('dragover', (e) => {
+        if (dropZone2) {
+            dropZone2.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                dropZone.classList.add('border-[#00bfff]');
+                dropZone2.classList.add('border-[#00bfff]');
             });
 
-            dropZone.addEventListener('dragleave', (e) => {
+            dropZone2.addEventListener('dragleave', (e) => {
                 e.preventDefault();
-                dropZone.classList.remove('border-[#00bfff]');
+                dropZone2.classList.remove('border-[#00bfff]');
             });
 
-            dropZone.addEventListener('drop', (e) => {
+            dropZone2.addEventListener('drop', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                dropZone.classList.remove('border-[#00bfff]');
+                dropZone2.classList.remove('border-[#00bfff]');
                 console.log('📂 Files dropped, processing...');
                 this.handleLazFileSelection(e.dataTransfer.files);
             });
 
             // Click on drop zone to browse - but prevent conflicts with browse button
-            dropZone.addEventListener('click', (e) => {
+            dropZone2.addEventListener('click', (e) => {
                 // Only trigger if clicking directly on the drop zone text, not on the button
-                if (e.target === dropZone || (e.target.classList.contains('text-lg') && e.target.textContent.includes('Drop LAZ files'))) {
+                if (e.target === dropZone2 || (e.target.classList.contains('text-lg') && e.target.textContent.includes('Drop LAZ files'))) {
                     e.preventDefault();
                     e.stopPropagation();
                     console.log('📂 Drop zone clicked, opening file dialog...');
-                    if (fileInput) fileInput.click();
+                    if (fileInput2) fileInput2.click();
                 }
             });
         }
 
         // Clear files button
-        if (clearBtn) {
-            clearBtn.addEventListener('click', (e) => {
+        if (clearBtn2) {
+            clearBtn2.addEventListener('click', (e) => {
                 e.preventDefault();
                 this.clearLazFiles();
             });
         }
 
         // Load files button
-        if (loadBtn) {
-            loadBtn.addEventListener('click', (e) => {
+        if (loadBtn2) {
+            loadBtn2.addEventListener('click', (e) => {
                 e.preventDefault();
                 this.loadLazFiles();
             });
@@ -587,11 +638,29 @@ class GeoTiffLeftPanel {
     }
 
     async openLazFileModal(clear = true) { // Made async
-        console.log('📂 Opening LAZ file browser modal');
+        console.log('📂 Opening LAZ file browser modal, clear =', clear);
+        console.log('📂 Current selectedLazFiles before modal open:', this.selectedLazFiles ? this.selectedLazFiles.length : 'undefined');
+
+        // Check if modal is already loaded and visible to prevent double loading
+        const existingModal = document.getElementById('laz-file-modal');
+        if (existingModal && !existingModal.classList.contains('hidden')) {
+            console.log('📂 Modal already open, skipping reload');
+            return;
+        }
+
+        // Store current files before potentially losing them during modal reload
+        const currentFiles = this.selectedLazFiles ? [...this.selectedLazFiles] : [];
+        console.log('📂 Stored current files for preservation:', currentFiles.length);
 
         // Load the modal HTML first into the placeholder
         // Ensure loadModule is globally accessible (defined in app_new.js)
         await loadModule('modules/modals/laz-file-modal.html', 'modals-placeholder');
+
+        // Restore files after modal reload if we weren't supposed to clear
+        if (!clear && currentFiles.length > 0) {
+            this.selectedLazFiles = currentFiles;
+            console.log('📂 Restored files after modal reload:', this.selectedLazFiles.length);
+        }
 
         const modal = document.getElementById('laz-file-modal'); // Get from placeholder after loading
         if (modal) {
@@ -622,8 +691,11 @@ class GeoTiffLeftPanel {
             $(modal).fadeIn(); // Or use jQuery if preferred for consistency
 
             if (clear) {
+                console.log('📂 Clearing files as requested (clear = true)');
                 // Reset modal state
                 this.clearLazFiles(); // This updates elements within #laz-file-modal
+            } else {
+                console.log('📂 Preserving files as requested (clear = false), current count:', this.selectedLazFiles ? this.selectedLazFiles.length : 0);
             }
 
             // If UIManager has a generic modal re-initializer, call it.
@@ -723,6 +795,9 @@ class GeoTiffLeftPanel {
     }
 
     clearLazFiles() {
+        console.log('📂 clearLazFiles called - clearing', this.selectedLazFiles ? this.selectedLazFiles.length : 0, 'files');
+        console.trace('📂 clearLazFiles call stack'); // This will show us where it's being called from
+        
         this.selectedLazFiles = [];
         this.updateLazFilesList();
         this.updateLoadButton();
@@ -757,6 +832,14 @@ class GeoTiffLeftPanel {
     }
 
     setupLazFolderModalEvents() {
+        // Prevent setting up events multiple times
+        if (this.lazFolderModalEventsSetup) {
+            console.log('📂 LAZ folder modal events already set up, skipping...');
+            return;
+        }
+
+        console.log('📂 Setting up LAZ folder modal events...');
+
         const modal = document.getElementById('laz-folder-modal');
         const closeBtn = document.getElementById('laz-folder-modal-close');
         const cancelBtn = document.getElementById('cancel-laz-folder-modal');
@@ -779,12 +862,16 @@ class GeoTiffLeftPanel {
         if (browseBtn) {
             browseBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (folderInput) folderInput.click();
+                console.log('📂 Folder browse button clicked');
+                if (folderInput) {
+                    folderInput.click();
+                }
             });
         }
 
         if (folderInput) {
             folderInput.addEventListener('change', (e) => {
+                console.log('📂 Folder input changed, files found:', e.target.files.length);
                 this.handleLazFolderSelection(e.target.files);
             });
         }
@@ -803,6 +890,7 @@ class GeoTiffLeftPanel {
                 dropZone.classList.remove('border-[#5e60ce]');
                 this.handleLazFolderSelection(e.dataTransfer.files);
             });
+
             dropZone.addEventListener('click', (e) => {
                 if (e.target === dropZone || (e.target.closest('#laz-folder-drop-zone') && !e.target.closest('#browse-laz-folder-btn'))) {
                     if (folderInput) folderInput.click();
@@ -817,27 +905,62 @@ class GeoTiffLeftPanel {
         if (doneBtn) {
             doneBtn.addEventListener('click', () => {
                 const hasFiles = this.selectedLazFiles && this.selectedLazFiles.length > 0;
+                console.log('📂 Done button clicked, has files:', hasFiles);
+                console.log('📂 Selected LAZ files before transition:', this.selectedLazFiles);
+                console.log('📂 Selected LAZ files count:', this.selectedLazFiles ? this.selectedLazFiles.length : 'undefined');
+                
+                // Store files temporarily to ensure they persist
+                const filesToTransfer = this.selectedLazFiles ? [...this.selectedLazFiles] : [];
+                console.log('📂 Files to transfer:', filesToTransfer.length);
+                
                 this.closeLazFolderModal();
-                if (hasFiles) {
-                    this.openLazFileModal(false);
-                    this.updateLazFilesList();
-                    this.updateLoadButton();
-                    this.loadLazFiles();
+                
+                if (hasFiles && filesToTransfer.length > 0) {
+                    // Ensure files are restored after folder modal closes
+                    this.selectedLazFiles = filesToTransfer;
+                    console.log('📂 Files restored after folder modal close:', this.selectedLazFiles.length);
+                    
+                    // Open file modal with pre-selected files and start loading automatically
+                    this.openLazFileModal(false).then(() => {
+                        console.log('📂 File modal opened, files available:', this.selectedLazFiles ? this.selectedLazFiles.length : 0);
+                        this.updateLazFilesList();
+                        this.updateLoadButton();
+                        
+                        // Add a small delay before loading to ensure UI is ready
+                        setTimeout(() => {
+                            console.log('📂 About to call loadLazFiles, current files:', this.selectedLazFiles ? this.selectedLazFiles.length : 0);
+                            this.loadLazFiles();
+                        }, 500);
+                    });
                 } else {
                     this.showError('No LAZ files found in selected folder');
                 }
             });
         }
+
+        // Mark as set up to prevent duplicates
+        this.lazFolderModalEventsSetup = true;
+        console.log('📂 LAZ folder modal events setup complete');
     }
 
     async openLazFolderModal() { // Made async
         console.log('📂 Opening LAZ Folder browser modal');
+
+        // Check if modal is already loaded and visible to prevent double loading
+        const existingModal = document.getElementById('laz-folder-modal');
+        if (existingModal && !existingModal.classList.contains('hidden')) {
+            console.log('📂 Folder modal already open, skipping reload');
+            return;
+        }
 
         // Load the modal HTML first into the placeholder
         await loadModule('modules/modals/laz-folder-modal.html', 'modals-placeholder');
 
         const modal = document.getElementById('laz-folder-modal'); // Get from placeholder
         if (modal) {
+            // Reset the flag to allow re-setup since modal was reloaded
+            this.lazFolderModalEventsSetup = false;
+            
             // Call setup for its internal events AFTER it's in the DOM
             this.setupLazFolderModalEvents();
 
@@ -855,24 +978,58 @@ class GeoTiffLeftPanel {
     }
 
     closeLazFolderModal() {
+        console.log('📂 Closing LAZ folder modal');
+        console.log('📂 selectedLazFiles before closing folder modal:', this.selectedLazFiles ? this.selectedLazFiles.length : 0);
+        
         const modal = document.getElementById('laz-folder-modal'); // Target directly or via placeholder
         if (modal) {
             // modal.classList.add('hidden');
             $(modal).fadeOut(() => {
                 // $('#modals-placeholder').empty();
             });
-            this.clearLazFolders();
+            this.clearLazFolders(); // This should only clear folders, not files
         }
+        
+        console.log('📂 selectedLazFiles after closing folder modal:', this.selectedLazFiles ? this.selectedLazFiles.length : 0);
     }
 
     handleLazFolderSelection(files) {
+        console.log('📂 handleLazFolderSelection called with files:', files ? files.length : 0);
+        
+        if (!files || files.length === 0) {
+            console.log('📂 No files provided to handleLazFolderSelection');
+            this.showError('No files selected from folder');
+            return;
+        }
+
+        console.log('📂 Processing folder selection with', files.length, 'total files');
+        
+        // Reset arrays
         this.selectedLazFolders = [];
         this.selectedLazFiles = [];
+        
+        // Count LAZ files by folder
         const counts = GeoTiffLeftPanel.countLazFilesByFolder(files);
+        console.log('📂 LAZ files found by folder:', counts);
+        
+        // Store folder information
         Object.entries(counts).forEach(([folder, count]) => {
             this.selectedLazFolders.push({ name: folder, count });
         });
-        this.selectedLazFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.laz'));
+        
+        // Filter and store LAZ files
+        this.selectedLazFiles = Array.from(files).filter(f => {
+            const isLaz = f.name.toLowerCase().endsWith('.laz');
+            if (isLaz) {
+                console.log('📂 Found LAZ file:', f.name, 'Size:', f.size);
+            }
+            return isLaz;
+        });
+        
+        console.log('📂 Total LAZ files selected:', this.selectedLazFiles.length);
+        console.log('📂 Selected LAZ files:', this.selectedLazFiles.map(f => f.name));
+        
+        // Update UI
         this.updateLazFolderList();
     }
 
@@ -896,19 +1053,34 @@ class GeoTiffLeftPanel {
     }
 
     clearLazFolders() {
+        console.log('📂 clearLazFolders called - clearing folders but preserving selectedLazFiles');
+        console.log('📂 selectedLazFiles before clearLazFolders:', this.selectedLazFiles ? this.selectedLazFiles.length : 0);
+        
         this.selectedLazFolders = [];
-        this.selectedLazFiles = [];
+        // NOTE: We intentionally do NOT clear selectedLazFiles here as those should persist
+        // this.selectedLazFiles = []; // <- This should NOT be here
+        
         const input = document.getElementById('laz-folder-input');
         if (input) input.value = '';
         this.updateLazFolderList();
+        
+        console.log('📂 selectedLazFiles after clearLazFolders:', this.selectedLazFiles ? this.selectedLazFiles.length : 0);
     }
 
     async loadLazFiles() {
         const files = this.selectedLazFiles;
+        console.log('📂 loadLazFiles called with files:', files ? files.length : 0);
+        
         if (!files || files.length === 0) {
+            console.log('❌ No files available for loading');
             this.showError('No files selected');
             return;
         }
+
+        console.log('📂 Starting LAZ file loading process for', files.length, 'files');
+        files.forEach((file, index) => {
+            console.log(`📂 File ${index + 1}: ${file.name} (${file.size} bytes)`);
+        });
 
         try {
             this.showLazProgress(true);
@@ -919,6 +1091,8 @@ class GeoTiffLeftPanel {
                 formData.append('files', file);
             });
 
+            console.log('📂 Sending files to /api/laz/upload...');
+            
             // Upload files and get coordinates
             const response = await fetch('/api/laz/upload', {
                 method: 'POST',
@@ -930,12 +1104,13 @@ class GeoTiffLeftPanel {
             }
 
             const result = await response.json();
-            console.log('LAZ upload result:', result);
+            console.log('📂 LAZ upload result:', result);
 
             this.updateLazProgress(50, 'Files uploaded, processing coordinates...');
 
             // Store the loaded files info
             const loadedFiles = result.files || [];
+            console.log('📂 Loaded files from server:', loadedFiles);
 
             this.loadFileTree();
 

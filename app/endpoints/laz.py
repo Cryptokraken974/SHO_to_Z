@@ -1446,28 +1446,32 @@ async def upload_multiple_laz_files(
         uploaded_files = []
         
         for file in files:
+            # Extract just the filename, removing any path components (e.g., "Load_1/file.laz" -> "file.laz")
+            clean_filename = Path(file.filename).name
+            
             # Validate file type
             allowed_extensions = ['.laz', '.las']
-            file_ext = Path(file.filename).suffix.lower()
+            file_ext = Path(clean_filename).suffix.lower()
             
             if file_ext not in allowed_extensions:
-                logger.warning(f"Skipping invalid file type: {file.filename}")
+                logger.warning(f"Skipping invalid file type: {clean_filename}")
                 continue
             
             # Read file content
             content = await file.read()
             
             if not content:
-                logger.warning(f"Skipping empty file: {file.filename}")
+                logger.warning(f"Skipping empty file: {clean_filename}")
                 continue
             
             # Create unique filename if file already exists
-            upload_path = LAZ_INPUT_DIR / file.filename
+            upload_path = LAZ_INPUT_DIR / clean_filename
             counter = 1
-            original_stem = upload_path.stem
+            original_stem = Path(clean_filename).stem
+            original_suffix = Path(clean_filename).suffix
             
             while upload_path.exists():
-                new_name = f"{original_stem}_{counter}{upload_path.suffix}"
+                new_name = f"{original_stem}_{counter}{original_suffix}"
                 upload_path = LAZ_INPUT_DIR / new_name
                 counter += 1
             

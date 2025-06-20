@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAZ File Transfer Fix Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #2c2c2c; color: white; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #444; background: #1a1a1a; }
+        .btn { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        .btn:hover { background: #0056b3; }
+        .console-output { background: #000; padding: 10px; font-family: monospace; font-size: 12px; border-radius: 4px; max-height: 200px; overflow-y: auto; }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        .info { color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <h1>🔧 LAZ File Transfer Fix Test</h1>
+    
+    <div class="test-section">
+        <h2>✅ Root Cause Found and Fixed</h2>
+        <p><strong>The Problem:</strong> In <code>clearLazFolders()</code> method, there was:</p>
+        <div class="console-output error">this.selectedLazFiles = []; // ❌ This was clearing the LAZ files!</div>
+        
+        <p><strong>The Fix:</strong> Removed the line that was clearing <code>selectedLazFiles</code> in <code>clearLazFolders()</code></p>
+        <div class="console-output success">// NOTE: We intentionally do NOT clear selectedLazFiles here as those should persist</div>
+    </div>
+    
+    <div class="test-section">
+        <h2>🔍 Additional Improvements Added</h2>
+        <ul>
+            <li><strong>Enhanced Logging:</strong> Added detailed logging to track file transfers</li>
+            <li><strong>File Preservation:</strong> Store files temporarily during modal transitions</li>
+            <li><strong>Clear Parameter Handling:</strong> Better handling of the <code>clear</code> parameter in <code>openLazFileModal()</code></li>
+            <li><strong>Call Stack Tracing:</strong> Added <code>console.trace()</code> to identify where <code>clearLazFiles()</code> is called</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>📋 Expected Console Messages After Fix</h2>
+        <div class="console-output">
+<span class="info">📂 Done button clicked, has files: true</span>
+<span class="info">📂 Selected LAZ files before transition: [Array of files]</span>
+<span class="info">📂 Files to transfer: X</span>
+<span class="info">📂 clearLazFolders called - clearing folders but preserving selectedLazFiles</span>
+<span class="info">📂 selectedLazFiles before clearLazFolders: X</span>
+<span class="info">📂 selectedLazFiles after clearLazFolders: X</span>
+<span class="info">📂 Files restored after folder modal close: X</span>
+<span class="info">📂 Opening LAZ file browser modal, clear = false</span>
+<span class="info">📂 Current selectedLazFiles before modal open: X</span>
+<span class="info">📂 Stored current files for preservation: X</span>
+<span class="info">📂 Restored files after modal reload: X</span>
+<span class="info">📂 Preserving files as requested (clear = false), current count: X</span>
+<span class="info">📂 File modal opened, files available: X</span>
+<span class="info">📂 About to call loadLazFiles, current files: X</span>
+<span class="success">📂 loadLazFiles called with files: X</span>
+<span class="success">📂 Starting LAZ file loading process for X files</span>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>🧪 Test Instructions</h2>
+        <ol>
+            <li>Open the main application</li>
+            <li>Click "Upload" button to browse for LAZ folder</li>
+            <li>Select a folder containing .laz files</li>
+            <li>Click "Done" in the folder modal</li>
+            <li>Verify in console that file count remains consistent throughout the process</li>
+            <li>Confirm that files are successfully loaded without "No files selected" error</li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>🎯 Key Fix Points</h2>
+        <ul>
+            <li><strong>clearLazFolders():</strong> Now only clears folder list, preserves file list</li>
+            <li><strong>File Transfer Flow:</strong> Files are explicitly preserved during modal transitions</li>
+            <li><strong>Modal Opening:</strong> Better handling of clear/preserve file scenarios</li>
+            <li><strong>Debug Logging:</strong> Comprehensive logging to track file state</li>
+        </ul>
+    </div>
+    
+    <button class="btn" onclick="window.close()">Close Test Page</button>
+    
+    <script>
+        console.log('🧪 LAZ File Transfer Fix test page loaded');
+        console.log('🧪 The main issue was in clearLazFolders() method clearing selectedLazFiles');
+        console.log('🧪 This has been fixed and enhanced logging added');
+    </script>
+</body>
+</html>

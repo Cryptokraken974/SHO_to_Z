@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modal Fix Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .btn { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; cursor: pointer; }
+        .btn:hover { background: #0056b3; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 5px; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <h1>Modal Fix Test</h1>
+    
+    <div class="test-section">
+        <h2>Issue Summary</h2>
+        <p><strong>Problems Fixed:</strong></p>
+        <ul>
+            <li>✅ Double modal loading causing event handler conflicts</li>
+            <li>✅ Files not being passed as parameters in folder upload</li>
+            <li>✅ Multiple click triggers causing loops</li>
+            <li>✅ Event listener duplication</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>Key Changes Made</h2>
+        <ul>
+            <li><strong>Event Handler Cleanup:</strong> Clone and replace elements to remove duplicate listeners</li>
+            <li><strong>Modal Loading Protection:</strong> Check if modal is already loaded/visible before reloading</li>
+            <li><strong>Click Protection:</strong> Prevent multiple rapid clicks with loading flags</li>
+            <li><strong>Enhanced Logging:</strong> Added detailed console logging for debugging file selection</li>
+            <li><strong>File Parameter Validation:</strong> Better validation and logging of file arrays</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>Files Modified</h2>
+        <ul>
+            <li><code>/frontend/js/geotiff-left-panel.js</code></li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>Testing Instructions</h2>
+        <ol>
+            <li>Open the main application</li>
+            <li>Click "Upload" button in the file explorer (folder upload)</li>
+            <li>Select a folder containing .laz files</li>
+            <li>Verify that:
+                <ul>
+                    <li>Modal opens only once (no double-loading)</li>
+                    <li>Files are properly detected and listed</li>
+                    <li>Console shows detailed file information</li>
+                    <li>No error messages about "No files selected"</li>
+                    <li>Processing completes without loops</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>Console Debug Information</h2>
+        <p>When testing, look for these console messages:</p>
+        <ul>
+            <li><code>📂 handleLazFolderSelection called with files: X</code></li>
+            <li><code>📂 Total LAZ files selected: X</code></li>
+            <li><code>📂 loadLazFiles called with files: X</code></li>
+            <li><code>📂 File X: filename.laz (size bytes)</code></li>
+        </ul>
+    </div>
+    
+    <button class="btn" onclick="window.close()">Close Test Page</button>
+    
+    <script>
+        console.log('🧪 Modal fix test page loaded');
+        console.log('🧪 Ready to test folder upload functionality');
+    </script>
+</body>
+</html>
