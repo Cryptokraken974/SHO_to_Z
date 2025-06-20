@@ -133,6 +133,18 @@ class RegionAPIClient extends BaseAPIClient {
   }
 
   /**
+   * Get PNG files for a specific region
+   * @param {string} regionName - Name of the region
+   * @returns {Promise<Object>} List of PNG files in the region
+   */
+  async getRegionPngFiles(regionName) {
+    console.log('RegionAPIClient.getRegionPngFiles called with region:', regionName);
+    const result = await this.get(`regions/${encodeURIComponent(regionName)}/png-files`);
+    console.log('RegionAPIClient.getRegionPngFiles result:', result);
+    return result;
+  }
+
+  /**
    * Delete a region
    * @param {string} regionName - Name of the region to delete
    * @returns {Promise<Object>} Deletion result
@@ -401,7 +413,7 @@ class ProcessingAPIClient extends BaseAPIClient {
     // Support both camelCase and snake_case parameter names for flexibility
     if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
     if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
-    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.processingType || options.processing_type) formData.append('processing_type', optionsProcessingType || options.processing_type);
     if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
     
     return this.postForm('roughness', formData);
@@ -966,7 +978,10 @@ class OverlayAPIClient extends BaseAPIClient {
    * @returns {Promise<Object>} Raster overlay data
    */
   async getRasterOverlayData(regionName, processingType) {
-    return this.get(`overlay/raster/${encodeURIComponent(regionName)}/${processingType}`);
+    console.log('OverlayAPIClient.getRasterOverlayData called with region:', regionName, 'processing type:', processingType);
+    const result = await this.get(`overlay/raster/${encodeURIComponent(regionName)}/${processingType}`);
+    console.log('OverlayAPIClient.getRasterOverlayData result:', result);
+    return result;
   }
 
   /**
@@ -1329,7 +1344,7 @@ class LAZAPIClient extends BaseAPIClient {
    */
   async getLAZFileBounds(filePath) {
     if (!filePath) {
-      throw new Error('File path is required for getLAZFileBounds');
+      throw new Error('File path is required for getCachedMetadata');
     }
     // The endpoint expects the file path to be part of the URL path.
     // Ensure the filePath is properly encoded if it might contain special characters.
@@ -1913,5 +1928,20 @@ window.CacheManagementAPIClient = CacheManagementAPIClient;
 window.PromptAPIClient = PromptAPIClient;
 window.OpenAIAPIClient = OpenAIAPIClient;
 window.APIClientFactory = APIClientFactory;
+
+// Convenience functions for easy access to API clients
+window.regions = () => window.APIClient.region;
+window.processing = () => window.APIClient.processing;
+window.regionAnalysis = () => window.APIClient.regionAnalysis;
+window.elevation = () => window.APIClient.elevation;
+window.satellite = () => window.APIClient.satellite;
+window.overlays = () => window.APIClient.overlay;
+window.savedPlaces = () => window.APIClient.savedPlaces;
+window.geotiff = () => window.APIClient.geotiff;
+window.laz = () => window.APIClient.laz;
+window.dataAcquisition = () => window.APIClient.dataAcquisition;
+window.cacheManagement = () => window.APIClient.cacheManagement;
+window.prompts = () => window.APIClient.prompts;
+window.openai = () => window.APIClient.openai;
 
 Utils.log('info', 'API Client system initialized successfully');

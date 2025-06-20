@@ -15,6 +15,7 @@ window.UIManager = {
     this.initializeImageModalEventHandlers(); // Specific for image modal
     this.initializeGlobalRegionSelector();
     this.initializeResizablePanels();
+    this.initializeReloadRasterButton(); // Initialize reload raster gallery button
 
     this.resultsTabInitialized = false; // Initialize flag for Results tab
     
@@ -60,7 +61,10 @@ window.UIManager = {
 
         // Initialize galleries if they are specific to this tab
         if (window.RasterOverlayGallery && document.getElementById('gallery')) {
-            // Example: new RasterOverlayGallery('gallery').init();
+            console.log('Initializing RasterOverlayGallery for #gallery element');
+            window.rasterOverlayGallery = new RasterOverlayGallery('gallery');
+            window.rasterOverlayGallery.init();
+            console.log('RasterOverlayGallery initialized successfully');
         }
         if (window.SatelliteOverlayGallery && document.getElementById('satellite-gallery')) {
             // Example: new SatelliteOverlayGallery('satellite-gallery').init();
@@ -152,7 +156,7 @@ window.UIManager = {
 
     if (!$modal.length || !$modal.hasClass('modal')) {
         if(modalSelector) console.warn(`Modal not found with selector ${modalSelector} in reinitializeModalEventHandlers.`);
-        else if(contextNode && !$(contextNode).hasClass('modal')) console.warn('Provided contextElement is not a modal itself for reinitialization.');
+        else if(!$(contextNode).hasClass('modal')) console.warn('Provided contextElement is not a modal itself for reinitialization.');
         return;
     }
 
@@ -285,6 +289,8 @@ window.UIManager = {
    */
   updateGlobalRegionSelector(regionName) {
     this.globalSelectedRegion = regionName;
+    // Also set on window for compatibility
+    window.globalSelectedRegion = regionName;
     
     if (regionName) {
       $('#global-selected-region-name')
@@ -735,6 +741,18 @@ window.UIManager = {
     $('#region-name-input').on('input', () => {
       // Allow manual editing of region name
       Utils.log('info', 'Region name manually edited');
+    });
+
+    // Event listener for the reload button
+    $(document).on('click', '#reload-raster-gallery-btn', function() {
+        console.log("Reloading raster gallery...");
+        const selectedRegion = UIManager.globalSelectedRegion;
+        if (selectedRegion) {
+            rasterOverlayGallery.loadRasters(selectedRegion);
+        } else {
+            console.warn("No region selected, cannot reload raster gallery.");
+            Utils.showToast("Please select a region first.", "warning");
+        }
     });
 
     Utils.log('info', 'Event handlers initialized');
@@ -1358,8 +1376,12 @@ window.UIManager = {
    * @param {string} regionName - The name of the region.
    */
   async displayLidarRasterForRegion(regionName) {
+    console.log('displayLidarRasterForRegion called with region:', regionName);
     if (window.rasterOverlayGallery) {
+      console.log('RasterOverlayGallery found, calling loadRasters');
       window.rasterOverlayGallery.loadRasters(regionName);
+    } else {
+      console.error('window.rasterOverlayGallery not found!');
     }
   },
 
@@ -1368,14 +1390,19 @@ window.UIManager = {
    * @param {Array} availableRasters - Array of available raster data
    */
   displayLidarRasterGallery(availableRasters) {
+    console.log('displayLidarRasterGallery called with rasters:', availableRasters);
     if (window.rasterOverlayGallery) {
+      console.log('RasterOverlayGallery found, preparing items');
       const items = availableRasters.map(r => ({
         id: r.processingType,
         imageUrl: `data:image/png;base64,${r.overlayData.image_data}`,
         title: r.display,
         status: 'ready'
       }));
+      console.log('Mapped items for gallery:', items);
       window.rasterOverlayGallery.showRasters(items);
+    } else {
+      console.error('window.rasterOverlayGallery not found in displayLidarRasterGallery!');
     }
   },
 
@@ -1397,6 +1424,7 @@ window.UIManager = {
       { id: 'color_relief', label: 'Color Relief', color: '#f39c12' },
       { id: 'slope_relief', label: 'Slope Relief', color: '#9b59b6' },
       { id: 'lrm', label: 'Local Relief Model', color: '#1abc9c' },
+      { id: 'sky_view_factor', label: 'Sky View Factor', color: '#ffeaa7' },
       // Composite products
       { id: 'hillshade_rgb', label: 'RGB Hillshade', color: '#fdcb6e' },
       { id: 'tint_overlay', label: 'Tint Overlay', color: '#e84393' },
@@ -2863,30 +2891,886 @@ window.UIManager = {
 
     if (!$modal.length || !$modal.hasClass('modal')) {
         if(modalSelector) console.warn(`Modal not found with selector ${modalSelector} in reinitializeModalEventHandlers.`);
-        else if(!$(contextNode).hasClass('modal')) console.warn('Provided contextElement is not a modal itself for reinitialization.');
         return;
     }
 
     const modalId = $modal.attr('id');
-    Utils.log('info', `Re-initializing generic event handlers for modal: ${modalId || 'unknown modal'}`);
+    Utils.log('info', `Re-initializing event handlers for modal: ${modalId || 'unknown modal'}`);
 
-    // General close button with class 'modal-close'
-    // This re-binds to ensure it works for the newly loaded modal.
-    // Note: Global delegated handlers in initializeModals() might also catch this,
-    // but direct re-binding here is more specific to the just-loaded modal.
+    // General close buttons if not already covered by global delegation
+    // This ensures that if a modal's HTML is simple and relies on a common '.modal-close' class, it works.
     $modal.find('.modal-close').off('click').on('click', function() {
         $modal.fadeOut(() => {
-            // Optional: Clean up placeholder if modals are loaded one at a time and then removed.
-            // if ($modal.parent().is('#modals-placeholder')) { $('#modals-placeholder').empty(); }
+            if ($modal.parent().is('#modals-placeholder')) {
+                // $modal.remove(); // Or $('#modals-placeholder').empty(); if only one modal at a time
+            }
         });
     });
 
-    // Add any other generic modal behaviors here, e.g., cancel buttons with a common class.
-    // $modal.find('.cancel-btn').off('click').on('click', () => $modal.fadeOut());
+    // Specific re-initializations based on modal ID
+    // This is where you'd call specific setup functions for each modal's unique interactions
+    // if they are not handled by broader delegated event listeners or class initializations.
+    // For example, if 'laz-file-modal' has complex internal event logic not covered by its class's init:
+    // if (modalId === 'laz-file-modal' && window.geoTiffLeftPanelInstance) {
+    //    window.geoTiffLeftPanelInstance.setupSpecificLazModalInteractions($modal);
+    // }
+    // Most of our modal-specific JS is now called from initializeDynamicContent via class init methods.
+    // This function can serve as a fallback or for very generic re-bindings.
   },
-};
 
-// Make initializeDynamicContent globally available so app_new.js/loadModule can call it
-if (window.UIManager && typeof window.UIManager.initializeDynamicContent === 'function') {
-    window.initializeDynamicContent = window.UIManager.initializeDynamicContent.bind(window.UIManager);
-}
+  /**
+   * Initialize resizable panels
+   * @param {Element} contextElement - Optional context element to scope selectors
+   */
+  initializeResizablePanels(contextElement = document) {
+    const $context = $(contextElement);
+    let isResizing = false;
+    let currentPanel = null;
+    let startX = 0;
+    let startWidth = 0;
+
+    // Handle mousedown on resize handles
+    $context.find('.resize-handle').off('mousedown').on('mousedown', function(e) {
+      e.preventDefault();
+      isResizing = true;
+      currentPanel = $(this).parent();
+      startX = e.pageX;
+      startWidth = currentPanel.outerWidth();
+      
+      $(this).addClass('dragging');
+      $('body').addClass('resize-active');
+      
+      Utils.log('debug', 'Started resizing panel');
+    });
+
+    // Handle mousemove for resizing (document level event, only bind once)
+    if (!this._resizeMoveHandler) {
+      this._resizeMoveHandler = function(e) {
+        if (!isResizing || !currentPanel) return;
+        
+        e.preventDefault();
+        const deltaX = e.pageX - startX;
+        const newWidth = Math.max(200, Math.min(600, startWidth + deltaX));
+        
+        currentPanel.css('width', newWidth + 'px');
+      };
+      $(document).on('mousemove', this._resizeMoveHandler);
+    }
+
+    // Handle mouseup to stop resizing (document level event, only bind once)
+    if (!this._resizeUpHandler) {
+      this._resizeUpHandler = function(e) {
+        if (!isResizing) return;
+        
+        isResizing = false;
+        $('.resize-handle').removeClass('dragging');
+        $('body').removeClass('resize-active');
+        
+        if (currentPanel) {
+          const finalWidth = currentPanel.outerWidth();
+          Utils.log('info', `Panel resized to ${finalWidth}px`);
+          
+          // Save panel width preference
+          const panelId = currentPanel.attr('id');
+          localStorage.setItem(`panel-width-${panelId}`, finalWidth);
+        }
+        
+        currentPanel = null;
+        startX = 0;
+        startWidth = 0;
+      };
+      $(document).on('mouseup', this._resizeUpHandler);
+    }
+
+    // Load saved panel widths
+    $context.find('.resizable-panel').each(function() {
+      const panelId = $(this).attr('id');
+      const savedWidth = localStorage.getItem(`panel-width-${panelId}`);
+      if (savedWidth) {
+        $(this).css('width', savedWidth + 'px');
+      }
+    });
+
+    Utils.log('info', 'Resizable panels initialized');
+  },
+
+  /**
+   * Test coordinate acquisition functionality
+   */
+  async testCoordinateAcquisition() {
+    const lat = parseFloat($('#lat-input').val());
+    const lng = parseFloat($('#lng-input').val());
+    const regionName = $('#region-name-input').val(); // Get region name
+
+    if (!Utils.isValidCoordinate(lat, lng)) {
+      Utils.showNotification('Please enter valid coordinates', 'warning');
+      return;
+    }
+
+    // If the user is testing coordinate acquisition, it implies they might want to acquire data.
+    // We should include the region name if they've provided one.
+    // This example doesn't directly call /api/acquire-data, but if it did, region_name would be included.
+    // For now, we'll just log it and set the map view.
+
+    try {
+      this.showProgress('Setting map coordinates...');
+      
+      let message = 'Coordinates set successfully';
+      if (regionName && regionName.trim() !== '') {
+        message += ` for region: ${regionName.trim()}`;
+        Utils.log('info', `Region name for coordinate test: ${regionName.trim()}`);
+      }
+      
+      Utils.showNotification(message, 'success');
+      MapManager.setView(lat, lng, 13);
+
+    } catch (error) {
+      Utils.log('error', 'Coordinate setting failed', error);
+      Utils.showNotification('Failed to set coordinates', 'error');
+    } finally {
+      this.hideProgress();
+    }
+  },
+
+  /**
+   * Test overlay functionality
+   */
+  async testOverlay() {
+    Utils.log('info', 'Test Overlay button clicked');
+
+    const selectedRegion = FileManager.getSelectedRegion(); // Changed from getSelectedFile
+    if (!selectedRegion) {
+      Utils.showNotification('Please select a Region first before testing overlay', 'warning'); // Changed message
+      return;
+    }
+
+    try {
+      this.showProgress('Creating test overlay...');
+
+      // Use selectedRegion directly as it's the identifier (e.g., folder name)
+      Utils.log('info', `Testing overlay for region: ${selectedRegion}`);
+
+      // Use overlay service from factory
+      const data = await overlays().getTestOverlayData(selectedRegion);
+
+      if (data.success) {
+        Utils.log('info', 'Test overlay successful:', data);
+
+        // Add the test overlay to the map using OverlayManager
+        const bounds = [
+          [data.bounds.south, data.bounds.west],
+          [data.bounds.north, data.bounds.east]
+        ];
+
+        OverlayManager.addTestOverlay(data.image_data, bounds);
+
+        Utils.showNotification('Test overlay added to map! Look for a black rectangle with red border.', 'success');
+        Utils.log('info', 'Test overlay added to map with bounds:', bounds);
+
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
+
+    } catch (error) {
+      Utils.log('error', 'Error calling test overlay API:', error);
+      Utils.showNotification(`Error testing overlay: ${error.message}`, 'error');
+    } finally {
+      this.hideProgress();
+    }
+  },
+
+  /**
+   * Test Sentinel-2 Images functionality (DEBUG ONLY)
+   * Note: Sentinel-2 images normally load automatically when selecting a region.
+   * This function is for testing/debugging coordinate and download functionality.
+   */
+  async testSentinel2() {
+    Utils.log('info', '🧪 === STARTING SENTINEL-2 DEBUG TEST ===');
+    
+    // Log current region state for debugging
+    Utils.log('info', '📊 Current region state:', {
+      selectedRegion: FileManager.getSelectedRegion(),
+      processingRegion: FileManager.getProcessingRegion(),
+      regionPath: FileManager.getRegionPath()
+    });
+    
+    // Check if Sentinel-2 images are already loaded for selected region
+    if (FileManager.selectedRegion) {
+      const existingImages = $('#satellite-gallery .gallery-item').length;
+      if (existingImages > 0) {
+        const proceed = confirm(`Sentinel-2 images are already loaded for ${FileManager.selectedRegion}. This test will download additional images. Continue?`);
+        if (!proceed) {
+          Utils.log('info', 'Test Sentinel-2 cancelled by user - images already loaded');
+          return;
+        }
+      }
+    }
+
+    // Get coordinates from input fields
+    let lat = $('#lat-input').val();
+    let lng = $('#lng-input').val();
+    let regionName = $('#region-name-input').val(); // Get region name
+
+    // Check if we have a selected region but no coordinates in input fields
+    if ((!lat || !lng || lat === '' || lng === '') && FileManager.selectedRegion) {
+      // Try to get coordinates from the selected region
+      const selectedItem = $(`.file-item[data-region-name="${FileManager.selectedRegion}"]`);
+      let coords = null;
+      
+      // First try to get coordinates from stored data
+      if (selectedItem.length && selectedItem.data('coords')) {
+        coords = selectedItem.data('coords');
+        Utils.log('info', `Found coordinates in selected item data:`, coords);
+      }
+      
+      // If no coordinates in item data, try to extract from coordinate input fields that might have been set during region selection
+      if (!coords && $('#lat-input').val() && $('#lng-input').val()) {
+        const inputLat = parseFloat($('#lat-input').val());
+        const inputLng = parseFloat($('#lng-input').val());
+        if (Utils.isValidCoordinate(inputLat, inputLng)) {
+          coords = { lat: inputLat, lng: inputLng };
+          Utils.log('info', `Using coordinates from input fields: ${inputLat}, ${inputLng}`);
+        }
+      }
+      
+      // If we found valid coordinates, use them
+      if (coords && coords.lat && coords.lng && Utils.isValidCoordinate(coords.lat, coords.lng)) {
+        lat = coords.lat;
+        lng = coords.lng;
+        
+        // Update the input fields
+        $('#lat-input').val(lat);
+        $('#lng-input').val(lng);
+        
+        Utils.log('info', `Using coordinates from selected region ${FileManager.selectedRegion}: ${lat}, ${lng}`);
+      } else {
+        Utils.log('warn', `No valid coordinates found for selected region ${FileManager.selectedRegion}`);
+      }
+    }
+
+    // If still no coordinates are set, use Portland, Oregon as default (good Sentinel-2 coverage)
+    if (!lat || !lng || lat === '' || lng === '') {
+      lat = 45.5152;  // Portland, Oregon
+      lng = -122.6784;
+
+      // Update the input fields
+      $('#lat-input').val(lat);
+      $('#lng-input').val(lng);
+
+      // Center map on the location
+      MapManager.setView(lat, lng, 12);
+
+      // Add a marker
+      MapManager.addSentinel2TestMarker(lat, lng);
+
+      Utils.showNotification('Using Portland, Oregon coordinates for Sentinel-2 test (good satellite coverage area)', 'info');
+    }
+    
+    // Check if we have a selected LAZ file but no region name
+    if (FileManager.selectedRegion && (!regionName || regionName.trim() === '')) {
+      // Extract filename without extension from the selected region
+      regionName = FileManager.selectedRegion.replace(/\.[^/.]+$/, '');
+      // Update the region name input field
+      $('#region-name-input').val(regionName);
+      Utils.log('info', `Auto-filled region name from selected file: ${regionName}`);
+    }
+
+    // Validate coordinates
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+
+    if (!Utils.isValidCoordinate(latNum, lngNum)) {
+      Utils.showNotification('Invalid coordinates. Please enter valid latitude and longitude values.', 'error');
+      return;
+    }
+
+    try {
+      this.showProgress('🛰️ Downloading Sentinel-2 images...');
+
+      // Start WebSocket connection for progress updates if available
+      if (window.WebSocketManager) {
+        WebSocketManager.connect();
+      }
+
+      const requestBody = {
+        lat: latNum,
+        lng: lngNum,
+        buffer_km: 5.0,  // 5km radius for 10km x 10km area
+        bands: ['B04', 'B08']  // Sentinel-2 red and NIR band identifiers
+      };
+
+      if (regionName && regionName.trim() !== '') {
+        requestBody.region_name = regionName.trim();
+      }
+
+      // Use satellite service from factory
+      const result = await satellite().downloadSentinel2Data(requestBody);
+
+      if (result.success) {
+        Utils.log('info', 'Sentinel-2 download successful:', result);
+
+        Utils.showNotification(
+          `Successfully downloaded Sentinel-2 images! File size: ${result.file_size_mb?.toFixed(2) || 'Unknown'} MB`,
+          'success'
+        );
+
+        // Automatically convert TIF files to PNG and display them
+        // Use the region name from the result if available, otherwise from input
+        const effectiveRegionName = result.metadata?.region_name || (regionName && regionName.trim() !== '' ? regionName.trim() : null);
+        if (effectiveRegionName) {
+          Utils.log('info', `Converting Sentinel-2 TIFs to PNG for region: ${effectiveRegionName}`);
+          await this.convertAndDisplaySentinel2(effectiveRegionName);
+        } else {
+          Utils.log('error', 'No region name found in Sentinel-2 result or input for conversion.');
+        }
+
+      } else {
+        throw new Error(result.error_message || 'Unknown error');
+      }
+
+    } catch (error) {
+      Utils.log('error', 'Error downloading Sentinel-2 images:', error);
+      Utils.showNotification(`Error downloading Sentinel-2 images: ${error.message}`, 'error');
+    } finally {
+      this.hideProgress();
+    }
+  },
+
+  /**
+   * Convert and display Sentinel-2 images
+   * @param {string} regionName - Region name for the conversion
+   */
+  async convertAndDisplaySentinel2(regionName) {
+    Utils.log('info', `Converting Sentinel-2 images for region: ${regionName}`);
+
+    try {
+      this.showProgress('Converting images to PNG...');
+
+      const formData = new FormData();
+      formData.append('region_name', regionName);
+
+      // Use satellite service from factory for Sentinel-2 conversion
+      const result = await satellite().convertSentinel2ToPNG(regionName);
+
+      if (result.success && result.files && result.files.length > 0) {
+        Utils.log('info', `Successfully converted ${result.files.length} Sentinel-2 images for ${regionName}`);
+
+        // Display each converted image in the satellite images gallery
+        this.displaySentinel2Images(result.files, regionName); // Pass regionName here
+
+        Utils.showNotification(`Converted ${result.files.length} Sentinel-2 images to PNG for ${regionName}`, 'success');
+      } else {
+        throw new Error(result.error || 'No images converted');
+      }
+
+    } catch (error) {
+      Utils.log('error', 'Error converting Sentinel-2 images:', error);
+      Utils.showNotification(`Error converting images: ${error.message}`, 'error');
+    } finally {
+      this.hideProgress();
+    }
+  },
+
+  /**
+   * Display Sentinel-2 images in the gallery
+   * @param {Array} files - Array of converted image file objects
+   */
+  displaySentinel2Images(files, regionName) {
+    if (!window.satelliteOverlayGallery) {
+      Utils.log('warn', 'SatelliteOverlayGallery not initialized, attempting to initialize...');
+      
+      // Check if the satellite gallery container exists
+      const satelliteGalleryContainer = document.getElementById('satellite-gallery');
+      if (!satelliteGalleryContainer) {
+        Utils.log('warn', 'Satellite gallery container not found, Sentinel-2 images will be displayed when map tab is accessed');
+        return;
+      }
+      
+      // Initialize the gallery if container exists
+      try {
+        window.satelliteOverlayGallery = new window.SatelliteOverlayGallery('satellite-gallery', {
+          onAddToMap: (regionBand, bandType) => {
+            if (window.UIManager?.addSentinel2OverlayToMap) {
+              window.UIManager.addSentinel2OverlayToMap(regionBand, bandType);
+            }
+          }
+        });
+        Utils.log('info', 'SatelliteOverlayGallery initialized successfully');
+      } catch (error) {
+        Utils.log('error', 'Failed to initialize SatelliteOverlayGallery:', error);
+        return;
+      }
+    }
+
+    const items = (files || []).map(fileObj => {
+      const band = fileObj.band;
+      let apiRegionName = regionName;
+      if (!regionName.startsWith('region_')) {
+        apiRegionName = `region_${regionName.replace(/\./g, '_')}`;
+      }
+      const regionBand = `${apiRegionName}_${band}`;
+      const title = window.satelliteOverlayGallery.getBandDisplayName
+        ? window.satelliteOverlayGallery.getBandDisplayName(band)
+        : band;
+      return {
+        id: regionBand,
+        imageUrl: `data:image/png;base64,${fileObj.image}`,
+        title,
+        subtitle: regionName,
+        status: 'ready',
+        bandType: title
+      };
+    });
+
+    window.satelliteOverlayGallery.showImages(items);
+  },
+
+  /**
+   * Fetches and displays Sentinel-2 images for a given region.
+   * Checks for available Sentinel-2 processing results and displays them in the satellite gallery.
+   * @param {string} regionName - The name of the region.
+   */
+  async displaySentinel2ImagesForRegion(regionName) {
+    if (!window.satelliteOverlayGallery) {
+      Utils.log('warn', 'SatelliteOverlayGallery not initialized, attempting to initialize...');
+      
+      // Check if the satellite gallery container exists
+      const satelliteGalleryContainer = document.getElementById('satellite-gallery');
+      if (!satelliteGalleryContainer) {
+        Utils.log('warn', 'Satellite gallery container not found, Sentinel-2 images will be loaded when map tab is accessed');
+        return;
+      }
+      
+      // Initialize the gallery if container exists
+      try {
+        window.satelliteOverlayGallery = new window.SatelliteOverlayGallery('satellite-gallery', {
+          onAddToMap: (regionBand, bandType) => {
+            if (window.UIManager?.addSentinel2OverlayToMap) {
+              window.UIManager.addSentinel2OverlayToMap(regionBand, bandType);
+            }
+          }
+        });
+        Utils.log('info', 'SatelliteOverlayGallery initialized successfully');
+      } catch (error) {
+        Utils.log('error', 'Failed to initialize SatelliteOverlayGallery:', error);
+        return;
+      }
+    }
+    
+    await window.satelliteOverlayGallery.loadImages(regionName);
+  },
+
+  /**
+   * Display Sentinel-2 band images in the satellite gallery
+   * @param {Array} availableBands - Array of available band data
+   */
+  displaySentinel2BandsGallery(availableBands) {
+    if (!window.satelliteOverlayGallery) {
+      Utils.log('warn', 'SatelliteOverlayGallery not initialized, attempting to initialize...');
+      
+      // Check if the satellite gallery container exists
+      const satelliteGalleryContainer = document.getElementById('satellite-gallery');
+      if (!satelliteGalleryContainer) {
+        Utils.log('warn', 'Satellite gallery container not found, Sentinel-2 images will be displayed when map tab is accessed');
+        return;
+      }
+      
+      // Initialize the gallery if container exists
+      try {
+        window.satelliteOverlayGallery = new window.SatelliteOverlayGallery('satellite-gallery', {
+          onAddToMap: (regionBand, bandType) => {
+            if (window.UIManager?.addSentinel2OverlayToMap) {
+              window.UIManager.addSentinel2OverlayToMap(regionBand, bandType);
+            }
+          }
+        });
+        Utils.log('info', 'SatelliteOverlayGallery initialized successfully');
+      } catch (error) {
+        Utils.log('error', 'Failed to initialize SatelliteOverlayGallery:', error);
+        return;
+      }
+    }
+
+    const items = (availableBands || []).map(bandData => {
+      const { band, overlayData, regionName } = bandData;
+      const imageB64 = overlayData.image_data;
+
+      let apiRegionName = regionName;
+      if (!regionName.startsWith('region_')) {
+        apiRegionName = `region_${regionName.replace(/\./g, '_')}`;
+      }
+      const regionBand = `${apiRegionName}_${band}`;
+      const title = window.satelliteOverlayGallery.getBandDisplayName
+        ? window.satelliteOverlayGallery.getBandDisplayName(band)
+        : band;
+
+      return {
+        id: regionBand,
+        imageUrl: `data:image/png;base64,${imageB64}`,
+        title,
+        subtitle: regionName,
+        status: 'ready',
+        bandType: title
+      };
+    });
+
+    window.satelliteOverlayGallery.showImages(items);
+  },
+
+  /**
+   * Get display name for Sentinel-2 bands
+   * @param {string} band - Band identifier (e.g., 'RED_B04', 'NIR_B08', 'NDVI')
+   * @returns {string} Display-friendly name
+   */
+  getSentinel2BandDisplayName(band) {
+    if (band.includes('NIR_B08')) {
+      return 'NIR (B08)';
+    } else if (band.includes('RED_B04')) {
+      return 'Red (B04)';
+    } else if (band === 'NDVI') {
+      return 'NDVI';
+    }
+    return band;
+  },
+
+  /**
+   * Fetches and displays LIDAR raster images for a given region.
+   * Checks for available LIDAR processing results and displays them in the processing gallery.
+   * @param {string} regionName - The name of the region.
+   */
+  async displayLidarRasterForRegion(regionName) {
+    console.log('displayLidarRasterForRegion called with region:', regionName);
+    if (window.rasterOverlayGallery) {
+      console.log('RasterOverlayGallery found, calling loadRasters');
+      window.rasterOverlayGallery.loadRasters(regionName);
+    } else {
+      console.error('window.rasterOverlayGallery not found!');
+    }
+  },
+
+  /**
+   * Display LIDAR raster images in the Processing Results gallery
+   * @param {Array} availableRasters - Array of available raster data
+   */
+  displayLidarRasterGallery(availableRasters) {
+    console.log('displayLidarRasterGallery called with rasters:', availableRasters);
+    if (window.rasterOverlayGallery) {
+      console.log('RasterOverlayGallery found, preparing items');
+      const items = availableRasters.map(r => ({
+        id: r.processingType,
+        imageUrl: `data:image/png;base64,${r.overlayData.image_data}`,
+        title: r.display,
+        status: 'ready'
+      }));
+      console.log('Mapped items for gallery:', items);
+      window.rasterOverlayGallery.showRasters(items);
+    } else {
+      console.error('window.rasterOverlayGallery not found in displayLidarRasterGallery!');
+    }
+  },
+
+  /**
+   * Reset the Processing Results gallery to show processing labels (text only)
+   */
+  resetProcessingGalleryToLabels() {
+    const gallery = $('#gallery');
+    
+    // Updated gallery items to match actual backend processing results
+    const labelItems = [
+      // Individual hillshades
+      { id: 'hs_red', label: 'Hillshade Red', color: '#e74c3c' },
+      { id: 'hs_green', label: 'Hillshade Green', color: '#27ae60' },
+      { id: 'hs_blue', label: 'Hillshade Blue', color: '#3498db' },
+      // Other raster products
+      { id: 'slope', label: 'Slope', color: '#e17055' },
+      { id: 'aspect', label: 'Aspect', color: '#00b894' },
+      { id: 'color_relief', label: 'Color Relief', color: '#f39c12' },
+      { id: 'slope_relief', label: 'Slope Relief', color: '#9b59b6' },
+      { id: 'lrm', label: 'Local Relief Model', color: '#1abc9c' },
+      { id: 'sky_view_factor', label: 'Sky View Factor', color: '#ffeaa7' },
+      // Composite products
+      { id: 'hillshade_rgb', label: 'RGB Hillshade', color: '#fdcb6e' },
+      { id: 'tint_overlay', label: 'Tint Overlay', color: '#e84393' },
+      { id: 'boosted_hillshade', label: 'Boosted Hillshade', color: '#00cec9' }
+    ];
+
+    const galleryHTML = labelItems.map(item => `
+      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-${item.id}">
+        <div class="flex-1 flex items-center justify-center">
+          <div class="text-white text-lg font-medium" style="color: ${item.color}">${item.label}</div>
+        </div>
+      </div>
+    `).join('');
+
+    gallery.html(`
+      <div class="flex gap-4 overflow-x-auto pb-4">
+        ${galleryHTML}
+      </div>
+    `);
+
+    Utils.log('info', 'Reset Processing Results gallery to show new hillshade and raster products');
+  },
+
+  /**
+   * Handle Add to Map button clicks in the Processing Results gallery
+   * @param {string} processingType - Processing type (hillshade, slope, etc.)
+   * @param {jQuery} $button - The clicked button element
+   */
+  handleProcessingResultsAddToMap(processingType, $button) {
+    const regionName = $button.data('region-name');
+    
+    if (!regionName) {
+      Utils.showNotification('No region selected for overlay', 'warning');
+      return;
+    }
+
+    const displayName = this.getProcessingDisplayName(processingType);
+    
+    // Check if the overlay is already active
+    const overlayKey = `LIDAR_RASTER_${regionName}_${processingType}`;
+    const isActive = OverlayManager.mapOverlays[overlayKey] !== undefined;
+    
+    if (isActive) {
+      // Remove overlay
+      OverlayManager.removeOverlay(overlayKey);
+      $button.text('Add to Map')
+             .removeClass('bg-[#dc3545] hover:bg-[#c82333]')
+             .addClass('bg-[#28a745] hover:bg-[#218838]');
+      Utils.showNotification(`Removed ${displayName} overlay from map`, 'success');
+    } else {
+      // Add overlay
+      $button.text('Remove from Map')
+             .removeClass('bg-[#28a745] hover:bg-[#218838]')
+             .addClass('bg-[#dc3545] hover:bg-[#c82333]');
+      
+      this.addLidarRasterOverlayToMap(regionName, processingType, displayName).then((success) => {
+        if (!success) {
+          // Revert button state if overlay failed
+          $button.text('Add to Map')
+                 .removeClass('bg-[#dc3545] hover:bg-[#c82333]')
+                 .addClass('bg-[#28a745] hover:bg-[#218838]');
+        }
+      });
+    }
+  },
+
+  /**
+   * Initialize the Analysis tab when first activated
+   */
+  initializeAnalysisTab() {
+    // Initialize analysis images array if not exists
+    if (!this.analysisImages) {
+      this.analysisImages = [];
+    }
+    
+    // Initialize the AnalysisManager if it exists and hasn't been initialized
+    if (typeof AnalysisManager !== 'undefined' && !this.analysisManagerInitialized) {
+      try {
+        AnalysisManager.init();
+        this.analysisManagerInitialized = true;
+        Utils.log('info', 'AnalysisManager initialized');
+      } catch (error) {
+        Utils.log('error', 'Failed to initialize AnalysisManager:', error);
+      }
+    }
+    
+    // Update the main area to show initial state
+    this.updateAnalysisMainArea();
+    
+    Utils.log('info', 'Analysis tab initialized');
+  },
+
+  /**
+   * Update the selected region display for Analysis tab
+   * @param {string} regionName - Name of the selected region
+   */
+  updateAnalysisSelectedRegion(regionName) {
+    $('#analysis-selected-region-name').text(regionName);
+    
+    // Update global region selector if not already updated
+    if (this.globalSelectedRegion !== regionName) {
+      this.updateGlobalRegionSelector(regionName);
+    }
+    
+    // Load images for the selected region
+    this.loadAnalysisImages(regionName);
+    
+    Utils.log('info', `Analysis tab region updated: ${regionName}`);
+  },
+
+  /**
+   * Load available images for a region in the Analysis tab
+   * @param {string} regionName - Name of the region
+   */
+  async loadAnalysisImages(regionName) {
+    try {
+      // Use region API client
+      const data = await regions().getRegionImages(regionName);
+      
+      // The API returns {images: [...], region_name: "...", total_images: 3}
+      // so we need to access the images array
+      const images = data.images || [];
+      this.displayAnalysisImages(images);
+      
+    } catch (error) {
+      Utils.log('error', 'Error loading analysis images:', error);
+      $('#analysis-images-list').html(`
+        <div class="text-[#dc3545] text-sm text-center py-4">
+          Error loading images: ${error.message}
+        </div>
+      `);
+    }
+  },
+
+  /**
+   * Display images in the Analysis tab
+   * @param {Array} images - Array of image objects
+   */
+  displayAnalysisImages(images) {
+    const imagesList = $('#analysis-images-list');
+    
+    if (!images || images.length === 0) {
+      imagesList.html(`
+        <div class="text-[#666] text-sm text-center py-8">
+          <div class="mb-2">No images available for this region</div>
+          <div class="text-xs">Select a region with processed data to view available images</div>
+        </div>
+      `);
+      return;
+    }
+
+    // Create image gallery using similar style to satellite images
+    const imageItems = images.map(image => {
+      // Determine image type and color
+      let imageType = 'Unknown';
+      let typeColor = '#666';
+      let typeIcon = '📄';
+      
+      if (image.type === 'lidar') {
+        imageType = 'LiDAR';
+        typeColor = '#28a745';
+        typeIcon = '🏔️';
+      } else if (image.type === 'sentinel2') {
+        imageType = 'Sentinel-2';
+        typeColor = '#007bff';
+        typeIcon = '🛰️';
+      }
+      
+      // Get processing type display
+      const processingType = image.processing_type || 'Unknown';
+      
+      return `
+        <div class="gallery-item bg-[#1a1a1a] border border-[#303030] rounded-lg overflow-hidden hover:border-[#404040] transition-colors">
+          <div class="relative w-full h-48">
+            <img src="/${image.path}" 
+                 alt="${this.getImageDisplayName(image.name)}" 
+                 class="w-full h-full object-cover cursor-pointer"
+                 title="Click to view larger image">
+            <div class="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+              ${typeIcon} ${imageType}
+            </div>
+            <div class="absolute top-2 right-8 bg-opacity-75 text-white text-xs px-2 py-1 rounded"
+                 style="background-color: ${typeColor};">
+              ${processingType}
+            </div>
+            <div class="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+              ${image.size || 'Unknown size'}
+            </div>
+          </div>
+          <div class="p-3">
+            <button class="add-to-analysis-btn w-full bg-[#28a745] hover:bg-[#218838] text-white px-3 py-2 text-sm font-medium rounded transition-colors" 
+                    data-image-path="${image.path}" 
+                    data-image-name="${image.name}"
+                    data-image-type="${imageType}"
+                    data-processing-type="${processingType}">
+              Add to Analysis
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Display in a responsive grid layout like the Map tab gallery
+    imagesList.html(`
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        ${imageItems}
+      </div>
+    `);
+
+    // Add event handlers for "Add to Analysis" buttons
+    $('.add-to-analysis-btn').on('click', (e) => {
+      const $button = $(e.target);
+      const imagePath = $button.data('image-path');
+      const imageName = $button.data('image-name');
+      const imageType = $button.data('image-type');
+      const processingType = $button.data('processing-type');
+      
+      // Add to analysis (placeholder - implement your analysis logic here)
+      console.log('Adding to analysis:', {
+        path: imagePath,
+        name: imageName,
+        type: imageType,
+        processingType: processingType
+      });
+      
+      // Show feedback
+      Utils.showToast(`Added ${imageName} to analysis`, 'success');
+    });
+  },
+
+  /**
+   * Event listener for the reload raster gallery button
+   */
+  initializeReloadRasterButton() {
+    $(document).on('click', '#reload-raster-gallery-btn', function() {
+      console.log("🔄 Reload Raster Gallery button clicked");
+      console.log("🔍 Checking for selected region...");
+      
+      // Debug: Log all potential region sources
+      console.log("UIManager.globalSelectedRegion:", UIManager.globalSelectedRegion);
+      console.log("Global region selector element:", $('#global-region-selector'));
+      console.log("Global region selector value:", $('#global-region-selector').val());
+      
+      // Try multiple ways to get the selected region
+      let selectedRegion = UIManager.globalSelectedRegion;
+      
+      // If not found, try to get it from the global region selector
+      if (!selectedRegion) {
+        const regionSelector = $('#global-region-selector');
+        if (regionSelector.length && regionSelector.val()) {
+          selectedRegion = regionSelector.val();
+          console.log("✅ Found region from selector:", selectedRegion);
+        }
+      }
+      
+      // If still not found, try to get it from the current URL or other sources
+      if (!selectedRegion) {
+        // Check if there are any regions available and use the first one as fallback
+        const regionOptions = $('#global-region-selector option');
+        console.log("Available region options:", regionOptions.length);
+        regionOptions.each(function(i, option) {
+          console.log(`  Option ${i}: ${$(option).val()} - ${$(option).text()}`);
+        });
+        
+        if (regionOptions.length > 1) { // More than just the default option
+          selectedRegion = regionOptions.eq(1).val(); // Get first actual region
+          console.log("🔄 Using fallback region:", selectedRegion);
+        }
+      }
+      
+      if (selectedRegion && selectedRegion !== 'default' && selectedRegion !== '') {
+        console.log("🚀 Loading rasters for region:", selectedRegion);
+        if (window.rasterOverlayGallery) {
+          window.rasterOverlayGallery.loadRasters(selectedRegion);
+          Utils.showToast(`Reloading rasters for ${selectedRegion}...`, "info");
+        } else {
+          console.error('❌ RasterOverlayGallery not found!');
+          Utils.showToast("Gallery not initialized. Please refresh the page.", "error");
+        }
+      } else {
+        console.warn("⚠️ No valid region found for reload");
+        Utils.showToast("Please select a region first, or wait for regions to load.", "warning");
+      }
+    });
+  }
+};

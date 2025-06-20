@@ -215,46 +215,7 @@
   <div class="mb-4">
     <h2 class="text-white text-lg font-semibold mb-4">Processing Results</h2>
     <div id="gallery" class="flex gap-4 overflow-x-auto pb-4">
-      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-dtm">
-        <div class="flex-1 flex items-center justify-center">
-          <div class="text-white text-lg font-medium">DTM</div>
-        </div>
-      </div>
-      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-dsm">
-        <div class="flex-1 flex items-center justify-center">
-          <div class="text-white text-lg font-medium">DSM</div>
-        </div>
-      </div>
-      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-hillshade">
-        <div class="flex-1 flex items-center justify-center">
-          <div class="text-white text-lg font-medium">Hillshade</div>
-        </div>
-      </div>
-      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-slope">
-        <div class="flex-1 flex items-center justify-center">
-          <div class="text-white text-lg font-medium">Slope</div>
-        </div>
-      </div>
-      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-aspect">
-        <div class="flex-1 flex items-center justify-center">
-          <div class="text-white text-lg font-medium">Aspect</div>
-        </div>
-      </div>
-      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-tpi">
-        <div class="flex-1 flex items-center justify-center">
-          <div class="text-white text-lg font-medium">TPI</div>
-        </div>
-      </div>
-      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-roughness">
-        <div class="flex-1 flex items-center justify-center">
-          <div class="text-white text-lg font-medium">Roughness</div>
-        </div>
-      </div>
-      <div class="gallery-item flex-shrink-0 w-64 h-48 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-chm">
-        <div class="flex-1 flex items-center justify-center">
-          <div class="text-white text-lg font-medium">CHM</div>
-        </div>
-      </div>
+      <!-- Dynamic gallery content will be loaded here -->
     </div>
   </div>
 
@@ -264,6 +225,16 @@
     <div id="satellite-gallery" class="flex gap-4 overflow-x-auto pb-4">
       <!-- Downloaded satellite images will be displayed here -->
     </div>
+  </div>
+
+  <!-- Raster Gallery Controls -->
+  <div class="raster-gallery-controls">
+    <button id="reload-raster-gallery-btn" class="btn btn-sm btn-primary">
+        <i class="fas fa-sync-alt"></i> Reload Rasters
+    </button>
+  </div>
+  <div id="raster-overlay-gallery-container" class="raster-overlay-gallery">
+    <!-- Gallery items will be dynamically loaded here -->
   </div>
 </div>
 </div>

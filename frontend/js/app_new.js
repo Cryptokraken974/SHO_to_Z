@@ -30,13 +30,13 @@ async function loadModule(modulePath, targetElementId) {
       console.log('🔍 DEBUG: After innerHTML, openai-analysis-tab exists:', !!openaiTab);
       
       // Call the global initializer function after content is loaded
-      if (typeof window.initializeDynamicContent === 'function') {
-        console.log('🔍 DEBUG: Calling initializeDynamicContent');
+      if (window.UIManager && typeof window.UIManager.initializeDynamicContent === 'function') {
+        console.log('🔍 DEBUG: Calling UIManager.initializeDynamicContent');
         // modulePath can serve as a hint for what was loaded.
         // Or, a more specific contextName could be passed from where loadModule is called.
-        window.initializeDynamicContent(targetElement, modulePath);
+        window.UIManager.initializeDynamicContent(targetElement, modulePath);
       } else {
-        console.error('🔍 DEBUG: initializeDynamicContent not available');
+        console.error('🔍 DEBUG: UIManager.initializeDynamicContent not available');
       }
     } else {
       console.error(`Target element ${targetElementId} not found for module ${fetchPath}`);

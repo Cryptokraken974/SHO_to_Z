@@ -192,8 +192,33 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
         print(f"📂 Region name: {region_name}")
         print(f"🔄 Processing type: {processing_type}")
         
+        # Map frontend processing types to backend processing types
+        processing_type_mapping = {
+            "lrm": "LRM",
+            "sky_view_factor": "Sky_View_Factor", 
+            "slope": "Slope",
+            "hillshade_rgb": "HillshadeRGB",
+            "hillshadergb": "HillshadeRGB",  # Support direct mapping
+            "tint_overlay": "TintOverlay",
+            "tintoverlay": "TintOverlay",    # Support direct mapping
+            "aspect": "Aspect",
+            "dtm": "DTM",
+            "dsm": "DSM",
+            "dem": "DEM",
+            "chm": "CHM",
+            "hillshade": "Hillshade",
+            "color_relief": "Color_Relief",
+            "tri": "TRI",
+            "tpi": "TPI",
+            "roughness": "Roughness"
+        }
+        
+        # Convert frontend processing type to backend processing type
+        backend_processing_type = processing_type_mapping.get(processing_type.lower(), processing_type.title())
+        print(f"🔄 Mapped processing type: {processing_type} -> {backend_processing_type}")
+        
         # Use the updated geo_utils function that prioritizes metadata.txt
-        overlay_data = get_laz_overlay_data(region_name, processing_type.title())
+        overlay_data = get_laz_overlay_data(region_name, backend_processing_type)
         
         if not overlay_data:
             print(f"❌ No overlay data found for {region_name}/{processing_type}")

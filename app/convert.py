@@ -7,8 +7,12 @@ import subprocess
 import numpy as np # Added numpy
 import logging
 import tempfile # Added tempfile for base64 conversion temp file
+from pathlib import Path # Added pathlib for Sentinel-2 processing
 
 logger = logging.getLogger(__name__)
+
+# Configure GDAL to prevent auxiliary file creation for PNG files
+gdal.SetConfigOption('GDAL_PAM_ENABLED', 'NO')
 
 def convert_geotiff_to_png(
     tif_path: str,
@@ -161,7 +165,7 @@ def convert_geotiff_to_png(
                 os.makedirs(consolidated_dir, exist_ok=True)
                 
                 base_tif_name = os.path.splitext(os.path.basename(tif_path))[0]
-                consolidated_png_name = f"{base_tif_name}_stretch_{stretch_type}.png"
+                consolidated_png_name = f"{base_tif_name}.png"
                 consolidated_png_path = os.path.join(consolidated_dir, consolidated_png_name)
 
                 import shutil

@@ -12,6 +12,7 @@ from osgeo import gdal, gdalconst
 from typing import Dict, Any, Tuple, Optional, List
 from pathlib import Path
 import asyncio
+from .sky_view_factor import process_sky_view_factor_tiff
 
 logger = logging.getLogger(__name__)
 
@@ -1056,7 +1057,8 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
         ("aspect", process_aspect_tiff, {}),
         ("color_relief", process_color_relief_tiff, {}),
         ("slope_relief", process_slope_relief_tiff, {}),
-        ("lrm", process_lrm_tiff, {})
+        ("lrm", process_lrm_tiff, {}),
+        ("sky_view_factor", process_sky_view_factor_tiff, {})
     ])
     
     results = {}
@@ -1084,76 +1086,68 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
             if result["status"] == "success":
                 print(f"✅ {task_name} completed successfully")
                 
-                # Convert to PNG for visualization
-                try:
-                    # Import the conversion function with proper path handling
-                    import sys
-                    from pathlib import Path
-                    
-                    # Add the app directory to sys.path if not already there
-                    app_dir = Path(__file__).parent.parent
-                    if str(app_dir) not in sys.path:
-                        sys.path.insert(0, str(app_dir))
-                    
-                    from convert import convert_geotiff_to_png
-                    from overlay_optimization import OverlayOptimizer
-                    
-                    # Create PNG output directory under the main lidar output folder
-                    png_output_dir = os.path.join(base_output_dir, "png_outputs")
-                    os.makedirs(png_output_dir, exist_ok=True)
-                    
-                    # Generate PNG filename and path
-                    tiff_basename = os.path.splitext(os.path.basename(result["output_file"]))[0]
-                    png_filename = f"{tiff_basename}.png"
-                    png_path = os.path.join(png_output_dir, png_filename)
-                    
-                    # Convert TIFF to PNG
-                    converted_png = convert_geotiff_to_png(result["output_file"], png_path)
-                    
-                    if converted_png and os.path.exists(converted_png):
-                        result["png_file"] = converted_png
-                        png_size = os.path.getsize(converted_png) / (1024 * 1024)  # MB
-                        print(f"🖼️ PNG created: {os.path.basename(converted_png)} ({png_size:.1f} MB)")
+                # Only create PNG for specific raster products: lrm, sky_view_factor, slope
+                if task_name in ["lrm", "sky_view_factor", "slope"]:
+                    # Convert to PNG for visualization
+                    try:
+                        # Import the conversion function with proper path handling
+                        import sys
+                        from pathlib import Path
                         
-                        # Generate optimized overlay if needed
-                        overlay_optimizer = OverlayOptimizer()
-                        overlay_path = overlay_optimizer.optimize_tiff_to_overlay(result["output_file"])
+                        # Add the app directory to sys.path if not already there
+                        app_dir = Path(__file__).parent.parent
+                        if str(app_dir) not in sys.path:
+                            sys.path.insert(0, str(app_dir))
                         
-                        if overlay_path:
-                            # Move overlay to png_outputs directory
-                            overlay_dest = os.path.join(png_output_dir, os.path.basename(overlay_path))
-                            if overlay_path != overlay_dest:
-                                import shutil
-                                shutil.move(overlay_path, overlay_dest)
-                                print(f"📦 Overlay moved to png_outputs: {os.path.basename(overlay_dest)}")
-                                
-                                # Also move overlay worldfile if it exists
-                                overlay_worldfile = os.path.splitext(overlay_path)[0] + ".pgw"
-                                overlay_worldfile_dest = os.path.splitext(overlay_dest)[0] + ".pgw"
-                                if os.path.exists(overlay_worldfile):
-                                    shutil.move(overlay_worldfile, overlay_worldfile_dest)
+                        from convert import convert_geotiff_to_png
+                        from overlay_optimization import OverlayOptimizer
                         
-                        # Also copy the TIFF and world files to png_outputs for overlay API compatibility
-                        import shutil
+                        # Create PNG output directory under the main lidar output folder
+                        png_output_dir = os.path.join(base_output_dir, "png_outputs")
+                        os.makedirs(png_output_dir, exist_ok=True)
                         
-                        # Copy TIFF file
-                        tiff_dest = os.path.join(png_output_dir, f"{tiff_basename}.tif")
-                        if os.path.exists(result["output_file"]) and not os.path.exists(tiff_dest):
-                            shutil.copy2(result["output_file"], tiff_dest)
-                            print(f"📋 TIFF copied: {os.path.basename(tiff_dest)}")
+                        # Generate short PNG filename based on task name
+                        png_name_mapping = {
+                            "lrm": "LRM.png",
+                            "sky_view_factor": "SVF.png",
+                            "slope": "Slope.png"
+                        }
+                        png_filename = png_name_mapping.get(task_name, f"{task_name}.png")
+                        png_path = os.path.join(png_output_dir, png_filename)
                         
-                        # Copy world file (.wld)
-                        original_world_file = os.path.splitext(result["output_file"])[0] + ".wld"
-                        world_dest = os.path.join(png_output_dir, f"{tiff_basename}.wld")
-                        if os.path.exists(original_world_file) and not os.path.exists(world_dest):
-                            shutil.copy2(original_world_file, world_dest)
-                            print(f"🌍 World file copied: {os.path.basename(world_dest)}")
+                        # Convert TIFF to PNG
+                        converted_png = convert_geotiff_to_png(result["output_file"], png_path)
+                        
+                        if converted_png and os.path.exists(converted_png):
+                            result["png_file"] = converted_png
+                            png_size = os.path.getsize(converted_png) / (1024 * 1024)  # MB
+                            print(f"🖼️ PNG created: {os.path.basename(converted_png)} ({png_size:.1f} MB)")
                             
-                    else:
-                        print(f"⚠️ PNG conversion failed for {task_name}: No output file created")
-                        
-                except Exception as e:
-                    print(f"⚠️ PNG conversion failed for {task_name}: {e}")
+                            # Generate optimized overlay if needed
+                            overlay_optimizer = OverlayOptimizer()
+                            overlay_path = overlay_optimizer.optimize_tiff_to_overlay(result["output_file"])
+                            
+                            if overlay_path:
+                                # Move overlay to png_outputs directory
+                                overlay_dest = os.path.join(png_output_dir, os.path.basename(overlay_path))
+                                if overlay_path != overlay_dest:
+                                    import shutil
+                                    shutil.move(overlay_path, overlay_dest)
+                                    print(f"📦 Overlay moved to png_outputs: {os.path.basename(overlay_dest)}")
+                                    
+                                    # Also move overlay worldfile if it exists
+                                    overlay_worldfile = os.path.splitext(overlay_path)[0] + ".pgw"
+                                    overlay_worldfile_dest = os.path.splitext(overlay_dest)[0] + ".pgw"
+                                    if os.path.exists(overlay_worldfile):
+                                        shutil.move(overlay_worldfile, overlay_worldfile_dest)
+                                
+                        else:
+                            print(f"⚠️ PNG conversion failed for {task_name}: No output file created")
+                    
+                    except Exception as e:
+                        print(f"⚠️ PNG conversion failed for {task_name}: {e}")
+                else:
+                    print(f"ℹ️ Skipping PNG generation for {task_name} (not in selected list)")
             else:
                 print(f"❌ {task_name} failed: {result.get('error', 'Unknown error')}")
                 
@@ -1192,7 +1186,7 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                 png_output_dir = os.path.join(base_output_dir, "png_outputs")
                 os.makedirs(png_output_dir, exist_ok=True)
 
-                png_name = os.path.splitext(os.path.basename(rgb_output))[0] + ".png"
+                png_name = "HillshadeRGB.png"
                 png_path = os.path.join(png_output_dir, png_name)
                 converted_png = convert_geotiff_to_png(rgb_output, png_path)
                 if converted_png and os.path.exists(converted_png):
@@ -1213,7 +1207,7 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                     if tint_result["status"] == "success":
                         png_output_dir = os.path.join(base_output_dir, "png_outputs")
                         os.makedirs(png_output_dir, exist_ok=True)
-                        png_name = os.path.splitext(os.path.basename(tint_output))[0] + ".png"
+                        png_name = "TintOverlay.png"
                         png_path = os.path.join(png_output_dir, png_name)
                         converted_png = convert_geotiff_to_png(tint_output, png_path)
                         if converted_png and os.path.exists(converted_png):
@@ -1233,12 +1227,7 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                                 results["boosted_hillshade"] = slope_overlay_res
 
                                 if slope_overlay_res["status"] == "success":
-                                    png_name = os.path.splitext(os.path.basename(boosted_output))[0] + ".png"
-                                    png_path = os.path.join(png_output_dir, png_name)
-                                    converted_png = convert_geotiff_to_png(boosted_output, png_path)
-                                    if converted_png and os.path.exists(converted_png):
-                                        slope_overlay_res["png_file"] = converted_png
-                                        print(f"🖼️ PNG created: {os.path.basename(converted_png)}")
+                                    print(f"✅ Boosted hillshade created: {os.path.basename(boosted_output)}")
                             except Exception as e:
                                 print(f"⚠️ Slope overlay generation failed: {e}")
 

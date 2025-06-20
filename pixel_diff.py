@@ -1,7 +1,7 @@
 from PIL import Image, ImageChops
 
 img1_path = "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/output/PRGL1260C9597_2014/lidar/png_outputs/boosted_hillshade.png"
-img2_path = "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/output/PRGL1260C9597_2014/lidar/png_outputs/boosted_hillshade_stretch_stddev.png"
+img2_path = "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/output/PRGL1260C9597_2014/lidar/png_outputs/boosted_hillshade.png"
 output_path = "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/output/PRGL1260C9597_2014/lidar/png_outputs/pixel_diff.png"
 
 try:

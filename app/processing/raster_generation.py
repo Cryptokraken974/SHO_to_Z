@@ -193,105 +193,18 @@ class RasterGenerator:
     def convert_to_png(self, products: Dict[str, str], output_folder: Path,
                        progress_callback: Optional[Callable] = None) -> Dict[str, str]:
         """Convert all TIFF products to PNG for visualization with enhanced resolution and automatic overlay generation"""
-        if progress_callback:
-            asyncio.create_task(progress_callback({
-                "type": "png_conversion_started",
-                "message": "Converting products to PNG with ENHANCED RESOLUTION and automatic overlay generation"
-            }))
         
-        png_outputs = {}
-        png_dir = output_folder / 'png_outputs'
-        
-        # Initialize overlay optimizer
-        overlay_optimizer = OverlayOptimizer()
-        
-        conversion_start = time.time()
-        
-        for product_name, tiff_path in products.items():
-            try:
-                # Generate PNG filename
-                tiff_basename = os.path.splitext(os.path.basename(tiff_path))[0]
-                png_filename = f"{tiff_basename}.png"
-                png_path = png_dir / png_filename
-                
-                # Convert using the ENHANCED resolution conversion function
-                result_png = convert_geotiff_to_png(tiff_path, str(png_path), enhanced_resolution=True)
-                
-                if result_png and os.path.exists(result_png):
-                    png_outputs[product_name] = result_png
-                    
-                    # Check if we need to generate an optimized overlay version
-                    if progress_callback:
-                        asyncio.create_task(progress_callback({
-                            "type": "overlay_optimization_check",
-                            "message": f"Checking {product_name} for overlay optimization..."
-                        }))
-                    
-                    # Generate overlay from TIFF (more efficient than PNG optimization)
-                    overlay_path = overlay_optimizer.optimize_tiff_to_overlay(tiff_path)
-                    
-                    if overlay_path:
-                        if progress_callback:
-                            asyncio.create_task(progress_callback({
-                                "type": "overlay_generated",
-                                "message": f"Generated optimized overlay for {product_name}",
-                                "product": product_name,
-                                "overlay_file": overlay_path
-                            }))
-                    
-                    if progress_callback:
-                        asyncio.create_task(progress_callback({
-                            "type": "png_conversion_progress",
-                            "message": f"Converted {product_name} to ENHANCED PNG",
-                            "product": product_name,
-                            "png_file": result_png
-                        }))
-                else:
-                    self.results['errors'].append(f"PNG conversion failed: {product_name}")
-                    
-                    if progress_callback:
-                        asyncio.create_task(progress_callback({
-                            "type": "png_conversion_error",
-                            "message": f"PNG conversion failed for {product_name}",
-                            "product": product_name
-                        }))
-                    
-            except Exception as e:
-                error_msg = f"PNG conversion error for {product_name}: {str(e)}"
-                self.results['errors'].append(error_msg)
-                
-                if progress_callback:
-                    asyncio.create_task(progress_callback({
-                        "type": "png_conversion_error",
-                        "message": error_msg,
-                        "product": product_name,
-                        "error": str(e)
-                    }))
-        
-        conversion_time = time.time() - conversion_start
-        
-        # Get optimization summary
-        optimization_summary = overlay_optimizer.get_optimization_summary()
+        # DISABLED: PNG conversion is now handled by the main tiff_processing.py pipeline
+        # to avoid duplicate PNG creation. This function now returns empty dict.
+        print("ℹ️ PNG conversion disabled in RasterGenerator - handled by main pipeline")
         
         if progress_callback:
             asyncio.create_task(progress_callback({
-                "type": "png_conversion_completed",
-                "message": f"ENHANCED PNG conversion completed in {conversion_time:.2f}s. Overlays: {optimization_summary['optimized_count']} generated, {optimization_summary['skipped_count']} skipped",
-                "successful": len(png_outputs),
-                "failed": len(products) - len(png_outputs),
-                "total_time": conversion_time,
-                "overlay_summary": optimization_summary
+                "type": "png_conversion_skipped",
+                "message": "PNG conversion skipped - handled by main pipeline to avoid duplicates"
             }))
         
-        # Log overlay optimization summary
-        if optimization_summary['optimized_count'] > 0:
-            print(f"\n🎯 Overlay Optimization Summary:")
-            print(f"   ✅ Generated: {optimization_summary['optimized_count']} overlay files")
-            print(f"   ⏭️ Skipped: {optimization_summary['skipped_count']} (below threshold)")
-            if optimization_summary['error_count'] > 0:
-                print(f"   ❌ Errors: {optimization_summary['error_count']}")
-        
-        return png_outputs
+        return {}
     
     def generate_colorized_dem(self, original_tiff: Path, output_folder: Path,
                               progress_callback: Optional[Callable] = None) -> Optional[str]:
@@ -406,8 +319,9 @@ class RasterGenerator:
                     "file": str(tiff_file)
                 }
             
-            # 4. Convert to PNG
-            png_outputs = self.convert_to_png(products, output_folder, progress_callback)
+            # 4. Convert to PNG - DISABLED to prevent duplicates (handled by main pipeline)
+            # png_outputs = self.convert_to_png(products, output_folder, progress_callback)
+            png_outputs = {}  # Empty dict since PNG conversion is handled elsewhere
             
             # 5. Generate colorized DEM
             colorized_dem = self.generate_colorized_dem(tiff_file, output_folder, progress_callback)

@@ -33,6 +33,16 @@ window.Utils = {
   },
 
   /**
+   * Show toast notification (alias for showNotification)
+   * @param {string} message - Message to show
+   * @param {string} type - Type of notification (info, success, error, warning)
+   * @param {number} duration - Duration in milliseconds (optional)
+   */
+  showToast(message, type = 'info', duration = 3000) {
+    return this.showNotification(message, type, duration);
+  },
+
+  /**
    * Debounce function to limit the rate of function calls
    * @param {Function} func - Function to debounce
    * @param {number} wait - Wait time in milliseconds

@@ -170,10 +170,10 @@ class RasterGenerationService:
                 png_outputs = await self.convert_products_to_png(products, raster_output_dir)
                 all_png_outputs.update(png_outputs)
                 
-                # Generate colorized DEM
-                colorized_dem = await self.generate_colorized_dem(tiff_file, raster_output_dir)
-                if colorized_dem:
-                    all_png_outputs[f"{tiff_file.stem}_colorized_dem"] = colorized_dem
+                # Generate colorized DEM - DISABLED to prevent duplicates
+                # colorized_dem = await self.generate_colorized_dem(tiff_file, raster_output_dir)
+                # if colorized_dem:
+                #     all_png_outputs[f"{tiff_file.stem}_colorized_dem"] = colorized_dem
             
             # 4. Update results
             results['success'] = True
@@ -238,35 +238,12 @@ class RasterGenerationService:
         return products
     
     async def convert_products_to_png(self, products: Dict[str, str], output_dir: Path) -> Dict[str, str]:
-        """Convert TIFF products to PNG for visualization"""
-        print(f"🎨 Converting {len(products)} products to PNG...")
+        """Convert TIFF products to PNG for visualization - DISABLED to prevent duplicates"""
+        print(f"🎨 PNG conversion disabled - main pipeline handles PNG generation...")
         
-        png_outputs = {}
-        png_dir = output_dir / 'png_outputs'
-        
-        for product_name, tiff_path in products.items():
-            try:
-                # Generate PNG filename
-                tiff_basename = os.path.splitext(os.path.basename(tiff_path))[0]
-                png_filename = f"{tiff_basename}.png"
-                png_path = png_dir / png_filename
-                
-                # Convert using the existing conversion function
-                result_png = convert_geotiff_to_png(tiff_path, str(png_path))
-                
-                if result_png and os.path.exists(result_png):
-                    png_outputs[product_name] = result_png
-                    
-                    # Get PNG file size
-                    png_size = os.path.getsize(result_png) / (1024 * 1024)  # MB
-                    print(f"✅ {product_name} PNG created ({png_size:.1f} MB)")
-                else:
-                    print(f"❌ PNG conversion failed for {product_name}")
-                    
-            except Exception as e:
-                print(f"❌ PNG conversion error for {product_name}: {str(e)}")
-        
-        return png_outputs
+        # Return empty dict to avoid duplicate PNG creation
+        # Main LAZ processing pipeline now handles all PNG generation with standardized naming
+        return {}
     
     async def generate_colorized_dem(self, tiff_file: Path, output_dir: Path) -> Optional[str]:
         """Generate a colorized DEM visualization"""

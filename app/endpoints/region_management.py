@@ -625,5 +625,102 @@ Center Longitude: {metadata.get('center_longitude', 'N/A')}
         print(f"❌ Error saving metadata: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to save metadata: {str(e)}")
 
+@router.get("/api/regions/{region_name}/png-files")
+async def list_region_png_files(region_name: str):
+    """List all available PNG files in a region's png_outputs directory"""
+    print(f"\n📁 API CALL: GET /api/regions/{region_name}/png-files")
+    
+    try:
+        import os
+        import glob
+        from pathlib import Path
+        
+        # Check png_outputs directory
+        png_outputs_dir = Path("output") / region_name / "lidar" / "png_outputs"
+        
+        if not png_outputs_dir.exists():
+            print(f"📁 PNG outputs directory doesn't exist: {png_outputs_dir}")
+            return {
+                "region_name": region_name,
+                "png_files": [],
+                "total_files": 0,
+                "directory": str(png_outputs_dir),
+                "exists": False
+            }
+        
+        # Find all PNG files in the directory
+        png_pattern = str(png_outputs_dir / "*.png")
+        png_files = glob.glob(png_pattern)
+        
+        # Process each PNG file to extract processing type
+        processed_files = []
+        for png_file in png_files:
+            filename = Path(png_file).name
+            
+            # Extract processing type from filename
+            # Expected patterns: LRM.png, SVF.png, Slope.png, HillshadeRGB.png, TintOverlay.png
+            processing_type = None
+            display_name = None
+            
+            if filename == "LRM.png":
+                processing_type = "lrm"
+                display_name = "Local Relief Model"
+            elif filename == "SVF.png":
+                processing_type = "sky_view_factor"
+                display_name = "Sky View Factor"
+            elif filename == "Slope.png":
+                processing_type = "slope"
+                display_name = "Slope"
+            elif filename == "HillshadeRGB.png":
+                processing_type = "hillshade_rgb"
+                display_name = "Hillshade RGB"
+            elif filename == "TintOverlay.png":
+                processing_type = "tint_overlay"
+                display_name = "Tint Overlay"
+            else:
+                # Try to extract from general pattern
+                name_base = filename.replace('.png', '')
+                if '_' in name_base:
+                    processing_type = name_base.split('_')[-1].lower()
+                else:
+                    processing_type = name_base.lower()
+                display_name = processing_type.replace('_', ' ').title()
+            
+            # Get file size
+            file_size = os.path.getsize(png_file)
+            
+            processed_files.append({
+                "filename": filename,
+                "processing_type": processing_type,
+                "display_name": display_name,
+                "file_path": str(png_file),
+                "file_size": file_size,
+                "file_size_mb": round(file_size / (1024 * 1024), 2)
+            })
+        
+        # Sort by processing type for consistent ordering
+        processed_files.sort(key=lambda x: x["processing_type"] or "zzz")
+        
+        print(f"✅ Found {len(processed_files)} PNG files in {png_outputs_dir}")
+        for pf in processed_files:
+            print(f"   📄 {pf['filename']} -> {pf['processing_type']} ({pf['file_size_mb']} MB)")
+        
+        return {
+            "region_name": region_name,
+            "png_files": processed_files,
+            "total_files": len(processed_files),
+            "directory": str(png_outputs_dir),
+            "exists": True
+        }
+        
+    except Exception as e:
+        print(f"❌ Error listing PNG files: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list PNG files for region {region_name}: {str(e)}"
+        )
+
 # ============================================================================
 

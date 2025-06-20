@@ -330,31 +330,67 @@ def get_laz_overlay_data(base_filename: str, processing_type: str, filename_proc
             'TRI': 'TRI',
             'TPI': 'TPI',
             'Roughness': 'Roughness',
-            'Sky_View_Factor': 'SkyViewFactor'
+            'Sky_View_Factor': 'SkyViewFactor',
+            'Tint_Overlay': 'TintOverlay'
+        }
+        
+        # Map processing type to new consolidated PNG names (PRIORITY)
+        consolidated_png_mapping = {
+            'LRM': 'LRM.png',
+            'Sky_View_Factor': 'SVF.png', 
+            'Slope': 'Slope.png',
+            'Hillshade': 'HillshadeRGB.png',
+            'HillshadeRGB': 'HillshadeRGB.png',  # Support direct mapping
+            'Tint_Overlay': 'TintOverlay.png',
+            'TintOverlay': 'TintOverlay.png'     # Support direct mapping
+        }
+        
+        # Map processing types to their actual directory names and TIFF files
+        directory_mapping = {
+            'HillshadeRGB': ('HillshadeRgb', 'hillshade_rgb.tif'),
+            'TintOverlay': ('HillshadeRgb', 'tint_overlay.tif'),  # TintOverlay files are in HillshadeRgb directory
+            'Sky_View_Factor': ('Sky_View_Factor', None),  # Will auto-detect TIFF file
+            'LRM': ('Lrm', None),
+            'Slope': ('Slope', None)
         }
         
         filename_suffix = filename_mapping.get(mapping_key, mapping_key.title())
         
         # Add possible file paths in order of preference
         # Pattern 0: PRIORITY - PNG outputs consolidated directory (NEW STANDARD)
-        png_outputs_pattern = f"output/{base_filename}/lidar/png_outputs/{base_filename}_elevation_{processing_type_lower}.png"
-        if os.path.exists(f"output/{base_filename}/lidar/png_outputs"):
-            # Check for files in png_outputs with elevation pattern
+        png_outputs_dir = f"output/{base_filename}/lidar/png_outputs"
+        if os.path.exists(png_outputs_dir):
+            # First check for new consolidated PNG names (LRM.png, SVF.png, etc.)
+            if processing_type in consolidated_png_mapping:
+                consolidated_png_name = consolidated_png_mapping[processing_type]
+                consolidated_png_path = f"{png_outputs_dir}/{consolidated_png_name}"
+                if os.path.exists(consolidated_png_path):
+                    base_name = os.path.splitext(consolidated_png_name)[0]
+                    possible_paths.append({
+                        'png': consolidated_png_path,
+                        'tiff': f"{png_outputs_dir}/{base_name}.tif",
+                        'world': f"{png_outputs_dir}/{base_name}.wld",
+                        'desc': f'Consolidated PNG ({consolidated_png_name}) - NEW STANDARD'
+                    })
+                    print(f"✅ Found consolidated PNG: {consolidated_png_path}")
+            
+            # Then check for old elevation pattern
+            png_outputs_pattern = f"{png_outputs_dir}/{base_filename}_elevation_{processing_type_lower}.png"
             if os.path.exists(png_outputs_pattern):
                 base_name = os.path.splitext(os.path.basename(png_outputs_pattern))[0]
                 possible_paths.append({
                     'png': png_outputs_pattern,
-                    'tiff': f"output/{base_filename}/lidar/png_outputs/{base_name}.tif",
-                    'world': f"output/{base_filename}/lidar/png_outputs/{base_name}.wld",
-                    'desc': 'PNG outputs consolidated directory (PRIORITY)'
+                    'tiff': f"{png_outputs_dir}/{base_name}.tif",
+                    'world': f"{png_outputs_dir}/{base_name}.wld",
+                    'desc': 'PNG outputs consolidated directory (OLD ELEVATION PATTERN)'
                 })
             else:
                 # Try alternative naming patterns in png_outputs
                 import glob
                 search_patterns = [
-                    f"output/{base_filename}/lidar/png_outputs/{base_filename}_elevation_{processing_type_lower}*.png",
-                    f"output/{base_filename}/lidar/png_outputs/*_elevation_{processing_type_lower}.png",
-                    f"output/{base_filename}/lidar/png_outputs/{base_filename}_{filename_suffix}*.png"
+                    f"{png_outputs_dir}/{base_filename}_elevation_{processing_type_lower}*.png",
+                    f"{png_outputs_dir}/*_elevation_{processing_type_lower}.png",
+                    f"{png_outputs_dir}/{base_filename}_{filename_suffix}*.png"
                 ]
                 
                 for pattern in search_patterns:
@@ -364,9 +400,9 @@ def get_laz_overlay_data(base_filename: str, processing_type: str, filename_proc
                         base_name = os.path.splitext(os.path.basename(png_file))[0]
                         possible_paths.append({
                             'png': png_file,
-                            'tiff': f"output/{base_filename}/lidar/png_outputs/{base_name}.tif",
-                            'world': f"output/{base_filename}/lidar/png_outputs/{base_name}.wld",
-                            'desc': 'PNG outputs consolidated directory (FOUND)'
+                            'tiff': f"{png_outputs_dir}/{base_name}.tif",
+                            'world': f"{png_outputs_dir}/{base_name}.wld",
+                            'desc': 'PNG outputs consolidated directory (PATTERN MATCH)'
                         })
                         break
 
@@ -662,6 +698,15 @@ def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, proce
     Common function to process overlay files and extract bounds and image data.
     """
     try:
+        # Map processing types to their actual directory names and TIFF files
+        directory_mapping = {
+            'HillshadeRGB': ('HillshadeRgb', 'hillshade_rgb.tif'),
+            'TintOverlay': ('HillshadeRgb', 'tint_overlay.tif'),  # TintOverlay files are in HillshadeRgb directory
+            'Sky_View_Factor': ('Sky_View_Factor', None),  # Will auto-detect TIFF file
+            'LRM': ('Lrm', None),
+            'Slope': ('Slope', None)
+        }
+        
         # Check if files exist
         print(f"📁 PNG exists: {os.path.exists(png_path)}")
         print(f"🗺️  TIFF exists: {os.path.exists(tiff_path)}")
@@ -670,6 +715,53 @@ def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, proce
         if not os.path.exists(png_path):
             print(f"❌ PNG file not found: {png_path}")
             return None
+        
+        # If the expected TIFF file doesn't exist, try to find the original TIFF in the processing type directory
+        original_tiff_path = tiff_path
+        if not os.path.exists(tiff_path):
+            print(f"🔍 PNG-adjacent TIFF not found, looking for original TIFF...")
+            
+            # Check if we have a directory mapping for this processing type
+            if processing_type in directory_mapping:
+                actual_dir, specific_tiff = directory_mapping[processing_type]
+                tiff_dir = f"output/{base_filename}/lidar/{actual_dir}"
+                print(f"📂 Using directory mapping: {processing_type} -> {actual_dir}")
+                
+                if os.path.exists(tiff_dir):
+                    if specific_tiff:
+                        # Look for a specific TIFF file
+                        specific_tiff_path = f"{tiff_dir}/{specific_tiff}"
+                        if os.path.exists(specific_tiff_path):
+                            original_tiff_path = specific_tiff_path
+                            print(f"✅ Found specific TIFF: {original_tiff_path}")
+                        else:
+                            print(f"❌ Specific TIFF not found: {specific_tiff_path}")
+                    else:
+                        # Auto-detect TIFF files in the directory
+                        import glob
+                        tiff_files = glob.glob(f"{tiff_dir}/*.tif")
+                        if tiff_files:
+                            original_tiff_path = tiff_files[0]  # Use the first TIFF found
+                            print(f"✅ Found original TIFF: {original_tiff_path}")
+                        else:
+                            print(f"❌ No TIFF files found in {tiff_dir}")
+                else:
+                    print(f"❌ Mapped directory not found: {tiff_dir}")
+            else:
+                # Fallback to original logic for unmapped processing types
+                tiff_dir = f"output/{base_filename}/lidar/{processing_type}"
+                if os.path.exists(tiff_dir):
+                    import glob
+                    tiff_files = glob.glob(f"{tiff_dir}/*.tif")
+                    if tiff_files:
+                        original_tiff_path = tiff_files[0]  # Use the first TIFF found
+                        print(f"✅ Found original TIFF: {original_tiff_path}")
+                    else:
+                        print(f"❌ No TIFF files found in {tiff_dir}")
+                else:
+                    print(f"❌ Processing type directory not found: {tiff_dir}")
+        else:
+            print(f"✅ Using expected TIFF path: {tiff_path}")
         
         # PRIORITY: Try to get bounds from metadata.txt file first (most reliable)
         metadata_center = _get_center_from_metadata(base_filename)
@@ -738,14 +830,34 @@ def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, proce
                         }
                         print(f"✅ Using metadata center with fixed buffer: {bounds}")
                         
+        # Try to get bounds from original TIFF if metadata was found but world file wasn't successful
+        if metadata_center and not bounds and os.path.exists(original_tiff_path):
+            print(f"🗺️  Trying to extract bounds from original TIFF: {original_tiff_path}")
+            tiff_bounds = get_image_bounds_from_geotiff(original_tiff_path)
+            if tiff_bounds:
+                bounds = tiff_bounds
+                bounds['source'] = 'geotiff + metadata_center_validation'
+                print(f"✅ Using bounds from original TIFF: {bounds}")
+            else:
+                print("❌ Failed to extract bounds from original TIFF")
+        
         else:
             print("📄 No metadata.txt found, trying other methods...")
             
             # Fallback: Try to get bounds from GeoTIFF, then world file
             epsg_code = None
             
-            if os.path.exists(tiff_path):
-                print("🗺️  Trying to extract bounds from GeoTIFF...")
+            # Try the original TIFF path first (may be different from expected path)
+            if os.path.exists(original_tiff_path):
+                print(f"🗺️  Trying to extract bounds from GeoTIFF: {original_tiff_path}")
+                bounds = get_image_bounds_from_geotiff(original_tiff_path)
+                if bounds:
+                    epsg_code = bounds.get('epsg')
+                    print(f"✅ Bounds from GeoTIFF: {bounds}")
+                else:
+                    print("❌ Failed to extract bounds from GeoTIFF")
+            elif os.path.exists(tiff_path):
+                print(f"🗺️  Trying to extract bounds from expected GeoTIFF: {tiff_path}")
                 bounds = get_image_bounds_from_geotiff(tiff_path)
                 if bounds:
                     epsg_code = bounds.get('epsg')
@@ -1224,9 +1336,9 @@ def crop_geotiff_to_bbox(input_path: str, output_path: str, bbox: 'BoundingBox')
             print(f"❌ GDAL cropping failed for {input_path}")
             return False
 
-        result.FlushCache()
-        result = None
+        print(f"✅ Cropped {input_path} to {output_path}")
         return True
+
     except Exception as e:
         print(f"❌ Error cropping GeoTIFF {input_path}: {e}")
         return False

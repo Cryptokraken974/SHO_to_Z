@@ -2,11 +2,6 @@ class RasterOverlayGallery {
     constructor(containerId = 'raster-overlay-gallery', options = {}) {
         this.containerId = containerId;
         this.options = Object.assign({
-            processingTypes: [
-                'hs_red', 'hs_green', 'hs_blue',
-                'slope', 'aspect', 'color_relief', 'slope_relief', 'lrm',
-                'hillshade_rgb', 'tint_overlay', 'boosted_hillshade'
-            ],
             onAddToMap: (type) => this.defaultAddToMap(type)
         }, options);
 
@@ -20,40 +15,84 @@ class RasterOverlayGallery {
         this.regionName = null;
     }
 
+    init() {
+        console.log('RasterOverlayGallery.init() called');
+        // Initialize the gallery - this method is expected by the UI system
+        // The actual gallery initialization is done in the constructor via ModularGallery
+        // This method exists to satisfy the UI initialization requirements
+        return this;
+    }
+
     async loadRasters(regionName) {
+        console.log('RasterOverlayGallery.loadRasters called with region:', regionName);
         this.regionName = regionName;
         if (!regionName) {
+            console.log('No region name provided, clearing gallery');
             this.gallery.clear();
             return;
         }
 
+        console.log('Showing loading state for gallery');
         this.gallery.showLoading();
         const items = [];
-        for (const type of this.options.processingTypes) {
-            try {
-                const data = await overlays().getRasterOverlayData(regionName, type);
-                if (data && data.image_data) {
-                    items.push({
-                        id: type,
-                        imageUrl: `data:image/png;base64,${data.image_data}`,
-                        title: window.UIManager?.getProcessingDisplayName
-                            ? window.UIManager.getProcessingDisplayName(type)
-                            : type,
-                        subtitle: null,
-                        status: 'ready'
-                    });
+        
+        try {
+            // Get available PNG files for this region dynamically
+            console.log('Fetching PNG files for region:', regionName);
+            const pngData = await regions().getRegionPngFiles(regionName);
+            console.log('PNG data received:', pngData);
+            
+            if (pngData && pngData.png_files && pngData.png_files.length > 0) {
+                console.log(`Found ${pngData.png_files.length} PNG files for region`);
+                // Process each available PNG file
+                for (const pngFile of pngData.png_files) {
+                    console.log('Processing PNG file:', pngFile);
+                    try {
+                        const processingType = pngFile.processing_type;
+                        if (!processingType) {
+                            console.warn('PNG file missing processing_type:', pngFile);
+                            continue;
+                        }
+                        
+                        // Get overlay data for this processing type
+                        console.log('Fetching overlay data for processing type:', processingType);
+                        const data = await overlays().getRasterOverlayData(regionName, processingType);
+                        console.log('Overlay data received for', processingType, ':', data ? 'SUCCESS' : 'FAILED');
+                        if (data && data.image_data) {
+                            const item = {
+                                id: processingType,
+                                imageUrl: `data:image/png;base64,${data.image_data}`,
+                                title: pngFile.display_name || this.getProcessingDisplayName(processingType),
+                                subtitle: `${pngFile.file_size_mb} MB`,
+                                status: 'ready'
+                            };
+                            console.log('Adding item to gallery:', item.title);
+                            items.push(item);
+                        }
+                    } catch (err) {
+                        console.warn('Failed to load overlay data for', pngFile.processing_type, ':', err);
+                        // Ignore missing or failed overlay data for individual files
+                    }
                 }
-            } catch (err) {
-                // ignore missing rasters
+            } else {
+                console.log('No PNG files found for region or empty response');
             }
+        } catch (error) {
+            console.error('Failed to load PNG files for region:', error);
+            // Fallback to empty list
         }
+        
+        console.log(`Finished loading rasters, found ${items.length} items`);
         this.showRasters(items);
     }
 
     showRasters(items) {
+        console.log('showRasters called with items:', items);
         if (!items || items.length === 0) {
+            console.log('No items to show, clearing gallery');
             this.gallery.clear();
         } else {
+            console.log(`Setting ${items.length} items in gallery`);
             this.gallery.setItems(items);
         }
     }
@@ -83,6 +122,26 @@ class RasterOverlayGallery {
                 console.error('Failed to add overlay', e);
             }
         }
+    }
+
+    getProcessingDisplayName(type) {
+        // Map processing types to user-friendly display names
+        const displayNames = {
+            'lrm': 'Local Relief Model',
+            'sky_view_factor': 'Sky View Factor',
+            'slope': 'Slope',
+            'aspect': 'Aspect',
+            'hillshade_rgb': 'Hillshade RGB',
+            'tint_overlay': 'Tint Overlay',
+            'color_relief': 'Color Relief',
+            'slope_relief': 'Slope Relief',
+            'boosted_hillshade': 'Boosted Hillshade',
+            'hs_red': 'Hillshade Red',
+            'hs_green': 'Hillshade Green',
+            'hs_blue': 'Hillshade Blue'
+        };
+        
+        return displayNames[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
 }
 
