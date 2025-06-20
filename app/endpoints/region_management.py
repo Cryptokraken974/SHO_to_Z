@@ -487,40 +487,76 @@ async def get_spatial_metadata(filePath: str):
 
 @router.delete("/api/delete-region/{region_name}")
 async def delete_region(region_name: str):
-    """Delete a region by removing its input and output folders"""
+    """Delete a region by removing its input and output folders and associated LAZ files"""
     print(f"\n🗑️  API CALL: DELETE /api/delete-region/{region_name}")
     
     try:
         import shutil
         from pathlib import Path
+        import glob
         
         # Define the paths to the region folders
         input_folder = Path("input") / region_name
         output_folder = Path("output") / region_name
+        laz_input_dir = Path("input") / "LAZ"
         
-        deleted_folders = []
+        deleted_items = []
         
         # Delete input folder if it exists
         if input_folder.exists() and input_folder.is_dir():
             shutil.rmtree(input_folder)
-            deleted_folders.append(str(input_folder))
+            deleted_items.append({"type": "folder", "path": str(input_folder)})
         
         # Delete output folder if it exists
         if output_folder.exists() and output_folder.is_dir():
             shutil.rmtree(output_folder)
-            deleted_folders.append(str(output_folder))
+            deleted_items.append({"type": "folder", "path": str(output_folder)})
         
-        if deleted_folders:
+        # Find and delete LAZ files associated with this region
+        # Search for LAZ files that match the region name
+        if laz_input_dir.exists():
+            # Look for exact matches and pattern matches
+            laz_patterns = [
+                f"{region_name}.laz",
+                f"{region_name}.las", 
+                f"*{region_name}*.laz",
+                f"*{region_name}*.las"
+            ]
+            
+            found_laz_files = []
+            for pattern in laz_patterns:
+                matching_files = list(laz_input_dir.glob(pattern))
+                for laz_file in matching_files:
+                    if laz_file.is_file() and laz_file not in found_laz_files:
+                        found_laz_files.append(laz_file)
+            
+            # Delete found LAZ files
+            for laz_file in found_laz_files:
+                try:
+                    laz_file.unlink()
+                    deleted_items.append({"type": "laz_file", "path": str(laz_file)})
+                    print(f"🗑️  Deleted LAZ file: {laz_file}")
+                except Exception as laz_error:
+                    print(f"⚠️  Warning: Could not delete LAZ file {laz_file}: {laz_error}")
+        
+        if deleted_items:
+            # Organize deleted items for response
+            deleted_folders = [item["path"] for item in deleted_items if item["type"] == "folder"]
+            deleted_laz_files = [item["path"] for item in deleted_items if item["type"] == "laz_file"]
+            
             return {
                 "success": True,
                 "message": f"Region '{region_name}' deleted successfully",
-                "deleted_folders": deleted_folders
+                "deleted_folders": deleted_folders,
+                "deleted_laz_files": deleted_laz_files,
+                "total_items_deleted": len(deleted_items)
             }
         else:
             return {
                 "success": False,
                 "message": f"Region '{region_name}' not found",
-                "deleted_folders": []
+                "deleted_folders": [],
+                "deleted_laz_files": []
             }
     except Exception as e:
         import traceback

@@ -52,15 +52,19 @@ window.MapManager = {
         maxZoom: 18
       }).addTo(this.map);
       Utils.log('info', 'Tile layer added successfully');
-      
-      // Initialize drawing controls
-      this.initDrawingControls();
-      
-      // Setup event handlers
-      this.setupEventHandlers();
-      
-      Utils.log('info', 'Map initialized successfully');
-      return true;
+         // Initialize drawing controls
+    this.initDrawingControls();
+    
+    // Setup event handlers
+    this.setupEventHandlers();
+
+    // Create pending region markers if any exist
+    if (window.FileManager && typeof FileManager.createPendingRegionMarkers === 'function') {
+      FileManager.createPendingRegionMarkers();
+    }
+
+    Utils.log('info', 'Map initialized successfully');
+    return true;
       
     } catch (error) {
       Utils.log('error', 'Failed to initialize map', error);

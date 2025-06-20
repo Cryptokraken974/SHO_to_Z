@@ -43,6 +43,14 @@ window.UIManager = {
             const mapInitialized = window.MapManager.init();
             if (!mapInitialized) {
                 console.error('Failed to initialize map from tab content');
+            } else {
+                // Load region markers when map is ready
+                if (window.FileManager && typeof FileManager.loadFiles === 'function') {
+                    console.log('*** Loading region markers for map ***');
+                    setTimeout(() => {
+                        FileManager.loadFiles('input'); // Load regions and create markers
+                    }, 500); // Small delay to ensure map is fully ready
+                }
             }
         } else {
             console.error('Map element or MapManager not found for tab content');
@@ -648,6 +656,14 @@ window.UIManager = {
             FileManager.selectRegion(regionName, coords, processingRegion, filePath);
         }
 
+        // Ensure region markers remain visible after selection
+        if (window.FileManager && typeof FileManager.ensureRegionMarkersVisible === 'function') {
+            // Give a small delay to ensure the selection is processed first
+            setTimeout(() => {
+                FileManager.ensureRegionMarkersVisible();
+            }, 100);
+        }
+
         $(this).closest('.modal').fadeOut();
         // Optionally clear the placeholder if modals are always reloaded:
         // $('#modals-placeholder').empty();
@@ -1128,8 +1144,29 @@ window.UIManager = {
    */
   displaySentinel2Images(files, regionName) {
     if (!window.satelliteOverlayGallery) {
-      Utils.log('error', 'SatelliteOverlayGallery not initialized');
-      return;
+      Utils.log('warn', 'SatelliteOverlayGallery not initialized, attempting to initialize...');
+      
+      // Check if the satellite gallery container exists
+      const satelliteGalleryContainer = document.getElementById('satellite-gallery');
+      if (!satelliteGalleryContainer) {
+        Utils.log('warn', 'Satellite gallery container not found, Sentinel-2 images will be displayed when map tab is accessed');
+        return;
+      }
+      
+      // Initialize the gallery if container exists
+      try {
+        window.satelliteOverlayGallery = new window.SatelliteOverlayGallery('satellite-gallery', {
+          onAddToMap: (regionBand, bandType) => {
+            if (window.UIManager?.addSentinel2OverlayToMap) {
+              window.UIManager.addSentinel2OverlayToMap(regionBand, bandType);
+            }
+          }
+        });
+        Utils.log('info', 'SatelliteOverlayGallery initialized successfully');
+      } catch (error) {
+        Utils.log('error', 'Failed to initialize SatelliteOverlayGallery:', error);
+        return;
+      }
     }
 
     const items = (files || []).map(fileObj => {
@@ -1162,9 +1199,31 @@ window.UIManager = {
    */
   async displaySentinel2ImagesForRegion(regionName) {
     if (!window.satelliteOverlayGallery) {
-      Utils.log('error', 'SatelliteOverlayGallery not initialized');
-      return;
+      Utils.log('warn', 'SatelliteOverlayGallery not initialized, attempting to initialize...');
+      
+      // Check if the satellite gallery container exists
+      const satelliteGalleryContainer = document.getElementById('satellite-gallery');
+      if (!satelliteGalleryContainer) {
+        Utils.log('warn', 'Satellite gallery container not found, Sentinel-2 images will be loaded when map tab is accessed');
+        return;
+      }
+      
+      // Initialize the gallery if container exists
+      try {
+        window.satelliteOverlayGallery = new window.SatelliteOverlayGallery('satellite-gallery', {
+          onAddToMap: (regionBand, bandType) => {
+            if (window.UIManager?.addSentinel2OverlayToMap) {
+              window.UIManager.addSentinel2OverlayToMap(regionBand, bandType);
+            }
+          }
+        });
+        Utils.log('info', 'SatelliteOverlayGallery initialized successfully');
+      } catch (error) {
+        Utils.log('error', 'Failed to initialize SatelliteOverlayGallery:', error);
+        return;
+      }
     }
+    
     await window.satelliteOverlayGallery.loadImages(regionName);
   },
 
@@ -1174,8 +1233,29 @@ window.UIManager = {
    */
   displaySentinel2BandsGallery(availableBands) {
     if (!window.satelliteOverlayGallery) {
-      Utils.log('error', 'SatelliteOverlayGallery not initialized');
-      return;
+      Utils.log('warn', 'SatelliteOverlayGallery not initialized, attempting to initialize...');
+      
+      // Check if the satellite gallery container exists
+      const satelliteGalleryContainer = document.getElementById('satellite-gallery');
+      if (!satelliteGalleryContainer) {
+        Utils.log('warn', 'Satellite gallery container not found, Sentinel-2 images will be displayed when map tab is accessed');
+        return;
+      }
+      
+      // Initialize the gallery if container exists
+      try {
+        window.satelliteOverlayGallery = new window.SatelliteOverlayGallery('satellite-gallery', {
+          onAddToMap: (regionBand, bandType) => {
+            if (window.UIManager?.addSentinel2OverlayToMap) {
+              window.UIManager.addSentinel2OverlayToMap(regionBand, bandType);
+            }
+          }
+        });
+        Utils.log('info', 'SatelliteOverlayGallery initialized successfully');
+      } catch (error) {
+        Utils.log('error', 'Failed to initialize SatelliteOverlayGallery:', error);
+        return;
+      }
     }
 
     const items = (availableBands || []).map(bandData => {

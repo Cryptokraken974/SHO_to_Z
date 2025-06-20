@@ -9,6 +9,7 @@ window.FileManager = {
   regionMarkers: [], // Changed from lazFileMarkers
   regionBoundRectangles: [], // To store Leaflet rectangle layers for bounds
   currentLocationPin: null,
+  pendingRegionsForMarkers: null, // Store regions when map isn't ready yet
 
   /**
    * Load available regions from server (previously LAZ files)
@@ -215,6 +216,13 @@ window.FileManager = {
    * @param {Array} regions - Array of region information
    */
   createRegionMarkers(regions) { // MODIFIED to createRegionMarkers
+    // Check if map is available before creating markers
+    if (!MapManager.map || !MapManager.getMap()) {
+      Utils.log('warn', 'Map not yet initialized, storing regions for later marker creation');
+      this.pendingRegionsForMarkers = regions; // Store for later
+      return;
+    }
+    
     // Clear existing markers
     this.clearRegionMarkers(); // MODIFIED to clearRegionMarkers
     
@@ -278,6 +286,29 @@ window.FileManager = {
     });
     
     Utils.log('info', `Created ${this.regionMarkers.length} region markers and ${this.regionBoundRectangles.length} bound rectangles`); // MODIFIED log
+  },
+
+  /**
+   * Create markers for pending regions when map becomes available
+   */
+  createPendingRegionMarkers() {
+    if (this.pendingRegionsForMarkers && MapManager.map && MapManager.getMap()) {
+      Utils.log('info', 'Map is now ready, creating pending region markers');
+      const pendingRegions = this.pendingRegionsForMarkers;
+      this.pendingRegionsForMarkers = null; // Clear pending
+      this.createRegionMarkers(pendingRegions); // Create markers now
+    }
+  },
+
+  /**
+   * Ensure region markers are visible on the map
+   * Called after region selection to make sure markers don't disappear
+   */
+  ensureRegionMarkersVisible() {
+    if (MapManager.map && MapManager.getMap() && this.regionMarkers.length === 0 && this.pendingRegionsForMarkers) {
+      // If no markers are visible but we have pending regions, create them
+      this.createPendingRegionMarkers();
+    }
   },
 
   /**
