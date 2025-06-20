@@ -54,6 +54,54 @@ if (this.lazModalEventsSetup) {
 }
 ```
 
+### 6. **Visual Progress Reset for New Files**
+**Problem:** When processing multiple LAZ files, the raster processing queue visual indicators retained the status from the previous file
+**Solution:** Added automatic reset of visual progress indicators when starting processing for each new LAZ file
+```javascript
+resetLazRasterProcessingQueue() {
+    console.log('🔄 Resetting LAZ raster processing queue visual indicators');
+    // Reset each queue item to default pending state
+    queueIds.forEach(queueId => {
+        const queueItem = document.getElementById(queueId);
+        if (queueItem) {
+            queueItem.className = 'p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]';
+        }
+    });
+}
+```
+
+**Implementation:** Reset function is called:
+- Before showing raster progress UI for each new file
+- At the start of `processAllRastersWithLazModalProgress()` function
+
+This ensures users see a clean slate for each LAZ file being processed, with all raster generation steps showing as "pending" initially.
+
+### 7. **CHM (Canopy Height Model) Re-integration**
+**Problem:** CHM was missing from the raster processing queue and visual indicators
+**Solution:** Added CHM back to the processing pipeline with proper visual indicators and separate processing logic
+```javascript
+// Added CHM to processing queue
+{ type: 'chm', name: 'CHM', icon: '🌳' },
+
+// CHM processed separately using dedicated API endpoint
+const chmResponse = await fetch('/api/chm', {
+    method: 'POST',
+    body: chmFormData
+});
+```
+
+**Implementation:**
+- Added CHM queue item to HTML modal with tree icon 🌳
+- Integrated CHM into processing queue between hillshade and other rasters
+- CHM processes separately via `/api/chm` endpoint before other rasters
+- Added CHM to reset function queue IDs list
+- Proper error handling for CHM processing failures
+
+**Visual Integration:**
+- CHM now appears in the processing queue with distinctive green tree icon
+- Progress indicator shows CHM processing status
+- Reset function includes CHM in the visual cleanup
+
 ## Files Modified
 
 ### `/frontend/js/geotiff-left-panel.js`
@@ -81,6 +129,8 @@ if (this.lazModalEventsSetup) {
 - [ ] Processing completes without loops
 - [ ] Modal buttons work correctly
 - [ ] Event handlers don't conflict
+- [ ] **Visual progress indicators reset for each new LAZ file**
+- [ ] **Raster processing queue shows "pending" state when new file starts**
 
 ## Console Debug Messages to Look For
 
@@ -90,6 +140,11 @@ if (this.lazModalEventsSetup) {
 ✅ `📂 Total LAZ files selected: X`
 ✅ `📂 loadLazFiles called with files: X`
 ✅ `📂 File X: filename.laz (size bytes)`
+✅ `🔄 Resetting LAZ raster processing queue visual indicators`
+✅ `✅ LAZ raster processing queue visual indicators reset`
+✅ `🌳 Processing CHM (Canopy Height Model)...`
+✅ `✅ CHM processing completed` or `⚠️ CHM processing failed`
+✅ `🚀 Processing remaining rasters...`
 
 ## Next Steps
 

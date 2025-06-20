@@ -1148,7 +1148,8 @@ class GeoTiffLeftPanel {
 
                     this.updateLazProgress(100 * (i / loadedFiles.length), `Processing rasters for ${fileName} (${i + 1}/${loadedFiles.length})`);
 
-                    // Step 2: Show progress UI and process all rasters
+                    // Step 2: Reset raster processing queue for new file and show progress UI
+                    this.resetLazRasterProcessingQueue();
                     this.showLazRasterProgress(true);
 
                     const success = await this.processAllRastersWithLazModalProgress();
@@ -1374,6 +1375,8 @@ class GeoTiffLeftPanel {
             { type: 'hs_red', name: 'HS Red', icon: '🔴' },
             { type: 'hs_green', name: 'HS Green', icon: '🟢' },
             { type: 'hs_blue', name: 'HS Blue', icon: '🔵' },
+            // CHM processing (uses separate API endpoint)
+            { type: 'chm', name: 'CHM', icon: '🌳' },
             // Other raster products
             { type: 'slope', name: 'Slope', icon: '📐' },
             { type: 'aspect', name: 'Aspect', icon: '🧭' },
@@ -1392,6 +1395,9 @@ class GeoTiffLeftPanel {
         let failedProcesses = [];
 
         try {
+            // Reset visual queue indicators for new processing session
+            this.resetLazRasterProcessingQueue();
+            
             // Initialize LAZ modal progress display
             this.updateLazRasterProcessingQueue(processingQueue, -1);
             
@@ -1414,6 +1420,40 @@ class GeoTiffLeftPanel {
                 
                 console.log(`🚀 Processing all rasters for region: ${regionName}, file: ${lazFileName}`);
                 
+                // Step 1: Process CHM separately first (uses LAZ file directly)
+                console.log('🌳 Processing CHM (Canopy Height Model)...');
+                this.updateLazRasterProcessingStep('CHM', 0, processingQueue.length);
+                this.updateLazRasterProcessingQueue(processingQueue, processingQueue.findIndex(p => p.type === 'chm'));
+                
+                try {
+                    const chmFormData = new FormData();
+                    chmFormData.append('region_name', regionName);
+                    chmFormData.append('processing_type', 'lidar'); // Required for CHM processing
+                    chmFormData.append('stretch_type', 'stddev');
+                    
+                    const chmResponse = await fetch('/api/chm', {
+                        method: 'POST',
+                        body: chmFormData
+                    });
+                    
+                    if (chmResponse.ok) {
+                        this.markLazQueueItemComplete('chm', 'success');
+                        console.log('✅ CHM processing completed');
+                    } else {
+                        this.markLazQueueItemComplete('chm', 'error');
+                        console.warn('⚠️ CHM processing failed');
+                        failedProcesses.push('CHM');
+                    }
+                } catch (chmError) {
+                    console.error('❌ CHM processing error:', chmError);
+                    this.markLazQueueItemComplete('chm', 'error');
+                    failedProcesses.push('CHM');
+                }
+                
+                // Step 2: Process all other rasters using unified backend processing
+                console.log('🚀 Processing remaining rasters...');
+                this.updateLazRasterProcessingStep('Other Rasters', 1, processingQueue.length);
+                
                 // Call the unified backend processing endpoint
                 const formData = new FormData();
                 formData.append('region_name', regionName);
@@ -1431,9 +1471,13 @@ class GeoTiffLeftPanel {
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Mark all processing steps as complete
+                    // Mark all non-CHM processing steps as complete
                     for (let i = 0; i < processingQueue.length; i++) {
                         const process = processingQueue[i];
+                        
+                        // Skip CHM as it was already processed
+                        if (process.type === 'chm') continue;
+                        
                         this.markLazQueueItemComplete(process.type.replace('_', '-'), 'success');
                         this.updateLazRasterProcessingStep(process.name, i + 1, processingQueue.length);
                         
@@ -1444,8 +1488,7 @@ class GeoTiffLeftPanel {
                     }
                     
                     console.log('✅ All raster processing completed successfully');
-                    successCount = processingQueue.length;
-                    failedProcesses = [];
+                    successCount = processingQueue.length - failedProcesses.length;
                 } else {
                     throw new Error('Backend processing failed');
                 }
@@ -1453,13 +1496,17 @@ class GeoTiffLeftPanel {
             } catch (error) {
                 console.error('❌ Unified raster processing failed:', error);
                 
-                // Mark all as failed
+                // Mark all non-CHM as failed (CHM was already handled)
                 for (const process of processingQueue) {
-                    this.markLazQueueItemComplete(process.type.replace('_', '-'), 'error');
+                    if (process.type !== 'chm') {
+                        this.markLazQueueItemComplete(process.type.replace('_', '-'), 'error');
+                        if (!failedProcesses.includes(process.name)) {
+                            failedProcesses.push(process.name);
+                        }
+                    }
                 }
                 
-                failedProcesses = processingQueue.map(p => p.name);
-                successCount = 0;
+                successCount = processingQueue.length - failedProcesses.length;
             }
 
             // Generate metadata.txt file after all rasters are complete
@@ -1590,6 +1637,44 @@ class GeoTiffLeftPanel {
             this.showLazRasterProgress(false);
             return false;
         }
+    }
+
+    /**
+     * Reset LAZ raster processing queue visual indicators to initial state
+     * This should be called when starting processing for a new LAZ file
+     */
+    resetLazRasterProcessingQueue() {
+        console.log('🔄 Resetting LAZ raster processing queue visual indicators');
+        
+        // List of all queue item IDs that need to be reset
+        const queueIds = [
+            'laz-queue-hs-red',
+            'laz-queue-hs-green', 
+            'laz-queue-hs-blue',
+            'laz-queue-chm',
+            'laz-queue-slope',
+            'laz-queue-aspect',
+            'laz-queue-color-relief',
+            'laz-queue-slope-relief',
+            'laz-queue-lrm',
+            'laz-queue-sky-view-factor',
+            'laz-queue-hillshade-rgb',
+            'laz-queue-tint-overlay',
+            'laz-queue-boosted-hillshade',
+            'laz-queue-metadata',
+            'laz-queue-sentinel2'
+        ];
+        
+        // Reset each queue item to default pending state
+        queueIds.forEach(queueId => {
+            const queueItem = document.getElementById(queueId);
+            if (queueItem) {
+                // Reset to default pending state (grey border, no status colors)
+                queueItem.className = 'p-2 rounded bg-[#1a1a1a] text-center border-l-2 border-[#666]';
+            }
+        });
+        
+        console.log('✅ LAZ raster processing queue visual indicators reset');
     }
 }
 

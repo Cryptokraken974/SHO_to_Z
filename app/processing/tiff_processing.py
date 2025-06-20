@@ -953,23 +953,128 @@ async def create_slope_overlay(base_path: str, slope_relief_path: str, output_pa
             'processing_time': time.time() - start_time
         }
 
-        save_color_raster(rgb, output_path, metadata, enhanced_quality=True)
-
+async def process_chm_tiff(tiff_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generate CHM (Canopy Height Model) from elevation TIFF.
+    For TIFF-based processing, we need both DSM and DTM TIFFs to calculate CHM = DSM - DTM.
+    
+    Args:
+        tiff_path: Path to the DTM TIFF file (base elevation)
+        output_dir: Output directory for CHM
+        parameters: Processing parameters (may include dsm_path)
+        
+    Returns:
+        Processing results dictionary
+    """
+    start_time = time.time()
+    
+    print(f"\n🌳 CHM PROCESSING (TIFF)")
+    print(f"📁 DTM Input: {os.path.basename(tiff_path)}")
+    print(f"📂 Output: {output_dir}")
+    
+    try:
+        # For CHM calculation, we need both DTM and DSM
+        # The tiff_path is typically the DTM, we need to find the corresponding DSM
+        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
+        
+        # Try to find DSM file in the same directory or parent directories
+        dtm_path = tiff_path
+        dsm_path = parameters.get('dsm_path')
+        
+        if not dsm_path:
+            # Try to find DSM file automatically
+            tiff_dir = os.path.dirname(tiff_path)
+            parent_dir = os.path.dirname(tiff_dir)
+            
+            # Common DSM file patterns to search for
+            potential_dsm_paths = [
+                # Same directory
+                os.path.join(tiff_dir, base_name.replace('DTM', 'DSM') + '.tif'),
+                os.path.join(tiff_dir, base_name.replace('_DTM', '_DSM') + '.tif'),
+                # DSM subdirectory
+                os.path.join(parent_dir, 'DSM', base_name.replace('DTM', 'DSM') + '.tif'),
+                os.path.join(parent_dir, 'DSM', base_name.replace('_DTM', '_DSM') + '.tif'),
+                # Raw DSM files
+                os.path.join(parent_dir, 'DSM', 'raw', base_name.replace('DTM', 'DSM') + '.tif'),
+                os.path.join(parent_dir, 'DSM', 'raw', base_name.replace('_DTM', '_DSM') + '.tif'),
+            ]
+            
+            for potential_path in potential_dsm_paths:
+                if os.path.exists(potential_path):
+                    dsm_path = potential_path
+                    break
+        
+        if not dsm_path or not os.path.exists(dsm_path):
+            raise FileNotFoundError(f"DSM file not found. CHM requires both DTM and DSM files. Searched for DSM corresponding to {base_name}")
+        
+        print(f"📁 DSM file found: {os.path.basename(dsm_path)}")
+        print(f"🧮 CHM calculation: DSM - DTM")
+        
+        # Read DTM and DSM data
+        dtm_array, dtm_metadata = read_elevation_tiff(dtm_path)
+        dsm_array, dsm_metadata = read_elevation_tiff(dsm_path)
+        
+        # Verify dimensions match
+        if dtm_array.shape != dsm_array.shape:
+            raise ValueError(f"DTM and DSM dimensions don't match: DTM {dtm_array.shape} vs DSM {dsm_array.shape}")
+        
+        # Calculate CHM = DSM - DTM
+        print(f"🔄 Calculating CHM (vegetation height)...")
+        chm_array = dsm_array.astype(np.float32) - dtm_array.astype(np.float32)
+        
+        # Create output filename
+        output_filename = f"{base_name.replace('DTM', 'CHM')}.tif"
+        if 'DTM' not in output_filename:
+            output_filename = f"{base_name}_CHM.tif"
+        output_path = os.path.join(output_dir, output_filename)
+        
+        # Save CHM result
+        save_raster(chm_array, output_path, dtm_metadata, gdal.GDT_Float32, enhanced_quality=True)
+        
+        # Calculate statistics
+        valid_data = chm_array[~np.isnan(chm_array) & ~np.isinf(chm_array)]
+        if len(valid_data) > 0:
+            min_height = float(np.min(valid_data))
+            max_height = float(np.max(valid_data))
+            mean_height = float(np.mean(valid_data))
+            std_height = float(np.std(valid_data))
+            
+            print(f"📊 CHM Statistics:")
+            print(f"   Min height: {min_height:.2f}m")
+            print(f"   Max height: {max_height:.2f}m")
+            print(f"   Mean height: {mean_height:.2f}m")
+            print(f"   Std dev: {std_height:.2f}m")
+        
         processing_time = time.time() - start_time
-        print(f"✅ Tint overlay created in {processing_time:.2f} seconds")
-        return {
-            'status': 'success',
-            'output_file': output_path,
-            'processing_time': processing_time
+        
+        result = {
+            "status": "success",
+            "output_file": output_path,
+            "processing_time": processing_time,
+            "parameters": {
+                "dtm_path": dtm_path,
+                "dsm_path": dsm_path,
+                "method": "DSM - DTM"
+            },
+            "statistics": {
+                "min_height": min_height if 'min_height' in locals() else None,
+                "max_height": max_height if 'max_height' in locals() else None,
+                "mean_height": mean_height if 'mean_height' in locals() else None,
+                "std_height": std_height if 'std_height' in locals() else None
+            } if 'min_height' in locals() else None
         }
-
+        
+        print(f"✅ CHM processing completed in {processing_time:.2f} seconds")
+        return result
+        
     except Exception as e:
-        error_msg = f"Tint overlay creation failed: {e}"
+        error_msg = f"CHM processing failed: {str(e)}"
         print(f"❌ {error_msg}")
+        logger.error(error_msg)
         return {
-            'status': 'error',
-            'error': error_msg,
-            'processing_time': time.time() - start_time
+            "status": "error",
+            "error": error_msg,
+            "processing_time": time.time() - start_time
         }
 
 async def process_all_raster_products(tiff_path: str, progress_callback=None, request=None) -> Dict[str, Any]:
@@ -1058,7 +1163,8 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
         ("color_relief", process_color_relief_tiff, {}),
         ("slope_relief", process_slope_relief_tiff, {}),
         ("lrm", process_lrm_tiff, {}),
-        ("sky_view_factor", process_sky_view_factor_tiff, {})
+        ("sky_view_factor", process_sky_view_factor_tiff, {}),
+        ("chm", process_chm_tiff, {})
     ])
     
     results = {}
