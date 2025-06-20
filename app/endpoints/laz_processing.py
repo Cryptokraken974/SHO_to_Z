@@ -287,6 +287,34 @@ async def api_chm(
         print(f"✅ CHM TIF generated: {tif_path}")
 
         parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+        
+        # Generate permanent PNG file for the raster gallery
+        try:
+            from convert import convert_geotiff_to_png
+            import os
+            
+            # Create png_outputs directory structure
+            tif_dir = os.path.dirname(tif_path)
+            base_output_dir = os.path.dirname(tif_dir)  # Go up from CHM/ to lidar/
+            png_output_dir = os.path.join(base_output_dir, "png_outputs")
+            os.makedirs(png_output_dir, exist_ok=True)
+            
+            # Generate PNG with standard filename
+            png_path = os.path.join(png_output_dir, "CHM.png")
+            convert_geotiff_to_png(
+                tif_path, 
+                png_path, 
+                enhanced_resolution=True,
+                save_to_consolidated=False,  # Already in the right directory
+                stretch_type=stretch_type if stretch_type else "stddev",
+                stretch_params=parsed_stretch_params
+            )
+            print(f"✅ CHM PNG file created: {png_path}")
+        except Exception as png_error:
+            print(f"⚠️ CHM PNG generation failed: {png_error}")
+            # Continue anyway since base64 conversion might still work
+
+        # Generate base64 for immediate display
         image_b64 = convert_geotiff_to_png_base64(
             tif_path,
             stretch_type=stretch_type if stretch_type else "stddev",

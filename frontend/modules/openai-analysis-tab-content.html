@@ -9,19 +9,8 @@
 
     <!-- Main Analysis Area -->
     <div class="flex-1 p-6 overflow-y-auto">
-      <!-- Image Selection Section -->
+      <!-- Region Selection Section -->
       <div class="mb-6">
-        <div class="flex items-center gap-4 mb-4">
-          <button id="select-images-btn" class="bg-[#00bfff] hover:bg-[#0099cc] text-white px-6 py-3 rounded-lg font-medium transition-colors">
-            📸 Select Images
-          </button>
-          
-          <div id="selected-images-count" class="text-[#ababab] text-sm">
-            No images selected
-          </div>
-        </div>
-
-        <!-- Region Selection -->
         <div class="mb-4">
           <label class="block text-white text-sm mb-2">Select Regions</label>
           <div class="flex gap-4">
@@ -47,9 +36,6 @@
         </div>
 
         <button id="send-to-openai" class="mt-2 bg-[#007bff] hover:bg-[#0056b3] text-white px-4 py-2 rounded font-medium transition-colors">Send to OpenAI</button>
-
-        <!-- Dynamic region galleries -->
-        <div id="region-galleries" class="space-y-4 mt-4"></div>
       </div>
 
       <!-- Analysis Controls -->

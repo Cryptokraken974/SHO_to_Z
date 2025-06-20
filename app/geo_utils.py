@@ -340,6 +340,8 @@ def get_laz_overlay_data(base_filename: str, processing_type: str, filename_proc
             'LRM': 'LRM.png',
             'Sky_View_Factor': 'SVF.png', 
             'Slope': 'Slope.png',
+            'CHM': 'CHM.png',  # Add CHM support for consolidated PNG directory
+            'chm': 'CHM.png',  # Add lowercase chm support (used by gallery)
             'Hillshade': 'HillshadeRGB.png',
             'HillshadeRGB': 'HillshadeRGB.png',  # Support direct mapping
             'Tint_Overlay': 'TintOverlay.png',
@@ -350,10 +352,12 @@ def get_laz_overlay_data(base_filename: str, processing_type: str, filename_proc
         # Map processing types to their actual directory names and TIFF files
         directory_mapping = {
             'HillshadeRGB': ('HillshadeRgb', 'hillshade_rgb.tif'),
-            'TintOverlay': ('HillshadeRgb', 'tint_overlay.tif'),  # TintOverlay files are in HillshadeRgb directory
+            'TintOverlay': ('HillshadeRgb', 'tint_overlay.tiff'),  # TintOverlay files are in HillshadeRgb directory
             'Sky_View_Factor': ('Sky_View_Factor', None),  # Will auto-detect TIFF file
             'LRM': ('Lrm', None),
-            'Slope': ('Slope', None)
+            'Slope': ('Slope', None),
+            'CHM': ('CHM', None),  # CHM files are in CHM directory, will auto-detect TIFF file
+            'chm': ('CHM', None)   # Support lowercase chm (used by gallery)
         }
         
         filename_suffix = filename_mapping.get(mapping_key, mapping_key.title())

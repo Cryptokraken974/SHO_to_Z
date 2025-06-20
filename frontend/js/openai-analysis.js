@@ -28,41 +28,6 @@ class OpenAIAnalysis {
     }
     
     setupEventListeners() {
-        // Select Images button
-        document.getElementById('select-images-btn')?.addEventListener('click', () => {
-            this.openImageSelectionModal();
-        });
-        
-        // Modal close handlers
-        document.getElementById('image-selection-modal-close')?.addEventListener('click', () => {
-            this.closeImageSelectionModal();
-        });
-        
-        document.getElementById('cancel-image-selection')?.addEventListener('click', () => {
-            this.closeImageSelectionModal();
-        });
-        
-        // Category buttons
-        document.querySelectorAll('.category-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                this.switchCategory(e.target.dataset.category);
-            });
-        });
-        
-        // Selection controls
-        document.getElementById('select-all-btn')?.addEventListener('click', () => {
-            this.selectAllVisible();
-        });
-        
-        document.getElementById('clear-selection-btn')?.addEventListener('click', () => {
-            this.clearSelection();
-        });
-        
-        // Confirm selection
-        document.getElementById('confirm-image-selection')?.addEventListener('click', () => {
-            this.confirmSelection();
-        });
-        
         // Analysis controls
         document.getElementById('start-openai-analysis-btn')?.addEventListener('click', () => {
             this.startAnalysis();
@@ -117,266 +82,13 @@ class OpenAIAnalysis {
     }
     
     initializeGalleries() {
-        // Initialize image selection gallery
-        this.galleryInstance = new ModularGallery('image-selection-gallery', {
-            allowSelection: true,
-            multipleSelection: true,
-            showAddToMap: false,
-            itemWidth: 'w-48',
-            itemHeight: 'h-36',
-            onSelectionChange: (selectedIds) => {
-                this.updateSelectionCount(selectedIds);
-            },
-            onImageClick: (itemId, imageSrc, imageAlt) => {
-                this.showImageModal(imageSrc, imageAlt);
-            }
-        });
-        
-        // Preview gallery removed
+        // Image selection functionality removed
+        console.log('✅ Image selection functionality removed');
     }
     
-    async openImageSelectionModal() {
-        console.log('📸 Opening image selection modal');
-
-        // Load the modal HTML first
-        await loadModule('modules/modals/image-selection-modal.html', 'modals-placeholder');
-        
-        const modalElement = document.getElementById('image-selection-modal');
-        if (!modalElement) {
-            console.error('Image selection modal element not found after loading.');
-            return;
-        }
-
-        // Re-run event listener setup for the modal's content
-        // This assumes setupEventListeners can be safely called or is idempotent,
-        // or a more specific function for modal events should be called.
-        this.setupEventListeners(); // Critical to re-bind events to new DOM
-
-        // Initialize gallery if it's part of this modal and not globally persistent
-        // If galleryInstance is tied to elements inside the modal, it needs re-init.
-        // this.initializeGalleries(); // Assuming gallery is inside the modal.
-
-        // Show loading state in gallery (if galleryInstance is valid)
-        if (this.galleryInstance) {
-            this.galleryInstance.showLoading();
-        } else {
-            // If gallery is inside the modal, it needs to be re-initialized first.
-            // This might involve creating a new ModularGallery instance targeting the new DOM.
-            this.initializeGalleries(); // Ensure gallery is ready
-            this.galleryInstance.showLoading();
-        }
-        
-        // Load available images
-        await this.loadAvailableImages();
-        
-        // Show modal
-        // modalElement.classList.remove('hidden');
-        $(modalElement).fadeIn();
-        
-        // Filter and display images
-        this.filterImagesByCategory(this.currentCategory); // This should target galleryInstance.setItems
-    }
+    // Image selection functionality removed
     
-    closeImageSelectionModal() {
-        const modalElement = document.getElementById('image-selection-modal');
-        if (modalElement) {
-            // modalElement.classList.add('hidden');
-            $(modalElement).fadeOut();
-            // $('#modals-placeholder').empty(); // Or modalElement.remove();
-        }
-    }
-    
-    async loadAvailableImages() {
-        try {
-            console.log('🔄 Loading available images for current region');
-            
-            // Get current region
-            const selectedRegion = window.FileManager?.getSelectedRegion();
-            if (!selectedRegion) {
-                this.galleryInstance.showError('No region selected. Please select a region first.');
-                return;
-            }
-            
-            this.availableImages = [];
-            
-            // Load raster products
-            await this.loadRasterImages(selectedRegion);
-            
-            // Load satellite images
-            await this.loadSatelliteImages(selectedRegion);
-            
-            console.log(`📁 Loaded ${this.availableImages.length} images`);
-            
-        } catch (error) {
-            console.error('Error loading available images:', error);
-            this.galleryInstance.showError('Failed to load images');
-        }
-    }
-    
-    async loadRasterImages(regionName) {
-        const rasterTypes = [
-            'hs_red', 'hs_green', 'hs_blue',
-            'slope', 'aspect', 'color_relief', 'slope_relief', 'lrm',
-            'hillshade_rgb', 'tint_overlay', 'boosted_hillshade'
-        ];
-        
-        for (const rasterType of rasterTypes) {
-            try {
-                const overlayData = await overlays().getRasterOverlayData(regionName, rasterType);
-                
-                if (overlayData && overlayData.image_data) {
-                    const imageUrl = `data:image/png;base64,${overlayData.image_data}`;
-                    
-                    this.availableImages.push({
-                        id: `raster_${rasterType}_${regionName}`,
-                        imageUrl: imageUrl,
-                        title: this.getRasterDisplayName(rasterType),
-                        subtitle: regionName,
-                        category: this.getRasterCategory(rasterType),
-                        type: 'raster',
-                        rasterType: rasterType,
-                        regionName: regionName
-                    });
-                }
-            } catch (error) {
-                console.debug(`No ${rasterType} data available for ${regionName}`);
-            }
-        }
-    }
-    
-    async loadSatelliteImages(regionName) {
-        try {
-            // This would need to be implemented based on your satellite image API
-            // For now, we'll check if there are satellite images in the UI
-            const satelliteGallery = document.getElementById('satellite-gallery');
-            const satelliteImages = satelliteGallery?.querySelectorAll('.gallery-item img');
-            
-            if (satelliteImages) {
-                satelliteImages.forEach((img, index) => {
-                    this.availableImages.push({
-                        id: `satellite_${regionName}_${index}`,
-                        imageUrl: img.src,
-                        title: `Satellite Image ${index + 1}`,
-                        subtitle: regionName,
-                        category: 'satellite',
-                        type: 'satellite',
-                        regionName: regionName
-                    });
-                });
-            }
-        } catch (error) {
-            console.debug('No satellite images available');
-        }
-    }
-    
-    getRasterDisplayName(rasterType) {
-        const displayNames = {
-            'hs_red': 'Hillshade Red',
-            'hs_green': 'Hillshade Green',
-            'hs_blue': 'Hillshade Blue',
-            'slope': 'Slope',
-            'aspect': 'Aspect',
-            'color_relief': 'Color Relief',
-            'slope_relief': 'Slope Relief',
-            'lrm': 'Local Relief Model',
-            'hillshade_rgb': 'RGB Hillshade',
-            'tint_overlay': 'Tint Overlay',
-            'boosted_hillshade': 'Boosted Hillshade'
-        };
-        return displayNames[rasterType] || rasterType;
-    }
-    
-    getRasterCategory(rasterType) {
-        if (['hs_red', 'hs_green', 'hs_blue'].includes(rasterType)) {
-            return 'hillshades';
-        }
-        if (['hillshade_rgb', 'tint_overlay', 'boosted_hillshade'].includes(rasterType)) {
-            return 'composites';
-        }
-        return 'rasters';
-    }
-    
-    switchCategory(category) {
-        this.currentCategory = category;
-        
-        // Update category button states
-        document.querySelectorAll('.category-btn').forEach(btn => {
-            if (btn.dataset.category === category) {
-                btn.classList.remove('bg-[#262626]', 'text-[#ababab]');
-                btn.classList.add('bg-[#00bfff]', 'text-white');
-            } else {
-                btn.classList.remove('bg-[#00bfff]', 'text-white');
-                btn.classList.add('bg-[#262626]', 'text-[#ababab]');
-            }
-        });
-        
-        // Update category title
-        const titles = {
-            'all': 'All Images',
-            'rasters': 'Raster Products',
-            'satellite': 'Satellite Images',
-            'hillshades': 'Hillshades',
-            'composites': 'Composite Images'
-        };
-        document.getElementById('category-title').textContent = titles[category] || 'Images';
-        
-        // Filter and display images
-        this.filterImagesByCategory(category);
-    }
-    
-    filterImagesByCategory(category) {
-        let filteredImages = this.availableImages;
-        
-        if (category !== 'all') {
-            filteredImages = this.availableImages.filter(image => image.category === category);
-        }
-        
-        this.galleryInstance.setItems(filteredImages);
-        
-        // Restore selection state
-        const selectedIds = this.selectedImages.map(img => img.id);
-        this.galleryInstance.setSelectedItems(selectedIds);
-    }
-    
-    updateSelectionCount(selectedIds) {
-        const count = selectedIds.length;
-        document.getElementById('selection-count').textContent = `${count} selected`;
-        document.getElementById('modal-selection-summary').textContent = 
-            count === 0 ? 'No images selected' : `${count} image${count === 1 ? '' : 's'} selected`;
-    }
-    
-    selectAllVisible() {
-        const visibleImages = this.galleryInstance.items;
-        const allIds = visibleImages.map(img => img.id);
-        this.galleryInstance.setSelectedItems(allIds);
-    }
-    
-    clearSelection() {
-        this.galleryInstance.setSelectedItems([]);
-    }
-    
-    confirmSelection() {
-        const selectedIds = this.galleryInstance.getSelectedItems();
-        this.selectedImages = this.availableImages.filter(img => selectedIds.includes(img.id));
-        
-        console.log(`✅ Selected ${this.selectedImages.length} images for analysis`);
-        
-        // Update UI
-        this.updateSelectedImagesCount();
-        
-        // Close modal
-        this.closeImageSelectionModal();
-    }
-    
-    updateSelectedImagesPreview() {
-        // Preview removed
-    }
-    
-    updateSelectedImagesCount() {
-        const count = this.selectedImages.length;
-        document.getElementById('selected-images-count').textContent = 
-            count === 0 ? 'No images selected' : `${count} image${count === 1 ? '' : 's'} selected`;
-    }
+    // Image loading functionality removed
     
     updateAnalysisPrompt() {
         const selectedType = document.querySelector('input[name="analysis-type"]:checked')?.value;
@@ -395,11 +107,6 @@ class OpenAIAnalysis {
     }
     
     async startAnalysis() {
-        if (this.selectedImages.length === 0) {
-            window.Utils?.showNotification('Please select images for analysis first', 'warning');
-            return;
-        }
-        
         const prompt = document.getElementById('analysis-prompt').value.trim();
         if (!prompt) {
             window.Utils?.showNotification('Please enter an analysis prompt', 'warning');
@@ -451,7 +158,7 @@ class OpenAIAnalysis {
             <div class="space-y-4">
                 <div class="bg-[#262626] rounded-lg p-4">
                     <h4 class="text-white font-semibold mb-2">🤖 AI Analysis Results</h4>
-                    <p class="text-[#ababab] text-sm mb-3">Based on ${this.selectedImages.length} image(s) analyzed</p>
+                    <p class="text-[#ababab] text-sm mb-3">Analysis based on selected regions</p>
                     
                     <div class="text-white space-y-3">
                         <p><strong>Analysis Prompt:</strong> ${prompt}</p>

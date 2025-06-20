@@ -190,6 +190,7 @@ class RasterOverlayGallery {
             'sky_view_factor': 'Sky View Factor',
             'slope': 'Slope',
             'aspect': 'Aspect',
+            'chm': 'Canopy Height Model',
             'hillshade_rgb': 'Hillshade RGB',
             'tint_overlay': 'Tint Overlay',
             'color_relief': 'Color Relief',

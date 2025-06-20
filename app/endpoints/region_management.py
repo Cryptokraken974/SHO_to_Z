@@ -676,6 +676,9 @@ async def list_region_png_files(region_name: str):
             elif filename == "Slope.png":
                 processing_type = "slope"
                 display_name = "Slope"
+            elif filename == "CHM.png":
+                processing_type = "chm"
+                display_name = "Canopy Height Model"
             elif filename == "HillshadeRGB.png":
                 processing_type = "hillshade_rgb"
                 display_name = "Hillshade RGB"

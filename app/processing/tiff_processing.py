@@ -1192,8 +1192,8 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
             if result["status"] == "success":
                 print(f"✅ {task_name} completed successfully")
                 
-                # Only create PNG for specific raster products: lrm, sky_view_factor, slope
-                if task_name in ["lrm", "sky_view_factor", "slope"]:
+                # Only create PNG for specific raster products: lrm, sky_view_factor, slope, chm
+                if task_name in ["lrm", "sky_view_factor", "slope", "chm"]:
                     # Convert to PNG for visualization
                     try:
                         # Import the conversion function with proper path handling
@@ -1216,7 +1216,8 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                         png_name_mapping = {
                             "lrm": "LRM.png",
                             "sky_view_factor": "SVF.png",
-                            "slope": "Slope.png"
+                            "slope": "Slope.png",
+                            "chm": "CHM.png"
                         }
                         png_filename = png_name_mapping.get(task_name, f"{task_name}.png")
                         png_path = os.path.join(png_output_dir, png_filename)

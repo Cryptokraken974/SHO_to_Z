@@ -370,7 +370,6 @@ window.FileManager = {
     this.processingRegion = null; // Clear processing region too
     this.regionPath = null; // Clear region path too
     $('#selected-region-name').text('No region selected').removeClass('text-[#00bfff]').addClass('text-[#666]'); // MODIFIED message
-    $('#analysis-selected-region-name').text('No region selected'); // Clear Analysis tab too
     
     // Update global region selector
     if (UIManager && UIManager.updateGlobalRegionSelector) {
