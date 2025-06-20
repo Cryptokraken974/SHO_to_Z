@@ -28,3 +28,7 @@ These six documents collectively provide a comprehensive suite of detailed metho
 ## 4. How to Use
 
 It is recommended that the user consult these documents sequentially or selectively based on their specific needs within the LAZ processing and raster generation workflow. They serve as a comprehensive guide, from initial DTM creation through to advanced visualization, innovative processing, and preparation for AI analysis. Each document builds upon the concepts of the previous ones, providing a structured approach to maximizing the archaeological information extracted from LiDAR data.
+
+cd /Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z && source venv/bin/activate
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+

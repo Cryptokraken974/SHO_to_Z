@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Form, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+
 from pydantic import BaseModel
 import os
 import glob

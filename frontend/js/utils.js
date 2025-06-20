@@ -129,7 +129,18 @@ window.Utils = {
     const timestamp = new Date().toISOString();
     const logMessage = `[${timestamp}] ${level.toUpperCase()}: ${message}`;
     
-    console[level](logMessage, data || '');
+    // Map invalid levels to valid console methods
+    const validLevels = {
+      'info': 'info',
+      'warn': 'warn', 
+      'warning': 'warn', // Map 'warning' to 'warn'
+      'error': 'error',
+      'debug': 'debug',
+      'log': 'log'
+    };
+    
+    const consoleMethod = validLevels[level] || 'log';
+    console[consoleMethod](logMessage, data || '');
   },
 
   /**

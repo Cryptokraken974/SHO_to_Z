@@ -876,6 +876,27 @@ async def create_tint_overlay(color_relief_path: str, hillshade_path: str, outpu
             'projection': proj
         }
 
+        save_color_raster(rgb, output_path, metadata, enhanced_quality=True)
+
+        processing_time = time.time() - start_time
+
+        print(f"✅ Tint overlay created in {processing_time:.2f} seconds")
+        return {
+            'status': 'success',
+            'output_file': output_path,
+            'processing_time': processing_time
+        }
+
+    except Exception as e:
+        error_msg = f"Tint overlay creation failed: {e}"
+        print(f"❌ {error_msg}")
+        return {
+            'status': 'error',
+            'error': error_msg,
+            'processing_time': time.time() - start_time
+        }
+
+
 async def create_slope_overlay(base_path: str, slope_relief_path: str, output_path: str, beta: float = 0.5) -> Dict[str, Any]:
     """Blend a tint overlay with a slope relief to enhance contrast."""
     start_time = time.time()

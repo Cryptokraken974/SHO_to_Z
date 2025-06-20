@@ -9,6 +9,24 @@ window.MapManager = {
   sentinel2TestMarker: null,
 
   /**
+   * Clean up existing map instance
+   */
+  cleanup() {
+    if (this.map) {
+      Utils.log('info', 'Cleaning up existing map instance');
+      try {
+        this.map.remove();
+      } catch (error) {
+        Utils.log('warn', 'Error during map cleanup', error);
+      }
+      this.map = null;
+      this.drawnItems = null;
+      this.drawControl = null;
+      this.sentinel2TestMarker = null;
+    }
+  },
+
+  /**
    * Initialize the Leaflet map
    */
   init() {
@@ -19,6 +37,9 @@ window.MapManager = {
       Utils.log('error', 'Map element not found!');
       return false;
     }
+    
+    // Clean up any existing map instance first
+    this.cleanup();
     
     try {
       // Create map instance centered on Brazil by default

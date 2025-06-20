@@ -37,9 +37,15 @@ window.UIManager = {
     // Tab-specific initializations
     // Note: contextName here is the modulePath like 'modules/map-tab-content.html'
     if (contextName.includes('map-tab-content.html')) {
+        // Always reinitialize map when tab content is loaded
         if (document.getElementById('map') && window.MapManager) {
-            if (MapManager.map) MapManager.map.invalidateSize();
-            // else MapManager.init(); // MapManager.init() is usually called once in app_new.js.
+            console.log('*** Reinitializing Map Manager from tab content ***');
+            const mapInitialized = window.MapManager.init();
+            if (!mapInitialized) {
+                console.error('Failed to initialize map from tab content');
+            }
+        } else {
+            console.error('Map element or MapManager not found for tab content');
         }
         if (window.SavedPlaces && typeof SavedPlaces.init === 'function') SavedPlaces.init(); // May need context
 
@@ -288,59 +294,62 @@ window.UIManager = {
 
   /**
    * Initialize accordion functionality
+   * @param {Element} contextElement - Optional context element to scope selectors
    */
-  initializeAccordions() {
+  initializeAccordions(contextElement = document) {
+    const $context = $(contextElement);
+    
     // Region accordion
-    $('#region-accordion').on('click', () => {
+    $context.find('#region-accordion').off('click').on('click', () => {
       this.toggleAccordion('region');
     });
 
     // Get Data accordion (renamed from Test)
-    $('#get-data-accordion').on('click', () => {
+    $context.find('#get-data-accordion').off('click').on('click', () => {
       this.toggleAccordion('get-data');
     });
 
     // Generate Rasters accordion
-    $('#generate-rasters-accordion').on('click', () => {
+    $context.find('#generate-rasters-accordion').off('click').on('click', () => {
       this.toggleAccordion('generate-rasters');
     });
 
     // Go to accordion
-    $('#go-to-accordion').on('click', () => {
+    $context.find('#go-to-accordion').off('click').on('click', () => {
       this.toggleAccordion('go-to');
     });
 
     // Analysis tab accordions
-    $('#analysis-images-accordion').on('click', () => {
+    $context.find('#analysis-images-accordion').off('click').on('click', () => {
       this.toggleAccordion('analysis-images');
     });
 
-    $('#analysis-tools-accordion').on('click', () => {
+    $context.find('#analysis-tools-accordion').off('click').on('click', () => {
       this.toggleAccordion('analysis-tools');
     });
 
-    $('#data-sources-accordion').on('click', () => {
+    $context.find('#data-sources-accordion').off('click').on('click', () => {
       this.toggleAccordion('data-sources');
     });
 
     // GeoTiff Tools tab accordions
-    $('#geotiff-files-accordion').on('click', () => {
+    $context.find('#geotiff-files-accordion').off('click').on('click', () => {
       this.toggleAccordion('geotiff-files');
     });
 
-    $('#geotiff-load-files-accordion').on('click', () => {
+    $context.find('#geotiff-load-files-accordion').off('click').on('click', () => {
       this.toggleAccordion('geotiff-load-files');
     });
 
-    $('#geotiff-tools-accordion').on('click', () => {
+    $context.find('#geotiff-tools-accordion').off('click').on('click', () => {
       this.toggleAccordion('geotiff-tools');
     });
 
-    $('#geotiff-processing-accordion').on('click', () => {
+    $context.find('#geotiff-processing-accordion').off('click').on('click', () => {
       this.toggleAccordion('geotiff-processing');
     });
 
-    $('#geotiff-info-accordion').on('click', () => {
+    $context.find('#geotiff-info-accordion').off('click').on('click', () => {
       this.toggleAccordion('geotiff-info');
     });
 
@@ -759,15 +768,17 @@ window.UIManager = {
 
   /**
    * Initialize resizable panels
+   * @param {Element} contextElement - Optional context element to scope selectors
    */
-  initializeResizablePanels() {
+  initializeResizablePanels(contextElement = document) {
+    const $context = $(contextElement);
     let isResizing = false;
     let currentPanel = null;
     let startX = 0;
     let startWidth = 0;
 
     // Handle mousedown on resize handles
-    $('.resize-handle').on('mousedown', function(e) {
+    $context.find('.resize-handle').off('mousedown').on('mousedown', function(e) {
       e.preventDefault();
       isResizing = true;
       currentPanel = $(this).parent();
@@ -780,41 +791,47 @@ window.UIManager = {
       Utils.log('debug', 'Started resizing panel');
     });
 
-    // Handle mousemove for resizing
-    $(document).on('mousemove', function(e) {
-      if (!isResizing || !currentPanel) return;
-      
-      e.preventDefault();
-      const deltaX = e.pageX - startX;
-      const newWidth = Math.max(200, Math.min(600, startWidth + deltaX));
-      
-      currentPanel.css('width', newWidth + 'px');
-    });
-
-    // Handle mouseup to stop resizing
-    $(document).on('mouseup', function(e) {
-      if (!isResizing) return;
-      
-      isResizing = false;
-      $('.resize-handle').removeClass('dragging');
-      $('body').removeClass('resize-active');
-      
-      if (currentPanel) {
-        const finalWidth = currentPanel.outerWidth();
-        Utils.log('info', `Panel resized to ${finalWidth}px`);
+    // Handle mousemove for resizing (document level event, only bind once)
+    if (!this._resizeMoveHandler) {
+      this._resizeMoveHandler = function(e) {
+        if (!isResizing || !currentPanel) return;
         
-        // Save panel width preference
-        const panelId = currentPanel.attr('id');
-        localStorage.setItem(`panel-width-${panelId}`, finalWidth);
-      }
-      
-      currentPanel = null;
-      startX = 0;
-      startWidth = 0;
-    });
+        e.preventDefault();
+        const deltaX = e.pageX - startX;
+        const newWidth = Math.max(200, Math.min(600, startWidth + deltaX));
+        
+        currentPanel.css('width', newWidth + 'px');
+      };
+      $(document).on('mousemove', this._resizeMoveHandler);
+    }
+
+    // Handle mouseup to stop resizing (document level event, only bind once)
+    if (!this._resizeUpHandler) {
+      this._resizeUpHandler = function(e) {
+        if (!isResizing) return;
+        
+        isResizing = false;
+        $('.resize-handle').removeClass('dragging');
+        $('body').removeClass('resize-active');
+        
+        if (currentPanel) {
+          const finalWidth = currentPanel.outerWidth();
+          Utils.log('info', `Panel resized to ${finalWidth}px`);
+          
+          // Save panel width preference
+          const panelId = currentPanel.attr('id');
+          localStorage.setItem(`panel-width-${panelId}`, finalWidth);
+        }
+        
+        currentPanel = null;
+        startX = 0;
+        startWidth = 0;
+      };
+      $(document).on('mouseup', this._resizeUpHandler);
+    }
 
     // Load saved panel widths
-    $('.resizable-panel').each(function() {
+    $context.find('.resizable-panel').each(function() {
       const panelId = $(this).attr('id');
       const savedWidth = localStorage.getItem(`panel-width-${panelId}`);
       if (savedWidth) {

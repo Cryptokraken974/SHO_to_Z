@@ -135,12 +135,9 @@ async function initializeModules() {
     console.log('*** Initializing UI Manager ***');
     UIManager.init();
     
-    // 2. Initialize Map Manager (creates map instance)
-    console.log('*** Initializing Map Manager ***');
-    const mapInitialized = MapManager.init();
-    if (!mapInitialized) {
-      throw new Error('Failed to initialize map');
-    }
+    // 2. Map Manager will be initialized when map tab content is loaded
+    console.log('*** Map Manager initialization deferred to tab loading ***');
+    // MapManager.init() will be called from initializeDynamicContent when map tab is loaded
     
     // 3. Initialize WebSocket Manager (for real-time updates)
     console.log('*** Initializing WebSocket Manager ***');

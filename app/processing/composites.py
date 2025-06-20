@@ -34,8 +34,7 @@ def generate_dtm_hillshade_blend(
     Output paths will follow conventions like:
     output/<region_name_for_output>/lidar/Composites/<input_stem>_DTM{res}m_CSF{csf_res}_HS_az{az}_alt{alt}_z{z}_blend.tif
     """
-    print(f"
-🎨 COMPOSITE: Starting DTM-Hillshade Blend for LAZ: {laz_input_file}")
+    print(f"🎨 COMPOSITE: Starting DTM-Hillshade Blend for LAZ: {laz_input_file}")
     logger.info(f"Starting DTM-Hillshade Blend for LAZ: {laz_input_file}, Region: {region_name_for_output}")
     start_time = time.time()
 

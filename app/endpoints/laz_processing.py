@@ -14,7 +14,6 @@ from ..processing.tpi import tpi
 from ..processing.roughness import roughness
 from ..processing.sky_view_factor import sky_view_factor
 from ..processing.composites import generate_dtm_hillshade_blend
-from ..processing.laz_processing_utils import resolve_laz_file_from_region
 import os
 import re
 from pathlib import Path
@@ -26,6 +25,111 @@ logger = logging.getLogger(__name__)
 def is_coordinate_based_region(region_name: str) -> bool:
     coordinate_pattern = r'^\d+\.\d+[NS]_\d+\.\d+[EW]$'
     return bool(re.match(coordinate_pattern, region_name))
+
+def resolve_laz_file_from_region(region_name: str, processing_type: str) -> str:
+    """
+    Resolve the LAZ file path from a region name and processing type.
+    
+    Args:
+        region_name: Region identifier (can be coordinate-based like "12.34N_56.78W" or named region)
+        processing_type: Type of processing/acquisition (e.g., "lidar", "elevation", etc.)
+    
+    Returns:
+        str: Path to the LAZ file
+        
+    Raises:
+        FileNotFoundError: If no LAZ file is found for the region
+        ValueError: If multiple LAZ files are found and selection is ambiguous
+    """
+    logger.info(f"Resolving LAZ file for region: {region_name}, processing_type: {processing_type}")
+    
+    # Define possible directory patterns where LAZ files might be stored
+    search_paths = [
+        f"input/{region_name}/lidar",
+        f"input/{region_name}/LAZ", 
+        f"input/{region_name}",
+        f"input/LAZ/{region_name}",
+        f"data/laz/{region_name}",
+        f"output/{region_name}/LAZ",
+        f"output/{region_name}/lidar"
+    ]
+    
+    # Also check for files with region name in filename
+    filename_patterns = [
+        f"*{region_name}*.laz",
+        f"*{region_name}*.copc.laz"
+    ]
+    
+    found_files = []
+    
+    # Search in directory patterns
+    for search_path in search_paths:
+        if os.path.exists(search_path):
+            logger.debug(f"Searching in directory: {search_path}")
+            
+            # Look for LAZ files in this directory
+            for pattern in ["*.laz", "*.copc.laz"]:
+                laz_files = list(Path(search_path).glob(pattern))
+                for laz_file in laz_files:
+                    full_path = str(laz_file)
+                    if full_path not in found_files:
+                        found_files.append(full_path)
+                        logger.debug(f"Found LAZ file: {full_path}")
+    
+    # Search by filename patterns in common directories
+    base_dirs = ["input", "data/laz", "output"]
+    for base_dir in base_dirs:
+        if os.path.exists(base_dir):
+            for pattern in filename_patterns:
+                matching_files = list(Path(base_dir).rglob(pattern))
+                for laz_file in matching_files:
+                    full_path = str(laz_file)
+                    if full_path not in found_files:
+                        found_files.append(full_path)
+                        logger.debug(f"Found LAZ file by pattern: {full_path}")
+    
+    if not found_files:
+        error_msg = f"No LAZ file found for region '{region_name}' with processing_type '{processing_type}'"
+        logger.error(error_msg)
+        raise FileNotFoundError(error_msg)
+    
+    if len(found_files) == 1:
+        selected_file = found_files[0]
+        logger.info(f"✅ Resolved LAZ file: {selected_file}")
+        return selected_file
+    
+    # Multiple files found - try to select the best match
+    logger.warning(f"Multiple LAZ files found for region '{region_name}': {found_files}")
+    
+    # Prioritization logic:
+    # 1. Files in input directories
+    # 2. Files with exact region name match
+    # 3. Most recent files
+    
+    prioritized_files = []
+    
+    # Priority 1: Files in input directories
+    input_files = [f for f in found_files if f.startswith("input/")]
+    if input_files:
+        prioritized_files.extend(input_files)
+    
+    # Priority 2: Files with exact region name in filename
+    exact_matches = [f for f in found_files if region_name in os.path.basename(f)]
+    for exact_match in exact_matches:
+        if exact_match not in prioritized_files:
+            prioritized_files.append(exact_match)
+    
+    # Add remaining files
+    for file in found_files:
+        if file not in prioritized_files:
+            prioritized_files.append(file)
+    
+    # Select the first prioritized file
+    selected_file = prioritized_files[0]
+    logger.info(f"✅ Selected LAZ file from multiple options: {selected_file}")
+    logger.info(f"Other options were: {prioritized_files[1:]}")
+    
+    return selected_file
 
 def _parse_stretch_params(stretch_params_json: Optional[str]) -> Optional[Dict[str, float]]:
     parsed_stretch_params = None
