@@ -17,11 +17,13 @@ class ModularGallery {
             onSelectionChange: options.onSelectionChange || (() => {}),
             onAddToMap: options.onAddToMap || (() => {}),
             onImageClick: options.onImageClick || null,
+            getOverlayState: options.getOverlayState || (() => false), // Function to check if overlay is active
             ...options
         };
         
         this.selectedItems = new Set();
         this.items = [];
+        this.overlayStates = new Map(); // Track overlay states for each item
         
         this.init();
     }
@@ -147,6 +149,56 @@ class ModularGallery {
             }
         });
     }
+
+    /**
+     * Update overlay button states
+     */
+    updateOverlayButtonStates() {
+        if (!this.options.showAddToMap) return;
+        
+        this.container.querySelectorAll(`.${this.options.itemClass}`).forEach(item => {
+            const itemId = item.dataset.itemId;
+            const button = item.querySelector('.add-to-map-btn');
+            if (button) {
+                const isOnMap = this.options.getOverlayState(itemId);
+                this.updateButtonState(button, isOnMap);
+            }
+        });
+    }
+
+    /**
+     * Update a single button's state
+     * @param {HTMLElement} button - The button element
+     * @param {boolean} isOnMap - Whether the overlay is on the map
+     */
+    updateButtonState(button, isOnMap) {
+        if (isOnMap) {
+            button.textContent = 'Remove from Map';
+            button.classList.remove('bg-[#28a745]', 'hover:bg-[#218838]');
+            button.classList.add('bg-[#dc3545]', 'hover:bg-[#c82333]');
+            button.dataset.overlayState = 'active';
+        } else {
+            button.textContent = 'Add to Map';
+            button.classList.remove('bg-[#dc3545]', 'hover:bg-[#c82333]');
+            button.classList.add('bg-[#28a745]', 'hover:bg-[#218838]');
+            button.dataset.overlayState = 'inactive';
+        }
+    }
+
+    /**
+     * Update button state for a specific item
+     * @param {string} itemId - ID of the item to update
+     * @param {boolean} isOnMap - Whether the overlay is on the map
+     */
+    updateItemOverlayState(itemId, isOnMap) {
+        const item = this.container.querySelector(`[data-item-id="${itemId}"]`);
+        if (item) {
+            const button = item.querySelector('.add-to-map-btn');
+            if (button) {
+                this.updateButtonState(button, isOnMap);
+            }
+        }
+    }
     
     /**
      * Render the gallery
@@ -171,6 +223,7 @@ class ModularGallery {
         `;
         
         this.updateSelectionUI();
+        this.updateOverlayButtonStates();
     }
     
     /**

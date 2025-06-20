@@ -50,3 +50,43 @@
   max-height: 100%;
   object-fit: contain;
 }
+
+/* Add to Map button styling */
+.add-to-map-btn {
+  transition: all 0.3s ease;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  border: none;
+  cursor: pointer;
+}
+
+.add-to-map-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.add-to-map-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* State-specific styling */
+.add-to-map-btn[data-overlay-state="active"] {
+  background-color: #dc3545 !important;
+  border-color: #dc3545 !important;
+}
+
+.add-to-map-btn[data-overlay-state="active"]:hover {
+  background-color: #c82333 !important;
+  border-color: #c82333 !important;
+}
+
+.add-to-map-btn[data-overlay-state="inactive"] {
+  background-color: #28a745 !important;
+  border-color: #28a745 !important;
+}
+
+.add-to-map-btn[data-overlay-state="inactive"]:hover {
+  background-color: #218838 !important;
+  border-color: #218838 !important;
+}

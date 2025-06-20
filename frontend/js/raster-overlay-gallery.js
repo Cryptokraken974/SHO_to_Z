@@ -5,14 +5,28 @@ class RasterOverlayGallery {
             onAddToMap: (type) => this.defaultAddToMap(type)
         }, options);
 
-        // Create underlying ModularGallery
+        // Create underlying ModularGallery with overlay state tracking
         this.gallery = new window.ModularGallery(this.containerId, {
             showAddToMap: true,
             allowSelection: false,
-            onAddToMap: (id) => this.handleAddToMap(id)
+            onAddToMap: (id) => this.handleAddToMap(id),
+            getOverlayState: (id) => this.isOverlayActive(id)
         });
 
         this.regionName = null;
+        
+        // Register for overlay state changes
+        this.overlayStateCallback = (overlayId, isActive) => {
+            // Check if this overlay belongs to our region
+            if (this.regionName && overlayId.includes(`LIDAR_RASTER_${this.regionName}_`)) {
+                const processingType = overlayId.replace(`LIDAR_RASTER_${this.regionName}_`, '');
+                this.updateButtonState(processingType, isActive);
+            }
+        };
+        
+        if (window.OverlayManager) {
+            window.OverlayManager.registerOverlayStateCallback(this.overlayStateCallback);
+        }
     }
 
     init() {
@@ -99,8 +113,53 @@ class RasterOverlayGallery {
 
     handleAddToMap(itemId) {
         const processingType = itemId;
-        if (typeof this.options.onAddToMap === 'function') {
-            this.options.onAddToMap(processingType);
+        
+        // Check current overlay state
+        const isCurrentlyActive = this.isOverlayActive(processingType);
+        
+        if (isCurrentlyActive) {
+            // Remove overlay
+            this.removeOverlay(processingType);
+        } else {
+            // Add overlay
+            if (typeof this.options.onAddToMap === 'function') {
+                this.options.onAddToMap(processingType);
+            }
+        }
+        
+        // Short delay to allow overlay state to update, then refresh button
+        setTimeout(() => {
+            this.gallery.updateItemOverlayState(itemId, !isCurrentlyActive);
+        }, 100);
+    }
+
+    /**
+     * Check if an overlay is currently active on the map
+     * @param {string} processingType - Processing type to check
+     * @returns {boolean} True if overlay is active
+     */
+    isOverlayActive(processingType) {
+        if (!this.regionName || !window.OverlayManager) return false;
+        
+        // Check for overlay using the expected key format
+        const overlayKey = `LIDAR_RASTER_${this.regionName}_${processingType}`;
+        return overlayKey in window.OverlayManager.mapOverlays;
+    }
+
+    /**
+     * Remove overlay from map
+     * @param {string} processingType - Processing type to remove
+     */
+    removeOverlay(processingType) {
+        if (!this.regionName || !window.OverlayManager) return;
+        
+        const overlayKey = `LIDAR_RASTER_${this.regionName}_${processingType}`;
+        window.OverlayManager.removeOverlay(overlayKey);
+        
+        // Show notification
+        const displayName = this.getProcessingDisplayName(processingType);
+        if (window.Utils) {
+            window.Utils.showNotification(`Removed ${displayName} overlay from map`, 'success');
         }
     }
 
@@ -142,6 +201,23 @@ class RasterOverlayGallery {
         };
         
         return displayNames[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+
+    /**
+     * Refresh button states for all items in the gallery
+     * Call this method when overlay states change externally
+     */
+    refreshButtonStates() {
+        this.gallery.updateOverlayButtonStates();
+    }
+
+    /**
+     * Update button state for a specific processing type
+     * @param {string} processingType - Processing type
+     * @param {boolean} isActive - Whether overlay is active
+     */
+    updateButtonState(processingType, isActive) {
+        this.gallery.updateItemOverlayState(processingType, isActive);
     }
 }
 

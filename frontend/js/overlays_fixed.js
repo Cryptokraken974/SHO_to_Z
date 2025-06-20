@@ -4,6 +4,7 @@
 
 window.OverlayManager = {
   mapOverlays: {},
+  overlayStateCallbacks: [], // Callbacks to notify when overlay states change
 
   /**
    * Add image overlay to map
@@ -80,6 +81,9 @@ window.OverlayManager = {
 
       // Update button state
       this.updateAddToMapButtonState(processingType, true);
+      
+      // Notify overlay state change
+      this.notifyOverlayStateChange(processingType, true);
 
       // Show notification
       this.showOverlayNotification(`${processingType} overlay added to map`, 'success');
@@ -109,6 +113,9 @@ window.OverlayManager = {
       
       // Update button state
       this.updateAddToMapButtonState(processingType, false);
+      
+      // Notify overlay state change
+      this.notifyOverlayStateChange(processingType, false);
       
       // Show notification
       this.showOverlayNotification(`${processingType} overlay removed from map`, 'info');
@@ -1406,6 +1413,42 @@ window.OverlayManager = {
       button.classList.remove('hidden');
       button.style.display = '';
     }
+  },
+
+  /**
+   * Register a callback for overlay state changes
+   * @param {Function} callback - Callback function (overlayId, isActive) => void
+   */
+  registerOverlayStateCallback(callback) {
+    if (typeof callback === 'function') {
+      this.overlayStateCallbacks.push(callback);
+    }
+  },
+
+  /**
+   * Unregister an overlay state callback
+   * @param {Function} callback - Callback function to remove
+   */
+  unregisterOverlayStateCallback(callback) {
+    const index = this.overlayStateCallbacks.indexOf(callback);
+    if (index > -1) {
+      this.overlayStateCallbacks.splice(index, 1);
+    }
+  },
+
+  /**
+   * Notify all registered callbacks of overlay state change
+   * @param {string} overlayId - ID of the overlay that changed
+   * @param {boolean} isActive - Whether the overlay is now active
+   */
+  notifyOverlayStateChange(overlayId, isActive) {
+    this.overlayStateCallbacks.forEach(callback => {
+      try {
+        callback(overlayId, isActive);
+      } catch (error) {
+        console.warn('Error in overlay state callback:', error);
+      }
+    });
   },
 
   // ...existing code...
