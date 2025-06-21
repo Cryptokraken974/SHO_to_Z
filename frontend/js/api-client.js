@@ -1764,6 +1764,36 @@ class OpenAIAPIClient extends BaseAPIClient {
 }
 
 /**
+ * Visual Lexicon API client
+ */
+class VisualLexiconAPIClient extends BaseAPIClient {
+  /**
+   * Get all anomaly types from the visual lexicon
+   * @returns {Promise<Object>} List of anomaly types
+   */
+  async getAnomalyTypes() {
+    return this.get('visual_lexicon/anomaly_types');
+  }
+
+  /**
+   * Get detailed information about a specific anomaly type
+   * @param {string} anomalyName - Name of the anomaly type
+   * @returns {Promise<Object>} Anomaly details
+   */
+  async getAnomalyDetails(anomalyName) {
+    return this.get(`visual_lexicon/anomaly_details/${encodeURIComponent(anomalyName)}`);
+  }
+
+  /**
+   * Get complete data for all anomaly types
+   * @returns {Promise<Object>} All anomaly data
+   */
+  async getAllAnomalyData() {
+    return this.get('visual_lexicon/all_anomaly_data');
+  }
+}
+
+/**
  * API Client Factory
  */
 class APIClientFactory {
@@ -1817,6 +1847,9 @@ class APIClientFactory {
           break;
         case 'openai':
           this._clients[clientType] = new OpenAIAPIClient();
+          break;
+        case 'visualLexicon':
+          this._clients[clientType] = new VisualLexiconAPIClient();
           break;
         default:
           throw new Error(`Unknown client type: ${clientType}`);
@@ -1915,6 +1948,13 @@ class APIClientFactory {
   get openai() {
     return this.getClient('openai');
   }
+
+  /**
+   * Get Visual Lexicon client
+   */
+  get visualLexicon() {
+    return this.getClient('visualLexicon');
+  }
 }
 
 // Global API client factory instance
@@ -1936,6 +1976,7 @@ window.DataAcquisitionAPIClient = DataAcquisitionAPIClient;
 window.CacheManagementAPIClient = CacheManagementAPIClient;
 window.PromptAPIClient = PromptAPIClient;
 window.OpenAIAPIClient = OpenAIAPIClient;
+window.VisualLexiconAPIClient = VisualLexiconAPIClient;
 window.APIClientFactory = APIClientFactory;
 
 // Convenience functions for easy access to API clients
@@ -1952,5 +1993,6 @@ window.dataAcquisition = () => window.APIClient.dataAcquisition;
 window.cacheManagement = () => window.APIClient.cacheManagement;
 window.prompts = () => window.APIClient.prompts;
 window.openai = () => window.APIClient.openai;
+window.visualLexicon = () => window.APIClient.visualLexicon;
 
 Utils.log('info', 'API Client system initialized successfully');

@@ -5,16 +5,21 @@ window.ResultsManager = {
     mainDashboardContainerId: 'results-main-panel', // ID of the div for the dashboard
     initialized: false,
     selectedLogFile: null, // Track the currently selected log file
+    availableAnomalyTypes: [], // Store available anomaly types from visual lexicon
+    activeAnomalyFilters: new Set(), // Store active filters
 
     init() {
         if (this.initialized) {
-            // If already initialized, just re-attach event listeners and refresh the list
+            // If already initialized, refresh everything including anomaly filters
             this.attachEventListeners();
             this.fetchResultsList();
+            this.loadAnomalyTypes(); // Always reload anomaly types on re-init
+            Utils.log('info', 'ResultsManager re-initialized - refreshed filters and results list.');
             return;
         }
         Utils.log('info', 'Initializing ResultsManager...');
         this.fetchResultsList();
+        this.loadAnomalyTypes();
         this.attachEventListeners();
         this.initialized = true;
         Utils.log('info', 'ResultsManager initialized.');
@@ -34,7 +39,143 @@ window.ResultsManager = {
                 this.handleDeleteSelected();
             });
         }
+
+        // Anomaly filter event listeners
+        const filterSelectAllBtn = document.getElementById('anomaly-filter-select-all');
+        if (filterSelectAllBtn) {
+            filterSelectAllBtn.addEventListener('click', () => {
+                this.selectAllAnomalyFilters();
+            });
+        }
+
+        const filterClearAllBtn = document.getElementById('anomaly-filter-clear-all');
+        if (filterClearAllBtn) {
+            filterClearAllBtn.addEventListener('click', () => {
+                this.clearAllAnomalyFilters();
+            });
+        }
         // Event listener for individual log item clicks will be added in displayResultsList
+    },
+
+    /**
+     * Load available anomaly types from the visual lexicon
+     */
+    async loadAnomalyTypes() {
+        try {
+            Utils.log('info', 'Loading anomaly types from visual lexicon...');
+            const response = await visualLexicon().getAnomalyTypes();
+            
+            if (response.success) {
+                this.availableAnomalyTypes = response.anomaly_types;
+                this.renderAnomalyFilter();
+                Utils.log('info', `Loaded ${this.availableAnomalyTypes.length} anomaly types`);
+            } else {
+                Utils.log('error', 'Failed to load anomaly types:', response.error);
+                this.showAnomalyFilterError('Failed to load anomaly types');
+            }
+        } catch (error) {
+            Utils.log('error', 'Error loading anomaly types:', error);
+            this.showAnomalyFilterError('Error loading filter options');
+        }
+    },
+
+    /**
+     * Render the anomaly filter checkboxes
+     */
+    renderAnomalyFilter() {
+        const filterContainer = document.getElementById('anomaly-filter-container');
+        if (!filterContainer) return;
+
+        if (this.availableAnomalyTypes.length === 0) {
+            filterContainer.innerHTML = '<div class="text-[#ababab] text-xs">No anomaly types available</div>';
+            return;
+        }
+
+        const checkboxesHtml = this.availableAnomalyTypes.map(anomalyType => `
+            <label class="flex items-center space-x-2 text-xs cursor-pointer hover:bg-[#3a3a3a] p-1 rounded">
+                <input type="checkbox" 
+                       class="anomaly-filter-checkbox" 
+                       data-anomaly-type="${anomalyType}"
+                       checked>
+                <span class="text-white">${anomalyType}</span>
+            </label>
+        `).join('');
+
+        filterContainer.innerHTML = checkboxesHtml;
+
+        // Initialize all filters as active (checked by default)
+        this.activeAnomalyFilters = new Set(this.availableAnomalyTypes);
+
+        // Add change event listeners to checkboxes
+        const checkboxes = filterContainer.querySelectorAll('.anomaly-filter-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const anomalyType = e.target.getAttribute('data-anomaly-type');
+                if (e.target.checked) {
+                    this.activeAnomalyFilters.add(anomalyType);
+                } else {
+                    this.activeAnomalyFilters.delete(anomalyType);
+                }
+                this.applyAnomalyFilters();
+            });
+        });
+    },
+
+    /**
+     * Show error message in the filter container
+     */
+    showAnomalyFilterError(message) {
+        const filterContainer = document.getElementById('anomaly-filter-container');
+        if (filterContainer) {
+            filterContainer.innerHTML = `<div class="text-red-400 text-xs">${message}</div>`;
+        }
+    },
+
+    /**
+     * Select all anomaly filters
+     */
+    selectAllAnomalyFilters() {
+        this.activeAnomalyFilters = new Set(this.availableAnomalyTypes);
+        
+        // Update checkbox states
+        const checkboxes = document.querySelectorAll('.anomaly-filter-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = true;
+        });
+        
+        this.applyAnomalyFilters();
+    },
+
+    /**
+     * Clear all anomaly filters
+     */
+    clearAllAnomalyFilters() {
+        this.activeAnomalyFilters.clear();
+        
+        // Update checkbox states
+        const checkboxes = document.querySelectorAll('.anomaly-filter-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        
+        this.applyAnomalyFilters();
+    },
+
+    /**
+     * Apply current anomaly filters to the dashboard
+     */
+    applyAnomalyFilters() {
+        if (window.AnomaliesDashboard && window.AnomaliesDashboard.setFilters) {
+            window.AnomaliesDashboard.setFilters(this.activeAnomalyFilters);
+        }
+    },
+
+    /**
+     * Force refresh anomaly types and filters
+     */
+    async refreshAnomalyFilters() {
+        Utils.log('info', 'Force refreshing anomaly filters...');
+        await this.loadAnomalyTypes();
     },
 
     async fetchResultsList() {
@@ -198,6 +339,11 @@ window.ResultsManager = {
             
             // Pass the log file name to the dashboard for image loading
             window.AnomaliesDashboard.render(containerElement, anomalyData, logFile);
+            
+            // Apply current filters after rendering
+            setTimeout(() => {
+                this.applyAnomalyFilters();
+            }, 100); // Small delay to ensure dashboard is fully rendered
         } else {
             Utils.log('error', 'AnomaliesDashboard component not loaded');
             containerElement.innerHTML = `

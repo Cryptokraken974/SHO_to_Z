@@ -4,6 +4,12 @@
 window.AnomaliesDashboard = {
     // Store the current analysis folder for image paths
     currentAnalysisFolder: null,
+    
+    // Store the original anomalies data for filtering
+    originalAnomaliesData: null,
+    
+    // Store current filter settings
+    activeFilters: new Set(),
 
     // Render the anomalies dashboard with provided data
     render(containerElement, jsonData, analysisFolder = null) {
@@ -55,6 +61,9 @@ window.AnomaliesDashboard = {
             jsonData = this.getTestData();
         }
 
+        // Store original data for filtering
+        this.originalAnomaliesData = jsonData;
+
         // Populate Analysis Summary
         const targetAreaElement = document.getElementById('targetAreaId');
         const anomaliesDetectedElement = document.getElementById('anomaliesDetected');
@@ -71,12 +80,87 @@ window.AnomaliesDashboard = {
         this.populateAnomalies(jsonData.identified_anomalies || []);
     },
 
+    /**
+     * Apply current filters to the anomalies data
+     */
+    applyFilters() {
+        if (!this.originalAnomaliesData || !this.originalAnomaliesData.identified_anomalies) {
+            return;
+        }
+
+        let filteredAnomalies;
+
+        // If no filters are active, show NO anomalies (empty result)
+        if (this.activeFilters.size === 0) {
+            filteredAnomalies = [];
+        } else {
+            // Apply type filters - only show anomalies matching active filters
+            filteredAnomalies = this.originalAnomaliesData.identified_anomalies.filter(anomaly => {
+                const anomalyType = anomaly.classification?.type || 'Unknown';
+                return this.activeFilters.has(anomalyType);
+            });
+        }
+
+        // Update the display
+        this.populateAnomalies(filteredAnomalies);
+        
+        // Update summary count
+        const numberOfAnomaliesElement = document.getElementById('numberOfAnomalies');
+        if (numberOfAnomaliesElement) {
+            numberOfAnomaliesElement.textContent = filteredAnomalies.length;
+        }
+    },
+
+    /**
+     * Set active filters and refresh display
+     * @param {Set} filterSet - Set of anomaly types to show
+     */
+    setFilters(filterSet) {
+        this.activeFilters = new Set(filterSet);
+        this.applyFilters();
+    },
+
+    /**
+     * Add a filter and refresh display
+     * @param {string} anomalyType - Anomaly type to add to filter
+     */
+    addFilter(anomalyType) {
+        this.activeFilters.add(anomalyType);
+        this.applyFilters();
+    },
+
+    /**
+     * Remove a filter and refresh display
+     * @param {string} anomalyType - Anomaly type to remove from filter
+     */
+    removeFilter(anomalyType) {
+        this.activeFilters.delete(anomalyType);
+        this.applyFilters();
+    },
+
+    /**
+     * Clear all filters and show all anomalies
+     */
+    clearAllFilters() {
+        this.activeFilters.clear();
+        this.applyFilters();
+    },
+
     populateAnomalies(anomalies) {
         const anomaliesContainer = document.getElementById('anomaliesContainer');
         if (!anomaliesContainer) return;
 
         if (anomalies.length === 0) {
-            anomaliesContainer.innerHTML = '<p class="no-anomalies">No anomalies identified.</p>';
+            // Determine appropriate message based on filter state
+            let message;
+            if (this.activeFilters.size === 0) {
+                message = 'No anomaly types selected. Use the filter controls to select anomaly types to display.';
+            } else if (this.originalAnomaliesData && this.originalAnomaliesData.identified_anomalies && this.originalAnomaliesData.identified_anomalies.length > 0) {
+                message = 'No anomalies match the selected filter criteria.';
+            } else {
+                message = 'No anomalies identified.';
+            }
+            anomaliesContainer.innerHTML = `<p class="no-anomalies">${message}</p>`;
             return;
         }
 

@@ -2409,10 +2409,14 @@ window.UIManager = {
       }
       this.resultsTabInitialized = true;
     } else {
-      Utils.log('info', 'Results tab switched - ensuring event listeners are attached.');
+      Utils.log('info', 'Results tab switched - refreshing anomaly filters and event listeners.');
       // Re-attach event listeners in case the DOM was reloaded
       if (window.ResultsManager && typeof window.ResultsManager.attachEventListeners === 'function') {
         window.ResultsManager.attachEventListeners();
+      }
+      // Always refresh anomaly filters when tab is accessed
+      if (window.ResultsManager && typeof window.ResultsManager.refreshAnomalyFilters === 'function') {
+        window.ResultsManager.refreshAnomalyFilters();
       }
     }
   },
