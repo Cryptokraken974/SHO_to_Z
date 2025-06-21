@@ -1,8 +1,10 @@
 window.ResultsManager = {
     logListContainerId: 'results-log-list', // ID of the div in results-tab's left panel
     selectAllButtonId: 'results-select-all-btn',
+    deleteButtonId: 'results-delete-btn',
     mainDashboardContainerId: 'results-main-panel', // ID of the div for the dashboard
     initialized: false,
+    selectedLogFile: null, // Track the currently selected log file
 
     init() {
         if (this.initialized) {
@@ -20,6 +22,13 @@ window.ResultsManager = {
         if (selectAllButton) {
             selectAllButton.addEventListener('click', () => {
                 this.handleSelectAll();
+            });
+        }
+        
+        const deleteButton = document.getElementById(this.deleteButtonId);
+        if (deleteButton) {
+            deleteButton.addEventListener('click', () => {
+                this.handleDeleteSelected();
             });
         }
         // Event listener for individual log item clicks will be added in displayResultsList
@@ -72,7 +81,21 @@ window.ResultsManager = {
             li.textContent = logFile.replace('.json', ''); // Display cleaner name
             li.setAttribute('data-logfile', logFile);
             li.addEventListener('click', (event) => {
-                this.handleLogItemClick(event.target.getAttribute('data-logfile'));
+                // Remove selection from other items
+                ul.querySelectorAll('li').forEach(item => {
+                    item.classList.remove('bg-blue-600', 'bg-blue-700');
+                    item.classList.add('bg-gray-700');
+                });
+                
+                // Add selection to clicked item
+                li.classList.remove('bg-gray-700');
+                li.classList.add('bg-blue-600');
+                
+                // Track selected file and show delete button
+                this.selectedLogFile = event.target.getAttribute('data-logfile');
+                this.showDeleteButton();
+                
+                this.handleLogItemClick(this.selectedLogFile);
             });
             ul.appendChild(li);
         });
@@ -154,13 +177,8 @@ window.ResultsManager = {
 
     displayAnomalyDashboard(containerElement, data, logFile = null) {
         if (window.AnomaliesDashboard) {
-            // Extract anomaly data from the response structure
-            let anomalyData = data;
-            if (data && data.openai_response) {
-                anomalyData = data.openai_response;
-            } else if (data && data.response) {
-                anomalyData = data.response;
-            }
+            // The anomaly data is now stored directly in the response
+            const anomalyData = data;
             
             // Pass the log file name to the dashboard for image loading
             window.AnomaliesDashboard.render(containerElement, anomalyData, logFile);
@@ -185,17 +203,28 @@ window.ResultsManager = {
 
     isAnomalyData(data) {
         // Check if the data structure matches anomaly analysis format
-        // Handle both direct anomaly data and wrapped openai_response format
-        const responseData = data.openai_response || data.response || data;
-        
-        return responseData && 
-               (responseData.analysis_summary || responseData.identified_anomalies) ||
-               (responseData.anomalies_detected !== undefined) ||
-               (responseData.number_of_anomalies !== undefined);
+        // The response is now stored directly without wrapper
+        return data && 
+               (data.analysis_summary || data.identified_anomalies) ||
+               (data.anomalies_detected !== undefined) ||
+               (data.number_of_anomalies !== undefined);
     },
 
     handleSelectAll() {
         Utils.log('info', '"Select All" clicked.');
+        
+        // Clear selection and hide delete button
+        this.hideDeleteButton();
+        
+        // Remove selection styling from all items
+        const logListContainer = document.getElementById(this.logListContainerId);
+        if (logListContainer) {
+            logListContainer.querySelectorAll('li').forEach(item => {
+                item.classList.remove('bg-blue-600', 'bg-blue-700');
+                item.classList.add('bg-gray-700');
+            });
+        }
+        
         const dashboardContainer = document.getElementById(this.mainDashboardContainerId);
         if (dashboardContainer) {
             dashboardContainer.innerHTML = `
@@ -205,6 +234,81 @@ window.ResultsManager = {
 
             // Try to fetch aggregated results
             this.fetchAndDisplayAggregatedResults(dashboardContainer);
+        }
+    },
+
+    showDeleteButton() {
+        const deleteButton = document.getElementById(this.deleteButtonId);
+        if (deleteButton) {
+            deleteButton.classList.remove('hidden');
+        }
+    },
+
+    hideDeleteButton() {
+        const deleteButton = document.getElementById(this.deleteButtonId);
+        if (deleteButton) {
+            deleteButton.classList.add('hidden');
+        }
+        this.selectedLogFile = null;
+    },
+
+    async handleDeleteSelected() {
+        if (!this.selectedLogFile) {
+            Utils.showNotification('No log file selected for deletion', 'warning');
+            return;
+        }
+
+        // Show confirmation dialog
+        const confirmed = confirm(
+            `Are you sure you want to delete the result log "${this.selectedLogFile.replace('.json', '')}" and all its associated files?\n\n` +
+            `This will delete:\n` +
+            `• The response log file\n` +
+            `• The associated request log file\n` +
+            `• Any related directories\n\n` +
+            `This action cannot be undone.`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            Utils.showNotification('Deleting files...', 'info');
+            
+            const response = await fetch(`/api/results/delete/${encodeURIComponent(this.selectedLogFile)}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                Utils.showNotification(
+                    `Successfully deleted ${result.files_deleted?.length || 0} files` + 
+                    (result.directories_deleted?.length > 0 ? ` and ${result.directories_deleted.length} directories` : ''),
+                    'success'
+                );
+                
+                // Hide delete button and clear selection
+                this.hideDeleteButton();
+                
+                // Clear the main panel
+                const dashboardContainer = document.getElementById(this.mainDashboardContainerId);
+                if (dashboardContainer) {
+                    dashboardContainer.innerHTML = `
+                        <h1 class="text-white text-xl font-bold">Results Dashboard</h1>
+                        <p class="text-gray-300">Select a result from the left panel to view details, or click "Select All" for a summary.</p>
+                    `;
+                }
+                
+                // Refresh the results list
+                this.fetchResultsList();
+                
+            } else {
+                const errorText = await response.text();
+                throw new Error(`${response.status}: ${errorText}`);
+            }
+        } catch (error) {
+            Utils.log('error', 'Failed to delete result log:', error);
+            Utils.showNotification(`Failed to delete result log: ${error.message}`, 'error');
         }
     },
 

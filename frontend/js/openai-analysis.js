@@ -44,8 +44,41 @@ class OpenAIAnalysis {
             this.navigatePrompt(1);
         });
 
+        // Prompt preview modal
+        document.getElementById('prompt-preview-btn')?.addEventListener('click', () => {
+            this.showPromptPreview();
+        });
+
+        document.getElementById('prompt-preview-close')?.addEventListener('click', () => {
+            this.hidePromptPreview();
+        });
+
+        document.getElementById('prompt-preview-close-btn')?.addEventListener('click', () => {
+            this.hidePromptPreview();
+        });
+
+        document.getElementById('prompt-preview-copy')?.addEventListener('click', () => {
+            this.copyPromptToClipboard();
+        });
+
+        // Close modal when clicking outside
+        document.getElementById('prompt-preview-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'prompt-preview-modal') {
+                this.hidePromptPreview();
+            }
+        });
+
         // Keyboard navigation for prompt parts
         document.addEventListener('keydown', (e) => {
+            // Handle modal close with ESC key
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('prompt-preview-modal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    this.hidePromptPreview();
+                    return;
+                }
+            }
+            
             // Only handle keyboard navigation when textarea is focused
             const currentTextarea = document.getElementById('current-prompt-textarea');
             if (document.activeElement === currentTextarea) {
@@ -172,6 +205,78 @@ class OpenAIAnalysis {
         }
     }
     
+    showPromptPreview() {
+        // Save current prompt content before showing preview
+        const currentTextarea = document.getElementById('current-prompt-textarea');
+        if (currentTextarea && this.promptParts[this.currentPromptIndex]) {
+            this.promptParts[this.currentPromptIndex].content = currentTextarea.value;
+        }
+
+        // Collect all prompt parts
+        let promptParts = [];
+        this.promptParts.forEach(promptPart => {
+            if (promptPart.content.trim()) {
+                promptParts.push(promptPart.content.trim());
+            }
+        });
+        const completePrompt = promptParts.join('\n\n');
+
+        // Update modal content
+        const modal = document.getElementById('prompt-preview-modal');
+        const content = document.getElementById('prompt-preview-content');
+        const stats = document.getElementById('prompt-preview-stats');
+
+        if (content) {
+            content.textContent = completePrompt || 'No prompt content available';
+        }
+
+        if (stats) {
+            const charCount = completePrompt.length;
+            const wordCount = completePrompt.trim() ? completePrompt.trim().split(/\s+/).length : 0;
+            stats.textContent = `${charCount} characters, ${wordCount} words`;
+        }
+
+        // Show modal
+        if (modal) {
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        }
+    }
+
+    hidePromptPreview() {
+        const modal = document.getElementById('prompt-preview-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+            document.body.style.overflow = ''; // Restore scrolling
+        }
+    }
+
+    async copyPromptToClipboard() {
+        const content = document.getElementById('prompt-preview-content');
+        if (content && content.textContent) {
+            try {
+                await navigator.clipboard.writeText(content.textContent);
+                window.Utils?.showNotification('Prompt copied to clipboard!', 'success');
+                
+                // Visual feedback on copy button
+                const copyBtn = document.getElementById('prompt-preview-copy');
+                if (copyBtn) {
+                    const originalText = copyBtn.textContent;
+                    copyBtn.textContent = '✓ Copied!';
+                    copyBtn.classList.add('bg-green-600');
+                    
+                    setTimeout(() => {
+                        copyBtn.textContent = originalText;
+                        copyBtn.classList.remove('bg-green-600');
+                    }, 2000);
+                }
+            } catch (err) {
+                console.error('Failed to copy to clipboard:', err);
+                window.Utils?.showNotification('Failed to copy to clipboard', 'error');
+            }
+        }
+    }
+    
     showImageModal(imageSrc, imageAlt) {
         // Reuse existing image modal if available
         if (window.UIManager && window.UIManager.showImageModal) {
@@ -215,9 +320,9 @@ class OpenAIAnalysis {
             window.Utils?.showNotification('No prompt content loaded or entered', 'warning');
             return;
         }
-        const lat = parseFloat(document.getElementById('lat-input').value);
-        const lng = parseFloat(document.getElementById('lng-input').value);
-        const coords = (!isNaN(lat) && !isNaN(lng)) ? { lat, lng } : null;
+        // Coordinates are optional for OpenAI analysis - they can be used to provide location context
+        // but aren't required for image analysis
+        const coords = null; // Could be enhanced later to get coordinates from selected region metadata
 
         const targetRegions = this.selectedRegions.length > 0
             ? this.selectedRegions

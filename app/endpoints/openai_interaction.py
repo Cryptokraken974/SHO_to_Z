@@ -36,15 +36,22 @@ class ResponsePayload(BaseModel):
 async def send_to_openai(payload: SendPayload):
     """Send prompt and images to OpenAI's chat model"""
     try:
-        import openai  # type: ignore
-        openai.api_key = os.getenv("OPENAI_API_KEY", "")
+        from openai import OpenAI
+        
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
 
         # Prepare content array for multimodal input.
         # The content array combines text prompts and image URLs.
         # It starts with the text prompt, followed by image URL objects for each image.
         content_list = [{"type": "text", "text": payload.prompt}]
         for image_url in payload.images:
-            content_list.append({"type": "image_url", "image_url": image_url})
+            # OpenAI expects the image URL to be in a specific format
+            content_list.append({
+                "type": "image_url", 
+                "image_url": {
+                    "url": image_url  # This can be either a data URL or HTTP URL
+                }
+            })
 
         messages = [
             {
@@ -52,11 +59,15 @@ async def send_to_openai(payload: SendPayload):
                 "content": content_list  # Combined text and image inputs
             }
         ]
-        # Use the model_name from the payload if provided, otherwise default to "gpt-4-vision-preview".
+        # Use the model_name from the payload if provided, otherwise default to "gpt-4o-mini".
         # This allows the client to specify which OpenAI model to use for the API call.
-        selected_model = payload.model_name or "gpt-4-vision-preview"
-        response = openai.ChatCompletion.create(model=selected_model, messages=messages)
-        content = response["choices"][0]["message"]["content"]
+        selected_model = payload.model_name or "gpt-4o-mini"
+        
+        response = client.chat.completions.create(
+            model=selected_model, 
+            messages=messages
+        )
+        content = response.choices[0].message.content
     except Exception as e:
         content = f"OpenAI call failed: {e}"
     return {"response": content}
@@ -100,7 +111,14 @@ async def save_response(payload: ResponsePayload):
     try:
         import datetime
         
-        resp_entry = {"response": payload.response, "log_file": payload.log_file}
+        # Store the response directly without wrapping it in a "response" object
+        resp_entry = payload.response.copy() if isinstance(payload.response, dict) else payload.response
+        # Add the log_file reference at the root level
+        if isinstance(resp_entry, dict):
+            resp_entry["log_file"] = payload.log_file
+        else:
+            # If response is not a dict, create a wrapper with both fields
+            resp_entry = {"analysis_data": payload.response, "log_file": payload.log_file}
         
         # If we have a log_file path, try to derive a meaningful filename
         if payload.log_file and "logs/" in payload.log_file:

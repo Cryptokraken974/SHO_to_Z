@@ -1,7 +1,7 @@
 {
   "module_type": "visual_lexicon_entry",
   "anomaly_name": "Causeway",
-  "description": "Long, narrow, and typically straight or gently curved raised earthen paths. These features often connect larger archaeological structures (e.g., mounds, platforms, ceremonial rings) and may follow topographic gradients or appear to cut through vegetation. They can be subtle but exhibit regular alignment, continuity, and structure. Width is typically consistent, and curvature is gradual.",
+  "description": "Long, narrow, and often curvilinear raised earthen paths. These features may connect platforms, ceremonial areas, or follow natural contours. Although often subtle, they show structured continuity, consistent width, and elevation contrast. Visibility improves with slope or LRM rasters. Unlike modern roads, ancient causeways may curve gently or sharply.",
   "phenomenological_signatures": {
     "required": [
       "positive_relief"
@@ -19,9 +19,10 @@
     "form_characteristics": {
       "linear_alignment": true,
       "connects_to_known_features": true,
-      "typical_width_pixels": [10, 50],
-      "curvature_constraint": "low",
-      "path_continuity_threshold": 0.6
+      "typical_width_pixels": [8, 60],
+      "curvature_constraint": "moderate",
+      "path_continuity_threshold": 0.5,
+      "minimum_length_pixels": 300
     }
   }
 }

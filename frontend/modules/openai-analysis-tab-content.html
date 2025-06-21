@@ -49,44 +49,58 @@
           <!-- Prompt Content Area -->
           <div id="prompt-content-area" class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-4">
             <textarea id="current-prompt-textarea" 
-                      class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-[#ababab] resize-none focus:outline-none focus:border-[#00bfff] h-48"
+                      class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-[#ababab] resize-none focus:outline-none focus:border-[#00bfff] h-80"
                       placeholder="Loading prompt parts..."></textarea>
           </div>
         </div>
 
-        <button id="send-to-openai" class="mt-2 bg-[#007bff] hover:bg-[#0056b3] text-white px-4 py-2 rounded font-medium transition-colors">Send to OpenAI</button>
-      </div>
+        <!-- Prompt Preview Button -->
+        <div class="mb-4">
+          <button id="prompt-preview-btn" class="bg-[#28a745] hover:bg-[#218838] text-white px-4 py-2 rounded font-medium transition-colors">
+            📄 Prompt Preview
+          </button>
+        </div>
 
-      <!-- Analysis Parameters -->
-      <div class="mb-6">
-        <div class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-6">
-          <h3 class="text-white text-lg font-semibold mb-4">⚙️ Parameters</h3>
-          <div class="space-y-4">
-            <div>
-              <label class="block text-white text-sm mb-2">Analysis Prompt</label>
-              <textarea id="analysis-prompt"
-                        class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-[#ababab] resize-none focus:outline-none focus:border-[#00bfff]"
-                        rows="3"
-                        placeholder="Describe what you want to analyze..."></textarea>
-            </div>
-            <div class="flex gap-4">
-              <div class="flex-1">
-                <label class="block text-white text-sm mb-2">Model</label>
-                <select id="openai-model" class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#00bfff]">
-                  <option value="gpt-4-vision-preview">GPT-4 Vision</option>
-                  <option value="gpt-4o">GPT-4o</option>
-                  <option value="gpt-4o-mini">GPT-4o Mini</option>
-                </select>
-              </div>
-              <div class="flex-1">
-                <label class="block text-white text-sm mb-2">Detail Level</label>
-                <select id="detail-level" class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#00bfff]">
-                  <option value="low">Low</option>
-                  <option value="high" selected>High</option>
-                </select>
-              </div>
-            </div>
-          </div>
+        <!-- Model Selection -->
+        <div class="mb-4">
+          <label class="block text-white text-sm mb-2">Model</label>
+          <select id="openai-model" class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-[#00bfff] max-w-xs">
+            <option value="gpt-4o">GPT-4o</option>
+            <option value="gpt-4o-mini" selected>GPT-4o Mini</option>
+            <option value="o1-mini">o1 Mini</option>
+          </select>
+        </div>
+
+        <button id="send-to-openai" class="bg-[#007bff] hover:bg-[#0056b3] text-white px-4 py-2 rounded font-medium transition-colors">Send to OpenAI</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Prompt Preview Modal -->
+  <div id="prompt-preview-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-6 max-w-4xl max-h-[80vh] w-[90vw] flex flex-col">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-white text-xl font-bold">📄 Complete Prompt Preview</h2>
+        <button id="prompt-preview-close" class="text-[#ababab] hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+      
+      <div class="flex-1 overflow-y-auto">
+        <div class="bg-[#262626] border border-[#404040] rounded-lg p-4">
+          <pre id="prompt-preview-content" class="text-white whitespace-pre-wrap text-sm leading-relaxed"></pre>
+        </div>
+      </div>
+      
+      <div class="flex justify-between items-center mt-4 pt-4 border-t border-[#303030]">
+        <div class="text-[#ababab] text-sm">
+          <span id="prompt-preview-stats">0 characters, 0 words</span>
+        </div>
+        <div class="flex gap-2">
+          <button id="prompt-preview-copy" class="bg-[#6c757d] hover:bg-[#5a6268] text-white px-3 py-1 rounded text-sm transition-colors">
+            📋 Copy
+          </button>
+          <button id="prompt-preview-close-btn" class="bg-[#dc3545] hover:bg-[#c82333] text-white px-3 py-1 rounded text-sm transition-colors">
+            Close
+          </button>
         </div>
       </div>
     </div>

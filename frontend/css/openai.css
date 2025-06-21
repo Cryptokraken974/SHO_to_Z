@@ -86,7 +86,7 @@
 
 #current-prompt-textarea {
   transition: border-color 0.2s ease;
-  min-height: 200px;
+  min-height: 320px; /* h-80 equivalent */
   font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
 
@@ -104,4 +104,38 @@
 .prompt-nav-transition.active {
   opacity: 1;
   transform: translateX(0);
+}
+
+/* Prompt Preview Modal */
+#prompt-preview-modal {
+  backdrop-filter: blur(4px);
+}
+
+#prompt-preview-modal .bg-black {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+#prompt-preview-content {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  line-height: 1.6;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+#prompt-preview-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+#prompt-preview-content::-webkit-scrollbar-track {
+  background: #404040;
+  border-radius: 4px;
+}
+
+#prompt-preview-content::-webkit-scrollbar-thumb {
+  background: #606060;
+  border-radius: 4px;
+}
+
+#prompt-preview-content::-webkit-scrollbar-thumb:hover {
+  background: #707070;
 }

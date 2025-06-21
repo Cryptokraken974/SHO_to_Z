@@ -7,34 +7,34 @@
     "json_format": {
       "analysis_summary": {
         "target_area_id": "unique_identifier_for_the_analyzed_area",
-        "anomalies_detected": true,
-        "number_of_anomalies": 1
+        "anomalies_detected": "<true or false>",
+        "number_of_anomalies": "<DYNAMICALLY_DETECTED_COUNT>"
       },
       "identified_anomalies": [
         {
-          "anomaly_id": "unique_id_for_this_anomaly",
+          "anomaly_id": "<unique_id_for_this_anomaly>",
           "classification": {
-            "type": "Settlement Platform",
-            "subtype": "N/A"
+            "type": "<archaeological_feature_type>",
+            "subtype": "<optional_subtype>"
           },
           "confidence": {
-            "global_score": 0.9,
+            "global_score": "<global_confidence_score>",
             "individual_scores": {
-              "lrm": 0.7,
-              "svf": 0.6,
-              "slope": 1.0,
-              "chm": 0.9,
-              "ndvi": 0.1
+              "lrm": "<individual_score_for_lrm>",
+              "svf": "<individual_score_for_svf>",
+              "slope": "<individual_score_for_slope>",
+              "chm": "<individual_score_for_chm>",
+              "ndvi": "<individual_score_for_ndvi>"
             }
           },
           "evidence_per_image": {
-            "lrm": "Evidence description based on the LRM's specific signatures.",
-            "svf": "Evidence description based on the SVF's specific signatures.",
-            "slope": "Evidence description based on the Slope raster's specific signatures.",
-            "chm": "Evidence description based on the CHM's specific signatures.",
-            "ndvi": "Evidence description based on the NDVI's specific signatures."
+            "lrm": "<Evidence description based on the LRM's specific signatures.>",
+            "svf": "<Evidence description based on the SVF's specific signatures.>",
+            "slope": "<Evidence description based on the Slope raster's specific signatures.>",
+            "chm": "<Evidence description based on the CHM's specific signatures.>",
+            "ndvi": "<Evidence description based on the NDVI's specific signatures.>"
           },
-          "archaeological_interpretation": "Your synthesis and plausible archaeological interpretation, informed by the multi-layer evidence.",
+          "archaeological_interpretation": "<Your synthesis and plausible archaeological interpretation, informed by the multi-layer evidence.>",
           "bounding_box_pixels": [
             {
               "x_min": 0,

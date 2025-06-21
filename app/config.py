@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     
     # API Keys (optional)
     opentopography_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
     
     # OpenTopography credentials for elevation data
     opentopo_username: Optional[str] = None

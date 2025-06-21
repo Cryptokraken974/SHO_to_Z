@@ -86,7 +86,7 @@ async def get_result_log_detail(log_filename: str):
 
     combined_data = {
         "response_filename": log_filename,
-        "openai_response": response_data.get("response"),
+        "openai_response": response_data.get("response") or response_data.get("analysis_data"),
         "request_log_filename": request_log_path.name,
         "original_prompt": request_data.get("prompt"),
         "input_images": request_data.get("images", []),
@@ -191,3 +191,81 @@ async def get_all_results_summary():
     aggregated_data["unique_regions"] = list(aggregated_data["unique_regions"])
 
     return aggregated_data
+
+@router.delete("/delete/{log_filename}")
+async def delete_result_log_and_associated_files(log_filename: str):
+    """
+    Deletes a specific response log file and all its associated files:
+    - The response log file itself
+    - The associated request log file
+    - Any directory containing the request log (if it's in a timestamped folder)
+    """
+    response_log_path = RESPONSE_DIR / log_filename
+
+    if not response_log_path.exists() or not response_log_path.is_file():
+        raise HTTPException(status_code=404, detail=f"Response log file not found: {log_filename}")
+
+    files_deleted = []
+    directories_deleted = []
+
+    try:
+        # First, read the response log to get the associated request log path
+        with open(response_log_path, 'r', encoding='utf-8') as f:
+            response_data = json.load(f)
+        
+        request_log_file_path_str = response_data.get("log_file")
+        
+        if request_log_file_path_str:
+            request_log_path = Path(request_log_file_path_str)
+            
+            # Handle path resolution like in the get endpoint
+            if not request_log_path.exists():
+                cwd_path = Path.cwd() / request_log_path
+                if cwd_path.exists():
+                    request_log_path = cwd_path
+                else:
+                    potential_path_in_log_dir = LOG_DIR / request_log_path.name
+                    if potential_path_in_log_dir.exists():
+                        request_log_path = potential_path_in_log_dir
+            
+            # Delete the request log file if it exists
+            if request_log_path.exists() and request_log_path.is_file():
+                request_log_path.unlink()
+                files_deleted.append(str(request_log_path))
+                
+                # Check if the request log is in a timestamped directory
+                # If so, and the directory is now empty, delete the directory too
+                parent_dir = request_log_path.parent
+                if parent_dir != LOG_DIR and parent_dir.exists():
+                    # Check if directory is empty (or only contains hidden files)
+                    remaining_files = [f for f in parent_dir.iterdir() if not f.name.startswith('.')]
+                    if not remaining_files:
+                        try:
+                            parent_dir.rmdir()
+                            directories_deleted.append(str(parent_dir))
+                        except OSError:
+                            # Directory not empty or other permission issue, skip
+                            pass
+        
+        # Delete the response log file
+        response_log_path.unlink()
+        files_deleted.append(str(response_log_path))
+        
+        return {
+            "message": f"Successfully deleted result log '{log_filename}' and associated files",
+            "files_deleted": files_deleted,
+            "directories_deleted": directories_deleted
+        }
+        
+    except json.JSONDecodeError:
+        # If we can't read the response log, still try to delete it
+        response_log_path.unlink()
+        files_deleted.append(str(response_log_path))
+        return {
+            "message": f"Deleted response log '{log_filename}' (could not read associated request log path)",
+            "files_deleted": files_deleted,
+            "directories_deleted": directories_deleted
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting files: {str(e)}")
