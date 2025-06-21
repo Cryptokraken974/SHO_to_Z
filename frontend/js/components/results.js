@@ -206,7 +206,7 @@ window.ResultsManager = {
             if (response.ok) {
                 const data = await response.json();
                 if (data.logs) {
-                    this.displayResultsList(data.logs);
+                    await this.displayResultsList(data.logs);
                 } else {
                     // Handle cases where data.logs might be missing even if response is ok
                     logListContainer.innerHTML = '<p class="text-red-500">Error: Response from server is missing "logs" data.</p>';
@@ -223,7 +223,7 @@ window.ResultsManager = {
         }
     },
 
-    displayResultsList(logs) {
+    async displayResultsList(logs) {
         const logListContainer = document.getElementById(this.logListContainerId);
         if (!logs || logs.length === 0) {
             logListContainer.innerHTML = '<p class="text-gray-400">No results found.</p>';
@@ -232,21 +232,35 @@ window.ResultsManager = {
 
         const ul = document.createElement('ul');
         ul.className = 'space-y-2';
-        logs.forEach(logFile => {
+        
+        // Store anomaly status for each log file
+        const anomalyStatusMap = new Map();
+        
+        // Process each log file to determine anomaly status
+        for (const logFile of logs) {
             const li = document.createElement('li');
-            li.className = 'p-2 bg-gray-700 hover:bg-gray-600 rounded-md cursor-pointer text-white text-sm';
+            li.className = 'p-2 rounded-md cursor-pointer text-white text-sm';
             li.textContent = logFile.replace('.json', ''); // Display cleaner name
             li.setAttribute('data-logfile', logFile);
+            
+            // Check anomaly status and set background color
+            const hasAnomalies = await this.checkAnomalyStatus(logFile);
+            anomalyStatusMap.set(logFile, hasAnomalies);
+            this.setListItemBackground(li, hasAnomalies);
+            
             li.addEventListener('click', (event) => {
-                // Remove selection from other items
-                ul.querySelectorAll('li').forEach(item => {
-                    item.classList.remove('bg-blue-600', 'bg-blue-700');
-                    item.classList.add('bg-gray-700');
+                // Remove selection from other items and restore their original backgrounds
+                ul.querySelectorAll('li').forEach((item) => {
+                    item.classList.remove('log-item-selected');
+                    // Restore original background based on stored anomaly status
+                    const itemLogFile = item.getAttribute('data-logfile');
+                    const itemHasAnomalies = anomalyStatusMap.get(itemLogFile);
+                    this.setListItemBackground(item, itemHasAnomalies);
                 });
                 
                 // Add selection to clicked item
-                li.classList.remove('bg-gray-700');
-                li.classList.add('bg-blue-600');
+                li.classList.remove('log-item-with-anomalies', 'log-item-no-anomalies', 'log-item-unknown');
+                li.classList.add('log-item-selected');
                 
                 // Track selected file and show delete button
                 this.selectedLogFile = event.target.getAttribute('data-logfile');
@@ -255,10 +269,11 @@ window.ResultsManager = {
                 this.handleLogItemClick(this.selectedLogFile);
             });
             ul.appendChild(li);
-        });
+        }
+        
         logListContainer.innerHTML = ''; // Clear loading message
         logListContainer.appendChild(ul);
-        Utils.log('info', `Displayed ${logs.length} result logs.`);
+        Utils.log('info', `Displayed ${logs.length} result logs with anomaly status indicators.`);
     },
 
     handleLogItemClick(logFile) {
@@ -555,5 +570,66 @@ window.ResultsManager = {
                 }
             ]
         };
-    }
+    },
+
+    /**
+     * Check if a log file contains anomalies by reading the response
+     * @param {string} logFile - The log file name
+     * @returns {Promise<boolean|null>} - true if anomalies detected, false if not, null if unknown
+     */
+    async checkAnomalyStatus(logFile) {
+        try {
+            const response = await fetch(`/api/results/get/${logFile}`);
+            if (!response.ok) {
+                return null; // Unknown status
+            }
+            
+            const data = await response.json();
+            
+            // The response contains JSON wrapped in a string in the openai_response field
+            const parsedData = this.extractJsonFromResponse(data.openai_response || '');
+            
+            if (parsedData && parsedData.analysis_summary) {
+                const anomaliesDetected = parsedData.analysis_summary.anomalies_detected;
+                
+                // Handle both boolean and string "true"/"false" values
+                if (typeof anomaliesDetected === 'boolean') {
+                    return anomaliesDetected;
+                } else if (typeof anomaliesDetected === 'string') {
+                    return anomaliesDetected.toLowerCase() === 'true';
+                }
+            }
+            
+            return null; // Unknown status
+        } catch (error) {
+            Utils.log('error', `Failed to check anomaly status for ${logFile}:`, error);
+            return null; // Unknown status
+        }
+    },
+
+    /**
+     * Set the background color of a list item based on anomaly status
+     * @param {HTMLElement} listItem - The list item element
+     * @param {boolean|null} hasAnomalies - true for anomalies (green), false for none (red), null for unknown (gray)
+     */
+    setListItemBackground(listItem, hasAnomalies) {
+        // Remove all anomaly status classes
+        listItem.classList.remove(
+            'log-item-with-anomalies', 
+            'log-item-no-anomalies', 
+            'log-item-unknown',
+            'log-item-selected'
+        );
+        
+        if (hasAnomalies === true) {
+            // Green background for anomalies detected
+            listItem.classList.add('log-item-with-anomalies');
+        } else if (hasAnomalies === false) {
+            // Red background for no anomalies
+            listItem.classList.add('log-item-no-anomalies');
+        } else {
+            // Gray background for unknown status
+            listItem.classList.add('log-item-unknown');
+        }
+    },
 };

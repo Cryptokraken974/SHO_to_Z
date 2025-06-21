@@ -1732,34 +1732,14 @@ class OpenAIAPIClient extends BaseAPIClient {
   }
 
   /**
-   * Convenience method: send prompt, log request, and store response
+   * Convenience method: send prompt to OpenAI
+   * Note: The /api/openai/send endpoint now automatically handles logging and response storage
    * @param {Object} payload Request payload
    */
   async sendPrompt(payload) {
-    const sendResp = await this.send(payload);
-    const logImages = (payload.images || []).map((img) => ({
-      path: img,
-      size: typeof img === 'string' ? img.length : 0,
-    }));
-    const logPayload = {
-      laz_name: payload.laz_name,
-      coordinates: payload.coordinates,
-      images: logImages,
-      prompt: payload.prompt,
-      model_name: payload.model_name, // Pass through the model_name
-    };
-    let logResp = {};
-    try {
-      logResp = await this.createLog(logPayload);
-    } catch (e) {}
-    const responsePayload = {
-      response: sendResp.response,
-      log_file: logResp.log_file || null,
-    };
-    try {
-      await this.saveResponse(responsePayload);
-    } catch (e) {}
-    return sendResp;
+    // The /api/openai/send endpoint now automatically creates logs and saves responses
+    // So we just need to call send() - no additional logging needed
+    return await this.send(payload);
   }
 }
 

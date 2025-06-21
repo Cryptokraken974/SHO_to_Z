@@ -221,3 +221,41 @@
     padding: 0.5rem;
     text-align: center;
 }
+
+/* Anomaly Status Indicators for Log List Items */
+.log-item-with-anomalies {
+    background-color: #059669 !important; /* Green-600 */
+    border-left: 4px solid #10b981; /* Green-500 accent */
+}
+
+.log-item-with-anomalies:hover {
+    background-color: #047857 !important; /* Green-700 */
+}
+
+.log-item-no-anomalies {
+    background-color: #dc2626 !important; /* Red-600 */
+    border-left: 4px solid #ef4444; /* Red-500 accent */
+}
+
+.log-item-no-anomalies:hover {
+    background-color: #b91c1c !important; /* Red-700 */
+}
+
+.log-item-unknown {
+    background-color: #374151 !important; /* Gray-700 */
+    border-left: 4px solid #6b7280; /* Gray-500 accent */
+}
+
+.log-item-unknown:hover {
+    background-color: #4b5563 !important; /* Gray-600 */
+}
+
+/* Selection state overrides */
+.log-item-selected {
+    background-color: #2563eb !important; /* Blue-600 for selected */
+    border-left: 4px solid #3b82f6 !important; /* Blue-500 accent */
+}
+
+.log-item-selected:hover {
+    background-color: #1d4ed8 !important; /* Blue-700 */
+}
