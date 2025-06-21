@@ -1,0 +1,11 @@
+{
+  "module_type": "input_image_definition",
+  "image_name": "slope",
+  "full_name": "Slope (Degrees)",
+  "analysis_stage": "secondary_confirmation",
+  "phenomenon_signatures": {
+    "steep_faces": "High slope values delineate scarps, cliffs or walls.",
+    "gentle_plains": "Low values map flat valley floors, plateaus or infilled basins.",
+    "erosional_patterns": "Radial or dendritic clusters of steeper slopes highlight gullies and rill networks."
+  }
+}

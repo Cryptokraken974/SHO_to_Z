@@ -1,0 +1,11 @@
+{
+  "module_type": "input_image_definition",
+  "image_name": "hillshade_rgb",
+  "full_name": "RGB Hillshade",
+  "analysis_stage": "visualisation",
+  "phenomenon_signatures": {
+    "enhanced_relief": "Multi‑azimuth shading emphasises three‑dimensional form, clarifying both convex and concave shapes.",
+    "textural_gradation": "Colour transitions convey aspect and illumination, separating overlapping landforms.",
+    "context_for_other_layers": "Serves as an intuitive backdrop when composited with thematic rasters."
+  }
+}

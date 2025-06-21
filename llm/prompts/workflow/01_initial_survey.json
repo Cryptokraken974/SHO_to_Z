@@ -1,6 +1,6 @@
 {
   "module_type": "workflow_step",
   "step_number": 1,
-  "step_name": "Primary Detection Survey",
-  "content": "Your first task is to perform a systematic survey for potential anomalies. You must **only** use the images designated with \"analysis_stage\": \"primary_detection\". Scan these LiDAR-derived rasters for any topographic features that appear anthropogenic (e.g., unnatural geometric shapes, linear features, regular patterns). Create an internal list of these 'potential anomalies'. **Do not analyze any other images at this stage.**"
+  "step_name": "Broad-Spectrum Anomaly Detection",
+  "content": "Your first task is a holistic survey for potential anomalies. You must simultaneously examine all rasters derived from surface structure and topography: `lrm`, `svf`, `slope`, and `chm`. Scan these layers for any features that appear potentially anthropogenic (e.g., unnatural geometric shapes, sharp linear features, regular patterns, or distinct textural zones). Flag any location that shows a clear signature in ANY of these layers as a 'potential anomaly' for further investigation. Use the visualization rasters (`hillshade_rgb`, `tint_overlay`) for context and orientation."
 }

@@ -1,6 +1,6 @@
 {
   "module_type": "workflow_step",
   "step_number": 5,
-  "step_name": "Confidence Assessment",
-  "content": "Assign a confidence score (0.0 to 1.0) to each classification based on the hierarchy of evidence.\n- **High Confidence (0.8-1.0):** The feature is unambiguously visible in multiple `primary_detection` layers AND is clearly corroborated by evidence from a `secondary_confirmation` layer.\n- **Medium Confidence (0.5-0.7):** The feature is clearly visible in `primary_detection` layers but has weak, ambiguous, or no corroborating evidence in `secondary_confirmation` layers.\n- **Low Confidence (0.1-0.4):** The feature is subtle or ambiguous even in the `primary_detection` layers."
+  "step_name": "Archaeological Interpretation",
+  "content": "Based on your classification and the detailed evidence profile, formulate a plausible archaeological interpretation for the anomaly. Use the rich, multi-layer information to describe its form, potential function, and relationship to the landscape and other features. Your interpretation should be more nuanced now, referencing which data layers provided the strongest evidence (e.g., 'While topographically subtle, the feature's existence is strongly supported by its clear definition in the slope raster and its persistent influence on vegetation height visible in the CHM')."
 }

@@ -1,31 +1,50 @@
 {
   "module_type": "workflow_step",
   "step_number": 6,
-  "step_name": "Generate Report",
+  "step_name": "Generate Final Report",
   "content": {
-    "instruction": "Your final task is to compile all your findings for all identified anomalies into a single JSON object. The structure of this object must strictly adhere to the following format. The `evidence_per_image` object must only contain keys for the images provided in this task.",
+    "instruction": "Your final task is to compile all your findings into a single JSON object. The structure must strictly adhere to the following revised format, which includes a granular, multi-layered confidence assessment and is compatible with the provided set of rasters.",
     "json_format": {
-        "analysis_summary": {
-          "target_area_id": "unique_identifier_for_the_analyzed_area",
-          "anomalies_detected": true,
-          "number_of_anomalies": 1
-        },
-        "identified_anomalies": [
-          {
-            "anomaly_id": "unique_id_for_this_anomaly",
-            "classification": { "type": "Settlement Platform", "subtype": "N/A" },
-            "confidence_score": 0.9,
-            "evidence_per_image": {
-              "lrm": "Evidence description based on the LRM's specific signatures.",
-              "svf": "Evidence description based on the SVF's specific signatures.",
-              "boosted_hillshade": "Evidence description based on the Boosted Hillshade's specific signatures.",
-              "chm": "Evidence description based on the CHM's specific signatures.",
-              "ndvi": "Evidence description based on the NDVI's specific signatures."
-            },
-            "archaeological_interpretation": "Your synthesis and plausible archaeological interpretation.",
-            "bounding_box_pixels": [ { "x_min": 0, "y_min": 0, "x_max": 0, "y_max": 0 } ]
-          }
-        ]
+      "analysis_summary": {
+        "target_area_id": "unique_identifier_for_the_analyzed_area",
+        "anomalies_detected": true,
+        "number_of_anomalies": 1
+      },
+      "identified_anomalies": [
+        {
+          "anomaly_id": "unique_id_for_this_anomaly",
+          "classification": {
+            "type": "Settlement Platform",
+            "subtype": "N/A"
+          },
+          "confidence": {
+            "global_score": 0.9,
+            "individual_scores": {
+              "lrm": 0.7,
+              "svf": 0.6,
+              "slope": 1.0,
+              "chm": 0.9,
+              "ndvi": 0.1
+            }
+          },
+          "evidence_per_image": {
+            "lrm": "Evidence description based on the LRM's specific signatures.",
+            "svf": "Evidence description based on the SVF's specific signatures.",
+            "slope": "Evidence description based on the Slope raster's specific signatures.",
+            "chm": "Evidence description based on the CHM's specific signatures.",
+            "ndvi": "Evidence description based on the NDVI's specific signatures."
+          },
+          "archaeological_interpretation": "Your synthesis and plausible archaeological interpretation, informed by the multi-layer evidence.",
+          "bounding_box_pixels": [
+            {
+              "x_min": 0,
+              "y_min": 0,
+              "x_max": 0,
+              "y_max": 0
+            }
+          ]
+        }
+      ]
     }
   }
 }
