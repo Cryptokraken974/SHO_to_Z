@@ -1,10 +1,27 @@
 {
   "module_type": "visual_lexicon_entry",
   "anomaly_name": "Causeway",
-  "description": "Linear, raised earthen features that connect settlements, ceremonial sites, or resource areas.",
+  "description": "Long, narrow, and typically straight or gently curved raised earthen paths. These features often connect larger archaeological structures (e.g., mounds, platforms, ceremonial rings) and may follow topographic gradients or appear to cut through vegetation. They can be subtle but exhibit regular alignment, continuity, and structure. Width is typically consistent, and curvature is gradual.",
   "phenomenological_signatures": {
-    "required": ["positive_relief"],
-    "expected": ["vegetation_height_difference"],
-    "secondary": ["vegetation_health_anomaly"]
+    "required": [
+      "positive_relief"
+    ],
+    "expected": [
+      "steep_faces",
+      "subtle_topographic_pattern",
+      "vegetation_height_difference"
+    ],
+    "secondary": [
+      "vegetation_health_anomaly",
+      "elevation_bands",
+      "subtle_slope_gradient"
+    ],
+    "form_characteristics": {
+      "linear_alignment": true,
+      "connects_to_known_features": true,
+      "typical_width_pixels": [10, 50],
+      "curvature_constraint": "low",
+      "path_continuity_threshold": 0.6
+    }
   }
 }

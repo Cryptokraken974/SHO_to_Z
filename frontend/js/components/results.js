@@ -112,7 +112,7 @@ window.ResultsManager = {
                 
                 // Check if the data contains anomaly analysis results
                 if (this.isAnomalyData(openaiResponse)) {
-                    this.displayAnomalyDashboard(containerElement, openaiResponse);
+                    this.displayAnomalyDashboard(containerElement, openaiResponse, logFile);
                 } else {
                     // Fall back to regular results display
                     this.displayRegularResults(containerElement, resultData, logFile);
@@ -121,12 +121,12 @@ window.ResultsManager = {
                 const errorText = await response.text();
                 Utils.log('error', `HTTP ${response.status}: ${errorText}`);
                 // API endpoint not available, show demo dashboard with test data
-                this.displayAnomalyDashboard(containerElement, null);
+                this.displayAnomalyDashboard(containerElement, null, logFile);
             }
         } catch (error) {
             Utils.log('warn', `Could not fetch results for ${logFile}, showing demo dashboard:`, error);
             // Show demo dashboard with test data
-            this.displayAnomalyDashboard(containerElement, null);
+            this.displayAnomalyDashboard(containerElement, null, logFile);
         }
     },
 
@@ -152,7 +152,7 @@ window.ResultsManager = {
         }
     },
 
-    displayAnomalyDashboard(containerElement, data) {
+    displayAnomalyDashboard(containerElement, data, logFile = null) {
         if (window.AnomaliesDashboard) {
             // Extract anomaly data from the response structure
             let anomalyData = data;
@@ -162,7 +162,8 @@ window.ResultsManager = {
                 anomalyData = data.response;
             }
             
-            window.AnomaliesDashboard.render(containerElement, anomalyData);
+            // Pass the log file name to the dashboard for image loading
+            window.AnomaliesDashboard.render(containerElement, anomalyData, logFile);
         } else {
             Utils.log('error', 'AnomaliesDashboard component not loaded');
             containerElement.innerHTML = `
@@ -232,7 +233,8 @@ window.ResultsManager = {
         }
 
         if (window.AnomaliesDashboard) {
-            window.AnomaliesDashboard.render(containerElement, aggregatedData);
+            // For aggregated data, we don't have a specific log file, so pass null
+            window.AnomaliesDashboard.render(containerElement, aggregatedData, null);
         } else {
             Utils.log('error', 'AnomaliesDashboard component not loaded');
             containerElement.innerHTML = `

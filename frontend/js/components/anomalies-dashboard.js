@@ -2,12 +2,18 @@
 // Integrated into the main SHO_to_Z application
 
 window.AnomaliesDashboard = {
+    // Store the current analysis folder for image paths
+    currentAnalysisFolder: null,
+
     // Render the anomalies dashboard with provided data
-    render(containerElement, jsonData) {
+    render(containerElement, jsonData, analysisFolder = null) {
         if (!containerElement) {
             Utils.log('error', 'AnomaliesDashboard: Container element not provided');
             return;
         }
+
+        // Store the analysis folder name for image loading
+        this.currentAnalysisFolder = analysisFolder;
 
         // Clear container
         containerElement.innerHTML = '';
@@ -76,7 +82,7 @@ window.AnomaliesDashboard = {
 
         anomaliesContainer.innerHTML = '';
 
-        anomalies.forEach(anomaly => {
+        anomalies.forEach((anomaly, index) => {
             const anomalyElement = document.createElement('article');
             anomalyElement.className = 'anomaly-item';
 
@@ -111,6 +117,28 @@ window.AnomaliesDashboard = {
                 <p><strong>Type:</strong> ${classificationType}</p>
                 <p><strong>Subtype:</strong> ${classificationSubtype}</p>
 
+                <div class="image-gallery-section">
+                    <h4>Image Evidence Gallery:</h4>
+                    <div class="image-gallery-container" id="gallery-${index}">
+                        <div class="gallery-navigation">
+                            <button class="gallery-nav-btn prev-btn" data-gallery="${index}" data-direction="prev">
+                                ← Previous
+                            </button>
+                            <span class="gallery-counter" id="counter-${index}">1 / 1</span>
+                            <button class="gallery-nav-btn next-btn" data-gallery="${index}" data-direction="next">
+                                Next →
+                            </button>
+                        </div>
+                        <div class="gallery-display">
+                            <canvas id="canvas-${index}" class="anomaly-image-canvas"></canvas>
+                            <div class="image-info" id="info-${index}">
+                                <span class="image-type"></span>
+                                <span class="mouse-coordinates" id="coords-${index}">Canvas: (0, 0) | Original: {"x": 0, "y": 0}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="confidence-section">
                     <h4>Confidence:</h4>
                     <p class="global-score">Global Score: ${anomaly.confidence?.global_score || 'N/A'}</p>
@@ -137,7 +165,338 @@ window.AnomaliesDashboard = {
             `;
             
             anomaliesContainer.appendChild(anomalyElement);
+
+            // Initialize the image gallery for this anomaly
+            this.initializeImageGallery(index, anomaly);
         });
+
+        // Set up navigation event listeners
+        this.setupGalleryNavigation();
+    },
+
+    async initializeImageGallery(anomalyIndex, anomaly) {
+        const canvas = document.getElementById(`canvas-${anomalyIndex}`);
+        const ctx = canvas.getContext('2d');
+        
+        // Get available images for the analysis
+        const images = await this.getAnalysisImages();
+        
+        if (images.length === 0) {
+            canvas.width = 400;
+            canvas.height = 200;
+            ctx.fillStyle = '#374151';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#9CA3AF';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('No images available', canvas.width / 2, canvas.height / 2);
+            return;
+        }
+
+        // Store gallery data
+        if (!this.galleries) this.galleries = {};
+        this.galleries[anomalyIndex] = {
+            images: images,
+            currentIndex: 0,
+            anomaly: anomaly,
+            canvas: canvas,
+            ctx: ctx
+        };
+
+        // Load first image
+        this.loadGalleryImage(anomalyIndex, 0);
+        this.updateGalleryCounter(anomalyIndex);
+    },
+
+    async getAnalysisImages() {
+        // If we don't have the analysis folder, we can't get the images
+        if (!this.currentAnalysisFolder) {
+            console.warn('No analysis folder specified, cannot load images');
+            return [];
+        }
+
+        // Extract the base folder name without _response.json suffix
+        const folderName = this.currentAnalysisFolder.replace('_response.json', '');
+        
+        // Define the expected image types and their paths in the sent_images folder
+        const imageTypes = [
+            { type: 'CHM', filename: 'CHM.png', name: 'Canopy Height Model' },
+            { type: 'LRM', filename: 'LRM.png', name: 'Local Relief Model' },
+            { type: 'SVF', filename: 'SVF.png', name: 'Sky View Factor' },
+            { type: 'Slope', filename: 'Slope.png', name: 'Slope' },
+            { type: 'HillshadeRGB', filename: 'HillshadeRGB.png', name: 'RGB Hillshade' },
+            { type: 'TintOverlay', filename: 'TintOverlay.png', name: 'Tint Overlay' }
+        ];
+
+        // Check for NDVI with dynamic naming pattern
+        // Extract region name: OR_WizardIsland_gpt4visionpreview_... -> OR_WizardIsland
+        const regionMatch = folderName.match(/^([^_]+_[^_]+)/);
+        if (regionMatch) {
+            const regionName = regionMatch[1];
+            imageTypes.push({
+                type: 'NDVI', 
+                filename: `${regionName}_20250531_sentinel2_NDVI.png`, 
+                name: 'NDVI'
+            });
+        }
+
+        // Build paths to the sent_images folder
+        const availableImages = [];
+        for (const imageType of imageTypes) {
+            const imagePath = `/llm/logs/${folderName}/sent_images/${imageType.filename}`;
+            
+            try {
+                // Test if image loads
+                const img = new Image();
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = imagePath;
+                });
+                
+                availableImages.push({
+                    type: imageType.type,
+                    path: imagePath,
+                    name: imageType.name
+                });
+                
+            } catch (error) {
+                console.log(`Image not available: ${imagePath}`);
+            }
+        }
+
+        console.log(`Found ${availableImages.length} available images for analysis: ${folderName}`);
+        return availableImages;
+    },
+
+    async loadGalleryImage(anomalyIndex, imageIndex) {
+        const gallery = this.galleries[anomalyIndex];
+        if (!gallery || !gallery.images[imageIndex]) return;
+
+        const imageInfo = gallery.images[imageIndex];
+        const canvas = gallery.canvas;
+        const ctx = gallery.ctx;
+
+        try {
+            const img = new Image();
+            img.crossOrigin = 'anonymous'; // Handle CORS if needed
+            
+            await new Promise((resolve, reject) => {
+                img.onload = () => {
+                    // Set canvas size to match image (max width 600px for display)
+                    const maxDisplayWidth = 600;
+                    canvas.width = Math.min(img.width, maxDisplayWidth);
+                    canvas.height = (canvas.width / img.width) * img.height;
+                    
+                    // Store scaling factors in the gallery object
+                    gallery.scaleX = canvas.width / img.width;
+                    gallery.scaleY = canvas.height / img.height;
+                    gallery.originalWidth = img.width;
+                    gallery.originalHeight = img.height;
+                    
+                    // Debug logging
+                    console.log(`Image loaded: ${imageInfo.name}`);
+                    console.log(`Original size: ${img.width}x${img.height}`);
+                    console.log(`Canvas size: ${canvas.width}x${canvas.height}`);
+                    console.log(`Scale factors: scaleX=${gallery.scaleX.toFixed(3)}, scaleY=${gallery.scaleY.toFixed(3)}`);
+                    
+                    // Draw the image
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // Draw bounding boxes
+                    this.drawBoundingBoxes(ctx, gallery.anomaly, gallery.scaleX, gallery.scaleY);
+                    
+                    // Optional: Draw debug markers (uncomment to enable)
+                    // this.drawDebugMarkers(ctx, gallery.scaleX, gallery.scaleY, img.width, img.height);
+                    
+                    resolve();
+                };
+                img.onerror = reject;
+                img.src = imageInfo.path;
+            });
+
+            // Set up mouse tracking for this canvas
+            this.setupMouseTracking(anomalyIndex);
+
+            // Update image info
+            const infoElement = document.getElementById(`info-${anomalyIndex}`);
+            if (infoElement) {
+                infoElement.querySelector('.image-type').textContent = imageInfo.name;
+            }
+
+        } catch (error) {
+            console.error('Failed to load image:', imageInfo.path, error);
+            
+            // Draw error state
+            canvas.width = 400;
+            canvas.height = 200;
+            ctx.fillStyle = '#374151';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#EF4444';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Failed to load image', canvas.width / 2, canvas.height / 2);
+        }
+    },
+
+    drawBoundingBoxes(ctx, anomaly, scaleX, scaleY) {
+        if (!anomaly.bounding_box_pixels || anomaly.bounding_box_pixels.length === 0) return;
+
+        console.log(`Drawing bounding boxes for ${anomaly.anomaly_id}:`);
+        console.log(`Scale factors: scaleX=${scaleX.toFixed(3)}, scaleY=${scaleY.toFixed(3)}`);
+
+        // Set bounding box style
+        ctx.strokeStyle = '#FFFFFF'; // White color
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]); // Continuous line (no dashes)
+
+        anomaly.bounding_box_pixels.forEach((bbox, index) => {
+            const x = bbox.x_min * scaleX;
+            const y = bbox.y_min * scaleY;
+            const width = (bbox.x_max - bbox.x_min) * scaleX;
+            const height = (bbox.y_max - bbox.y_min) * scaleY;
+
+            console.log(`  Bbox ${index + 1}:`);
+            console.log(`    Original: x_min=${bbox.x_min}, y_min=${bbox.y_min}, x_max=${bbox.x_max}, y_max=${bbox.y_max}`);
+            console.log(`    Scaled: x=${x.toFixed(1)}, y=${y.toFixed(1)}, width=${width.toFixed(1)}, height=${height.toFixed(1)}`);
+
+            // Draw bounding box
+            ctx.strokeRect(x, y, width, height);
+
+            // Draw corner markers for precise coordinate verification
+            ctx.fillStyle = '#00FF00'; // Bright green for corners
+            const cornerSize = 3;
+            
+            // Top-left corner (x_min, y_min)
+            ctx.fillRect(x - cornerSize/2, y - cornerSize/2, cornerSize, cornerSize);
+            
+            // Top-right corner (x_max, y_min) 
+            ctx.fillRect(x + width - cornerSize/2, y - cornerSize/2, cornerSize, cornerSize);
+            
+            // Bottom-left corner (x_min, y_max)
+            ctx.fillRect(x - cornerSize/2, y + height - cornerSize/2, cornerSize, cornerSize);
+            
+            // Bottom-right corner (x_max, y_max)
+            ctx.fillRect(x + width - cornerSize/2, y + height - cornerSize/2, cornerSize, cornerSize);
+
+            // Draw label background
+            const label = anomaly.anomaly_id;
+            ctx.font = '12px Arial';
+            const labelWidth = ctx.measureText(label).width;
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(x, y - 20, labelWidth + 8, 16);
+            
+            // Draw label text
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillText(label, x + 4, y - 8);
+        });
+
+        // Reset line dash
+        ctx.setLineDash([]);
+    },
+
+    // Debug method to verify coordinate system
+    drawDebugMarkers(ctx, scaleX, scaleY, originalWidth, originalHeight) {
+        ctx.fillStyle = '#FF00FF'; // Magenta for debug markers
+        const markerSize = 5;
+        
+        // Draw markers at known positions with labels
+        const debugPoints = [
+            { x: 0, y: 0, label: '(0,0)' },
+            { x: 100, y: 100, label: '(100,100)' },
+            { x: originalWidth - 1, y: 0, label: `(${originalWidth-1},0)` },
+            { x: 0, y: originalHeight - 1, label: `(0,${originalHeight-1})` },
+            { x: originalWidth - 1, y: originalHeight - 1, label: `(${originalWidth-1},${originalHeight-1})` }
+        ];
+        
+        debugPoints.forEach(point => {
+            const scaledX = point.x * scaleX;
+            const scaledY = point.y * scaleY;
+            
+            // Draw marker
+            ctx.fillRect(scaledX - markerSize/2, scaledY - markerSize/2, markerSize, markerSize);
+            
+            // Draw label
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '10px Arial';
+            ctx.fillText(point.label, scaledX + 5, scaledY - 5);
+            ctx.fillStyle = '#FF00FF';
+        });
+    },
+
+    setupMouseTracking(anomalyIndex) {
+        const gallery = this.galleries[anomalyIndex];
+        if (!gallery) return;
+
+        const canvas = gallery.canvas;
+        const coordsElement = document.getElementById(`coords-${anomalyIndex}`);
+        
+        if (!coordsElement) return;
+
+        // Remove existing mouse listeners to avoid duplicates
+        canvas.removeEventListener('mousemove', gallery.mouseMoveHandler);
+        canvas.removeEventListener('mouseleave', gallery.mouseLeaveHandler);
+
+        // Create mouse move handler
+        gallery.mouseMoveHandler = (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const canvasX = event.clientX - rect.left;
+            const canvasY = event.clientY - rect.top;
+            
+            // Convert canvas coordinates to original image coordinates
+            const originalX = Math.round(canvasX / gallery.scaleX);
+            const originalY = Math.round(canvasY / gallery.scaleY);
+            
+            // Update coordinates display in JSON format
+            coordsElement.textContent = `Canvas: (${Math.round(canvasX)}, ${Math.round(canvasY)}) | Original: {"x": ${originalX}, "y": ${originalY}}`;
+        };
+
+        // Create mouse leave handler
+        gallery.mouseLeaveHandler = () => {
+            coordsElement.textContent = `Canvas: (0, 0) | Original: {"x": 0, "y": 0}`;
+        };
+
+        // Add event listeners
+        canvas.addEventListener('mousemove', gallery.mouseMoveHandler);
+        canvas.addEventListener('mouseleave', gallery.mouseLeaveHandler);
+    },
+
+    updateGalleryCounter(anomalyIndex) {
+        const gallery = this.galleries[anomalyIndex];
+        if (!gallery) return;
+
+        const counter = document.getElementById(`counter-${anomalyIndex}`);
+        if (counter) {
+            counter.textContent = `${gallery.currentIndex + 1} / ${gallery.images.length}`;
+        }
+    },
+
+    setupGalleryNavigation() {
+        // Remove existing listeners first
+        document.removeEventListener('click', this.galleryNavigationHandler);
+        
+        // Add new listener
+        this.galleryNavigationHandler = (event) => {
+            if (event.target.classList.contains('gallery-nav-btn')) {
+                const galleryIndex = parseInt(event.target.dataset.gallery);
+                const direction = event.target.dataset.direction;
+                
+                const gallery = this.galleries[galleryIndex];
+                if (!gallery) return;
+
+                if (direction === 'next') {
+                    gallery.currentIndex = (gallery.currentIndex + 1) % gallery.images.length;
+                } else if (direction === 'prev') {
+                    gallery.currentIndex = (gallery.currentIndex - 1 + gallery.images.length) % gallery.images.length;
+                }
+
+                this.loadGalleryImage(galleryIndex, gallery.currentIndex);
+                this.updateGalleryCounter(galleryIndex);
+            }
+        };
+
+        document.addEventListener('click', this.galleryNavigationHandler);
     },
 
     // Test data (same as original script.js)

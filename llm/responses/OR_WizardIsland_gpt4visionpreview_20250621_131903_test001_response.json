@@ -1,7 +1,7 @@
 {
   "response": {
     "analysis_summary": {
-      "target_area_id": "OR_WizardIsland_20250621",
+      "target_area_id": "WizardIsland_20250621",
       "anomalies_detected": true,
       "number_of_anomalies": 3
     },
@@ -31,7 +31,7 @@
         },
         "archaeological_interpretation": "This is a large constructed earthen platform or mound, likely for settlement or ceremonial use, due to its regularity, topographic prominence, and vegetation modification.",
         "bounding_box_pixels": [
-          { "x_min": 300, "y_min": 600, "x_max": 750, "y_max": 1050 }
+          { "x_min": 210, "y_min": 480, "x_max": 750, "y_max": 1100 }
         ]
       },
       {
@@ -59,7 +59,7 @@
         },
         "archaeological_interpretation": "This is likely a causeway or raised path, connecting or encircling the main platform. Its geometry and continuity suggest intentional construction.",
         "bounding_box_pixels": [
-          { "x_min": 120, "y_min": 900, "x_max": 700, "y_max": 1200 }
+          { "x_min": 50, "y_min": 900, "x_max": 750, "y_max": 1300 }
         ]
       },
       {
@@ -87,7 +87,7 @@
         },
         "archaeological_interpretation": "This feature could be an artificial terrace, edge of a constructed settlement, or defensive earthwork, as shown by the abrupt topography and clear vegetation boundary.",
         "bounding_box_pixels": [
-          { "x_min": 830, "y_min": 600, "x_max": 1100, "y_max": 1200 }
+          { "x_min": 830, "y_min": 600, "x_max": 1200, "y_max": 1300 }
         ]
       }
     ]

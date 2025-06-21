@@ -1,0 +1,31 @@
+{
+  "module_type": "visual_lexicon_entry",
+  "anomaly_name": "Hillside Settlement",
+  "description": "Clusters of anthropogenic features distributed across sloped terrain, typically representing ancient dwellings, terraces, or communal areas arranged to conform with natural hillsides or ridgelines. These settlements may lack a single large platform but exhibit multiple semi-leveled zones, regular clearings, edge structures, or concentric patterns. They often show subtle terracing, stepped relief transitions, and vegetation anomalies tracking the slope.",
+  "phenomenological_signatures": {
+    "required": [
+      "subtle_topographic_pattern"
+    ],
+    "expected": [
+      "steep_faces",
+      "vegetation_height_difference",
+      "positive_relief"
+    ],
+    "secondary": [
+      "vegetation_health_anomaly",
+      "subtle_slope_gradient",
+      "uniform_regrowth_area"
+    ],
+    "form_characteristics": {
+      "terrain_context": "moderate_to_high_slope",
+      "arrangement_pattern": ["clustered", "linear_along_contour", "semi-circular"],
+      "terrace_step_height_threshold": 1.5,
+      "micro-platform_size_pixels": [100, 800],
+      "proximity_bias": {
+        "to_causeway": true,
+        "to_watercourse": true,
+        "to_summit_or_ridge": true
+      }
+    }
+  }
+}

@@ -57,3 +57,51 @@
   border-color: #00bfff; /* Highlight color on focus - standard for this app */
   box-shadow: 0 0 0 1px #00bfff; /* Optional focus ring, consistent with other inputs */
 }
+
+/* Rotating prompt parts UI */
+#prompt-nav-prev,
+#prompt-nav-next {
+  transition: all 0.2s ease;
+  min-width: 80px;
+}
+
+#prompt-nav-prev:hover:not(:disabled),
+#prompt-nav-next:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+#prompt-title {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#prompt-counter {
+  font-family: monospace;
+  min-width: 50px;
+  text-align: center;
+}
+
+#current-prompt-textarea {
+  transition: border-color 0.2s ease;
+  min-height: 200px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
+#current-prompt-textarea:focus {
+  box-shadow: 0 0 0 3px rgba(0, 191, 255, 0.1);
+}
+
+/* Navigation animation */
+.prompt-nav-transition {
+  opacity: 0;
+  transform: translateX(10px);
+  transition: all 0.2s ease;
+}
+
+.prompt-nav-transition.active {
+  opacity: 1;
+  transform: translateX(0);
+}

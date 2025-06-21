@@ -32,38 +32,33 @@
 
         <!-- Container for dynamically loaded prompt parts -->
         <div id="dynamic-prompt-parts-container" class="space-y-4 my-4">
-          <!-- Prompt parts will be dynamically injected here by JavaScript -->
+          <!-- Navigation Header -->
+          <div class="flex items-center justify-between bg-[#1a1a1a] border border-[#303030] rounded-lg p-3">
+            <button id="prompt-nav-prev" class="bg-[#404040] hover:bg-[#505050] text-white px-3 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              ← Previous
+            </button>
+            <div class="flex items-center space-x-2">
+              <span id="prompt-counter" class="text-[#ababab] text-sm">0 / 0</span>
+              <span id="prompt-title" class="text-white font-semibold">No prompts loaded</span>
+            </div>
+            <button id="prompt-nav-next" class="bg-[#404040] hover:bg-[#505050] text-white px-3 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              Next →
+            </button>
+          </div>
+          
+          <!-- Prompt Content Area -->
+          <div id="prompt-content-area" class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-4">
+            <textarea id="current-prompt-textarea" 
+                      class="w-full bg-[#262626] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-[#ababab] resize-none focus:outline-none focus:border-[#00bfff] h-48"
+                      placeholder="Loading prompt parts..."></textarea>
+          </div>
         </div>
 
         <button id="send-to-openai" class="mt-2 bg-[#007bff] hover:bg-[#0056b3] text-white px-4 py-2 rounded font-medium transition-colors">Send to OpenAI</button>
       </div>
 
-      <!-- Analysis Controls -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <!-- Analysis Type Selection -->
-        <div class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-6">
-          <h3 class="text-white text-lg font-semibold mb-4">🎯 Analysis Type</h3>
-          <div class="space-y-3">
-            <label class="flex items-center">
-              <input type="radio" name="analysis-type" value="terrain" class="mr-3" checked>
-              <span class="text-white">Terrain Analysis</span>
-            </label>
-            <label class="flex items-center">
-              <input type="radio" name="analysis-type" value="vegetation" class="mr-3">
-              <span class="text-white">Vegetation Assessment</span>
-            </label>
-            <label class="flex items-center">
-              <input type="radio" name="analysis-type" value="change-detection" class="mr-3">
-              <span class="text-white">Change Detection</span>
-            </label>
-            <label class="flex items-center">
-              <input type="radio" name="analysis-type" value="custom" class="mr-3">
-              <span class="text-white">Custom Analysis</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Analysis Parameters -->
+      <!-- Analysis Parameters -->
+      <div class="mb-6">
         <div class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-6">
           <h3 class="text-white text-lg font-semibold mb-4">⚙️ Parameters</h3>
           <div class="space-y-4">
@@ -91,30 +86,6 @@
                 </select>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Analysis Controls -->
-      <div class="flex items-center gap-4 mb-6">
-        <button id="start-openai-analysis-btn" class="bg-[#28a745] hover:bg-[#218838] text-white px-6 py-3 rounded-lg font-medium transition-colors">
-          🚀 Start Analysis
-        </button>
-        <button id="stop-openai-analysis-btn" class="bg-[#dc3545] hover:bg-[#c82333] text-white px-6 py-3 rounded-lg font-medium transition-colors hidden">
-          🛑 Stop Analysis
-        </button>
-        <div id="openai-analysis-status" class="text-[#ababab] text-sm">
-          Ready to analyze
-        </div>
-      </div>
-
-      <!-- Analysis Results -->
-      <div class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-6">
-        <h3 class="text-white text-lg font-semibold mb-4">📋 Analysis Results</h3>
-        <div id="openai-analysis-results" class="min-h-[300px]">
-          <div class="text-center text-[#666] py-8">
-            <div class="text-4xl mb-4">🤖</div>
-            <p>Analysis results will appear here</p>
           </div>
         </div>
       </div>

@@ -1,10 +1,31 @@
 {
   "module_type": "visual_lexicon_entry",
   "anomaly_name": "Settlement Platform",
-  "description": "Raised earthen platforms for dwellings, sometimes arranged in a circle.",
+  "description": "Artificially leveled or raised earthen surfaces constructed to support dwellings, communal buildings, or ritual spaces. These platforms typically exhibit rectangular, circular, or compound arrangements, and may be found singly or in clusters. They are often enclosed or bounded by subtle berms or ditches, with sharp relief edges and consistent elevation. Settlement platforms are frequently associated with reduced canopy cover, vegetation regrowth zones, or path/causeway intersections.",
   "phenomenological_signatures": {
-    "required": ["positive_relief"],
-    "expected": ["vegetation_height_difference"],
-    "secondary": ["vegetation_health_anomaly"]
+    "required": [
+      "positive_relief"
+    ],
+    "expected": [
+      "steep_faces",
+      "vegetation_height_difference",
+      "subtle_topographic_pattern"
+    ],
+    "secondary": [
+      "vegetation_health_anomaly",
+      "elevation_bands",
+      "uniform_regrowth_area"
+    ],
+    "form_characteristics": {
+      "geometry_type": ["rectangle", "circle", "compound"],
+      "bounding_edge_slope_threshold": 15,
+      "elevation_consistency_threshold": 0.85,
+      "platform_area_pixels": [1000, 25000],
+      "adjacency_bias": {
+        "to_causeway": true,
+        "to_geoglyph": false,
+        "to_other_platforms": true
+      }
+    }
   }
 }

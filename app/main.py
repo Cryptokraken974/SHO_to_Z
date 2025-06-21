@@ -124,6 +124,7 @@ app.mount("/static", StaticFiles(directory="frontend"), name="static")
 app.mount("/css", StaticFiles(directory="frontend/css"), name="css")
 app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
 app.mount("/output", StaticFiles(directory="output"), name="output")
+app.mount("/llm", StaticFiles(directory="llm"), name="llm")
 
 # Include routers from endpoint modules
 from .endpoints.core import router as core_router

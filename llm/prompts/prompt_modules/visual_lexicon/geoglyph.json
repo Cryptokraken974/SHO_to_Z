@@ -1,10 +1,28 @@
 {
   "module_type": "visual_lexicon_entry",
   "anomaly_name": "Geoglyph",
-  "description": "Large-scale geometric (circles, squares) or figurative designs etched into the landscape.",
+  "description": "Large-scale geometric earthworks, typically constructed as excavated ditches, berms, or embanked outlines forming regular shapes such as circles, rectangles, or compound enclosures. These features are often shallow but distinct, with precise proportions, closed-loop geometry, and internal symmetry. They may be partially infilled or eroded but retain recognizable shape patterns.",
   "phenomenological_signatures": {
-    "required": ["negative_relief"],
-    "expected": ["subtle_topographic_pattern"],
-    "secondary": ["soil_moisture_pattern", "uniform_regrowth_area"]
+    "required": [
+      "negative_relief"
+    ],
+    "expected": [
+      "subtle_topographic_pattern",
+      "subtle_slope_gradient",
+      "elevation_bands"
+    ],
+    "secondary": [
+      "soil_moisture_pattern",
+      "uniform_regrowth_area",
+      "vegetation_height_difference"
+    ],
+    "form_characteristics": {
+      "geometry_type": ["circle", "rectangle", "compound"],
+      "closure_ratio_threshold": 0.85,
+      "minimum_diameter_pixels": 80,
+      "edge_continuity_tolerance": 0.15,
+      "symmetry_bias": true,
+      "aspect_ratio_constraint": [0.7, 1.3]
+    }
   }
 }

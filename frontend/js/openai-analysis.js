@@ -12,6 +12,8 @@ class OpenAIAnalysis {
         this.selectedRegions = [];
         this.regionGalleries = {};
         this.availableRegions = [];
+        this.promptParts = []; // Store loaded prompt parts
+        this.currentPromptIndex = 0; // Track current prompt part
 
         this.init();
     }
@@ -28,25 +30,35 @@ class OpenAIAnalysis {
     }
     
     setupEventListeners() {
-        // Analysis controls
-        document.getElementById('start-openai-analysis-btn')?.addEventListener('click', () => {
-            this.startAnalysis();
-        });
-        
-        document.getElementById('stop-openai-analysis-btn')?.addEventListener('click', () => {
-            this.stopAnalysis();
-        });
-
         // Send prompt to OpenAI
         document.getElementById('send-to-openai')?.addEventListener('click', () => {
             this.sendPromptToOpenAI();
         });
-        
-        // Analysis type change handler
-        document.querySelectorAll('input[name="analysis-type"]').forEach(radio => {
-            radio.addEventListener('change', () => {
-                this.updateAnalysisPrompt();
-            });
+
+        // Prompt navigation
+        document.getElementById('prompt-nav-prev')?.addEventListener('click', () => {
+            this.navigatePrompt(-1);
+        });
+
+        document.getElementById('prompt-nav-next')?.addEventListener('click', () => {
+            this.navigatePrompt(1);
+        });
+
+        // Keyboard navigation for prompt parts
+        document.addEventListener('keydown', (e) => {
+            // Only handle keyboard navigation when textarea is focused
+            const currentTextarea = document.getElementById('current-prompt-textarea');
+            if (document.activeElement === currentTextarea) {
+                if (e.ctrlKey || e.metaKey) { // Ctrl/Cmd + Arrow keys
+                    if (e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        this.navigatePrompt(-1);
+                    } else if (e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        this.navigatePrompt(1);
+                    }
+                }
+            }
         });
 
         const addBtn = document.getElementById('add-region-btn');
@@ -90,137 +102,74 @@ class OpenAIAnalysis {
     
     // Image loading functionality removed
     
-    updateAnalysisPrompt() {
-        const selectedType = document.querySelector('input[name="analysis-type"]:checked')?.value;
-        const promptTextarea = document.getElementById('analysis-prompt');
+    navigatePrompt(direction) {
+        if (this.promptParts.length === 0) return;
         
-        const prompts = {
-            'terrain': 'Analyze the terrain characteristics including elevation patterns, slope gradients, aspect distributions, and topographic features. Identify potential geological hazards and terrain stability.',
-            'vegetation': 'Assess vegetation coverage, health, and distribution patterns. Identify different vegetation types, canopy density, and potential areas of vegetation stress or change.',
-            'change-detection': 'Compare temporal changes in the landscape including vegetation changes, terrain modifications, and land use alterations. Highlight significant changes and their potential causes.',
-            'custom': 'Please describe your custom analysis requirements...'
-        };
-        
-        if (selectedType && prompts[selectedType]) {
-            promptTextarea.value = prompts[selectedType];
+        // Save current prompt content
+        const currentTextarea = document.getElementById('current-prompt-textarea');
+        if (currentTextarea && this.promptParts[this.currentPromptIndex]) {
+            this.promptParts[this.currentPromptIndex].content = currentTextarea.value;
         }
+        
+        // Update index
+        this.currentPromptIndex += direction;
+        if (this.currentPromptIndex < 0) {
+            this.currentPromptIndex = this.promptParts.length - 1;
+        } else if (this.currentPromptIndex >= this.promptParts.length) {
+            this.currentPromptIndex = 0;
+        }
+        
+        this.displayCurrentPrompt();
     }
     
-    async startAnalysis() {
-        const prompt = document.getElementById('analysis-prompt').value.trim();
-        if (!prompt) {
-            window.Utils?.showNotification('Please enter an analysis prompt', 'warning');
-            return;
-        }
+    displayCurrentPrompt() {
+        if (this.promptParts.length === 0) return;
         
-        console.log('🚀 Starting OpenAI analysis...');
+        const currentPrompt = this.promptParts[this.currentPromptIndex];
         
-        // Update UI
-        document.getElementById('start-openai-analysis-btn').classList.add('hidden');
-        document.getElementById('stop-openai-analysis-btn').classList.remove('hidden');
-        document.getElementById('openai-analysis-status').textContent = 'Analyzing...';
+        // Update UI elements
+        const titleElement = document.getElementById('prompt-title');
+        const counterElement = document.getElementById('prompt-counter');
+        const textareaElement = document.getElementById('current-prompt-textarea');
+        const prevButton = document.getElementById('prompt-nav-prev');
+        const nextButton = document.getElementById('prompt-nav-next');
+        const contentArea = document.getElementById('prompt-content-area');
         
-        // Show processing state
-        document.getElementById('openai-analysis-results').innerHTML = `
-            <div class="text-center py-8">
-                <div class="text-4xl mb-4">🤖</div>
-                <p class="text-white">AI analysis in progress...</p>
-                <div class="mt-4">
-                    <div class="w-full bg-[#303030] rounded-full h-2">
-                        <div class="bg-[#00bfff] h-2 rounded-full animate-pulse" style="width: 30%"></div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        try {
-            // Here you would implement the actual OpenAI API call
-            // For now, we'll simulate the analysis
-            await this.simulateAnalysis(prompt);
+        // Add transition animation
+        if (contentArea) {
+            contentArea.classList.add('prompt-nav-transition');
             
-        } catch (error) {
-            console.error('Analysis failed:', error);
-            this.showAnalysisError(error.message);
-        } finally {
-            // Reset UI
-            document.getElementById('start-openai-analysis-btn').classList.remove('hidden');
-            document.getElementById('stop-openai-analysis-btn').classList.add('hidden');
-            document.getElementById('openai-analysis-status').textContent = 'Analysis complete';
-        }
-    }
-    
-    async simulateAnalysis(prompt) {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        // Simulate response
-        const response = `
-            <div class="space-y-4">
-                <div class="bg-[#262626] rounded-lg p-4">
-                    <h4 class="text-white font-semibold mb-2">🤖 AI Analysis Results</h4>
-                    <p class="text-[#ababab] text-sm mb-3">Analysis based on selected regions</p>
-                    
-                    <div class="text-white space-y-3">
-                        <p><strong>Analysis Prompt:</strong> ${prompt}</p>
-                        
-                        <div class="border-t border-[#404040] pt-3">
-                            <p><strong>Key Findings:</strong></p>
-                            <ul class="list-disc list-inside space-y-1 text-[#ababab] mt-2">
-                                <li>Terrain shows varied elevation patterns with significant relief</li>
-                                <li>Slope analysis indicates areas of potential instability</li>
-                                <li>Vegetation coverage appears healthy in most areas</li>
-                                <li>Some areas show signs of erosion or land use change</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="border-t border-[#404040] pt-3">
-                            <p><strong>Recommendations:</strong></p>
-                            <ul class="list-disc list-inside space-y-1 text-[#ababab] mt-2">
-                                <li>Further monitoring recommended for steep slope areas</li>
-                                <li>Consider additional vegetation analysis in sparse areas</li>
-                                <li>Regular temporal analysis to track changes</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
+            setTimeout(() => {
+                if (titleElement) titleElement.textContent = currentPrompt.title;
+                if (counterElement) counterElement.textContent = `${this.currentPromptIndex + 1} / ${this.promptParts.length}`;
+                if (textareaElement) {
+                    textareaElement.value = currentPrompt.content;
+                    textareaElement.placeholder = `Editing: ${currentPrompt.title}`;
+                }
                 
-                <div class="flex gap-3">
-                    <button class="bg-[#28a745] hover:bg-[#218838] text-white px-4 py-2 rounded font-medium transition-colors">
-                        📄 Export Report
-                    </button>
-                    <button class="bg-[#007bff] hover:bg-[#0056b3] text-white px-4 py-2 rounded font-medium transition-colors">
-                        🔄 Run New Analysis
-                    </button>
-                </div>
-            </div>
-        `;
+                contentArea.classList.add('active');
+            }, 100);
+            
+            setTimeout(() => {
+                contentArea.classList.remove('prompt-nav-transition');
+            }, 300);
+        } else {
+            // Fallback without animation
+            if (titleElement) titleElement.textContent = currentPrompt.title;
+            if (counterElement) counterElement.textContent = `${this.currentPromptIndex + 1} / ${this.promptParts.length}`;
+            if (textareaElement) {
+                textareaElement.value = currentPrompt.content;
+                textareaElement.placeholder = `Editing: ${currentPrompt.title}`;
+            }
+        }
         
-        document.getElementById('openai-analysis-results').innerHTML = response;
-    }
-    
-    stopAnalysis() {
-        console.log('🛑 Stopping analysis...');
-        
-        // Reset UI
-        document.getElementById('start-openai-analysis-btn').classList.remove('hidden');
-        document.getElementById('stop-openai-analysis-btn').classList.add('hidden');
-        document.getElementById('openai-analysis-status').textContent = 'Analysis stopped';
-        
-        document.getElementById('openai-analysis-results').innerHTML = `
-            <div class="text-center text-[#666] py-8">
-                <div class="text-4xl mb-4">⏹️</div>
-                <p>Analysis stopped by user</p>
-            </div>
-        `;
-    }
-    
-    showAnalysisError(message) {
-        document.getElementById('openai-analysis-results').innerHTML = `
-            <div class="text-center text-[#dc3545] py-8">
-                <div class="text-4xl mb-4">❌</div>
-                <p>Analysis failed: ${message}</p>
-            </div>
-        `;
+        // Update button states (always allow cycling)
+        if (prevButton) {
+            prevButton.disabled = this.promptParts.length <= 1;
+        }
+        if (nextButton) {
+            nextButton.disabled = this.promptParts.length <= 1;
+        }
     }
     
     showImageModal(imageSrc, imageAlt) {
@@ -249,16 +198,16 @@ class OpenAIAnalysis {
         const modelSelect = document.getElementById('openai-model'); // Corrected ID
         const modelName = modelSelect ? modelSelect.value : 'gpt-4-vision-preview'; // Kept default as 'gpt-4-vision-preview'
 
-        const promptPartsContainer = document.getElementById('dynamic-prompt-parts-container');
-        if (!promptPartsContainer) {
-            window.Utils?.showNotification('Prompt container not found', 'warning');
-            return;
+        // Save current prompt content before sending
+        const currentTextarea = document.getElementById('current-prompt-textarea');
+        if (currentTextarea && this.promptParts[this.currentPromptIndex]) {
+            this.promptParts[this.currentPromptIndex].content = currentTextarea.value;
         }
 
-        const textareas = promptPartsContainer.querySelectorAll('.prompt-part-textarea');
+        // Collect all prompt parts
         let promptParts = [];
-        textareas.forEach(textarea => {
-            promptParts.push(textarea.value);
+        this.promptParts.forEach(promptPart => {
+            promptParts.push(promptPart.content);
         });
         const prompt = promptParts.join('\n');
 
@@ -321,36 +270,49 @@ class OpenAIAnalysis {
                 return;
             }
 
-            container.innerHTML = ''; // Clear existing content
-            console.log('✅ Prompt container found and cleared');
+            console.log('✅ Prompt container found');
 
-            if (promptData && Array.isArray(promptData)) {
+            if (promptData && Array.isArray(promptData) && promptData.length > 0) {
                 console.log(`📋 Loading ${promptData.length} prompt parts...`);
-                promptData.forEach((promptPart, index) => {
-                    const titleElement = document.createElement('h3');
-                    titleElement.textContent = promptPart.title;
-                    titleElement.classList.add('text-lg', 'font-semibold', 'mt-2', 'mb-1', 'text-white'); // Added some styling
-
-                    const textareaElement = document.createElement('textarea');
-                    textareaElement.value = promptPart.content;
-                    textareaElement.classList.add('prompt-part-textarea', 'w-full', 'p-2', 'border', 'border-gray-600', 'rounded-md', 'bg-gray-700', 'text-gray-200', 'h-48'); // Added some styling and h-48 for height
-                    textareaElement.dataset.promptTitle = promptPart.title; // Store title for potential future use
-                    textareaElement.id = `prompt-part-${index}`; // Unique ID
-
-                    container.appendChild(titleElement);
-                    container.appendChild(textareaElement);
-                });
+                
+                // Store prompt parts
+                this.promptParts = promptData.map(part => ({
+                    title: part.title,
+                    content: part.content
+                }));
+                
+                // Reset to first prompt
+                this.currentPromptIndex = 0;
+                
+                // Display the first prompt
+                this.displayCurrentPrompt();
+                
+                console.log('✅ Prompt parts loaded successfully');
             } else {
                 console.error('Failed to load prompts or prompts data is not in the expected format:', response);
-                container.innerHTML = '<p class="text-red-500">Error loading prompts. See console for details.</p>';
+                
+                // Show error state
+                const titleElement = document.getElementById('prompt-title');
+                const counterElement = document.getElementById('prompt-counter');
+                const textareaElement = document.getElementById('current-prompt-textarea');
+                
+                if (titleElement) titleElement.textContent = 'Error loading prompts';
+                if (counterElement) counterElement.textContent = '0 / 0';
+                if (textareaElement) textareaElement.placeholder = 'Error loading prompts. See console for details.';
             }
         } catch (err) {
             console.error('Failed to load prompts API:', err);
-            const container = document.getElementById('dynamic-prompt-parts-container');
-            if (container) {
-                 container.innerHTML = `<p class="text-red-500">Failed to fetch prompts: ${err.message}. Check API and network.</p>`;
-            }
-             window.Utils?.showNotification(`Failed to load prompts: ${err.message}`, 'error');
+            
+            // Show error state
+            const titleElement = document.getElementById('prompt-title');
+            const counterElement = document.getElementById('prompt-counter');
+            const textareaElement = document.getElementById('current-prompt-textarea');
+            
+            if (titleElement) titleElement.textContent = 'Failed to load prompts';
+            if (counterElement) counterElement.textContent = '0 / 0';
+            if (textareaElement) textareaElement.placeholder = `Failed to fetch prompts: ${err.message}`;
+            
+            window.Utils?.showNotification(`Failed to load prompts: ${err.message}`, 'error');
         }
     }
 
