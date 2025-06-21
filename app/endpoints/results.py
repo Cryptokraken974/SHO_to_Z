@@ -234,18 +234,17 @@ async def delete_result_log_and_associated_files(log_filename: str):
                 files_deleted.append(str(request_log_path))
                 
                 # Check if the request log is in a timestamped directory
-                # If so, and the directory is now empty, delete the directory too
+                # If so, delete the entire directory tree (including sent_images folder)
                 parent_dir = request_log_path.parent
                 if parent_dir != LOG_DIR and parent_dir.exists():
-                    # Check if directory is empty (or only contains hidden files)
-                    remaining_files = [f for f in parent_dir.iterdir() if not f.name.startswith('.')]
-                    if not remaining_files:
-                        try:
-                            parent_dir.rmdir()
-                            directories_deleted.append(str(parent_dir))
-                        except OSError:
-                            # Directory not empty or other permission issue, skip
-                            pass
+                    try:
+                        import shutil
+                        shutil.rmtree(parent_dir)
+                        directories_deleted.append(str(parent_dir))
+                    except OSError as e:
+                        # Directory not empty or other permission issue, skip
+                        print(f"Warning: Could not delete directory {parent_dir}: {e}")
+                        pass
         
         # Delete the response log file
         response_log_path.unlink()

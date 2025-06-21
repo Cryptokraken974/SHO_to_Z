@@ -4,6 +4,7 @@ input/
 cache/
 data/
 demo_output/
+llm/logs/
 
 # Elevation data and configuration
 elevation_config.ini

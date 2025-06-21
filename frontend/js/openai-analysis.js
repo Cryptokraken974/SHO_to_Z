@@ -299,66 +299,171 @@ class OpenAIAnalysis {
     }
 
     async sendPromptToOpenAI() {
-        // Get the selected model name
-        const modelSelect = document.getElementById('openai-model'); // Corrected ID
-        const modelName = modelSelect ? modelSelect.value : 'gpt-4-vision-preview'; // Kept default as 'gpt-4-vision-preview'
+        try {
+            // Get the selected model name
+            const modelSelect = document.getElementById('openai-model'); // Corrected ID
+            const modelName = modelSelect ? modelSelect.value : 'gpt-4-vision-preview'; // Kept default as 'gpt-4-vision-preview'
 
-        // Save current prompt content before sending
-        const currentTextarea = document.getElementById('current-prompt-textarea');
-        if (currentTextarea && this.promptParts[this.currentPromptIndex]) {
-            this.promptParts[this.currentPromptIndex].content = currentTextarea.value;
-        }
+            // Save current prompt content before sending
+            const currentTextarea = document.getElementById('current-prompt-textarea');
+            if (currentTextarea && this.promptParts[this.currentPromptIndex]) {
+                this.promptParts[this.currentPromptIndex].content = currentTextarea.value;
+            }
 
-        // Collect all prompt parts
-        let promptParts = [];
-        this.promptParts.forEach(promptPart => {
-            promptParts.push(promptPart.content);
-        });
-        const prompt = promptParts.join('\n');
+            // Collect all prompt parts
+            let promptParts = [];
+            this.promptParts.forEach(promptPart => {
+                promptParts.push(promptPart.content);
+            });
+            const prompt = promptParts.join('\n');
 
-        if (!prompt.trim()) {
-            window.Utils?.showNotification('No prompt content loaded or entered', 'warning');
-            return;
-        }
-        // Coordinates are optional for OpenAI analysis - they can be used to provide location context
-        // but aren't required for image analysis
-        const coords = null; // Could be enhanced later to get coordinates from selected region metadata
+            if (!prompt.trim()) {
+                window.Utils?.showNotification('No prompt content loaded or entered', 'warning');
+                return;
+            }
+            // Coordinates are optional for OpenAI analysis - they can be used to provide location context
+            // but aren't required for image analysis
+            const coords = null; // Could be enhanced later to get coordinates from selected region metadata
 
-        const targetRegions = this.selectedRegions.length > 0
-            ? this.selectedRegions
-            : [window.FileManager?.getSelectedRegion()].filter(Boolean);
+            const targetRegions = this.selectedRegions.length > 0
+                ? this.selectedRegions
+                : [window.FileManager?.getSelectedRegion()].filter(Boolean);
 
-        if (targetRegions.length === 0) {
-            window.Utils?.showNotification('No region selected', 'warning');
-            return;
-        }
+            if (targetRegions.length === 0) {
+                window.Utils?.showNotification('No region selected', 'warning');
+                return;
+            }
 
-        for (const region of targetRegions) {
-            const images = this.selectedRegions.length > 0
-                ? this.getImagesForRegion(region)
-                : this.selectedImages.map(img => img.imageUrl);
+            // Show loading overlay
+            this.showLoadingOverlay(targetRegions);
 
-            try {
-                const payload = {
-                    prompt,
-                    images,
-                    laz_name: region,
-                    coordinates: coords,
-                    model_name: modelName, // Add model_name to the payload
-                };
-                const data = await openai().sendPrompt(payload);
-                console.log('OpenAI response', data);
+            let successCount = 0;
+            let totalRegions = targetRegions.length;
+
+            for (const region of targetRegions) {
+                const imageDataUrls = this.selectedRegions.length > 0
+                    ? this.getImagesForRegion(region)
+                    : this.selectedImages.map(img => img.imageUrl);
+
+                try {
+                    // Update loading message for current region
+                    this.updateLoadingMessage(`Processing region: ${region}`, `Analyzing ${imageDataUrls.length} images...`);
+
+                    // Step 1: Save images to file system first
+                    let imagePaths = [];
+                    let tempFolderName = null; // Store temp folder name for backend
+                    if (imageDataUrls && imageDataUrls.length > 0) {
+                        console.log(`💾 Saving ${imageDataUrls.length} images for region ${region}...`);
+                        
+                        // Extract meaningful image names from gallery data
+                        const imagesData = imageDataUrls.map((dataUrl, index) => {
+                            let imageName = `image_${index + 1}`;
+                            
+                            // Try to get meaningful names from gallery items
+                            const galleries = this.regionGalleries[region];
+                            if (galleries) {
+                                const allItems = [
+                                    ...(galleries.raster?.gallery?.items || []),
+                                    ...(galleries.sentinel?.items || [])
+                                ];
+                                
+                                const matchingItem = allItems.find(item => item.imageUrl === dataUrl);
+                                if (matchingItem) {
+                                    // Create meaningful filename from title
+                                    imageName = matchingItem.title
+                                        .toLowerCase()
+                                        .replace(/[^a-z0-9_-]/g, '_')
+                                        .replace(/_+/g, '_');
+                                }
+                            }
+                            
+                            return {
+                                name: imageName,
+                                data: dataUrl
+                            };
+                        });
+                        
+                        // Save images to backend
+                        const savePayload = {
+                            region_name: region,
+                            images: imagesData
+                        };
+                        
+                        const saveResult = await openai().saveImages(savePayload);
+                        if (saveResult.saved_images && saveResult.saved_images.length > 0) {
+                            imagePaths = saveResult.saved_images.map(img => img.path);
+                            console.log(`✅ Saved images to: ${imagePaths.join(', ')}`);
+                            
+                            // Store temp folder name for sending to backend
+                            tempFolderName = saveResult.temp_folder_name;
+                        } else {
+                            console.warn('⚠️ No images were saved, proceeding with data URLs');
+                            imagePaths = imageDataUrls;
+                        }
+                    } else {
+                        console.log(`ℹ️ No images found for region ${region}`);
+                    }
+
+                    // Step 2: Send prompt with saved image paths
+                    this.updateLoadingMessage(`Sending to OpenAI...`, `Waiting for AI analysis response...`);
+                    
+                    const payload = {
+                        prompt,
+                        images: imagePaths, // Use file paths instead of data URLs
+                        laz_name: region,
+                        coordinates: coords,
+                        model_name: modelName,
+                        temp_folder_name: tempFolderName, // Pass temp folder name to backend
+                    };
+                    
+                    const data = await openai().sendPrompt(payload);
+                    console.log('OpenAI response', data);
+                    successCount++;
+                    
+                    window.Utils?.showNotification(
+                        `Analysis completed for ${region}`,
+                        'success'
+                    );
+                } catch (err) {
+                    console.error('Failed to send to OpenAI', err);
+                    window.Utils?.showNotification(
+                        `Failed to send prompt for ${region}`,
+                        'error'
+                    );
+                }
+            }
+
+            // Show completion notification
+            if (successCount === totalRegions) {
                 window.Utils?.showNotification(
-                    `Prompt sent for ${region}`,
+                    `Analysis completed for all ${successCount} region(s)! Switching to Results tab...`,
                     'success'
                 );
-            } catch (err) {
-                console.error('Failed to send to OpenAI', err);
+                
+                // Automatically switch to Results tab after a short delay
+                setTimeout(() => {
+                    this.switchToResultsTab();
+                }, 1500);
+            } else if (successCount > 0) {
                 window.Utils?.showNotification(
-                    `Failed to send prompt for ${region}`,
-                    'error'
+                    `Analysis completed for ${successCount} of ${totalRegions} regions. Check Results tab for details.`,
+                    'warning'
                 );
+                
+                // Still switch to results tab to show partial results
+                setTimeout(() => {
+                    this.switchToResultsTab();
+                }, 2000);
             }
+        } catch (error) {
+            console.error('Unexpected error in sendPromptToOpenAI:', error);
+            window.Utils?.showNotification(
+                'An unexpected error occurred during analysis',
+                'error'
+            );
+        } finally {
+            // Always hide loading overlay, regardless of success or failure
+            this.hideLoadingOverlay();
         }
     }
 
@@ -573,6 +678,69 @@ class OpenAIAnalysis {
         });
         this.renderRegionLists();
         this.updateSelectedRegionsInfo();
+    }
+
+    // Loading overlay methods
+    showLoadingOverlay(regions) {
+        const overlay = document.getElementById('openai-loading-overlay');
+        if (overlay) {
+            // Update message based on number of regions
+            const regionText = regions.length === 1 
+                ? `region: ${regions[0]}` 
+                : `${regions.length} regions`;
+            
+            this.updateLoadingMessage(
+                `🤖 AI Analysis Started`,
+                `Processing ${regionText}...<br><small>Preparing images and sending to OpenAI</small>`
+            );
+            
+            overlay.classList.add('show');
+            
+            // Disable page interactions
+            document.body.style.pointerEvents = 'none';
+            overlay.style.pointerEvents = 'auto'; // Keep overlay interactive
+        }
+    }
+
+    hideLoadingOverlay() {
+        const overlay = document.getElementById('openai-loading-overlay');
+        if (overlay) {
+            overlay.classList.remove('show');
+            
+            // Re-enable page interactions
+            document.body.style.pointerEvents = 'auto';
+        }
+    }
+
+    updateLoadingMessage(title, message) {
+        const titleElement = document.querySelector('.openai-loading-title');
+        const messageElement = document.querySelector('.openai-loading-message');
+        
+        if (titleElement) {
+            titleElement.innerHTML = title;
+        }
+        if (messageElement) {
+            messageElement.innerHTML = message;
+        }
+    }
+
+    switchToResultsTab() {
+        // Find and click the Results tab to switch to it
+        const resultsTab = document.querySelector('[data-tab="results"]');
+        if (resultsTab) {
+            resultsTab.click();
+            console.log('✅ Automatically switched to Results tab');
+        } else {
+            console.warn('⚠️ Results tab not found, cannot auto-switch');
+            // Try alternative selectors
+            const altResultsTab = document.getElementById('results-tab') || 
+                                 document.querySelector('.tab-button[data-target="results"]') ||
+                                 document.querySelector('button[data-tab="results"]');
+            if (altResultsTab) {
+                altResultsTab.click();
+                console.log('✅ Automatically switched to Results tab (alternative selector)');
+            }
+        }
     }
 }
 

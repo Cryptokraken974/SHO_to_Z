@@ -109,6 +109,10 @@ window.UIManager = {
 
     } else if (contextName.includes('results-tab-content.html')) {
         this.initializeResultsTab();
+        // Always refresh the results list when switching to the Results tab
+        if (window.ResultsManager && typeof window.ResultsManager.fetchResultsList === 'function') {
+            window.ResultsManager.fetchResultsList();
+        }
         // this.initializeResultsTabEventHandlers(contextElement);
     }
 
@@ -2404,9 +2408,13 @@ window.UIManager = {
         Utils.log('warn', 'ResultsManager not found or init function missing.');
       }
       this.resultsTabInitialized = true;
+    } else {
+      Utils.log('info', 'Results tab switched - ensuring event listeners are attached.');
+      // Re-attach event listeners in case the DOM was reloaded
+      if (window.ResultsManager && typeof window.ResultsManager.attachEventListeners === 'function') {
+        window.ResultsManager.attachEventListeners();
+      }
     }
-    // This log might be redundant if called from initializeDynamicContent as well
-    // Utils.log('info', 'Results tab switched or initialized.');
   },
 
   /**

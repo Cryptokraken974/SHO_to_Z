@@ -8,6 +8,9 @@ window.ResultsManager = {
 
     init() {
         if (this.initialized) {
+            // If already initialized, just re-attach event listeners and refresh the list
+            this.attachEventListeners();
+            this.fetchResultsList();
             return;
         }
         Utils.log('info', 'Initializing ResultsManager...');
@@ -36,6 +39,19 @@ window.ResultsManager = {
 
     async fetchResultsList() {
         Utils.log('info', 'Fetching OpenAI result logs list...');
+        
+        // Clear any existing selection when refreshing the list
+        this.hideDeleteButton();
+        
+        // Clear the main dashboard
+        const dashboardContainer = document.getElementById(this.mainDashboardContainerId);
+        if (dashboardContainer) {
+            dashboardContainer.innerHTML = `
+                <h1 class="text-white text-xl font-bold">Results Dashboard</h1>
+                <p class="text-gray-300">Select a result from the left panel to view details, or click "Select All" for a summary.</p>
+            `;
+        }
+        
         const logListContainer = document.getElementById(this.logListContainerId);
         if (!logListContainer) {
             Utils.log('error', `Element with ID ${this.logListContainerId} not found.`);

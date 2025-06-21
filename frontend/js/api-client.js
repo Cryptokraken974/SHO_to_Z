@@ -1724,6 +1724,14 @@ class OpenAIAPIClient extends BaseAPIClient {
   }
 
   /**
+   * Save base64 images to file system before sending to OpenAI
+   * @param {Object} payload Image save payload
+   */
+  async saveImages(payload) {
+    return this.post('openai/save_images', payload);
+  }
+
+  /**
    * Convenience method: send prompt, log request, and store response
    * @param {Object} payload Request payload
    */

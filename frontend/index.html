@@ -102,6 +102,23 @@
   <script src="/static/js/geotiff-main-canvas.js"></script>
   <script src="/static/js/app_new.js"></script>
 
+  <!-- OpenAI Loading Overlay -->
+  <div id="openai-loading-overlay" class="openai-loading-overlay">
+    <div class="openai-loading-content">
+      <div class="openai-loading-title">🤖 AI Analysis in Progress</div>
+      <div class="openai-loading-spinner"></div>
+      <div class="openai-loading-message">
+        Processing images and generating archaeological insights...<br>
+        <small>This may take a few moments</small>
+      </div>
+      <div class="openai-loading-dots">
+        <div></div>
+        <div></div>
+        <div></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Development and Testing Scripts -->
   <script src="/static/js/elevation-service-test.js"></script>
   <script src="/static/js/api-client-test.js"></script>
