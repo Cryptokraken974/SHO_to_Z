@@ -53,23 +53,28 @@ async def get_result_log_detail(log_filename: str):
     if not request_log_file_path_str:
         raise HTTPException(status_code=404, detail=f"Path to request log ('log_file') not found in response log: {log_filename}")
 
-    # Path() can take a full path like "llm/logs/file.json"
-    # or just a filename. We need to ensure it resolves correctly.
-    # The stored path in `log_file` is typically "llm/logs/<uuid>.json"
+    # Handle both old and new log file path formats
+    # New format: "llm/logs/OR_WizardIsland_gpt4vision_20250621_test001/request_log.json"
+    # Old format: "llm/logs/<uuid>.json"
     request_log_path = Path(request_log_file_path_str)
 
-    # Check if the path as stored is absolute and exists, or relative to project root and exists.
-    # If it's just a filename, it might be relative to LOG_DIR.
-    if not request_log_path.is_file(): # Checks if path is a file
-            # Try assuming it's relative to project root, or it might be just a filename
-        if not (Path.cwd() / request_log_path).is_file():
-            # If not found relative to CWD, try relative to LOG_DIR (if it's just a filename)
+    # Check if the path exists as-is (relative to project root)
+    if not request_log_path.exists():
+        # Try relative to current working directory
+        cwd_path = Path.cwd() / request_log_path
+        if cwd_path.exists():
+            request_log_path = cwd_path
+        else:
+            # If it's just a filename, try in LOG_DIR
             potential_path_in_log_dir = LOG_DIR / request_log_path.name
-            if potential_path_in_log_dir.is_file():
+            if potential_path_in_log_dir.exists():
                 request_log_path = potential_path_in_log_dir
             else:
-                raise HTTPException(status_code=404, detail=f"Associated request log file not found at {request_log_file_path_str} or derived paths.")
-        # If it was found relative to CWD, request_log_path is already correct.
+                raise HTTPException(status_code=404, detail=f"Associated request log file not found at {request_log_file_path_str}. Checked paths: {request_log_path}, {cwd_path}, {potential_path_in_log_dir}")
+    
+    # Ensure it's a file
+    if not request_log_path.is_file():
+        raise HTTPException(status_code=404, detail=f"Path exists but is not a file: {request_log_path}")
 
     try:
         with open(request_log_path, 'r', encoding='utf-8') as f:

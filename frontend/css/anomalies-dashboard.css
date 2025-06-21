@@ -1,0 +1,162 @@
+/* Anomalies Dashboard Styles */
+/* Adapted for integration into SHO_to_Z main application */
+
+.anomalies-dashboard {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    line-height: 1.6;
+    color: #e5e7eb; /* Light text for dark theme */
+    background-color: transparent; /* Let parent handle background */
+}
+
+.anomalies-header {
+    border-bottom: 1px solid #374151; /* Dark border */
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.anomalies-title {
+    color: #f3f4f6; /* Light gray title */
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.section-title {
+    color: #d1d5db; /* Lighter gray for section titles */
+    margin-top: 0;
+    border-bottom: 1px solid #374151;
+    padding-bottom: 5px;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.analysis-summary-section .summary-content p,
+.anomaly-item p {
+    margin-bottom: 8px;
+    color: #e5e7eb;
+}
+
+.analysis-summary-section strong,
+.anomaly-item strong {
+    color: #f9fafb; /* Even lighter for emphasis */
+}
+
+.identified-anomalies-section {
+    margin-top: 30px;
+}
+
+.anomaly-item {
+    background-color: #1f2937; /* Dark background for items */
+    border: 1px solid #374151; /* Dark border */
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3); /* Darker shadow */
+}
+
+.anomaly-item .anomaly-title {
+    color: #60a5fa; /* Blue accent for anomaly titles */
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.confidence-section {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #4b5563; /* Darker dashed border */
+}
+
+.confidence-section .global-score {
+    font-weight: bold;
+    color: #10b981; /* Green for scores */
+    font-size: 1.1em;
+}
+
+.confidence-section .individual-scores {
+    margin-top: 5px;
+    padding-left: 15px;
+}
+
+.confidence-section .individual-scores p {
+    margin: 3px 0;
+    font-size: 0.9em;
+    color: #d1d5db;
+}
+
+.evidence-section,
+.interpretation-section,
+.bounding-box-section {
+    margin-top: 10px;
+}
+
+.evidence-section h4,
+.interpretation-section h4,
+.bounding-box-section h4 {
+    color: #9ca3af; /* Gray headers */
+    font-size: 0.95em;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.evidence-list {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.evidence-list li {
+    background-color: #111827; /* Even darker background for evidence items */
+    padding: 8px;
+    border-radius: 4px;
+    margin-bottom: 5px;
+    border: 1px solid #374151;
+    font-size: 0.9em;
+    color: #e5e7eb;
+}
+
+.evidence-list li strong {
+    text-transform: uppercase;
+    color: #3b82f6; /* Blue accent */
+}
+
+.no-anomalies {
+    text-align: center;
+    color: #9ca3af;
+    font-style: italic;
+    padding: 20px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .anomalies-dashboard {
+        padding: 10px;
+    }
+
+    .anomalies-title {
+        font-size: 1.25rem;
+    }
+
+    .section-title {
+        font-size: 1.125rem;
+    }
+
+    .anomaly-item {
+        padding: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .anomalies-title {
+        font-size: 1.125rem;
+    }
+
+    .section-title {
+        font-size: 1rem;
+    }
+
+    .confidence-section .global-score {
+        font-size: 1em;
+    }
+}

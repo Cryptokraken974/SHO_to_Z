@@ -1,0 +1,48 @@
+{
+  "laz_name": "OR_WizardIsland",
+  "coordinates": {
+    "lat": 42.948,
+    "lng": -122.108
+  },
+  "images": [
+    {
+      "path": "/llm/test_images/OR_WizardIsland/CHM.png",
+      "size": 2457600,
+      "type": "chm"
+    },
+    {
+      "path": "/llm/test_images/OR_WizardIsland/HillshadeRGB.png", 
+      "size": 3145728,
+      "type": "hillshade_rgb"
+    },
+    {
+      "path": "/llm/test_images/OR_WizardIsland/LRM.png",
+      "size": 2621440,
+      "type": "lrm"
+    },
+    {
+      "path": "/llm/test_images/OR_WizardIsland/OR_WizardIsland_20250531_sentinel2_NDVI.png",
+      "size": 1572864,
+      "type": "ndvi"
+    },
+    {
+      "path": "/llm/test_images/OR_WizardIsland/SVF.png",
+      "size": 2359296,
+      "type": "svf"
+    },
+    {
+      "path": "/llm/test_images/OR_WizardIsland/Slope.png",
+      "size": 2097152,
+      "type": "slope"
+    },
+    {
+      "path": "/llm/test_images/OR_WizardIsland/TintOverlay.png",
+      "size": 3670016,
+      "type": "tint_overlay"
+    }
+  ],
+  "prompt": "You are an expert computational archaeologist. Your mission is to analyze a set of geospatial images provided to you as distinct modules. You will be given modules defining the images and how to interpret them, modules defining potential archaeological features (a visual lexicon), and a series of modules outlining your step-by-step workflow. You must follow this workflow precisely, synthesizing information from all provided modules to produce a final, structured JSON report. Strictly output only the JSON object, in a single code block. Do NOT add any natural language, instructions, or preamble—output only the JSON.\n\n[Full archaeological analysis prompt with image definitions, visual lexicon, and workflow steps - shortened for brevity]",
+  "model_name": "gpt-4-vision-preview",
+  "timestamp": "2025-06-21T13:19:03Z",
+  "analysis_type": "archaeological_terrain_analysis"
+}

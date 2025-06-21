@@ -1,0 +1,36 @@
+{
+  "response": {
+    "analysis_summary": {
+      "target_area_id": "OR_WizardIsland_Settlement_Analysis",
+      "anomalies_detected": true,
+      "number_of_anomalies": 1
+    },
+    "identified_anomalies": [
+      {
+        "anomaly_id": "WizardIsland_Platform_Alpha",
+        "classification": {
+          "type": "Settlement Platform",
+          "subtype": "Circular Earthwork"
+        },
+        "confidence": {
+          "global_score": 0.87,
+          "individual_scores": {
+            "lrm": 0.95,
+            "chm": 0.85,
+            "slope": 0.82
+          }
+        },
+        "evidence_per_image": {
+          "lrm": "Clear circular positive relief feature approximately 50m in diameter, with well-defined raised rim and central depression.",
+          "chm": "Vegetation shows distinct pattern - lower canopy height within the circle, suggesting previous clearing and regrowth.",
+          "slope": "Sharp slope gradients at the rim edges, indicating constructed embankment with steep artificial faces."
+        },
+        "archaeological_interpretation": "This circular earthwork exhibits characteristics consistent with a pre-contact settlement platform. The combination of artificial topographic modification and vegetation signatures suggests long-term human occupation and landscape management.",
+        "bounding_box_pixels": [
+          { "x_min": 450, "y_min": 720, "x_max": 680, "y_max": 950 }
+        ]
+      }
+    ]
+  },
+  "log_file": "llm/logs/OR_WizardIsland_gpt4o_20250621_113015_test002/request_log.json"
+}

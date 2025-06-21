@@ -1738,6 +1738,7 @@ class OpenAIAPIClient extends BaseAPIClient {
       coordinates: payload.coordinates,
       images: logImages,
       prompt: payload.prompt,
+      model_name: payload.model_name, // Pass through the model_name
     };
     let logResp = {};
     try {
