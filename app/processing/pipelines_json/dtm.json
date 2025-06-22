@@ -14,12 +14,10 @@
     {
         "type": "filters.csf",
         "ignore": "Classification[7:7]",
-        "slope": 0.15,
-        "class_threshold": 0.35,
-        "cloth_resolution": "__CLOTH_RESOLUTION__",
+        "threshold": 0.35,
+        "resolution": "__CLOTH_RESOLUTION__",
         "rigidness": 1,
-        "iterations": 500,
-        "points":true
+        "iterations": 500
     },
     {
       "type": "filters.range",

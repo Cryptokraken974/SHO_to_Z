@@ -129,11 +129,23 @@ def create_dtm_fallback_pipeline(input_file: str, output_file: str, resolution: 
     return {
         "pipeline": [
             input_file,
-            {"type": "filters.outlier", "method": "statistical", "multiplier": 2.0, "mean_k": 8},
+            {"type": "filters.outlier", "method": "statistical", "multiplier": 2.5, "mean_k": 8},
             {"type": "filters.assign", "assignment": "Classification[:]=0"},
-            {"type": "filters.pmf", "max_window_size": 33, "slope": 1, "initial_distance": 0.15, "max_distance": 3.0, "returns": "last,only"},
+            {"type": "filters.pmf", "max_window_size": 16, "slope": 1, "initial_distance": 0.15, "max_distance": 2.0, "returns": "last,only"},
             {"type": "filters.range", "limits": "Classification[2:2]"},
             {"type": "writers.gdal", "filename": output_file, "resolution": resolution, "output_type": "min", "nodata": -9999, "gdaldriver": "GTiff"}
+        ]
+    }
+
+def create_dtm_simple_pipeline(input_file: str, output_file: str, resolution: float = 1.0) -> Dict[str, Any]:
+    """Create a simple DTM pipeline without advanced ground classification - uses existing ground points only"""
+    logger.info(f"Creating simple DTM pipeline for {input_file} with resolution {resolution}m.")
+    return {
+        "pipeline": [
+            input_file,
+            {"type": "filters.outlier", "method": "statistical", "multiplier": 3, "mean_k": 8},
+            {"type": "filters.range", "limits": "Classification[2:2]"},  # Use only pre-classified ground points
+            {"type": "writers.gdal", "filename": output_file, "resolution": resolution, "output_type": "mean", "nodata": -9999, "gdaldriver": "GTiff"}
         ]
     }
 
@@ -144,7 +156,7 @@ def create_dtm_adaptive_pipeline(input_file: str, output_file: str, resolution: 
             input_file,
             {"type": "filters.outlier", "method": "statistical", "multiplier": 3, "mean_k": 8},
             {"type": "filters.assign", "assignment": "Classification[:]=0"},
-            {"type": "filters.ground", "method": "smrf", "slope": 0.2, "window": 16, "threshold": 0.45, "scalar": 1.2},
+            {"type": "filters.smrf", "slope": 0.2, "window": 16, "threshold": 0.45, "scalar": 1.2},
             {"type": "filters.range", "limits": "Classification[2:2]"},
             {"type": "writers.gdal", "filename": output_file, "resolution": resolution, "output_type": "min", "nodata": -9999, "gdaldriver": "GTiff"}
         ]
@@ -333,7 +345,7 @@ def convert_las_to_dtm(input_file: str, output_file: str, resolution: float = 1.
                 json.dump(pipeline_config, temp_file, indent=2)
                 temp_pipeline_path = temp_file.name
             try:
-                result = subprocess.run(['pdal', 'pipeline', temp_pipeline_path], capture_output=True, text=True, timeout=300)
+                result = subprocess.run(['pdal', 'pipeline', temp_pipeline_path], capture_output=True, text=True, timeout=120)  # Reduced timeout for PMF
                 if result.returncode == 0 and os.path.exists(output_file):
                     pipeline_executed_successfully = True
                     message = f"DTM generated successfully using fallback PMF pipeline: {output_file}"
@@ -384,6 +396,37 @@ def convert_las_to_dtm(input_file: str, output_file: str, resolution: float = 1.
         except Exception as e:
             prev_message = message
             message = f"Error setting up adaptive SMRF pipeline: {str(e)}. Previous error: {prev_message}"
+            logger.error(message, exc_info=True)
+
+    if not pipeline_executed_successfully:
+        print(f"\n🔄 Attempt 4: All advanced pipelines failed ({message}). Trying simple ground-only pipeline.")
+        logger.info(f"All advanced pipelines failed for {input_file}. Trying simple ground-only pipeline. Prev error: {message}")
+        try:
+            pipeline_config = create_dtm_simple_pipeline(input_file, output_file, resolution)
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
+                json.dump(pipeline_config, temp_file, indent=2)
+                temp_pipeline_path = temp_file.name
+            try:
+                result = subprocess.run(['pdal', 'pipeline', temp_pipeline_path], capture_output=True, text=True, timeout=300)
+                if result.returncode == 0 and os.path.exists(output_file):
+                    pipeline_executed_successfully = True
+                    message = f"DTM generated successfully using simple ground-only pipeline: {output_file}"
+                elif result.returncode != 0:
+                    message = f"Simple ground-only PDAL pipeline failed. RC: {result.returncode}. Stderr: {result.stderr}"
+                else:
+                    message = f"Simple ground-only PDAL pipeline reported success, but output file {output_file} was not created."
+            except subprocess.TimeoutExpired:
+                message = f"Simple ground-only PDAL pipeline timed out for {input_file}."
+                logger.warning(message)
+            except Exception as e:
+                message = f"Simple ground-only PDAL pipeline execution error: {str(e)}"
+                logger.warning(message, exc_info=True)
+            finally:
+                try: os.unlink(temp_pipeline_path)
+                except Exception as e_unlink: logger.error(f"Failed to delete temp simple pipeline file {temp_pipeline_path}: {e_unlink}")
+        except Exception as e:
+            prev_message = message
+            message = f"Error setting up simple ground-only pipeline: {str(e)}. Previous error: {prev_message}"
             logger.error(message, exc_info=True)
 
     success = pipeline_executed_successfully
