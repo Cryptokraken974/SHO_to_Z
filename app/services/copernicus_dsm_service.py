@@ -63,8 +63,8 @@ class CopernicusDSMService:
             bbox = self._calculate_bbox_from_center(lat, lng, buffer_km)
             logger.info(f"Calculated bounding box: {bbox}")
             
-            # Create output directory
-            output_dir = Path("output") / region_name / "dsm"
+            # Create output directory to match existing LAZ processing structure
+            output_dir = Path("output") / region_name / "lidar" / "DSM"
             output_dir.mkdir(parents=True, exist_ok=True)
             
             # Try different download methods in order of preference

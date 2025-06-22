@@ -1823,7 +1823,7 @@ window.UIManager = {
   },
 
   /**
-   * Acquire combined data: DTM, DSM, and Sentinel-2 for current coordinates
+   * Acquire combined data: DTM, DSM, CHM, and Sentinel-2 for current coordinates
    * This method orchestrates the complete data acquisition workflow
    */
   async getCombinedData() {
@@ -1908,7 +1908,7 @@ window.UIManager = {
     }
 
     try {
-      this.showProgress('🌍 Acquiring combined data (DTM + DSM + Sentinel-2)...');
+      this.showProgress('🌍 Acquiring combined data (DTM + DSM + CHM + Sentinel-2)...');
 
       // Start WebSocket connection for progress updates
       if (window.WebSocketManager) {
@@ -1919,8 +1919,8 @@ window.UIManager = {
       const effectiveRegionName = regionName && regionName.trim() !== '' ? regionName.trim() : null;
 
       // Step 1: Acquire elevation data (DTM)
-      Utils.log('info', 'Step 1/3: Acquiring elevation data (DTM)...');
-      this.showProgress('🏔️ Step 1/3: Acquiring elevation data (DTM)...');
+      Utils.log('info', 'Step 1/4: Acquiring elevation data (DTM)...');
+      this.showProgress('🏔️ Step 1/4: Acquiring elevation data (DTM)...');
       
       try {
         const elevationRequest = {
@@ -1938,17 +1938,17 @@ window.UIManager = {
           throw new Error(elevationResult?.error || 'Elevation data acquisition failed');
         }
 
-        Utils.log('info', 'Step 1/3: Elevation data acquisition completed successfully');
-        Utils.showNotification('Step 1/3: Elevation data acquired successfully!', 'success', 3000);
+        Utils.log('info', 'Step 1/4: Elevation data acquisition completed successfully');
+        Utils.showNotification('Step 1/4: Elevation data acquired successfully!', 'success', 3000);
       } catch (elevationError) {
-        Utils.log('warn', 'Step 1/3: Elevation data acquisition failed:', elevationError);
-        Utils.showNotification(`Step 1/3: Elevation data failed: ${elevationError.message}`, 'warning', 4000);
+        Utils.log('warn', 'Step 1/4: Elevation data acquisition failed:', elevationError);
+        Utils.showNotification(`Step 1/4: Elevation data failed: ${elevationError.message}`, 'warning', 4000);
         // Continue with other steps even if elevation fails
       }
 
       // Step 2: Acquire Copernicus DSM data
-      Utils.log('info', 'Step 2/3: Acquiring Copernicus DSM data...');
-      this.showProgress('🌍 Step 2/3: Acquiring Copernicus DSM data...');
+      Utils.log('info', 'Step 2/4: Acquiring Copernicus DSM data...');
+      this.showProgress('🌍 Step 2/4: Acquiring Copernicus DSM data...');
       
       try {
         const dsmRequestData = {
@@ -1978,17 +1978,55 @@ window.UIManager = {
           throw new Error(dsmResult.message || 'Copernicus DSM acquisition failed');
         }
 
-        Utils.log('info', 'Step 2/3: Copernicus DSM acquisition completed successfully');
-        Utils.showNotification('Step 2/3: Copernicus DSM acquired successfully!', 'success', 3000);
+        Utils.log('info', 'Step 2/4: Copernicus DSM acquisition completed successfully');
+        Utils.showNotification('Step 2/4: Copernicus DSM acquired successfully!', 'success', 3000);
       } catch (dsmError) {
-        Utils.log('warn', 'Step 2/3: Copernicus DSM acquisition failed:', dsmError);
-        Utils.showNotification(`Step 2/3: Copernicus DSM failed: ${dsmError.message}`, 'warning', 4000);
+        Utils.log('warn', 'Step 2/4: Copernicus DSM acquisition failed:', dsmError);
+        Utils.showNotification(`Step 2/4: Copernicus DSM failed: ${dsmError.message}`, 'warning', 4000);
         // Continue with next step even if DSM fails
       }
 
-      // Step 3: Acquire Sentinel-2 data
-      Utils.log('info', 'Step 3/3: Acquiring Sentinel-2 satellite data...');
-      this.showProgress('🛰️ Step 3/3: Acquiring Sentinel-2 satellite data...');
+      // Step 3: Generate CHM (Canopy Height Model)
+      Utils.log('info', 'Step 3/4: Generating CHM (Canopy Height Model)...');
+      this.showProgress('🌳 Step 3/4: Generating CHM (Canopy Height Model)...');
+      
+      try {
+        const chmRequestData = {
+          region_name: effectiveRegionName || `${Math.abs(latNum).toFixed(2)}${latNum >= 0 ? 'N' : 'S'}_${Math.abs(lngNum).toFixed(2)}${lngNum >= 0 ? 'E' : 'W'}`,
+          latitude: latNum,
+          longitude: lngNum
+        };
+
+        const chmResponse = await fetch('/api/generate-coordinate-chm', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(chmRequestData)
+        });
+
+        if (!chmResponse.ok) {
+          const errorData = await chmResponse.json();
+          throw new Error(errorData.detail || `HTTP ${chmResponse.status}: ${chmResponse.statusText}`);
+        }
+
+        const chmResult = await chmResponse.json();
+        
+        if (!chmResult.success) {
+          throw new Error(chmResult.message || 'CHM generation failed');
+        }
+
+        Utils.log('info', 'Step 3/4: CHM generation completed successfully');
+        Utils.showNotification('Step 3/4: CHM (vegetation height) generated successfully!', 'success', 3000);
+      } catch (chmError) {
+        Utils.log('warn', 'Step 3/4: CHM generation failed:', chmError);
+        Utils.showNotification(`Step 3/4: CHM failed: ${chmError.message}`, 'warning', 4000);
+        // Continue with next step even if CHM fails
+      }
+
+      // Step 4: Acquire Sentinel-2 data
+      Utils.log('info', 'Step 4/4: Acquiring Sentinel-2 satellite data...');
+      this.showProgress('🛰️ Step 4/4: Acquiring Sentinel-2 satellite data...');
       
       try {
         const sentinelRequestData = {
@@ -2017,11 +2055,11 @@ window.UIManager = {
           throw new Error(sentinelResult.message || 'Sentinel-2 acquisition failed');
         }
 
-        Utils.log('info', 'Step 3/3: Sentinel-2 acquisition completed successfully');
-        Utils.showNotification('Step 3/3: Sentinel-2 data acquired successfully!', 'success', 3000);
+        Utils.log('info', 'Step 4/4: Sentinel-2 acquisition completed successfully');
+        Utils.showNotification('Step 4/4: Sentinel-2 data acquired successfully!', 'success', 3000);
       } catch (sentinelError) {
-        Utils.log('warn', 'Step 3/3: Sentinel-2 acquisition failed:', sentinelError);
-        Utils.showNotification(`Step 3/3: Sentinel-2 failed: ${sentinelError.message}`, 'warning', 4000);
+        Utils.log('warn', 'Step 4/4: Sentinel-2 acquisition failed:', sentinelError);
+        Utils.showNotification(`Step 4/4: Sentinel-2 failed: ${sentinelError.message}`, 'warning', 4000);
       }
 
       // Final success message

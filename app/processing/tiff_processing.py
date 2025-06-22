@@ -1014,9 +1014,69 @@ async def process_chm_tiff(tiff_path: str, output_dir: str, parameters: Dict[str
         dtm_array, dtm_metadata = read_elevation_tiff(dtm_path)
         dsm_array, dsm_metadata = read_elevation_tiff(dsm_path)
         
-        # Verify dimensions match
+        # Handle dimension mismatches by resampling DTM to match DSM
         if dtm_array.shape != dsm_array.shape:
-            raise ValueError(f"DTM and DSM dimensions don't match: DTM {dtm_array.shape} vs DSM {dsm_array.shape}")
+            print(f"⚠️ Dimension mismatch detected!")
+            print(f"   DTM: {dtm_array.shape}")
+            print(f"   DSM: {dsm_array.shape}")
+            print(f"🔧 Resampling DTM to match DSM extent and resolution...")
+            
+            # Use rasterio for proper geospatial resampling
+            import rasterio
+            from rasterio.enums import Resampling
+            from rasterio.warp import reproject, calculate_default_transform
+            import tempfile
+            
+            # Create a temporary resampled DTM
+            with tempfile.NamedTemporaryFile(suffix='_dtm_resampled.tif', delete=False) as tmp_file:
+                resampled_dtm_path = tmp_file.name
+            
+            try:
+                # Open the original files with rasterio to get proper geospatial info
+                with rasterio.open(dsm_path) as dsm_src, rasterio.open(dtm_path) as dtm_src:
+                    # Get DSM properties to use as target
+                    target_crs = dsm_src.crs
+                    target_transform = dsm_src.transform
+                    target_width = dsm_src.width
+                    target_height = dsm_src.height
+                    
+                    # Create output profile for resampled DTM
+                    dtm_profile = dtm_src.profile.copy()
+                    dtm_profile.update({
+                        'crs': target_crs,
+                        'transform': target_transform,
+                        'width': target_width,
+                        'height': target_height
+                    })
+                    
+                    # Resample DTM to match DSM
+                    with rasterio.open(resampled_dtm_path, 'w', **dtm_profile) as dst:
+                        reproject(
+                            source=rasterio.band(dtm_src, 1),
+                            destination=rasterio.band(dst, 1),
+                            src_transform=dtm_src.transform,
+                            src_crs=dtm_src.crs,
+                            dst_transform=target_transform,
+                            dst_crs=target_crs,
+                            resampling=Resampling.bilinear
+                        )
+                
+                # Read the resampled DTM
+                dtm_array, dtm_metadata = read_elevation_tiff(resampled_dtm_path)
+                print(f"✅ DTM resampled successfully to shape: {dtm_array.shape}")
+                
+                # Clean up temporary file
+                os.unlink(resampled_dtm_path)
+                
+            except Exception as resample_error:
+                # Clean up temporary file on error
+                if os.path.exists(resampled_dtm_path):
+                    os.unlink(resampled_dtm_path)
+                raise RuntimeError(f"Failed to resample DTM: {str(resample_error)}")
+        
+        # Verify dimensions now match after resampling
+        if dtm_array.shape != dsm_array.shape:
+            raise ValueError(f"DTM and DSM dimensions still don't match after resampling: DTM {dtm_array.shape} vs DSM {dsm_array.shape}")
         
         # Calculate CHM = DSM - DTM
         print(f"🔄 Calculating CHM (vegetation height)...")

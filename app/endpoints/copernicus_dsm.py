@@ -120,8 +120,8 @@ async def get_dsm_status(region_name: str):
     try:
         logger.info(f"🔍 API CALL: GET /api/regions/{region_name}/dsm-status")
         
-        # Check for DSM files in the region directory
-        region_dsm_dir = Path("output") / region_name / "dsm"
+        # Check for DSM files in the region directory (match existing structure)
+        region_dsm_dir = Path("output") / region_name / "lidar" / "DSM"
         
         if not region_dsm_dir.exists():
             return JSONResponse(content={
@@ -201,3 +201,175 @@ async def get_copernicus_dsm_info():
     except Exception as e:
         logger.error(f"❌ Error getting DSM info: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting DSM info: {str(e)}")
+
+@router.post("/api/generate-coordinate-chm")
+async def generate_coordinate_chm(data: dict):
+    """
+    Generate CHM (Canopy Height Model) from coordinate-based DSM and DTM files
+    
+    Expected data format:
+    {
+        "region_name": "MyRegion",
+        "latitude": -14.87,
+        "longitude": -39.38
+    }
+    """
+    try:
+        logger.info(f"🌳 API CALL: POST /api/generate-coordinate-chm")
+        logger.info(f"📊 Request data: {data}")
+        
+        # Validate required fields
+        region_name = data.get('region_name')
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        
+        if not region_name:
+            raise HTTPException(status_code=400, detail="region_name is required")
+        
+        if latitude is None or longitude is None:
+            raise HTTPException(status_code=400, detail="latitude and longitude are required")
+        
+        # Validate coordinate ranges
+        if not (-90 <= latitude <= 90):
+            raise HTTPException(status_code=400, detail="latitude must be between -90 and 90")
+        
+        if not (-180 <= longitude <= 180):
+            raise HTTPException(status_code=400, detail="longitude must be between -180 and 180")
+        
+        logger.info(f"🚀 Starting CHM generation for region: {region_name}")
+        logger.info(f"📍 Coordinates: ({latitude}, {longitude})")
+        
+        # Check if both DSM and DTM files exist for this region
+        region_dir = Path("output") / region_name / "lidar"
+        dsm_dir = region_dir / "DSM"
+        dtm_dir = region_dir / "DTM" / "filled"  # Use filled DTM directory
+        
+        # Find DSM file
+        dsm_files = list(dsm_dir.glob(f"*{region_name}*dsm*.tif")) + list(dsm_dir.glob(f"*copernicus*dsm*.tif"))
+        if not dsm_files:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"DSM file not found for region '{region_name}'. Please download DSM first."
+            )
+        
+        dsm_file = dsm_files[0]  # Use the first found DSM file
+        logger.info(f"📁 Found DSM file: {dsm_file}")
+        
+        # Find DTM file - check multiple locations
+        dtm_files = []
+        
+        # First, try the traditional LAZ-based DTM location
+        if dtm_dir.exists():
+            dtm_files = list(dtm_dir.glob(f"*{region_name}*DTM*.tif"))
+            if not dtm_files:
+                # Try raw DTM directory as fallback
+                dtm_raw_dir = region_dir / "DTM" / "raw"
+                if dtm_raw_dir.exists():
+                    dtm_files = list(dtm_raw_dir.glob(f"*{region_name}*DTM*.tif"))
+        
+        # If no DTM files found in output, check input directory for coordinate-based elevation data
+        if not dtm_files:
+            input_region_dir = Path("input") / region_name
+            if input_region_dir.exists():
+                # Look for elevation data in coordinate-based folder structure
+                elevation_dirs = list(input_region_dir.glob("*_elevation"))
+                for elev_dir in elevation_dirs:
+                    original_dir = elev_dir / "Original"
+                    if original_dir.exists():
+                        # Look for elevation TIFF files (these are DTM for coordinate-based data)
+                        elevation_files = list(original_dir.glob("*.tiff")) + list(original_dir.glob("*.tif"))
+                        if elevation_files:
+                            dtm_files.extend(elevation_files)
+                            logger.info(f"📁 Found elevation DTM files in input: {elevation_files}")
+                            break
+            
+        if not dtm_files:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"DTM file not found for region '{region_name}'. Please download elevation data first. Checked: output/{region_name}/lidar/DTM/ and input/{region_name}/*_elevation/Original/"
+            )
+        
+        dtm_file = dtm_files[0]  # Use the first found DTM file
+        logger.info(f"📁 Found DTM file: {dtm_file}")
+        
+        # Use the tiff_processing CHM function to generate CHM
+        from ..processing.tiff_processing import process_chm_tiff
+        
+        # Create CHM output directory
+        chm_dir = region_dir / "CHM"
+        chm_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Set parameters for CHM processing
+        chm_parameters = {
+            "dsm_path": str(dsm_file),
+            "output_filename": f"{region_name}_CHM.tif"
+        }
+        
+        logger.info(f"🌳 Generating CHM using DSM-DTM calculation...")
+        
+        # Process CHM using TIFF processing function
+        result = await process_chm_tiff(
+            tiff_path=str(dtm_file),
+            output_dir=str(chm_dir),
+            parameters=chm_parameters
+        )
+        
+        if result.get("status") == "success":
+            chm_output_file = result.get("output_file")
+            processing_time = result.get("processing_time", 0)
+            statistics = result.get("statistics", {})
+            
+            logger.info(f"✅ CHM generated successfully: {chm_output_file}")
+            
+            # Generate PNG visualization
+            try:
+                from convert import convert_geotiff_to_png
+                
+                # Create png_outputs directory
+                png_output_dir = region_dir / "png_outputs"
+                png_output_dir.mkdir(parents=True, exist_ok=True)
+                
+                png_path = png_output_dir / "CHM.png"
+                
+                convert_geotiff_to_png(
+                    chm_output_file,
+                    str(png_path),
+                    enhanced_resolution=True,
+                    save_to_consolidated=False,
+                    stretch_type="stddev"
+                )
+                
+                logger.info(f"🖼️ CHM PNG created: {png_path}")
+                
+            except Exception as png_error:
+                logger.warning(f"⚠️ CHM PNG generation failed: {png_error}")
+                # Continue anyway since CHM TIF was created successfully
+            
+            return JSONResponse(content={
+                "success": True,
+                "message": f"CHM generated successfully for region '{region_name}'",
+                "region_name": region_name,
+                "chm_file": chm_output_file,
+                "processing_time": processing_time,
+                "statistics": statistics,
+                "dsm_file": str(dsm_file),
+                "dtm_file": str(dtm_file)
+            })
+            
+        else:
+            error_message = result.get("error", "CHM generation failed")
+            logger.error(f"❌ CHM generation failed: {error_message}")
+            
+            raise HTTPException(
+                status_code=500, 
+                detail=f"CHM generation failed: {error_message}"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in CHM generation: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"CHM generation failed: {str(e)}"
+        )
