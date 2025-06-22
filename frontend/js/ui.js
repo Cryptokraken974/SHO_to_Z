@@ -50,7 +50,7 @@ window.UIManager = {
                 if (window.FileManager && typeof FileManager.loadFiles === 'function') {
                     console.log('*** Loading region markers for map ***');
                     setTimeout(() => {
-                        FileManager.loadFiles('input'); // Load regions and create markers
+                        FileManager.loadFiles(); // Load ALL regions (input + output) and create markers
                     }, 500); // Small delay to ensure map is fully ready
                 }
             }
@@ -466,7 +466,8 @@ window.UIManager = {
     $('#global-browse-regions-btn').on('click', async () => { // Made async
       console.log('🔍 Select Region button clicked - Looking up folders:');
       console.log('📁 Primary folder: input/');
-      console.log('📊 Source filter: input (only input folder will be searched)');
+      console.log('📁 Secondary folder: output/');
+      console.log('📊 Source filter: all (both input and output folders will be searched)');
       
       // Load the modal HTML first
       await loadModule('modules/modals/file-modal.html', 'modals-placeholder'); // Ensure loadModule is accessible
@@ -476,12 +477,12 @@ window.UIManager = {
       // should ideally be re-attached here or in a callback after loadModule.
       // For now, assuming they might be globally attached or need addressing in Step 13.
 
-      FileManager.loadFiles('input'); // Only load from input folder
+      FileManager.loadFiles(); // Load from ALL directories (both input and output)
 
       const fileModal = document.getElementById('file-modal');
       if (fileModal) {
         $(fileModal).fadeIn(); // Use jQuery if it's still primary for show/hide
-        $('#file-modal h4').text('Select Region (Input Folder)'); // Use jQuery for consistency if fileModal is a jQuery object
+        $('#file-modal h4').text('Select Region (All Available)'); // Use jQuery for consistency if fileModal is a jQuery object
         $(fileModal).data('for-global', true);
         $('#delete-region-btn').addClass('hidden').prop('disabled', false).text('Delete Region');
 

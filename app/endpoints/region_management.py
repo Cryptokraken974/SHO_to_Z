@@ -4,6 +4,7 @@ from typing import Optional, Tuple, Dict, Union
 import os
 import glob
 import re
+from pathlib import Path
 
 router = APIRouter()
 
@@ -270,6 +271,76 @@ async def list_regions(source: str = None):
             regions_with_metadata.append(region_info)
     else:
         print(f"  ⏭️ Skipping input folder scan (source={source}, exists={os.path.exists(input_dir)})")
+    
+    # Third, check output directory for regions with metadata.txt files (coordinate-based regions, saved places, etc.)
+    output_dir = "output"
+    if (source is None or source == "output") and os.path.exists(output_dir):
+        print(f"  🔍 Scanning output folder for metadata-based regions: {output_dir}")
+        
+        for item in os.listdir(output_dir):
+            item_path = os.path.join(output_dir, item)
+            if os.path.isdir(item_path):
+                metadata_file = os.path.join(item_path, "metadata.txt")
+                if os.path.exists(metadata_file):
+                    # Check if this region is already in our list (avoid duplicates from input scan)
+                    existing_region = next((r for r in regions_with_metadata if r["name"] == item), None)
+                    
+                    if not existing_region:
+                        print(f"  📄 Found metadata-based region: {item}")
+                        
+                        # Read coordinates from metadata.txt
+                        cached_data = _read_coordinates_from_metadata(item)
+                        
+                        region_info = {
+                            "name": item,
+                            "source": "output",
+                            "folder_path": os.path.relpath(item_path),
+                        }
+                        
+                        if cached_data:
+                            if len(cached_data) == 3:
+                                region_info["center_lat"], region_info["center_lng"], region_info["bounds"] = cached_data
+                            elif len(cached_data) == 2:
+                                region_info["center_lat"], region_info["center_lng"] = cached_data
+                                region_info["bounds"] = None
+                            
+                            print(f"  📍 Loaded coordinates for {item}: ({region_info.get('center_lat')}, {region_info.get('center_lng')})")
+                        else:
+                            # If no coordinates in metadata, try to read source info
+                            try:
+                                with open(metadata_file, 'r') as f:
+                                    content = f.read()
+                                    
+                                # Look for saved place metadata format
+                                if "# Region Created from Saved Place" in content:
+                                    region_info["region_type"] = "saved_place"
+                                    print(f"  🏷️  Identified as saved place region: {item}")
+                                
+                                # Extract coordinates from different metadata formats
+                                for line in content.split('\n'):
+                                    line = line.strip()
+                                    if line.startswith('Center Latitude:') and 'N/A' not in line:
+                                        try:
+                                            region_info["center_lat"] = float(line.split('Center Latitude:')[1].strip())
+                                        except (ValueError, IndexError):
+                                            pass
+                                    elif line.startswith('Center Longitude:') and 'N/A' not in line:
+                                        try:
+                                            region_info["center_lng"] = float(line.split('Center Longitude:')[1].strip())
+                                        except (ValueError, IndexError):
+                                            pass
+                                
+                                if region_info.get("center_lat") and region_info.get("center_lng"):
+                                    print(f"  📍 Extracted coordinates for {item}: ({region_info['center_lat']}, {region_info['center_lng']})")
+                                    
+                            except Exception as e:
+                                print(f"  ⚠️  Error reading metadata for {item}: {e}")
+                        
+                        regions_with_metadata.append(region_info)
+                    else:
+                        print(f"  ↪️  Region {item} already found in input scan, skipping duplicate")
+    else:
+        print(f"  ⏭️ Skipping output folder scan (source={source}, exists={os.path.exists(output_dir)})")
         
     regions_with_metadata.sort(key=lambda x: x["name"])
     
@@ -575,160 +646,81 @@ async def progress_callback_wrapper(progress_data: dict, region_name: Optional[s
 # SAVED PLACES API ENDPOINTS
 # ============================================================================
 
-# ============================================================================
-# REGION METADATA API ENDPOINTS
-# ============================================================================
-
-@router.post("/api/save-region-metadata")
-async def save_region_metadata(data: dict):
-    """Save simple coordinate-only metadata for a selected region
+@router.post("/api/create-region")
+async def create_region(data: dict):
+    """Create a region folder structure when saving a place
     
     Args:
-        data: Dictionary containing region_name and metadata
+        data: Dictionary containing region_name, coordinates, and metadata
     """
     try:
         region_name = data.get('region_name')
-        metadata = data.get('metadata')
+        coordinates = data.get('coordinates', {})
+        place_name = data.get('place_name')
         
-        if not region_name or not metadata:
-            raise HTTPException(status_code=400, detail="region_name and metadata are required")
+        if not region_name:
+            raise HTTPException(status_code=400, detail="region_name is required")
         
-        # Create output directory for the region
-        output_dir = os.path.join("output", region_name)
-        os.makedirs(output_dir, exist_ok=True)
+        if not coordinates.get('lat') or not coordinates.get('lng'):
+            raise HTTPException(status_code=400, detail="coordinates with lat and lng are required")
         
-        # Create simple metadata file with just coordinates
-        metadata_path = os.path.join(output_dir, "metadata.txt")
+        # Sanitize region name for file system
+        import re
+        safe_region_name = re.sub(r'[<>:"/\\|?*]', '_', region_name)
+        safe_region_name = safe_region_name.strip()
         
-        metadata_content = f"""# Region Selection Metadata
-# Created: {metadata.get('creation_time', 'Unknown')}
-# Source: {metadata.get('source', 'region_selection')}
+        if not safe_region_name:
+            raise HTTPException(status_code=400, detail="Invalid region name")
+        
+        # Create input folder structure
+        input_folder = Path("input") / safe_region_name
+        input_folder.mkdir(parents=True, exist_ok=True)
+        
+        # Create output folder structure  
+        output_folder = Path("output") / safe_region_name
+        output_folder.mkdir(parents=True, exist_ok=True)
+        
+        # Create metadata file in output folder
+        metadata_file = output_folder / "metadata.txt"
+        metadata_content = f"""# Region Created from Saved Place
+# Created: {data.get('created_at', 'Unknown')}
+# Original Place Name: {place_name or safe_region_name}
 
-Region Name: {metadata.get('region_name', region_name)}
-Display Name: {metadata.get('display_name', region_name)}
-Center Latitude: {metadata.get('center_latitude', 'N/A')}
-Center Longitude: {metadata.get('center_longitude', 'N/A')}
+Region Name: {safe_region_name}
+Display Name: {place_name or safe_region_name}
+Center Latitude: {coordinates['lat']}
+Center Longitude: {coordinates['lng']}
+Source: saved_place
+Created: {data.get('created_at', 'Unknown')}
+
+# This region was created by saving a place location
+# You can add elevation data, LAZ files, or satellite imagery to the input folder
 """
         
-        with open(metadata_path, 'w') as f:
+        with open(metadata_file, 'w') as f:
             f.write(metadata_content)
         
-        print(f"✅ Created simple metadata file: {metadata_path}")
+        print(f"✅ Created region folder structure for: {safe_region_name}")
+        print(f"   📁 Input folder: {input_folder}")
+        print(f"   📁 Output folder: {output_folder}")
+        print(f"   📄 Metadata file: {metadata_file}")
         
         return JSONResponse(content={
             "success": True,
-            "message": f"Metadata saved for region {region_name}",
-            "file_path": metadata_path
+            "message": f"Region '{safe_region_name}' created successfully",
+            "region_name": safe_region_name,
+            "input_folder": str(input_folder),
+            "output_folder": str(output_folder),
+            "metadata_file": str(metadata_file)
         })
         
     except Exception as e:
-        print(f"❌ Error saving metadata: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to save metadata: {str(e)}")
-
-@router.get("/api/regions/{region_name}/png-files")
-async def list_region_png_files(region_name: str):
-    """List all available PNG files in a region's png_outputs directory"""
-    print(f"\n📁 API CALL: GET /api/regions/{region_name}/png-files")
-    
-    try:
-        import os
-        import glob
-        from pathlib import Path
-        
-        # Check png_outputs directory
-        png_outputs_dir = Path("output") / region_name / "lidar" / "png_outputs"
-        
-        if not png_outputs_dir.exists():
-            print(f"📁 PNG outputs directory doesn't exist: {png_outputs_dir}")
-            return {
-                "region_name": region_name,
-                "png_files": [],
-                "total_files": 0,
-                "directory": str(png_outputs_dir),
-                "exists": False
-            }
-        
-        # Find all PNG files in the directory
-        png_pattern = str(png_outputs_dir / "*.png")
-        png_files = glob.glob(png_pattern)
-        
-        # Process each PNG file to extract processing type
-        processed_files = []
-        for png_file in png_files:
-            filename = Path(png_file).name
-            
-            # Skip NDVI files - they belong to satellite gallery, not raster overlay gallery
-            if "_NDVI.png" in filename or filename.endswith("_NDVI.png"):
-                print(f"⏭️ Skipping NDVI file (belongs to satellite gallery): {filename}")
-                continue
-            
-            # Extract processing type from filename
-            # Expected patterns: LRM.png, SVF.png, Slope.png, HillshadeRGB.png, TintOverlay.png
-            processing_type = None
-            display_name = None
-            
-            if filename == "LRM.png":
-                processing_type = "lrm"
-                display_name = "Local Relief Model"
-            elif filename == "SVF.png":
-                processing_type = "sky_view_factor"
-                display_name = "Sky View Factor"
-            elif filename == "Slope.png":
-                processing_type = "slope"
-                display_name = "Slope"
-            elif filename == "CHM.png":
-                processing_type = "chm"
-                display_name = "Canopy Height Model"
-            elif filename == "HillshadeRGB.png":
-                processing_type = "hillshade_rgb"
-                display_name = "Hillshade RGB"
-            elif filename == "TintOverlay.png":
-                processing_type = "tint_overlay"
-                display_name = "Tint Overlay"
-            else:
-                # Try to extract from general pattern
-                name_base = filename.replace('.png', '')
-                if '_' in name_base:
-                    processing_type = name_base.split('_')[-1].lower()
-                else:
-                    processing_type = name_base.lower()
-                display_name = processing_type.replace('_', ' ').title()
-            
-            # Get file size
-            file_size = os.path.getsize(png_file)
-            
-            processed_files.append({
-                "filename": filename,
-                "processing_type": processing_type,
-                "display_name": display_name,
-                "file_path": str(png_file),
-                "file_size": file_size,
-                "file_size_mb": round(file_size / (1024 * 1024), 2)
-            })
-        
-        # Sort by processing type for consistent ordering
-        processed_files.sort(key=lambda x: x["processing_type"] or "zzz")
-        
-        print(f"✅ Found {len(processed_files)} PNG files in {png_outputs_dir}")
-        for pf in processed_files:
-            print(f"   📄 {pf['filename']} -> {pf['processing_type']} ({pf['file_size_mb']} MB)")
-        
-        return {
-            "region_name": region_name,
-            "png_files": processed_files,
-            "total_files": len(processed_files),
-            "directory": str(png_outputs_dir),
-            "exists": True
-        }
-        
-    except Exception as e:
-        print(f"❌ Error listing PNG files: {str(e)}")
+        print(f"❌ Error creating region: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to list PNG files for region {region_name}: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to create region: {str(e)}")
 
+# ============================================================================
+# REGION METADATA API ENDPOINTS
 # ============================================================================
 

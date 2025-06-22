@@ -623,16 +623,24 @@ class BrazilianElevationSource(BaseDataSource):
     
     def _create_input_folder(self, request: DownloadRequest) -> Path:
         """Create descriptive folder in input directory."""
+        # Use provided region name if available, otherwise fall back to coordinate-based naming
+        if request.region_name:
+            folder_name = request.region_name
+            print(f"Using provided region name for folder: {folder_name}")
+        else:
+            center_lat = (request.bbox.north + request.bbox.south) / 2
+            center_lng = (request.bbox.east + request.bbox.west) / 2
+            
+            # Determine region name from coordinates
+            lat_dir = 'N' if center_lat >= 0 else 'S'
+            lng_dir = 'E' if center_lng >= 0 else 'W'
+            region_name = f"{abs(center_lat):.2f}{lat_dir}_{abs(center_lng):.2f}{lng_dir}"
+            folder_name = region_name
+            print(f"Generated coordinate-based folder name: {folder_name}")
+        
+        # Log the terrain type for reference but don't include it in folder name
         center_lat = (request.bbox.north + request.bbox.south) / 2
         center_lng = (request.bbox.east + request.bbox.west) / 2
-        
-        # Determine region name
-        lat_dir = 'N' if center_lat >= 0 else 'S'
-        lng_dir = 'E' if center_lng >= 0 else 'W'
-        region_name = f"{abs(center_lat):.2f}{lat_dir}_{abs(center_lng):.2f}{lng_dir}"
-        
-        # Use only the coordinate-based region name for the folder
-        folder_name = region_name
         
         # Log the terrain type for reference but don't include it in folder name
         terrain_type = self.classify_terrain(center_lat, center_lng)

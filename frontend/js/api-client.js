@@ -154,6 +154,15 @@ class RegionAPIClient extends BaseAPIClient {
   }
 
   /**
+   * Create a new region with folder structure
+   * @param {Object} regionData - Region data containing name, coordinates, etc.
+   * @returns {Promise<Object>} Creation result
+   */
+  async createRegion(regionData) {
+    return this.post('create-region', regionData);
+  }
+
+  /**
    * Search regions by name and source
    * @param {string} searchTerm - Search term
    * @param {string} source - Source filter
@@ -371,7 +380,7 @@ class ProcessingAPIClient extends BaseAPIClient {
     // Support both camelCase and snake_case parameter names for flexibility
     if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
     if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
-    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.processingType || options.processing_type) formData.append('processing_type', optionsProcessingType || options.processing_type);
     if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
     
     return this.postForm('color_relief', formData);
@@ -392,7 +401,7 @@ class ProcessingAPIClient extends BaseAPIClient {
     // Support both camelCase and snake_case parameter names for flexibility
     if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
     if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
-    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.processingType || options.processing_type) formData.append('processing_type', optionsProcessingType || options.processing_type);
     if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
     
     return this.postForm('tpi', formData);
@@ -433,7 +442,7 @@ class ProcessingAPIClient extends BaseAPIClient {
 
     if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
     if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
-    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.processingType || options.processing_type) formData.append('processing_type', optionsProcessingType || options.processing_type);
     if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
 
     return this.postForm('sky_view_factor', formData);

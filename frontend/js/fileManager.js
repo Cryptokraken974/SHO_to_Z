@@ -67,7 +67,7 @@ window.FileManager = {
     fileList.empty();
     
     if (regions.length === 0) {
-      fileList.html('<div class="no-files">No regions found in input folder.</div>');
+      fileList.html('<div class="no-files">No regions found.</div>');
       return;
     }
     
@@ -410,10 +410,10 @@ window.FileManager = {
         // Clear map markers if necessary
         this.clearRegionMarkers();
         
-        // Reload file list with the same source filter as currently displayed
+        // Reload file list with all regions (both input and output)
         const modal = $('#file-modal');
         const isForGlobal = modal.data('for-global');
-        const source = isForGlobal ? 'input' : null; // Only reload input regions for global modal
+        const source = isForGlobal ? null : null; // Always reload all regions for consistency
         await this.loadFiles(source);
         
         return {
