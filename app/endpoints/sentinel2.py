@@ -153,6 +153,33 @@ async def download_sentinel2(request: Sentinel2Request):
         await sentinel2_source.close()
         
         if result.success:
+            # Automatically trigger conversion after successful download
+            print(f"✅ Sentinel-2 download successful, starting automatic conversion...")
+            
+            try:
+                # Get region name from metadata or download_request
+                region_name_for_conversion = result.metadata.get('region_name') if result.metadata else download_request.region_name
+                
+                if region_name_for_conversion:
+                    from ..convert import convert_sentinel2_to_png
+                    from pathlib import Path
+                    
+                    # Convert the downloaded TIF to individual bands and PNG
+                    data_dir = Path("input") / region_name_for_conversion
+                    conversion_result = convert_sentinel2_to_png(str(data_dir), region_name_for_conversion)
+                    
+                    if conversion_result['success']:
+                        print(f"✅ Automatic Sentinel-2 conversion completed: {len(conversion_result['files'])} files generated")
+                    else:
+                        print(f"⚠️ Automatic Sentinel-2 conversion had issues: {conversion_result['errors']}")
+                        
+                else:
+                    print(f"⚠️ No region name available for automatic conversion")
+                    
+            except Exception as conversion_error:
+                print(f"⚠️ Automatic conversion failed (download still successful): {conversion_error}")
+                # Don't fail the overall download if conversion fails
+            
             return {
                 "success": True,
                 "file_path": result.file_path,

@@ -786,76 +786,80 @@ async def get_region_png_files(region_name: str):
                         elif filename.endswith("_aspect"):
                             processing_type = "aspect"
                             display_name = "Aspect"
+                        # Skip Sentinel-2 files - they belong in the satellite gallery, not raster gallery
+                        elif "_sentinel2_" in filename:
+                            print(f"  🛰️ Skipping Sentinel-2 file for raster gallery: {filename}")
+                            continue
                         else:
-                            # Skip Sentinel-2 files in lidar/png_outputs (they should be processed separately)
-                            if "_sentinel2_" in filename:
-                                continue
-                            
-                            # Skip files that are clearly not LIDAR processing results
-                            skip_patterns = [
-                                "colorized_dem",     # Visualization files like colorized_dem.png
-                                "visualization",     # General visualization files
-                                "preview",          # Preview files
-                                "thumbnail",        # Thumbnail files
-                                "_raw",            # Raw unprocessed files
-                                "_temp",           # Temporary files
-                                "elevation_colorized" # Colorized elevation files
-                            ]
-                            
-                            if any(pattern in filename.lower() for pattern in skip_patterns):
-                                print(f"  ⏭️ Skipping visualization/non-processing file: {filename}")
-                                continue
+                                # Skip files that are clearly not LIDAR processing results
+                                skip_patterns = [
+                                    "colorized_dem",     # Visualization files like colorized_dem.png
+                                    "visualization",     # General visualization files
+                                    "preview",          # Preview files
+                                    "thumbnail",        # Thumbnail files
+                                    "_raw",            # Raw unprocessed files
+                                    "_temp",           # Temporary files
+                                    "elevation_colorized" # Colorized elevation files
+                                ]
                                 
-                            # Try to extract processing type from filename patterns
-                            # Pattern: regionname_processtype.png or regionname_date_processtype.png
-                            filename_parts = filename.split('_')
-                            if len(filename_parts) >= 2:
-                                # Take the last part as processing type
-                                last_part = filename_parts[-1].lower()
-                                type_mapping = {
-                                    'hillshade': 'hillshade',
-                                    'slope': 'slope', 
-                                    'aspect': 'aspect',
-                                    'chm': 'chm',
-                                    'dtm': 'dtm',
-                                    'dsm': 'dsm',
-                                    'lrm': 'lrm',
-                                    'tpi': 'tpi',
-                                    'tri': 'tri',
-                                    'roughness': 'roughness'
-                                }
-                                processing_type = type_mapping.get(last_part, None)
-                                if processing_type:
-                                    display_name = last_part.replace("_", " ").title()
-                                else:
-                                    # Skip files with unknown processing types
-                                    print(f"  ⏭️ Skipping file with unknown processing type: {filename} (last_part: {last_part})")
+                                if any(pattern in filename.lower() for pattern in skip_patterns):
+                                    print(f"  ⏭️ Skipping visualization/non-processing file: {filename}")
                                     continue
-                            else:
-                                # Direct processing type names (e.g., TintOverlay.png, HillshadeRGB.png, LRM.png, SVF.png)
-                                direct_type_mapping = {
-                                    'tintoverlay': 'tint_overlay',
-                                    'hillshadergb': 'hillshade_rgb', 
-                                    'lrm': 'lrm',
-                                    'svf': 'sky_view_factor',
-                                    'slope': 'slope',
-                                    'aspect': 'aspect',
-                                    'chm': 'chm',
-                                    'dtm': 'dtm',
-                                    'dsm': 'dsm',
-                                    'roughness': 'roughness',
-                                    'tpi': 'tpi',
-                                    'tri': 'tri'
-                                }
-                                filename_lower = filename.lower()
-                                processing_type = direct_type_mapping.get(filename_lower, None)
-                                if processing_type:
-                                    display_name = filename.replace("_", " ").replace("RGB", " RGB").replace("SVF", "Sky View Factor")
-                                    print(f"  🔍 Direct mapping: {filename} -> {processing_type} ({display_name})")
+                                    
+                                # Try to extract processing type from filename patterns
+                                # Pattern: regionname_processtype.png or regionname_date_processtype.png
+                                filename_parts = filename.split('_')
+                                if len(filename_parts) >= 2:
+                                    # Take the last part as processing type
+                                    last_part = filename_parts[-1].lower()
+                                    type_mapping = {
+                                        'hillshade': 'hillshade',
+                                        'slope': 'slope', 
+                                        'aspect': 'aspect',
+                                        'chm': 'chm',
+                                        'dtm': 'dtm',
+                                        'dsm': 'dsm',
+                                        'lrm': 'lrm',
+                                        'tpi': 'tpi',
+                                        'tri': 'tri',
+                                        'roughness': 'roughness',
+                                        'ndvi': 'sentinel2'  # Handle NDVI files that end with _NDVI
+                                    }
+                                    processing_type = type_mapping.get(last_part, None)
+                                    if processing_type:
+                                        if last_part == 'ndvi':
+                                            display_name = "NDVI"
+                                        else:
+                                            display_name = last_part.replace("_", " ").title()
+                                    else:
+                                        # Skip files with unknown processing types
+                                        print(f"  ⏭️ Skipping file with unknown processing type: {filename} (last_part: {last_part})")
+                                        continue
                                 else:
-                                    # Skip files that don't match any known processing type
-                                    print(f"  ⏭️ Skipping file with unmapped processing type: {filename}")
-                                    continue
+                                    # Direct processing type names (e.g., TintOverlay.png, HillshadeRGB.png, LRM.png, SVF.png)
+                                    direct_type_mapping = {
+                                        'tintoverlay': 'tint_overlay',
+                                        'hillshadergb': 'hillshade_rgb', 
+                                        'lrm': 'lrm',
+                                        'svf': 'sky_view_factor',
+                                        'slope': 'slope',
+                                        'aspect': 'aspect',
+                                        'chm': 'chm',
+                                        'dtm': 'dtm',
+                                        'dsm': 'dsm',
+                                        'roughness': 'roughness',
+                                        'tpi': 'tpi',
+                                        'tri': 'tri'
+                                    }
+                                    filename_lower = filename.lower()
+                                    processing_type = direct_type_mapping.get(filename_lower, None)
+                                    if processing_type:
+                                        display_name = filename.replace("_", " ").replace("RGB", " RGB").replace("SVF", "Sky View Factor")
+                                        print(f"  🔍 Direct mapping: {filename} -> {processing_type} ({display_name})")
+                                    else:
+                                        # Skip files that don't match any known processing type
+                                        print(f"  ⏭️ Skipping file with unmapped processing type: {filename}")
+                                        continue
                     elif "lidar" in path_parts:
                         # Pattern: lidar/ProcessingType/filename.png
                         for i, part in enumerate(path_parts):
