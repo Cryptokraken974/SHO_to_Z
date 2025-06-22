@@ -7,7 +7,7 @@
 }
 
 /* Gallery styling - Grid layout instead of horizontal scroll */
-#gallery, #satellite-gallery, #raster-overlay-gallery {
+#gallery, #raster-overlay-gallery {
   width: 100%;
   overflow: visible;
 }

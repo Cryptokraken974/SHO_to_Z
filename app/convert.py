@@ -341,6 +341,11 @@ def convert_sentinel2_to_png(data_dir: str, region_name: str) -> dict:
                     actual_ndvi_png = convert_geotiff_to_png(str(ndvi_tif_path), str(ndvi_png_path))
                     if os.path.exists(actual_ndvi_png):
                         results['files'].append({'band': 'NDVI', 'tif_path': str(ndvi_tif_path), 'png_path': actual_ndvi_png, 'size_mb': os.path.getsize(actual_ndvi_png)/(1024*1024)})
+                        
+                        # 🛰️ Trigger satellite gallery refresh - NDVI processing completed
+                        results['ndvi_completed'] = True
+                        results['trigger_satellite_refresh'] = region_name
+                        print(f"✅ NDVI PNG processing completed - satellite gallery should refresh for region: {region_name}")
                     else: results['errors'].append("Failed to create PNG for NDVI")
                 else: results['errors'].append(f"Failed to calculate NDVI from {latest_tif.stem}")
             except Exception as ndvi_e: results['errors'].append(f"Error generating NDVI: {ndvi_e}")

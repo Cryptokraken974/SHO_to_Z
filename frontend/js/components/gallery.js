@@ -31,36 +31,6 @@ window.componentManager.register('gallery', (props = {}) => {
     `;
 });
 
-/**
- * Satellite Gallery Component
- */
-window.componentManager.register('satellite-gallery', (props = {}) => {
-    const { title = 'Downloaded Satellite Images' } = props;
-    
-    return `
-        <div class="mb-4">
-            <h2 class="text-white text-lg font-semibold mb-4">${title}</h2>
-            <div id="satellite-gallery" class="pb-4">
-                <!-- Downloaded satellite images will be displayed here -->
-            </div>
-        </div>
-    `;
-});
-
-/**
- * Satellite Overlay Gallery Component
- */
-window.componentManager.register('satellite-overlay-gallery', (props = {}) => {
-    const { title = 'Satellite Overlays' } = props;
-
-    return `
-        <div class="mb-4">
-            <h2 class="text-white text-lg font-semibold mb-4">${title}</h2>
-            <div id="satellite-gallery" class="pb-4"></div>
-        </div>
-    `;
-});
-
 function generateGalleryItem(item) {
     return `
         <div class="gallery-item w-full h-40 bg-[#1a1a1a] border border-[#303030] rounded-lg flex flex-col hover:border-[#404040] transition-colors" id="cell-${item.id}">

@@ -198,7 +198,8 @@ class RasterOverlayGallery {
             'boosted_hillshade': 'Boosted Hillshade',
             'hs_red': 'Hillshade Red',
             'hs_green': 'Hillshade Green',
-            'hs_blue': 'Hillshade Blue'
+            'hs_blue': 'Hillshade Blue',
+            'ndvi': 'NDVI (Vegetation Index)'  // Add NDVI display name
         };
         
         return displayNames[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());

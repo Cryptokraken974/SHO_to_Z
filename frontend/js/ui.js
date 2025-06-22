@@ -66,9 +66,6 @@ window.UIManager = {
             window.rasterOverlayGallery.init();
             console.log('RasterOverlayGallery initialized successfully');
         }
-        if (window.SatelliteOverlayGallery && document.getElementById('satellite-gallery')) {
-            // Example: new SatelliteOverlayGallery('satellite-gallery').init();
-        }
         // this.initializeMapTabEventHandlers(contextElement); // For tab-specific non-delegated event handlers
 
     } else if (contextName.includes('geotiff-tools-tab-content.html')) {
@@ -354,25 +351,19 @@ window.UIManager = {
       MapManager.setView(coords.lat, coords.lng, 13);
     }
     
-    // Clear satellite gallery immediately when switching regions to prevent showing old images
-    const gallery = $('#satellite-gallery');
-    if (gallery.length) {
-      gallery.empty();
-      // Add a loading message to provide immediate visual feedback
-      gallery.html('<div class="loading-message text-center text-[#666] p-8">🔄 Switching to new region...</div>');
-      Utils.log('info', '🗑️ Cleared satellite gallery for new region selection (including any downloaded images)');
-    }
+    // Satellite gallery removed - NDVI now handled in raster gallery
+    Utils.log('info', '🗑️ Note: Satellite gallery removed - NDVI now available in raster gallery');
     
     // Load satellite images and LIDAR data for the region
     // ALWAYS load both Sentinel-2 images AND LiDAR data regardless of file type
     // Use processing region name for consistent Sentinel-2 calls
     const sentinel2RegionName = processingRegion || regionName;
-    Utils.log('info', `🛰️ === HANDLESELECTION CALLING SENTINEL-2 ===`);
+    Utils.log('info', `🛰️ === HANDLESELECTION (Satellite gallery removed) ===`);
     Utils.log('info', `📍 Display Name: ${regionName}`);
     Utils.log('info', `📍 Processing Region: ${processingRegion}`);
     Utils.log('info', `📍 Using Region Name: ${sentinel2RegionName}`);
     Utils.log('info', `📍 File Path: ${filePath}`);
-    this.displaySentinel2ImagesForRegion(sentinel2RegionName);
+    // Satellite gallery removed - NDVI now handled in raster gallery
     
     this.displayLidarRasterForRegion(regionName);
     
@@ -1011,7 +1002,7 @@ window.UIManager = {
 
         OverlayManager.addTestOverlay(data.image_data, bounds);
 
-        Utils.showNotification('Test overlay added to map! Look for a black rectangle with red border.', 'success');
+        Utils.showNotification('Test overlay to map! Look for a black rectangle with red border.', 'success');
         Utils.log('info', 'Test overlay added to map with bounds:', bounds);
 
       } else {
@@ -1041,16 +1032,9 @@ window.UIManager = {
       regionPath: FileManager.getRegionPath()
     });
     
-    // Check if Sentinel-2 images are already loaded for selected region
+    // Check if we have a selected region - satellite gallery removed, NDVI now in raster gallery
     if (FileManager.selectedRegion) {
-      const existingImages = $('#satellite-gallery .gallery-item').length;
-      if (existingImages > 0) {
-        const proceed = confirm(`Sentinel-2 images are already loaded for ${FileManager.selectedRegion}. This test will download additional images. Continue?`);
-        if (!proceed) {
-          Utils.log('info', 'Test Sentinel-2 cancelled by user - images already loaded');
-          return;
-        }
-      }
+      Utils.log('info', 'Note: Satellite gallery removed - NDVI now available in raster gallery');
     }
 
     // Get coordinates from input fields
@@ -1207,6 +1191,30 @@ window.UIManager = {
         this.displaySentinel2Images(result.files, regionName); // Pass regionName here
 
         Utils.showNotification(`Converted ${result.files.length} Sentinel-2 images to PNG for ${regionName}`, 'success');
+        
+        // 🛰️ If NDVI processing was completed, refresh satellite gallery
+        if (result.ndvi_completed && result.trigger_satellite_refresh) {
+          const refreshRegion = result.trigger_satellite_refresh;
+          Utils.log('info', `🛰️ NDVI processing completed - refreshing satellite gallery for region: ${refreshRegion}`);
+          console.log('🛰️ NDVI COMPLETION DETECTED:', { 
+            ndvi_completed: result.ndvi_completed, 
+            trigger_satellite_refresh: result.trigger_satellite_refresh,
+            refreshRegion 
+          });
+          
+          // NDVI is now handled in raster gallery - no satellite gallery refresh needed
+          setTimeout(() => {
+            Utils.log('info', '🔄 NDVI now handled in raster gallery - satellite gallery removed');
+            // Note: NDVI images are now available in the raster gallery
+          }, 2000);
+          
+          Utils.showNotification('🌱 NDVI imagery updated and available in raster gallery!', 'success');
+        } else {
+          console.log('🛰️ No NDVI completion detected in result:', { 
+            ndvi_completed: result.ndvi_completed, 
+            trigger_satellite_refresh: result.trigger_satellite_refresh 
+          });
+        }
       } else {
         throw new Error(result.error || 'No images converted');
       }
@@ -1217,113 +1225,6 @@ window.UIManager = {
     } finally {
       this.hideProgress();
     }
-  },
-  /**
-   * Fetches and displays Sentinel-2 images for a given region.
-   * Checks for available Sentinel-2 processing results and displays them in the satellite gallery.
-   * @param {string} regionName - The name of the region.
-   */
-  async displaySentinel2ImagesForRegion(regionName) {
-    if (!window.satelliteOverlayGallery) {
-      Utils.log('warn', 'SatelliteOverlayGallery not initialized, attempting to initialize...');
-      
-      // Check if the satellite gallery container exists
-      const satelliteGalleryContainer = document.getElementById('satellite-gallery');
-      if (!satelliteGalleryContainer) {
-        Utils.log('warn', 'Satellite gallery container not found, Sentinel-2 images will be loaded when map tab is accessed');
-        return;
-      }
-      
-      // Initialize the gallery if container exists
-      try {
-        window.satelliteOverlayGallery = new window.SatelliteOverlayGallery('satellite-gallery', {
-          onAddToMap: (regionBand, bandType) => {
-            if (window.UIManager?.addSentinel2OverlayToMap) {
-              window.UIManager.addSentinel2OverlayToMap(regionBand, bandType);
-            }
-          }
-        });
-        Utils.log('info', 'SatelliteOverlayGallery initialized successfully');
-      } catch (error) {
-        Utils.log('error', 'Failed to initialize SatelliteOverlayGallery:', error);
-        return;
-      }
-    }
-    
-    await window.satelliteOverlayGallery.loadImages(regionName);
-  },
-
-  /**
-   * Display Sentinel-2 band images in the satellite gallery
-   * @param {Array} availableBands - Array of available band data
-   */
-  displaySentinel2BandsGallery(availableBands) {
-    if (!window.satelliteOverlayGallery) {
-      Utils.log('warn', 'SatelliteOverlayGallery not initialized, attempting to initialize...');
-      
-      // Check if the satellite gallery container exists
-      const satelliteGalleryContainer = document.getElementById('satellite-gallery');
-      if (!satelliteGalleryContainer) {
-        Utils.log('warn', 'Satellite gallery container not found, Sentinel-2 images will be displayed when map tab is accessed');
-        return;
-      }
-      
-      // Initialize the gallery if container exists
-      try {
-        window.satelliteOverlayGallery = new window.SatelliteOverlayGallery('satellite-gallery', {
-          onAddToMap: (regionBand, bandType) => {
-            if (window.UIManager?.addSentinel2OverlayToMap) {
-              window.UIManager.addSentinel2OverlayToMap(regionBand, bandType);
-            }
-          }
-        });
-        Utils.log('info', 'SatelliteOverlayGallery initialized successfully');
-      } catch (error) {
-        Utils.log('error', 'Failed to initialize SatelliteOverlayGallery:', error);
-        return;
-      }
-    }
-
-    const items = (availableBands || []).map(bandData => {
-      const { band, overlayData, regionName } = bandData;
-      const imageB64 = overlayData.image_data;
-
-      let apiRegionName = regionName;
-      if (!regionName.startsWith('region_')) {
-        apiRegionName = `region_${regionName.replace(/\./g, '_')}`;
-      }
-      const regionBand = `${apiRegionName}_${band}`;
-      const title = window.satelliteOverlayGallery.getBandDisplayName
-        ? window.satelliteOverlayGallery.getBandDisplayName(band)
-        : band;
-
-      return {
-        id: regionBand,
-        imageUrl: `data:image/png;base64,${imageB64}`,
-        title,
-        subtitle: regionName,
-        status: 'ready',
-        bandType: title
-      };
-    });
-
-    window.satelliteOverlayGallery.showImages(items);
-  },
-
-  /**
-   * Get display name for Sentinel-2 bands
-   * @param {string} band - Band identifier (e.g., 'RED_B04', 'NIR_B08', 'NDVI')
-   * @returns {string} Display-friendly name
-   */
-  getSentinel2BandDisplayName(band) {
-    if (band.includes('NIR_B08')) {
-      return 'NIR (B08)';
-    } else if (band.includes('RED_B04')) {
-      return 'Red (B04)';
-    } else if (band === 'NDVI') {
-      return 'NDVI';
-    }
-    return band;
   },
 
   /**
@@ -1795,8 +1696,7 @@ window.UIManager = {
     } finally {
       this.hideProgress();
     }
-  },
-
+ },
   /**
    * Initialize the Results tab
    */
@@ -1804,6 +1704,7 @@ window.UIManager = {
     if (!this.resultsTabInitialized) {
       Utils.log('info', 'Initializing Results tab for the first time.');
       if (window.ResultsManager && typeof window.ResultsManager.init === 'function') {
+
         window.ResultsManager.init();
       } else {
         Utils.log('warn', 'ResultsManager not found or init function missing.');

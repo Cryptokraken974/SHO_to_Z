@@ -257,13 +257,35 @@ async def convert_sentinel2_images(region_name: str = Form(...)):
                 except Exception as e:
                     print(f"❌ Error generating base64 for {file_info['band']}: {e}")
             
-            return {
+            response_data = {
                 "success": True,
                 "region_name": region_name,
                 "files": display_files,
                 "total_files": len(display_files),
                 "errors": conversion_result['errors']
             }
+            
+            # 🛰️ Add satellite gallery refresh trigger if NDVI was completed
+            if conversion_result.get('ndvi_completed'):
+                response_data['ndvi_completed'] = True
+                response_data['trigger_satellite_refresh'] = conversion_result.get('trigger_satellite_refresh', region_name)
+                print(f"🔄 Adding satellite gallery refresh trigger to response for region: {region_name}")
+                
+                # 🛰️ Send WebSocket message for satellite gallery refresh
+                try:
+                    from ..main import manager
+                    await manager.send_progress_update({
+                        "type": "ndvi_conversion_complete",
+                        "message": f"NDVI conversion completed for {region_name}",
+                        "region_name": region_name,
+                        "trigger_satellite_refresh": True,
+                        "band": "NDVI"
+                    })
+                    print(f"📡 WebSocket message sent for NDVI conversion completion: {region_name}")
+                except Exception as ws_error:
+                    print(f"⚠️ Could not send WebSocket message: {ws_error}")
+            
+            return response_data
         else:
             return {
                 "success": False,

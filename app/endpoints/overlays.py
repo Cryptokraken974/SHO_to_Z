@@ -253,13 +253,13 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
                 "sky_view_factor": ["SVF.png", "Sky_View_Factor.png", "sky_view_factor.png"],
                 "slope": ["Slope.png", "slope.png"],
                 "aspect": ["Aspect.png", "aspect.png"],
-                "chm": ["CHM.png", "Chm.png", "chm.png"],
-                "hillshade": ["Hillshade.png", "hillshade.png"],
-                "roughness": ["Roughness.png", "roughness.png"],
-                "color_relief": ["Color_Relief.png", "color_relief.png"],
-                "tpi": ["TPI.png", "tpi.png"],
-                "tri": ["TRI.png", "tri.png"]
-            }
+                "chm": ["CHM.png", "Chm.png", "chm.png"],            "hillshade": ["Hillshade.png", "hillshade.png"],
+            "roughness": ["Roughness.png", "roughness.png"],
+            "color_relief": ["Color_Relief.png", "color_relief.png"],
+            "tpi": ["TPI.png", "tpi.png"],
+            "tri": ["TRI.png", "tri.png"],
+            "ndvi": ["NDVI.png", "ndvi.png"]  # Add NDVI support
+        }
             
             # Find the actual PNG file
             png_file_path = None
@@ -344,7 +344,8 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
             "color_relief": "Color_Relief",
             "tri": "TRI",
             "tpi": "TPI",
-            "roughness": "Roughness"
+            "roughness": "Roughness",
+            "ndvi": "NDVI"  # Add NDVI mapping
         }
         
         # Convert frontend processing type to backend processing type

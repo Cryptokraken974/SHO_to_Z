@@ -129,12 +129,7 @@ window.FileManager = {
    * @param {Object} bounds - Optional bounds object {north, south, east, west}
    */
   selectRegion(displayName, coords = null, processingRegion = null, regionPath = null, bounds = null) { // MODIFIED to selectRegion, added regionPath and bounds
-    // Clear satellite gallery immediately when region is selected
-    const satelliteGallery = document.getElementById('satellite-gallery');
-    if (satelliteGallery) {
-      satelliteGallery.innerHTML = '<div class="text-center text-gray-500 p-4">🔄 Switching to new region...</div>';
-      Utils.log('info', 'Cleared satellite gallery for region switch');
-    }
+    // Satellite gallery removed - NDVI now handled in raster gallery
     
     this.selectedRegion = displayName;
     this.processingRegion = processingRegion || displayName; // Store the processing region separately
@@ -383,8 +378,8 @@ window.FileManager = {
     // UIManager.updateProcessingButtons(false); // This might need to be adapted based on new logic
     UIManager.hideFileInfo();
     $('.file-item').removeClass('selected');
-    // Clear satellite image gallery when selection is cleared
-    $('#satellite-gallery').empty().html('<div class="no-files">Select a region to see satellite images.</div>');
+    // Clear raster galleries when selection is cleared
+    this.clearRegionSelection();
     Utils.log('info', 'Region selection cleared');
   },
 

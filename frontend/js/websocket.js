@@ -106,6 +106,10 @@ window.WebSocketManager = {
         this.handleDownloadComplete(data);
         break;
         
+      case 'ndvi_conversion_complete':
+        this.handleNDVIConversionComplete(data);
+        break;
+        
       default:
         Utils.log('warn', `Unknown WebSocket message type: ${type}`, data);
     }
@@ -300,6 +304,29 @@ window.WebSocketManager = {
       if (window.UIManager && window.UIManager.onSentinel2DownloadComplete) {
         window.UIManager.onSentinel2DownloadComplete(data);
       }
+    }
+  },
+
+  /**
+   * Handle NDVI conversion completion and trigger satellite gallery refresh
+   * @param {Object} data - NDVI conversion completion data
+   */
+  handleNDVIConversionComplete(data) {
+    const { message, region_name, trigger_satellite_refresh } = data;
+    
+    Utils.log('info', `🛰️ NDVI conversion completed via WebSocket: ${message}`, data);
+    console.log('🛰️ WebSocket NDVI completion:', { message, region_name, trigger_satellite_refresh });
+    
+    if (trigger_satellite_refresh && region_name) {
+      Utils.showNotification('🌱 NDVI imagery updated and available in raster gallery!', 'success', 3000);
+      
+      // NDVI is now handled in raster gallery - no satellite gallery refresh needed
+      setTimeout(() => {
+        Utils.log('info', '🔄 NDVI now handled in raster gallery - satellite gallery removed');
+        // Note: NDVI images are now available in the raster gallery
+      }, 2000);
+    } else {
+      console.log('🛰️ WebSocket: No refresh trigger or region name:', { trigger_satellite_refresh, region_name });
     }
   },
 

@@ -769,12 +769,39 @@ async def get_region_png_files(region_name: str):
                     processing_type = "unknown"
                     display_name = png_file.stem
                     
+                    # Skip files that are clearly not LIDAR processing results (apply globally)
+                    filename = png_file.name
+                    skip_patterns = [
+                        "colorized_dem",     # Visualization files like colorized_dem.png
+                        "elevation_colorized", # Colorized elevation files
+                        "visualization",     # General visualization files
+                        "preview",          # Preview files
+                        "thumbnail",        # Thumbnail files
+                        "_raw",            # Raw unprocessed files
+                        "_temp"            # Temporary files
+                        # Note: _sentinel2_ pattern removed to allow NDVI files
+                    ]
+                    
+                    # Special handling for Sentinel-2 files: only allow NDVI
+                    if "_sentinel2_" in filename.lower():
+                        if "ndvi" not in filename.lower():
+                            print(f"  🛰️ Skipping non-NDVI Sentinel-2 file: {filename}")
+                            continue
+                        # If it's NDVI, allow it to continue
+                    
+                    if any(pattern in filename.lower() for pattern in skip_patterns):
+                        print(f"  ⏭️ Skipping visualization/non-processing file: {filename}")
+                        continue
+                    
                     # Extract processing type from path patterns
                     path_parts = relative_path.parts
                     if "png_outputs" in path_parts:
                         # Pattern: lidar/png_outputs/filename_elevation_type.png
                         filename = png_file.stem
-                        if "_elevation_" in filename:
+                        if "_sentinel2_NDVI" in filename:
+                            processing_type = "ndvi"
+                            display_name = "NDVI (Normalized Difference Vegetation Index)"
+                        elif "_elevation_" in filename:
                             processing_type = filename.split("_elevation_")[-1]
                             display_name = processing_type.replace("_", " ").title()
                         elif filename.endswith("_hillshade"):
@@ -791,21 +818,6 @@ async def get_region_png_files(region_name: str):
                             print(f"  🛰️ Skipping Sentinel-2 file for raster gallery: {filename}")
                             continue
                         else:
-                                # Skip files that are clearly not LIDAR processing results
-                                skip_patterns = [
-                                    "colorized_dem",     # Visualization files like colorized_dem.png
-                                    "visualization",     # General visualization files
-                                    "preview",          # Preview files
-                                    "thumbnail",        # Thumbnail files
-                                    "_raw",            # Raw unprocessed files
-                                    "_temp",           # Temporary files
-                                    "elevation_colorized" # Colorized elevation files
-                                ]
-                                
-                                if any(pattern in filename.lower() for pattern in skip_patterns):
-                                    print(f"  ⏭️ Skipping visualization/non-processing file: {filename}")
-                                    continue
-                                    
                                 # Try to extract processing type from filename patterns
                                 # Pattern: regionname_processtype.png or regionname_date_processtype.png
                                 filename_parts = filename.split('_')
@@ -823,12 +835,12 @@ async def get_region_png_files(region_name: str):
                                         'tpi': 'tpi',
                                         'tri': 'tri',
                                         'roughness': 'roughness',
-                                        'ndvi': 'sentinel2'  # Handle NDVI files that end with _NDVI
+                                        'ndvi': 'ndvi'  # Include NDVI in raster gallery
                                     }
                                     processing_type = type_mapping.get(last_part, None)
                                     if processing_type:
                                         if last_part == 'ndvi':
-                                            display_name = "NDVI"
+                                            display_name = "NDVI (Normalized Difference Vegetation Index)"
                                         else:
                                             display_name = last_part.replace("_", " ").title()
                                     else:
@@ -868,16 +880,9 @@ async def get_region_png_files(region_name: str):
                                 display_name = path_parts[i + 1]
                                 break
                     elif "sentinel2" in path_parts:
-                        # Sentinel-2 files
-                        processing_type = "sentinel2"
-                        if "NDVI" in png_file.name:
-                            display_name = "NDVI"
-                        elif "RED_B04" in png_file.name:
-                            display_name = "Red Band"
-                        elif "NIR_B08" in png_file.name:
-                            display_name = "NIR Band"
-                        else:
-                            display_name = "Satellite Image"
+                        # Skip Sentinel-2 files - they belong in the satellite gallery, not raster gallery
+                        print(f"  🛰️ Skipping Sentinel-2 file for raster gallery: {png_file.name}")
+                        continue
                     
                     png_files.append({
                         "file_path": str(png_file),

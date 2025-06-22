@@ -42,6 +42,7 @@ class SatelliteOverlayGallery {
             return;
         }
 
+        console.log(`🛰️ SatelliteOverlayGallery: Loading images for region: ${regionName}`);
         this.gallery.showLoading();
         const items = [];
 
@@ -50,12 +51,15 @@ class SatelliteOverlayGallery {
         if (!regionName.startsWith('region_') && regionName.includes('.')) {
             apiRegionName = `region_${regionName.replace(/\./g, '_')}`;
         }
+        console.log(`🛰️ API region name: ${apiRegionName}`);
 
         for (const band of this.options.bands) {
             const regionBand = `${apiRegionName}_${band}`;
+            console.log(`🛰️ Loading band: ${band}, regionBand: ${regionBand}`);
             try {
                 const data = await satellite().getSentinel2Overlay(regionBand);
                 if (data && data.image_data) {
+                    console.log(`✅ Successfully loaded band ${band}`);
                     const title = this.getBandDisplayName(band);
                     items.push({
                         id: regionBand,
@@ -65,20 +69,27 @@ class SatelliteOverlayGallery {
                         status: 'ready',
                         bandType: band // Use the raw band name, not the display name
                     });
+                } else {
+                    console.warn(`❌ No image data for band ${band}`);
                 }
             } catch (e) {
-                // ignore missing images
+                console.error(`Failed to load Sentinel-2 band ${band} for region ${regionBand}:`, e);
+                // ignore missing images but log the error
             }
         }
 
+        console.log(`🛰️ Loaded ${items.length} satellite images`);
         this.showImages(items);
     }
 
     showImages(items) {
+        console.log(`🛰️ showImages called with ${items ? items.length : 0} items:`, items);
         this.items = items || [];
         if (!items || items.length === 0) {
+            console.log('🛰️ Clearing gallery - no items');
             this.gallery.clear();
         } else {
+            console.log('🛰️ Setting gallery items');
             this.gallery.setItems(items);
         }
     }
@@ -168,6 +179,24 @@ class SatelliteOverlayGallery {
      */
     updateButtonState(itemId, isActive) {
         this.gallery.updateItemOverlayState(itemId, isActive);
+    }
+    
+    /**
+     * Refresh the gallery for the current region
+     * This reloads images without needing to know the region name
+     */
+    async refresh() {
+        console.log('🔄 SatelliteOverlayGallery.refresh() called');
+        if (this.regionName) {
+            console.log(`🔄 Refreshing gallery for region: ${this.regionName}`);
+            // Show loading state immediately
+            this.gallery.showLoading();
+            // Wait a moment to ensure any recent processing has completed
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await this.loadImages(this.regionName);
+        } else {
+            console.log('🔄 No region name stored, cannot refresh');
+        }
     }
 }
 
