@@ -1391,8 +1391,29 @@ window.UIManager = {
    */
   async addLidarRasterOverlayToMap(regionName, processingType, displayName) {
     try {
-      // Use the overlays service to get the raster data
-      const data = await overlays().getRasterOverlayData(regionName, processingType);
+      // Try multiple ways to get the raster data
+      let data = null;
+      
+      // Method 1: Use overlays service if available
+      if (window.overlays && typeof window.overlays === 'function') {
+        try {
+          data = await overlays().getRasterOverlayData(regionName, processingType);
+        } catch (serviceError) {
+          Utils.log('warn', 'Overlays service failed, trying direct API call:', serviceError);
+        }
+      }
+      
+      // Method 2: Direct API call as fallback
+      if (!data || !data.success) {
+        try {
+          const response = await fetch(`/api/overlay/raster/${encodeURIComponent(regionName)}_${processingType}`);
+          if (response.ok) {
+            data = await response.json();
+          }
+        } catch (apiError) {
+          Utils.log('warn', 'Direct API call failed:', apiError);
+        }
+      }
       
       if (data && data.success && data.bounds && data.image_data) {
         const bounds = [
