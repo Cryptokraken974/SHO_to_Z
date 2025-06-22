@@ -1126,9 +1126,12 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
         print(f"⚠️ Fallback to filename-based region: {region_folder}")
     
     # Create output structure: output/<region coordinates>/lidar
+    # Always use output directory regardless of where input TIFF is located
     base_output_dir = os.path.join("output", region_folder, "lidar")
     
     print(f"📂 Output directory: {base_output_dir}")
+    print(f"📂 Input TIFF location: {tiff_path}")
+    print(f"🎯 Ensuring all processing outputs go to: {base_output_dir}")
     
     # Create the base output directory if it doesn't exist
     os.makedirs(base_output_dir, exist_ok=True)

@@ -52,13 +52,21 @@ class RasterGenerator:
             'timing': {}
         }
     
-    def create_output_structure(self, tiff_file: Path) -> Path:
+    def create_output_structure(self, tiff_file: Path, region_name: str = None) -> Path:
         """Create organized output directory structure for a TIFF file"""
-        # Use the TIFF filename (without extension) as the base folder name
-        base_name = tiff_file.stem
+        # Use region name if provided, otherwise use TIFF filename (without extension)
+        if region_name:
+            base_name = region_name
+        else:
+            base_name = tiff_file.stem
         
-        # Create main output folder for this TIFF
-        output_folder = self.output_base_dir / base_name
+        # Always create output in the proper output directory structure: output/{region}/lidar/
+        # This ensures coordinate-based regions don't create directories in input/
+        if region_name:
+            output_folder = Path("output") / region_name / "lidar"
+        else:
+            # Fallback to the configured output base directory
+            output_folder = self.output_base_dir / base_name
         
         # Create subdirectories for different product types
         subdirs = [
@@ -87,108 +95,15 @@ class RasterGenerator:
         return copied_tiff
     
     async def generate_raster_products(self, tiff_file: Path, output_folder: Path, 
-                                      progress_callback: Optional[Callable] = None) -> Dict[str, str]:
-        """Generate all raster products from the elevation TIFF"""
-        if progress_callback:
-            await progress_callback({
-                "type": "raster_generation_started",
-                "message": f"Generating raster products for: {tiff_file.name}"
-            })
-        
-        # Convert Path to string for processing functions
-        tiff_str = str(tiff_file)
-        products = {}
-        
-        total_start = time.time()
-        
-        # Define processing parameters for different products
-        processing_params = {
-            'hillshade_standard': {'azimuth': 315, 'altitude': 45, 'z_factor': 1.0},
-            'hillshade_315_45_08': {'azimuth': 315, 'altitude': 45, 'z_factor': 0.8},
-            'hillshade_225_45_08': {'azimuth': 225, 'altitude': 45, 'z_factor': 0.8},
-            'slope': {},
-            'aspect': {},
-            'color_relief': {}
-        }
-        
-        # Define output directories for different product types
-        output_dirs = {
-            'hillshade_standard': output_folder / 'Hillshade',
-            'hillshade_315_45_08': output_folder / 'Hillshade',
-            'hillshade_225_45_08': output_folder / 'Hillshade',
-            'slope': output_folder / 'Terrain_Analysis',
-            'aspect': output_folder / 'Terrain_Analysis', 
-            'color_relief': output_folder / 'Visualization'
-        }
-        
-        for product_name, processor_func in self.processors.items():
-            if progress_callback:
-                await progress_callback({
-                    "type": "processing_product",
-                    "message": f"Processing: {product_name}"
-                })
-            
-            product_start = time.time()
-            
-            try:
-                # Get output directory and parameters for this product
-                output_dir = output_dirs[product_name]
-                params = processing_params[product_name]
-                
-                # Call the async processing function
-                result = await processor_func(tiff_str, str(output_dir), params)
-                
-                if result['status'] == 'success' and os.path.exists(result['output_file']):
-                    products[product_name] = result['output_file']
-                    product_time = result['processing_time']
-                    
-                    # Store timing info
-                    self.results['timing'][f"{tiff_file.stem}_{product_name}"] = product_time
-                    
-                    if progress_callback:
-                        await progress_callback({
-                            "type": "product_completed",
-                            "message": f"{product_name} completed",
-                            "product": product_name,
-                            "output_file": result['output_file'],
-                            "time": product_time
-                        })
-                else:
-                    error_msg = result.get('error', 'Unknown error')
-                    self.results['errors'].append(f"{tiff_file.name}: {product_name} - {error_msg}")
-                    
-                    if progress_callback:
-                        await progress_callback({
-                            "type": "product_error",
-                            "message": f"{product_name} failed: {error_msg}",
-                            "product": product_name,
-                            "error": error_msg
-                        })
-                    
-            except Exception as e:
-                product_time = time.time() - product_start
-                error_msg = f"{tiff_file.name}: {product_name} - {str(e)}"
-                self.results['errors'].append(error_msg)
-                
-                if progress_callback:
-                    await progress_callback({
-                        "type": "product_error",
-                        "message": f"{product_name} failed: {str(e)}",
-                        "product": product_name,
-                        "error": str(e)
-                    })
-        
-        total_time = time.time() - total_start
-        
-        if progress_callback:
-            await progress_callback({
-                "type": "raster_generation_progress",
-                "message": f"Generated {len(products)} products in {total_time:.2f}s",
-                "products_count": len(products),
-                "total_time": total_time
-            })
-        
-        return products
+                                      progress_callback: Optional[Callable] = None, 
+                                      region_name: str = None) -> Dict[str, str]:
+        """
+        DEPRECATED: Generate all raster products from the elevation TIFF
+        This method is deprecated in favor of generate_all_raster_products which uses
+        the unified processor to ensure proper output directory structure.
+        """
+        # Redirect to the new unified processor
+        return await self.generate_all_raster_products(tiff_file, output_folder, progress_callback, region_name)
     
     def convert_to_png(self, products: Dict[str, str], output_folder: Path,
                        progress_callback: Optional[Callable] = None) -> Dict[str, str]:
@@ -284,7 +199,7 @@ class RasterGenerator:
                 # If move fails, don't raise an error - the file might already be in the right place
                 pass
     
-    async def process_single_tiff(self, tiff_file: Path, progress_callback: Optional[Callable] = None) -> Dict:
+    async def process_single_tiff(self, tiff_file: Path, progress_callback: Optional[Callable] = None, region_name: str = None) -> Dict:
         """Process a single TIFF file through the complete pipeline"""
         overall_start = time.time()
         
@@ -296,15 +211,15 @@ class RasterGenerator:
             })
         
         try:
-            # 1. Create output structure
-            output_folder = self.create_output_structure(tiff_file)
+            # 1. Create output structure with region name if provided
+            output_folder = self.create_output_structure(tiff_file, region_name)
             
             # 2. Copy original TIFF for reference
             copied_tiff = self.copy_original_tiff(tiff_file, output_folder)
             
             # 3. Generate raster products (async)
             # Use the new unified processor instead of the original method
-            products = await self.generate_all_raster_products(tiff_file, output_folder, progress_callback)
+            products = await self.generate_all_raster_products(tiff_file, output_folder, progress_callback, region_name)
             
             if not products:
                 if progress_callback:
@@ -449,7 +364,7 @@ class RasterGenerator:
         
         results = []
         for tiff_file in unique_tiffs:
-            result = await self.process_single_tiff(tiff_file, progress_callback)
+            result = await self.process_single_tiff(tiff_file, progress_callback, region_name)
             results.append(result)
         
         successful = [r for r in results if r["success"]]
@@ -464,7 +379,8 @@ class RasterGenerator:
         }
 
     async def generate_all_raster_products(self, tiff_file: Path, output_folder: Path, 
-                                  progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
+                                  progress_callback: Optional[Callable] = None, 
+                                  region_name: str = None) -> Dict[str, Any]:
         """
         Process all raster products using the unified process_all_raster_products function.
         This method is an alternative to the manual processing and uses the updated function
@@ -481,8 +397,15 @@ class RasterGenerator:
         # Convert Path to string
         tiff_str = str(tiff_file)
         
-        # Process all raster products
-        result = await process_all_raster_products(tiff_str, progress_callback)
+        # Create a simple request object with region name if provided
+        class SimpleRequest:
+            def __init__(self, region_name):
+                self.region_name = region_name
+        
+        request = SimpleRequest(region_name) if region_name else None
+        
+        # Process all raster products with region name context
+        result = await process_all_raster_products(tiff_str, progress_callback, request)
         
         if progress_callback:
             await progress_callback({

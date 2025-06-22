@@ -550,38 +550,38 @@ window.UIManager = {
       this.testCoordinateAcquisition();
     });
 
-    // Test Sentinel-2 button
-    $('#test-sentinel2-btn').on('click', () => {
+    // Test Sentinel-2 button - Use event delegation
+    $(document).on('click', '#test-sentinel2-btn', () => {
       this.testSentinel2();
     });
 
-    // Get Elevation Data button
-    $('#get-lidar-btn').on('click', () => {
+    // Get Elevation Data button - Use event delegation
+    $(document).on('click', '#get-lidar-btn', () => {
       this.acquireElevationData();
     });
 
-    // Get Data button (Combined: Elevation + Satellite)
-    $('#get-data-btn').on('click', () => {
+    // Get Data button (Combined: Elevation + Satellite) - Use event delegation
+    $(document).on('click', '#get-data-btn', () => {
       this.getCombinedData();
     });
 
-    // Generate Rasters - Single Button for All Processing
-    $('#generate-all-rasters-btn').on('click', () => {
+    // Generate Rasters - Single Button for All Processing - Use event delegation
+    $(document).on('click', '#generate-all-rasters-btn', () => {
       ProcessingManager.processAllRasters();
     });
 
-    // Cancel All Rasters Processing
-    $('#cancel-all-rasters-btn').on('click', () => {
+    // Cancel All Rasters Processing - Use event delegation
+    $(document).on('click', '#cancel-all-rasters-btn', () => {
       ProcessingManager.cancelAllRasterProcessing();
     });
 
-    // Go to coordinates button
-    $('#go-to-coordinates-btn').on('click', () => {
+    // Go to coordinates button - Use event delegation
+    $(document).on('click', '#go-to-coordinates-btn', () => {
       this.goToCoordinates();
     });
 
-    // Coordinate input parser
-    $('#goto-coordinates-input').on('input', Utils.debounce(() => {
+    // Coordinate input parser - Use event delegation
+    $(document).on('input', '#goto-coordinates-input', Utils.debounce(() => {
       this.parseAndDisplayCoordinates();
     }, 300));
 
@@ -714,13 +714,13 @@ window.UIManager = {
         this.hideProgress(); // Assumes hideProgress targets #progress-modal correctly even if nested
     });
 
-    // Coordinate input field event handlers for region name generation
-    $('#lat-input, #lng-input').on('input change', Utils.debounce(() => {
+    // Coordinate input field event handlers for region name generation - Use event delegation
+    $(document).on('input change', '#lat-input, #lng-input', Utils.debounce(() => {
       this.updateRegionNameFromCoordinates();
     }, 500));
 
-    // Manual region name editing
-    $('#region-name-input').on('input', () => {
+    // Manual region name editing - Use event delegation
+    $(document).on('input', '#region-name-input', () => {
       // Allow manual editing of region name
       Utils.log('info', 'Region name manually edited');
     });

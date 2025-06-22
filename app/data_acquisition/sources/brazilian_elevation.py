@@ -626,6 +626,7 @@ class BrazilianElevationSource(BaseDataSource):
         # Use provided region name if available, otherwise fall back to coordinate-based naming
         if request.region_name:
             folder_name = request.region_name
+            region_name = request.region_name  # Store for consistent reference
             print(f"Using provided region name for folder: {folder_name}")
         else:
             center_lat = (request.bbox.north + request.bbox.south) / 2

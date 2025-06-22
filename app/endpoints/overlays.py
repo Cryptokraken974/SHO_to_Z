@@ -187,12 +187,145 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
     print(f"\n🗺️  API CALL: /api/overlay/raster/{region_name}/{processing_type}")
     
     try:
-        from ..geo_utils import get_laz_overlay_data
+        from ..geo_utils import get_laz_overlay_data, get_sentinel2_overlay_data_util
         
         print(f"📂 Region name: {region_name}")
         print(f"🔄 Processing type: {processing_type}")
         print(f"🔍 Current working directory: {os.getcwd()}")
         
+        # Check if this is a Sentinel-2 processing type
+        if processing_type.startswith("sentinel2_"):
+            print(f"🛰️ Handling Sentinel-2 processing type: {processing_type}")
+            
+            # Map processing type to band identifier
+            sentinel2_mapping = {
+                "sentinel2_ndvi": "NDVI",
+                "sentinel2_red": "RED_B04", 
+                "sentinel2_nir": "NIR_B08"
+            }
+            
+            band_type = sentinel2_mapping.get(processing_type)
+            if not band_type:
+                return JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": f"Unknown Sentinel-2 processing type: {processing_type}"}
+                )
+            
+            # Use Sentinel-2 specific overlay function
+            print(f"🔄 Calling get_sentinel2_overlay_data_util({region_name}, {band_type})")
+            overlay_data = get_sentinel2_overlay_data_util(region_name, band_type)
+            
+            if not overlay_data:
+                print(f"❌ No Sentinel-2 overlay data found for {region_name}/{band_type}")
+                return JSONResponse(
+                    status_code=404,
+                    content={"success": False, "error": f"No Sentinel-2 {band_type} data found for region {region_name}"}
+                )
+            
+            print(f"✅ Successfully prepared Sentinel-2 overlay data")
+            result = {
+                'success': True,
+                'bounds': overlay_data['bounds'],
+                'image_data': overlay_data['image_data'],
+                'processing_type': processing_type,
+                'region_name': region_name,
+                'filename': overlay_data.get('filename', f"{region_name}_{band_type}"),
+                'is_optimized': overlay_data.get('is_optimized', False)
+            }
+            
+            # Add optimization metadata if available
+            if overlay_data.get('optimization_info'):
+                result['optimization_info'] = overlay_data['optimization_info']
+            
+            return result
+        
+        # Handle LIDAR/elevation processing types - NEW APPROACH
+        # First, try direct PNG file lookup in png_outputs folder
+        png_outputs_dir = f"output/{region_name}/lidar/png_outputs"
+        if os.path.exists(png_outputs_dir):
+            print(f"🔍 Looking for PNG files in: {png_outputs_dir}")
+            
+            # Map processing types to possible PNG filenames
+            filename_mapping = {
+                "tint_overlay": ["TintOverlay.png", "tint_overlay.png"],
+                "hillshade_rgb": ["HillshadeRGB.png", "hillshade_rgb.png"],
+                "lrm": ["LRM.png", "lrm.png"],
+                "sky_view_factor": ["SVF.png", "Sky_View_Factor.png", "sky_view_factor.png"],
+                "slope": ["Slope.png", "slope.png"],
+                "aspect": ["Aspect.png", "aspect.png"],
+                "chm": ["CHM.png", "Chm.png", "chm.png"],
+                "hillshade": ["Hillshade.png", "hillshade.png"],
+                "roughness": ["Roughness.png", "roughness.png"],
+                "color_relief": ["Color_Relief.png", "color_relief.png"],
+                "tpi": ["TPI.png", "tpi.png"],
+                "tri": ["TRI.png", "tri.png"]
+            }
+            
+            # Find the actual PNG file
+            png_file_path = None
+            possible_names = filename_mapping.get(processing_type, [f"{processing_type}.png", f"{processing_type.title()}.png"])
+            
+            for filename in possible_names:
+                full_path = os.path.join(png_outputs_dir, filename)
+                if os.path.exists(full_path):
+                    png_file_path = full_path
+                    print(f"✅ Found PNG file: {png_file_path}")
+                    break
+            
+            if png_file_path:
+                # Read bounds from metadata.txt
+                metadata_path = f"output/{region_name}/metadata.txt"
+                bounds = None
+                
+                if os.path.exists(metadata_path):
+                    try:
+                        with open(metadata_path, 'r') as f:
+                            content = f.read()
+                        
+                        # Extract bounds from metadata
+                        bounds_dict = {}
+                        for line in content.split('\n'):
+                            line = line.strip()
+                            if line.startswith('North Bound:'):
+                                bounds_dict['north'] = float(line.split(':')[1].strip())
+                            elif line.startswith('South Bound:'):
+                                bounds_dict['south'] = float(line.split(':')[1].strip())
+                            elif line.startswith('East Bound:'):
+                                bounds_dict['east'] = float(line.split(':')[1].strip())
+                            elif line.startswith('West Bound:'):
+                                bounds_dict['west'] = float(line.split(':')[1].strip())
+                        
+                        if all(k in bounds_dict for k in ['north', 'south', 'east', 'west']):
+                            bounds = bounds_dict
+                            print(f"✅ Found bounds in metadata: {bounds}")
+                    except Exception as e:
+                        print(f"⚠️ Error reading bounds from metadata: {e}")
+                
+                if bounds:
+                    # Read and encode PNG image
+                    try:
+                        with open(png_file_path, 'rb') as f:
+                            image_data = base64.b64encode(f.read()).decode('utf-8')
+                        
+                        result = {
+                            'success': True,
+                            'bounds': bounds,
+                            'image_data': image_data,
+                            'processing_type': processing_type,
+                            'region_name': region_name,
+                            'filename': os.path.basename(png_file_path),
+                            'is_optimized': False
+                        }
+                        
+                        print(f"✅ Successfully prepared PNG overlay data from png_outputs")
+                        return result
+                        
+                    except Exception as e:
+                        print(f"❌ Error reading PNG file: {e}")
+                else:
+                    print(f"❌ No bounds found in metadata for region {region_name}")
+        
+        # Fallback to original approach if PNG files not found in png_outputs
         # Map frontend processing types to backend processing types
         processing_type_mapping = {
             "lrm": "LRM",

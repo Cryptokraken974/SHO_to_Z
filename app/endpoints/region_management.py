@@ -724,3 +724,188 @@ Created: {data.get('created_at', 'Unknown')}
 # REGION METADATA API ENDPOINTS
 # ============================================================================
 
+@router.get("/api/regions/{region_name}/png-files")
+async def get_region_png_files(region_name: str):
+    """Get available PNG files for a specific region"""
+    try:
+        print(f"\n📸 API CALL: /api/regions/{region_name}/png-files")
+        
+        # Check both input and output directories for PNG files
+        png_files = []
+        base_dirs = ["input", "output"]
+        
+        for base_dir in base_dirs:
+            region_dir = Path(base_dir) / region_name
+            if not region_dir.exists():
+                continue
+                
+            print(f"🔍 Scanning {region_dir} for PNG files...")
+            
+            # Search for PNG files in various subdirectories
+            png_patterns = [
+                "**/*.png",
+                "**/png_outputs/*.png",
+                "**/lidar/**/*.png",
+                "**/sentinel2/**/*.png"
+            ]
+            
+            found_files = []
+            for pattern in png_patterns:
+                matches = list(region_dir.glob(pattern))
+                found_files.extend(matches)
+            
+            # Remove duplicates and process files
+            unique_files = list(set(found_files))
+            
+            for png_file in unique_files:
+                try:
+                    # Get relative path from region directory
+                    relative_path = png_file.relative_to(region_dir)
+                    file_size_mb = round(png_file.stat().st_size / (1024 * 1024), 2)
+                    
+                    # Try to determine processing type from file path
+                    processing_type = "unknown"
+                    display_name = png_file.stem
+                    
+                    # Extract processing type from path patterns
+                    path_parts = relative_path.parts
+                    if "png_outputs" in path_parts:
+                        # Pattern: lidar/png_outputs/filename_elevation_type.png
+                        filename = png_file.stem
+                        if "_elevation_" in filename:
+                            processing_type = filename.split("_elevation_")[-1]
+                            display_name = processing_type.replace("_", " ").title()
+                        elif filename.endswith("_hillshade"):
+                            processing_type = "hillshade"
+                            display_name = "Hillshade"
+                        elif filename.endswith("_slope"):
+                            processing_type = "slope"
+                            display_name = "Slope"
+                        elif filename.endswith("_aspect"):
+                            processing_type = "aspect"
+                            display_name = "Aspect"
+                        else:
+                            # Skip Sentinel-2 files in lidar/png_outputs (they should be processed separately)
+                            if "_sentinel2_" in filename:
+                                continue
+                            
+                            # Skip files that are clearly not LIDAR processing results
+                            skip_patterns = [
+                                "colorized_dem",     # Visualization files like colorized_dem.png
+                                "visualization",     # General visualization files
+                                "preview",          # Preview files
+                                "thumbnail",        # Thumbnail files
+                                "_raw",            # Raw unprocessed files
+                                "_temp",           # Temporary files
+                                "elevation_colorized" # Colorized elevation files
+                            ]
+                            
+                            if any(pattern in filename.lower() for pattern in skip_patterns):
+                                print(f"  ⏭️ Skipping visualization/non-processing file: {filename}")
+                                continue
+                                
+                            # Try to extract processing type from filename patterns
+                            # Pattern: regionname_processtype.png or regionname_date_processtype.png
+                            filename_parts = filename.split('_')
+                            if len(filename_parts) >= 2:
+                                # Take the last part as processing type
+                                last_part = filename_parts[-1].lower()
+                                type_mapping = {
+                                    'hillshade': 'hillshade',
+                                    'slope': 'slope', 
+                                    'aspect': 'aspect',
+                                    'chm': 'chm',
+                                    'dtm': 'dtm',
+                                    'dsm': 'dsm',
+                                    'lrm': 'lrm',
+                                    'tpi': 'tpi',
+                                    'tri': 'tri',
+                                    'roughness': 'roughness'
+                                }
+                                processing_type = type_mapping.get(last_part, None)
+                                if processing_type:
+                                    display_name = last_part.replace("_", " ").title()
+                                else:
+                                    # Skip files with unknown processing types
+                                    print(f"  ⏭️ Skipping file with unknown processing type: {filename} (last_part: {last_part})")
+                                    continue
+                            else:
+                                # Direct processing type names (e.g., TintOverlay.png, HillshadeRGB.png, LRM.png, SVF.png)
+                                direct_type_mapping = {
+                                    'tintoverlay': 'tint_overlay',
+                                    'hillshadergb': 'hillshade_rgb', 
+                                    'lrm': 'lrm',
+                                    'svf': 'sky_view_factor',
+                                    'slope': 'slope',
+                                    'aspect': 'aspect',
+                                    'chm': 'chm',
+                                    'dtm': 'dtm',
+                                    'dsm': 'dsm',
+                                    'roughness': 'roughness',
+                                    'tpi': 'tpi',
+                                    'tri': 'tri'
+                                }
+                                filename_lower = filename.lower()
+                                processing_type = direct_type_mapping.get(filename_lower, None)
+                                if processing_type:
+                                    display_name = filename.replace("_", " ").replace("RGB", " RGB").replace("SVF", "Sky View Factor")
+                                    print(f"  🔍 Direct mapping: {filename} -> {processing_type} ({display_name})")
+                                else:
+                                    # Skip files that don't match any known processing type
+                                    print(f"  ⏭️ Skipping file with unmapped processing type: {filename}")
+                                    continue
+                    elif "lidar" in path_parts:
+                        # Pattern: lidar/ProcessingType/filename.png
+                        for i, part in enumerate(path_parts):
+                            if part == "lidar" and i + 1 < len(path_parts):
+                                processing_type = path_parts[i + 1].lower()
+                                display_name = path_parts[i + 1]
+                                break
+                    elif "sentinel2" in path_parts:
+                        # Sentinel-2 files
+                        processing_type = "sentinel2"
+                        if "NDVI" in png_file.name:
+                            display_name = "NDVI"
+                        elif "RED_B04" in png_file.name:
+                            display_name = "Red Band"
+                        elif "NIR_B08" in png_file.name:
+                            display_name = "NIR Band"
+                        else:
+                            display_name = "Satellite Image"
+                    
+                    png_files.append({
+                        "file_path": str(png_file),
+                        "relative_path": str(relative_path),
+                        "file_name": png_file.name,
+                        "file_size_mb": file_size_mb,
+                        "processing_type": processing_type,
+                        "display_name": display_name,
+                        "source_dir": base_dir
+                    })
+                    
+                except Exception as e:
+                    print(f"⚠️ Error processing PNG file {png_file}: {e}")
+                    continue
+        
+        print(f"📸 Found {len(png_files)} PNG files for region {region_name}")
+        
+        # Sort by processing type and file name
+        png_files.sort(key=lambda x: (x["processing_type"], x["file_name"]))
+        
+        return {
+            "success": True,
+            "region_name": region_name,
+            "png_files": png_files,
+            "total_files": len(png_files)
+        }
+        
+    except Exception as e:
+        print(f"❌ Error getting PNG files for region {region_name}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to get PNG files: {str(e)}")
+
+# ============================================================================
+# REGION METADATA API ENDPOINTS  
+# ============================================================================
+
