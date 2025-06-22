@@ -530,17 +530,17 @@ class OpenAIAnalysis {
         try {
             console.log('🔄 Loading regions for OpenAI analysis...');
             
-            // Load regions directly using the input folder API call (matching "Select Region" button)
-            const data = await regions().listRegions('input');
+            // Load regions from OUTPUT folder where processed data and coordinate-based regions are stored
+            const data = await regions().listRegions('output');
             console.log('📊 API response:', data);
             
             this.availableRegions = (data.regions || []).map(r => r.name);
-            console.log('📋 Available regions:', this.availableRegions);
+            console.log('📋 Available regions from output folder:', this.availableRegions);
             
             this.renderRegionLists();
             this.updateSelectedRegionsInfo();
             
-            console.log('✅ Regions loaded successfully');
+            console.log('✅ Regions loaded successfully from output folder');
         } catch (err) {
             console.error('❌ Failed to load regions:', err);
             // Show error in UI if elements exist
