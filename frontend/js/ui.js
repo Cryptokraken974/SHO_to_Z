@@ -1349,6 +1349,79 @@ window.UIManager = {
   },
 
   /**
+   * Get display name for processing types
+   * @param {string} processingType - Processing type
+   * @returns {string} Display name
+   */
+  getProcessingDisplayName(processingType) {
+    const displayNames = {
+      'laz_to_dem': 'DEM',
+      'dtm': 'DTM',
+      'dsm': 'DSM',
+      'chm': 'CHM',
+      'hillshade': 'Hillshade',
+      'hillshade_315_45_08': 'Hillshade 315°',
+      'hillshade_225_45_08': 'Hillshade 225°',
+      'slope': 'Slope',
+      'aspect': 'Aspect',
+      'tpi': 'TPI',
+      'roughness': 'Roughness',
+      'sky_view_factor': 'Sky View Factor',
+      'ndvi': 'NDVI (Vegetation Index)',
+      'hs_red': 'Hillshade Red',
+      'hs_green': 'Hillshade Green',
+      'hs_blue': 'Hillshade Blue',
+      'color_relief': 'Color Relief',
+      'slope_relief': 'Slope Relief',
+      'lrm': 'Local Relief Model',
+      'hillshade_rgb': 'RGB Hillshade',
+      'tint_overlay': 'Tint Overlay',
+      'boosted_hillshade': 'Boosted Hillshade'
+    };
+    
+    return displayNames[processingType] || processingType.charAt(0).toUpperCase() + processingType.slice(1);
+  },
+
+  /**
+   * Add LIDAR raster overlay to map
+   * @param {string} regionName - Region name
+   * @param {string} processingType - Processing type
+   * @param {string} displayName - Display name for notifications
+   * @returns {Promise<boolean>} Success status
+   */
+  async addLidarRasterOverlayToMap(regionName, processingType, displayName) {
+    try {
+      // Use the overlays service to get the raster data
+      const data = await overlays().getRasterOverlayData(regionName, processingType);
+      
+      if (data && data.success && data.bounds && data.image_data) {
+        const bounds = [
+          [data.bounds.south, data.bounds.west], 
+          [data.bounds.north, data.bounds.east]
+        ];
+        const imageUrl = `data:image/png;base64,${data.image_data}`;
+        const overlayKey = `LIDAR_RASTER_${regionName}_${processingType}`;
+        
+        // Add overlay using OverlayManager
+        if (window.OverlayManager && window.OverlayManager.addImageOverlay) {
+          const success = window.OverlayManager.addImageOverlay(overlayKey, imageUrl, bounds);
+          if (success) {
+            Utils.showNotification(`Added ${displayName} overlay to map`, 'success');
+            return true;
+          }
+        }
+      }
+      
+      Utils.showNotification(`Failed to add ${displayName} overlay to map`, 'error');
+      return false;
+    } catch (error) {
+      Utils.log('error', `Failed to add LIDAR raster overlay: ${error}`);
+      Utils.showNotification(`Error adding ${displayName} overlay: ${error.message}`, 'error');
+      return false;
+    }
+  },
+
+  /**
    * Event listener for the reload raster gallery button
    */
   initializeReloadRasterButton() {
@@ -1736,6 +1809,7 @@ window.UIManager = {
     let regionName = $('#region-name-input').val();
 
     // Check if we have a selected region but no region name
+
     if (FileManager.selectedRegion && (!regionName || regionName.trim() === '')) {
       // Extract filename without extension from the selected region
       regionName = FileManager.selectedRegion.replace(/\.[^/.]+$/, '');
