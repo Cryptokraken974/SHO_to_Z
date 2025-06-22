@@ -144,6 +144,7 @@ from .endpoints.geotiff import router as geotiff_router
 from .endpoints.laz import router as laz_file_router
 from .endpoints.cache_management import router as cache_router
 from .endpoints.visual_lexicon import router as visual_lexicon_router
+from .endpoints.copernicus_dsm import router as copernicus_dsm_router
 from .endpoints import results # Import the new results router
 
 app.include_router(core_router)
@@ -161,6 +162,7 @@ app.include_router(geotiff_router)
 app.include_router(laz_file_router)
 app.include_router(cache_router)
 app.include_router(visual_lexicon_router)
+app.include_router(copernicus_dsm_router)
 app.include_router(prompts_router)
 app.include_router(openai_router)
 app.include_router(results.router) # Include the results router

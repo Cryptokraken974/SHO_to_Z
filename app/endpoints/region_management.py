@@ -705,14 +705,16 @@ Created: {data.get('created_at', 'Unknown')}
         print(f"   📁 Output folder: {output_folder}")
         print(f"   📄 Metadata file: {metadata_file}")
         
-        return JSONResponse(content={
+        response_content = {
             "success": True,
             "message": f"Region '{safe_region_name}' created successfully",
             "region_name": safe_region_name,
             "input_folder": str(input_folder),
             "output_folder": str(output_folder),
             "metadata_file": str(metadata_file)
-        })
+        }
+            
+        return JSONResponse(content=response_content)
         
     except Exception as e:
         print(f"❌ Error creating region: {str(e)}")
@@ -908,4 +910,149 @@ async def get_region_png_files(region_name: str):
 # ============================================================================
 # REGION METADATA API ENDPOINTS  
 # ============================================================================
+
+async def _auto_download_dsm_for_region(region_name: str, lat: float, lng: float) -> Dict:
+    """
+    Automatically download Copernicus DSM data for a coordinate-based region
+    
+    Args:
+        region_name: Name of the region
+        lat: Latitude of the center point
+        lng: Longitude of the center point
+        
+    Returns:
+        Dictionary with download results
+    """
+    try:
+        from ..services.copernicus_dsm_service import copernicus_dsm_service
+        
+        print(f"🌍 Auto-downloading DSM data for region: {region_name}")
+        print(f"📍 Coordinates: ({lat}, {lng})")
+        
+        # Download DSM with default settings (5km buffer, 30m resolution)
+        result = await copernicus_dsm_service.get_dsm_for_region(
+            lat=lat,
+            lng=lng,
+            region_name=region_name,
+            buffer_km=5.0,
+            resolution="30m"
+        )
+        
+        if result.get('success'):
+            print(f"✅ Successfully auto-downloaded DSM for region: {region_name}")
+            print(f"📁 DSM file saved to: {result.get('file_path')}")
+            return {
+                "success": True,
+                "dsm_downloaded": True,
+                "dsm_file": result.get('file_path'),
+                "method": result.get('method', 'unknown')
+            }
+        else:
+            print(f"⚠️ Failed to auto-download DSM for region: {region_name}")
+            print(f"🔍 Error: {result.get('error')}")
+            return {
+                "success": True,  # Don't fail region creation if DSM download fails
+                "dsm_downloaded": False,
+                "error": result.get('error')
+            }
+            
+    except Exception as e:
+        print(f"❌ Error in auto DSM download for region {region_name}: {str(e)}")
+        return {
+            "success": True,  # Don't fail region creation if DSM download fails
+            "dsm_downloaded": False,
+            "error": str(e)
+        }
+
+@router.post("/api/regions/{region_name}/download-dsm")
+async def download_dsm_for_region(region_name: str, data: dict = None):
+    """
+    Download Copernicus DSM data for an existing region
+    
+    Args:
+        region_name: Name of the region
+        data: Optional parameters including buffer_km and resolution
+    """
+    try:
+        print(f"\n🌍 API CALL: POST /api/regions/{region_name}/download-dsm")
+        
+        # Check if region exists and has coordinates
+        metadata_data = _read_coordinates_from_metadata(region_name)
+        if not metadata_data:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Region '{region_name}' not found or has no coordinate information"
+            )
+        
+        # Extract coordinates
+        if len(metadata_data) >= 2:
+            lat, lng = metadata_data[0], metadata_data[1]
+        else:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Region '{region_name}' does not have valid coordinates"
+            )
+        
+        # Get optional parameters
+        buffer_km = 5.0
+        resolution = "30m"
+        
+        if data:
+            buffer_km = data.get('buffer_km', 5.0)
+            resolution = data.get('resolution', '30m')
+            
+            # Validate parameters
+            if not (0.1 <= buffer_km <= 50.0):
+                raise HTTPException(status_code=400, detail="buffer_km must be between 0.1 and 50.0")
+            
+            if resolution not in ['30m', '90m']:
+                raise HTTPException(status_code=400, detail="resolution must be '30m' or '90m'")
+        
+        print(f"📍 Region coordinates: ({lat}, {lng})")
+        print(f"📏 Buffer: {buffer_km} km")
+        print(f"🔍 Resolution: {resolution}")
+        
+        # Import the service
+        from ..services.copernicus_dsm_service import copernicus_dsm_service
+        
+        # Download DSM data
+        result = await copernicus_dsm_service.get_dsm_for_region(
+            lat=lat,
+            lng=lng,
+            region_name=region_name,
+            buffer_km=buffer_km,
+            resolution=resolution
+        )
+        
+        if result.get('success'):
+            print(f"✅ Successfully downloaded DSM for region: {region_name}")
+            
+            return JSONResponse(content={
+                "success": True,
+                "message": f"Copernicus DSM downloaded successfully for region '{region_name}'",
+                "region_name": region_name,
+                "dsm_file": result.get('file_path'),
+                "method": result.get('method'),
+                "tiles_downloaded": result.get('tiles_downloaded'),
+                "metadata": result.get('metadata'),
+                "parameters": {
+                    "buffer_km": buffer_km,
+                    "resolution": resolution,
+                    "coordinates": {"lat": lat, "lng": lng}
+                }
+            })
+        else:
+            print(f"❌ Failed to download DSM for region: {region_name}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to download DSM: {result.get('error', 'Unknown error')}"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error downloading DSM for region {region_name}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
