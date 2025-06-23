@@ -344,8 +344,15 @@ window.ResultsManager = {
             // The anomaly data is now stored directly in the response
             const anomalyData = data;
             
-            // Pass the log file name to the dashboard for image loading
-            window.AnomaliesDashboard.render(containerElement, anomalyData, logFile);
+            // Extract the analysis folder name from the logFile
+            // Remove the '_response.json' suffix to get the actual folder name
+            let analysisFolder = logFile;
+            if (logFile && logFile.endsWith('_response.json')) {
+                analysisFolder = logFile.replace('_response.json', '');
+            }
+            
+            // Pass the corrected analysis folder name to the dashboard for image loading
+            window.AnomaliesDashboard.render(containerElement, anomalyData, analysisFolder);
             
             // Apply current filters after rendering
             setTimeout(() => {

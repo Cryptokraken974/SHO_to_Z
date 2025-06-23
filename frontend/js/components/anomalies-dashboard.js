@@ -29,6 +29,7 @@ window.AnomaliesDashboard = {
             <div id="anomaliesDashboard" class="anomalies-dashboard">
                 <header class="anomalies-header">
                     <h1 class="anomalies-title">Anomaly Analysis Report</h1>
+                    <button id="anomalies-export-btn" class="anomalies-export-btn">Export</button>
                 </header>
                 
                 <section id="analysisSummary" class="analysis-summary-section">
@@ -256,427 +257,970 @@ window.AnomaliesDashboard = {
 
         // Set up navigation event listeners
         this.setupGalleryNavigation();
+        
+        // Set up export button event listener
+        this.setupExportButton();
     },
 
-    async initializeImageGallery(anomalyIndex, anomaly) {
-        const canvas = document.getElementById(`canvas-${anomalyIndex}`);
-        const ctx = canvas.getContext('2d');
+    /**
+     * Set up export button functionality
+     */
+    setupExportButton() {
+        const exportBtn = document.getElementById('anomalies-export-btn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => {
+                this.exportReport();
+            });
+        }
+    },
+
+    /**
+     * Export the anomaly analysis as a comprehensive HTML report
+     */
+    async exportReport() {
+        try {
+            if (!this.originalAnomaliesData) {
+                window.Utils?.showNotification('No data available to export', 'warning');
+                return;
+            }
+
+            // Extract metadata from current analysis folder
+            const metadata = await this.extractAnalysisMetadata();
+            
+            // Generate the HTML report
+            const htmlContent = this.generateHTMLReport(this.originalAnomaliesData, metadata);
+            
+            // Save the report to llm/reports folder
+            const reportFileName = this.generateReportFileName(metadata);
+            
+            // Send to backend to save the file
+            const response = await fetch('/api/anomalies/export-report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    htmlContent: htmlContent,
+                    fileName: reportFileName,
+                    metadata: metadata
+                })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                window.Utils?.showNotification(
+                    `Report exported successfully: ${reportFileName}`, 
+                    'success'
+                );
+                
+                // Optionally open the report in a new tab
+                this.showReportPreview(htmlContent);
+            } else {
+                throw new Error(`Export failed: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('Export error:', error);
+            window.Utils?.showNotification(`Export failed: ${error.message}`, 'error');
+        }
+    },
+
+    /**
+     * Extract metadata from the current analysis folder
+     */
+    async extractAnalysisMetadata() {
+        const metadata = {
+            regionName: 'Unknown Region',
+            coordinates: null,
+            sentDate: new Date().toISOString(),
+            sentPrompt: 'Analysis prompt not available',
+            uid: this.generateUID(),
+            images: []
+        };
+
+        // Try to extract from current analysis folder name
+        if (this.currentAnalysisFolder) {
+            // Parse folder name format: REGION_MODEL_YYYYMMDD_HHMMSS_UID
+            const parts = this.currentAnalysisFolder.split('_');
+            if (parts.length >= 4) {
+                metadata.regionName = parts[0];
+                metadata.uid = parts[parts.length - 1];
+                
+                // Parse date from folder name
+                const datePart = parts[parts.length - 3];
+                const timePart = parts[parts.length - 2];
+                if (datePart && timePart) {
+                    const dateStr = `${datePart.substring(0, 4)}-${datePart.substring(4, 6)}-${datePart.substring(6, 8)}`;
+                    const timeStr = `${timePart.substring(0, 2)}:${timePart.substring(2, 4)}:${timePart.substring(4, 6)}`;
+                    metadata.sentDate = `${dateStr}T${timeStr}`;
+                }
+            }
+            
+            // Try to load request log for more details
+            try {
+                const logResponse = await fetch(`/llm/logs/${this.currentAnalysisFolder}/request_log.json`);
+                if (logResponse.ok) {
+                    const logData = await logResponse.json();
+                    metadata.coordinates = logData.coordinates;
+                    metadata.sentPrompt = logData.prompt || metadata.sentPrompt;
+                    metadata.images = logData.images || [];
+                }
+            } catch (error) {
+                console.warn('Could not load request log:', error);
+            }
+        }
+
+        return metadata;
+    },
+
+    /**
+     * Generate unique ID for report
+     */
+    generateUID() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    },
+
+    /**
+     * Generate report file name
+     */
+    generateReportFileName(metadata) {
+        const regionName = metadata.regionName.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const dateStr = new Date(metadata.sentDate).toISOString().split('T')[0].replace(/-/g, '');
+        return `${regionName}_${dateStr}_${metadata.uid}_anomaly_report.html`;
+    },
+
+    /**
+     * Generate comprehensive HTML report
+     */
+    generateHTMLReport(anomalyData, metadata) {
+        const reportDate = new Date().toLocaleDateString();
+        const sentDate = new Date(metadata.sentDate).toLocaleDateString();
         
-        // Get available images for the analysis
-        const images = await this.getAnalysisImages();
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anomaly Analysis Report - ${metadata.regionName}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
         
-        if (images.length === 0) {
-            canvas.width = 400;
-            canvas.height = 200;
-            ctx.fillStyle = '#374151';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#9CA3AF';
-            ctx.font = '16px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('No images available', canvas.width / 2, canvas.height / 2);
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            margin: 0 0 10px 0;
+            font-size: 2.5em;
+            font-weight: 700;
+        }
+        
+        .header .subtitle {
+            color: #7f8c8d;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+        }
+        
+        .metadata {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .metadata-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .metadata-label {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .metadata-value {
+            margin-top: 5px;
+            font-size: 1.1em;
+            color: #34495e;
+        }
+        
+        .section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        }
+        
+        .section h2 {
+            color: #2c3e50;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .summary-card {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+        
+        .summary-number {
+            font-size: 3em;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .summary-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .images-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .image-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .image-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .image-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .image-info {
+            padding: 15px;
+        }
+        
+        .image-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .image-description {
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        
+        .anomaly-card {
+            background: #fff;
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+            border-left: 5px solid #e74c3c;
+        }
+        
+        .anomaly-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .anomaly-title {
+            color: #e74c3c;
+            font-size: 1.3em;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .confidence-badge {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        
+        .anomaly-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+        }
+        
+        .detail-section h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        
+        .evidence-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .evidence-item {
+            background: #f8f9fa;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border-left: 3px solid #3498db;
+        }
+        
+        .evidence-label {
+            font-weight: 600;
+            color: #2c3e50;
+            text-transform: uppercase;
+            font-size: 0.8em;
+        }
+        
+        .coordinates-display {
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .prompt-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #9b59b6;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: white;
+            opacity: 0.8;
+        }
+        
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .header { padding: 20px; }
+            .section { padding: 20px; }
+            .anomaly-details { grid-template-columns: 1fr; }
+            .header h1 { font-size: 2em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🔍 Anomaly Analysis Report</h1>
+            <p class="subtitle">AI-Powered Archaeological Feature Detection</p>
+            
+            <div class="metadata">
+                <div class="metadata-item">
+                    <div class="metadata-label">Region</div>
+                    <div class="metadata-value">${metadata.regionName}</div>
+                </div>
+                <div class="metadata-item">
+                    <div class="metadata-label">Analysis Date</div>
+                    <div class="metadata-value">${sentDate}</div>
+                </div>
+                <div class="metadata-item">
+                    <div class="metadata-label">Report ID</div>
+                    <div class="metadata-value">${metadata.uid}</div>
+                </div>
+                <div class="metadata-item">
+                    <div class="metadata-label">Generated</div>
+                    <div class="metadata-value">${reportDate}</div>
+                </div>
+            </div>
+            
+            ${metadata.coordinates ? `
+            <div class="coordinates-display">
+                <strong>📍 Coordinates:</strong> 
+                Lat: ${metadata.coordinates.lat?.toFixed(6) || 'N/A'}, 
+                Lng: ${metadata.coordinates.lng?.toFixed(6) || 'N/A'}
+            </div>
+            ` : ''}
+        </header>
+
+        <section class="section">
+            <h2>📊 Analysis Summary</h2>
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="summary-number">${anomalyData.analysis_summary?.number_of_anomalies || 0}</div>
+                    <div class="summary-label">Anomalies Detected</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-number">${metadata.images?.length || 0}</div>
+                    <div class="summary-label">Images Analyzed</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-number">${anomalyData.analysis_summary?.anomalies_detected ? 'YES' : 'NO'}</div>
+                    <div class="summary-label">Features Found</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>🖼️ Source Images</h2>
+            <div class="images-grid">
+                ${metadata.images?.map(img => `
+                <div class="image-card">
+                    <img src="/${img.path}" alt="${img.name}" onerror="this.style.display='none'">
+                    <div class="image-info">
+                        <div class="image-title">${img.name.toUpperCase()}</div>
+                        <div class="image-description">${this.getImageDescription(img.name)}</div>
+                    </div>
+                </div>
+                `).join('') || '<p>No images available</p>'}
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>🚨 Identified Anomalies</h2>
+            ${anomalyData.identified_anomalies?.map((anomaly, index) => `
+            <div class="anomaly-card">
+                <div class="anomaly-header">
+                    <h3 class="anomaly-title">${anomaly.anomaly_id || `Anomaly ${index + 1}`}</h3>
+                    <div class="confidence-badge">
+                        ${((anomaly.confidence?.global_score || 0) * 100).toFixed(0)}% Confidence
+                    </div>
+                </div>
+                
+                <div class="anomaly-details">
+                    <div class="detail-section">
+                        <h4>Classification</h4>
+                        <p><strong>Type:</strong> ${anomaly.classification?.type || 'Unknown'}</p>
+                        <p><strong>Subtype:</strong> ${anomaly.classification?.subtype || 'N/A'}</p>
+                        
+                        <h4>Confidence Scores</h4>
+                        ${Object.entries(anomaly.confidence?.individual_scores || {}).map(([key, value]) => `
+                        <div class="evidence-item">
+                            <div class="evidence-label">${key.toUpperCase()}</div>
+                            <div>${(value * 100).toFixed(0)}%</div>
+                        </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h4>Evidence per Image</h4>
+                        <ul class="evidence-list">
+                            ${Object.entries(anomaly.evidence_per_image || {}).map(([key, value]) => `
+                            <li class="evidence-item">
+                                <div class="evidence-label">${key.toUpperCase()}</div>
+                                <div>${value}</div>
+                            </li>
+                            `).join('')}
+                        </ul>
+                        
+                        <h4>Archaeological Interpretation</h4>
+                        <p>${anomaly.archaeological_interpretation || 'No interpretation provided'}</p>
+                    </div>
+                </div>
+            </div>
+            `).join('') || '<p>No anomalies identified in this analysis.</p>'}
+        </section>
+
+        <section class="section">
+            <h2>📝 Analysis Prompt</h2>
+            <div class="prompt-section">${metadata.sentPrompt}</div>
+        </section>
+    </div>
+
+    <footer class="footer">
+        <p>Generated by SHO_to_Z Anomaly Detection System | ${reportDate}</p>
+        <p>Report ID: ${metadata.uid} | Region: ${metadata.regionName}</p>
+    </footer>
+</body>
+</html>`;
+},
+
+/**
+ * Get description for image type
+ */
+getImageDescription(imageName) {
+    const descriptions = {
+        'hillshadergb': 'RGB Hillshade visualization showing terrain relief',
+        'hillshade': 'Terrain relief visualization',
+        'slope': 'Slope analysis showing gradient steepness',
+        'aspect': 'Aspect analysis showing slope direction',
+        'chm': 'Canopy Height Model showing vegetation heights',
+        'lrm': 'Local Relief Model highlighting topographic features',
+        'svf': 'Sky View Factor indicating terrain openness',
+        'tintoverlay': 'Enhanced terrain visualization with color overlay',
+        'ndvi': 'Vegetation index from satellite imagery',
+        'dtm': 'Digital Terrain Model showing ground elevation',
+        'dsm': 'Digital Surface Model including all features'
+    };
+    
+    const key = imageName.toLowerCase().replace(/[^a-z]/g, '');
+    return descriptions[key] || 'Geospatial analysis layer';
+},
+
+/**
+ * Show report preview in a new window
+ */
+showReportPreview(htmlContent) {
+    const previewWindow = window.open('', '_blank');
+    previewWindow.document.write(htmlContent);
+    previewWindow.document.close();
+},
+
+    /**
+     * Initialize image gallery for an individual anomaly
+     * @param {number} anomalyIndex - Index of the anomaly
+     * @param {Object} anomaly - The anomaly data
+     */
+    initializeImageGallery(anomalyIndex, anomaly) {
+        // Store the anomaly data for this gallery
+        this.galleryAnomalies = this.galleryAnomalies || {};
+        this.galleryAnomalies[anomalyIndex] = anomaly;
+        
+        // Get list of available images from the analysis folder
+        this.loadImagesForGallery(anomalyIndex);
+    },
+
+    /**
+     * Load images for the gallery from the sent_images folder
+     * @param {number} anomalyIndex - Index of the anomaly
+     */
+    async loadImagesForGallery(anomalyIndex) {
+        if (!this.currentAnalysisFolder) {
+            console.warn('No current analysis folder set for loading images');
             return;
         }
 
-        // Store gallery data
-        if (!this.galleries) this.galleries = {};
-        this.galleries[anomalyIndex] = {
-            images: images,
-            currentIndex: 0,
-            anomaly: anomaly,
-            canvas: canvas,
-            ctx: ctx
-        };
-
-        // Load first image
-        this.loadGalleryImage(anomalyIndex, 0);
-        this.updateGalleryCounter(anomalyIndex);
-    },
-
-    async getAnalysisImages() {
-        // If we don't have the analysis folder, we can't get the images
-        if (!this.currentAnalysisFolder) {
-            console.warn('No analysis folder specified, cannot load images');
-            return [];
-        }
-
-        // Extract the base folder name without _response.json suffix
-        const folderName = this.currentAnalysisFolder.replace('_response.json', '');
+        const canvas = document.getElementById(`canvas-${anomalyIndex}`);
+        const counter = document.getElementById(`counter-${anomalyIndex}`);
+        const info = document.getElementById(`info-${anomalyIndex}`);
         
-        // Define the expected image types and their paths in the sent_images folder
-        const imageTypes = [
-            { type: 'CHM', filename: 'CHM.png', name: 'Canopy Height Model' },
-            { type: 'LRM', filename: 'LRM.png', name: 'Local Relief Model' },
-            { type: 'SVF', filename: 'SVF.png', name: 'Sky View Factor' },
-            { type: 'Slope', filename: 'Slope.png', name: 'Slope' },
-            { type: 'HillshadeRGB', filename: 'HillshadeRGB.png', name: 'RGB Hillshade' },
-            { type: 'TintOverlay', filename: 'TintOverlay.png', name: 'Tint Overlay' }
-        ];
-
-        // Check for NDVI with dynamic naming pattern
-        // Extract region name: OR_WizardIsland_gpt4visionpreview_... -> OR_WizardIsland
-        const regionMatch = folderName.match(/^([^_]+_[^_]+)/);
-        if (regionMatch) {
-            const regionName = regionMatch[1];
-            imageTypes.push({
-                type: 'NDVI', 
-                filename: `${regionName}_20250531_sentinel2_NDVI.png`, 
-                name: 'NDVI'
-            });
+        if (!canvas || !counter || !info) {
+            console.warn(`Gallery elements not found for anomaly ${anomalyIndex}`);
+            return;
         }
-
-        // Build paths to the sent_images folder
-        const availableImages = [];
-        for (const imageType of imageTypes) {
-            const imagePath = `/llm/logs/${folderName}/sent_images/${imageType.filename}`;
-            
-            try {
-                // Test if image loads
-                const img = new Image();
-                await new Promise((resolve, reject) => {
-                    img.onload = resolve;
-                    img.onerror = reject;
-                    img.src = imagePath;
-                });
-                
-                availableImages.push({
-                    type: imageType.type,
-                    path: imagePath,
-                    name: imageType.name
-                });
-                
-            } catch (error) {
-                console.log(`Image not available: ${imagePath}`);
-            }
-        }
-
-        console.log(`Found ${availableImages.length} available images for analysis: ${folderName}`);
-        return availableImages;
-    },
-
-    async loadGalleryImage(anomalyIndex, imageIndex) {
-        const gallery = this.galleries[anomalyIndex];
-        if (!gallery || !gallery.images[imageIndex]) return;
-
-        const imageInfo = gallery.images[imageIndex];
-        const canvas = gallery.canvas;
-        const ctx = gallery.ctx;
 
         try {
-            const img = new Image();
-            img.crossOrigin = 'anonymous'; // Handle CORS if needed
-            
-            await new Promise((resolve, reject) => {
-                img.onload = () => {
-                    // Set canvas size to match image (max width 600px for display)
-                    const maxDisplayWidth = 600;
-                    canvas.width = Math.min(img.width, maxDisplayWidth);
-                    canvas.height = (canvas.width / img.width) * img.height;
-                    
-                    // Store scaling factors in the gallery object
-                    gallery.scaleX = canvas.width / img.width;
-                    gallery.scaleY = canvas.height / img.height;
-                    gallery.originalWidth = img.width;
-                    gallery.originalHeight = img.height;
-                    
-                    // Debug logging
-                    console.log(`Image loaded: ${imageInfo.name}`);
-                    console.log(`Original size: ${img.width}x${img.height}`);
-                    console.log(`Canvas size: ${canvas.width}x${canvas.height}`);
-                    console.log(`Scale factors: scaleX=${gallery.scaleX.toFixed(3)}, scaleY=${gallery.scaleY.toFixed(3)}`);
-                    
-                    // Draw the image
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    
-                    // Draw bounding boxes
-                    this.drawBoundingBoxes(ctx, gallery.anomaly, gallery.scaleX, gallery.scaleY);
-                    
-                    // Optional: Draw debug markers (uncomment to enable)
-                    // this.drawDebugMarkers(ctx, gallery.scaleX, gallery.scaleY, img.width, img.height);
-                    
-                    resolve();
-                };
-                img.onerror = reject;
-                img.src = imageInfo.path;
-            });
+            // Define the standard image types that should be in sent_images folder
+            const standardImageTypes = [
+                'CHM.png',
+                'HillshadeRGB.png', 
+                'LRM.png',
+                'Slope.png',
+                'SVF.png',
+                'TintOverlay.png'
+            ];
 
-            // Set up mouse tracking for this canvas
-            this.setupMouseTracking(anomalyIndex);
+            // Create image objects for each standard image type
+            const images = standardImageTypes.map(filename => ({
+                name: filename.replace('.png', ''), // Remove .png extension for display
+                path: `llm/logs/${this.currentAnalysisFolder}/sent_images/${filename}`,
+                url: `/llm/logs/${this.currentAnalysisFolder}/sent_images/${filename}`
+            }));
 
-            // Update image info
-            const infoElement = document.getElementById(`info-${anomalyIndex}`);
-            if (infoElement) {
-                infoElement.querySelector('.image-type').textContent = imageInfo.name;
+            if (images.length === 0) {
+                this.showNoImagesMessage(canvas, info);
+                return;
             }
 
-        } catch (error) {
-            console.error('Failed to load image:', imageInfo.path, error);
+            // Store images data for this gallery
+            this.galleryImages = this.galleryImages || {};
+            this.galleryImages[anomalyIndex] = images;
+            this.currentImageIndex = this.currentImageIndex || {};
+            this.currentImageIndex[anomalyIndex] = 0;
+
+            // Update counter
+            counter.textContent = `1 / ${images.length}`;
+
+            // Load and display the first image
+            await this.displayImageInGallery(anomalyIndex, 0);
             
-            // Draw error state
-            canvas.width = 400;
-            canvas.height = 200;
-            ctx.fillStyle = '#374151';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#EF4444';
-            ctx.font = '16px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('Failed to load image', canvas.width / 2, canvas.height / 2);
+        } catch (error) {
+            console.error('Error loading images for gallery:', error);
+            this.showErrorMessage(canvas, info, 'Failed to load images');
         }
     },
 
-    drawBoundingBoxes(ctx, anomaly, scaleX, scaleY) {
-        if (!anomaly.bounding_box_pixels || anomaly.bounding_box_pixels.length === 0) return;
+    /**
+     * Display a specific image in the gallery
+     * @param {number} anomalyIndex - Index of the anomaly
+     * @param {number} imageIndex - Index of the image to display
+     */
+    async displayImageInGallery(anomalyIndex, imageIndex) {
+        const canvas = document.getElementById(`canvas-${anomalyIndex}`);
+        const info = document.getElementById(`info-${anomalyIndex}`);
+        const counter = document.getElementById(`counter-${anomalyIndex}`);
 
-        console.log(`Drawing bounding boxes for ${anomaly.anomaly_id}:`);
-        console.log(`Scale factors: scaleX=${scaleX.toFixed(3)}, scaleY=${scaleY.toFixed(3)}`);
+        if (!this.galleryImages || !this.galleryImages[anomalyIndex]) {
+            return;
+        }
 
-        // Set bounding box style
-        ctx.strokeStyle = '#FFFFFF'; // White color
+        const images = this.galleryImages[anomalyIndex];
+        const image = images[imageIndex];
+
+        if (!image) {
+            return;
+        }
+
+        try {
+            // Construct the image path
+            const imagePath = `/${image.path}`;
+            
+            // Create and load the image
+            const img = new Image();
+            img.onload = () => {
+                // Set canvas size to match image aspect ratio
+                const maxWidth = canvas.parentElement.clientWidth - 20;
+                const maxHeight = 400;
+                
+                let width = img.width;
+                let height = img.height;
+                
+                // Scale down if too large
+                if (width > maxWidth) {
+                    height = (height * maxWidth) / width;
+                    width = maxWidth;
+                }
+                if (height > maxHeight) {
+                    width = (width * maxHeight) / height;
+                    height = maxHeight;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                
+                // Draw the image on canvas
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // Draw bounding boxes if available
+                this.drawBoundingBoxes(ctx, anomalyIndex, width, height, img.width, img.height);
+                
+                // Update info display
+                const imageType = info.querySelector('.image-type');
+                if (imageType) {
+                    imageType.textContent = this.getImageDescription(image.name);
+                }
+                
+                // Update counter
+                if (counter) {
+                    counter.textContent = `${imageIndex + 1} / ${images.length}`;
+                }
+                
+                // Set up mouse tracking
+                this.setupMouseTracking(canvas, anomalyIndex, img.width, img.height);
+            };
+            
+            img.onerror = () => {
+                this.showErrorMessage(canvas, info, `Failed to load image: ${image.name}`);
+            };
+            
+            img.src = imagePath;
+            
+        } catch (error) {
+            console.error('Error displaying image:', error);
+            this.showErrorMessage(canvas, info, 'Error displaying image');
+        }
+    },
+
+    /**
+     * Draw bounding boxes on the canvas for detected anomalies
+     * @param {CanvasRenderingContext2D} ctx - The canvas rendering context
+     * @param {number} anomalyIndex - Index of the anomaly
+     * @param {number} canvasWidth - Canvas width (scaled)
+     * @param {number} canvasHeight - Canvas height (scaled)
+     * @param {number} originalWidth - Original image width
+     * @param {number} originalHeight - Original image height
+     */
+    drawBoundingBoxes(ctx, anomalyIndex, canvasWidth, canvasHeight, originalWidth, originalHeight) {
+        // Get the anomaly data for this gallery
+        if (!this.galleryAnomalies || !this.galleryAnomalies[anomalyIndex]) {
+            return;
+        }
+
+        const anomaly = this.galleryAnomalies[anomalyIndex];
+        
+        // Check if bounding box data exists
+        if (!anomaly.bounding_box_pixels || anomaly.bounding_box_pixels.length === 0) {
+            return;
+        }
+
+        // Calculate scale factors from original image to canvas
+        const scaleX = canvasWidth / originalWidth;
+        const scaleY = canvasHeight / originalHeight;
+
+        // Set up drawing style for bounding boxes
+        ctx.strokeStyle = '#ffffff'; // White color for visibility
         ctx.lineWidth = 2;
-        ctx.setLineDash([]); // Continuous line (no dashes)
-
+        ctx.setLineDash([]); // Solid line
+        
+        // Draw each bounding box
         anomaly.bounding_box_pixels.forEach((bbox, index) => {
+            // Scale bounding box coordinates to canvas size
             const x = bbox.x_min * scaleX;
             const y = bbox.y_min * scaleY;
             const width = (bbox.x_max - bbox.x_min) * scaleX;
             const height = (bbox.y_max - bbox.y_min) * scaleY;
-
-            console.log(`  Bbox ${index + 1}:`);
-            console.log(`    Original: x_min=${bbox.x_min}, y_min=${bbox.y_min}, x_max=${bbox.x_max}, y_max=${bbox.y_max}`);
-            console.log(`    Scaled: x=${x.toFixed(1)}, y=${y.toFixed(1)}, width=${width.toFixed(1)}, height=${height.toFixed(1)}`);
-
-            // Draw bounding box
+            
+            // Draw the bounding box rectangle
             ctx.strokeRect(x, y, width, height);
-
-            // Draw corner markers for precise coordinate verification
-            ctx.fillStyle = '#00FF00'; // Bright green for corners
-            const cornerSize = 3;
             
-            // Top-left corner (x_min, y_min)
-            ctx.fillRect(x - cornerSize/2, y - cornerSize/2, cornerSize, cornerSize);
-            
-            // Top-right corner (x_max, y_min) 
-            ctx.fillRect(x + width - cornerSize/2, y - cornerSize/2, cornerSize, cornerSize);
-            
-            // Bottom-left corner (x_min, y_max)
-            ctx.fillRect(x - cornerSize/2, y + height - cornerSize/2, cornerSize, cornerSize);
-            
-            // Bottom-right corner (x_max, y_max)
-            ctx.fillRect(x + width - cornerSize/2, y + height - cornerSize/2, cornerSize, cornerSize);
-
-            // Draw label background
-            const label = anomaly.anomaly_id;
+            // Add a label for the bounding box
+            ctx.fillStyle = '#ffffff';
             ctx.font = '12px Arial';
-            const labelWidth = ctx.measureText(label).width;
-            
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(x, y - 20, labelWidth + 8, 16);
-            
-            // Draw label text
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillText(label, x + 4, y - 8);
-        });
-
-        // Reset line dash
-        ctx.setLineDash([]);
-    },
-
-    // Debug method to verify coordinate system
-    drawDebugMarkers(ctx, scaleX, scaleY, originalWidth, originalHeight) {
-        ctx.fillStyle = '#FF00FF'; // Magenta for debug markers
-        const markerSize = 5;
-        
-        // Draw markers at known positions with labels
-        const debugPoints = [
-            { x: 0, y: 0, label: '(0,0)' },
-            { x: 100, y: 100, label: '(100,100)' },
-            { x: originalWidth - 1, y: 0, label: `(${originalWidth-1},0)` },
-            { x: 0, y: originalHeight - 1, label: `(0,${originalHeight-1})` },
-            { x: originalWidth - 1, y: originalHeight - 1, label: `(${originalWidth-1},${originalHeight-1})` }
-        ];
-        
-        debugPoints.forEach(point => {
-            const scaledX = point.x * scaleX;
-            const scaledY = point.y * scaleY;
-            
-            // Draw marker
-            ctx.fillRect(scaledX - markerSize/2, scaledY - markerSize/2, markerSize, markerSize);
-            
-            // Draw label
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = '10px Arial';
-            ctx.fillText(point.label, scaledX + 5, scaledY - 5);
-            ctx.fillStyle = '#FF00FF';
+            ctx.fillText(`Anomaly ${index + 1}`, x + 2, y - 4);
         });
     },
 
-    setupMouseTracking(anomalyIndex) {
-        const gallery = this.galleries[anomalyIndex];
-        if (!gallery) return;
+    /**
+     * Setup mouse tracking for coordinate display
+     * @param {HTMLCanvasElement} canvas - The canvas element
+     * @param {number} anomalyIndex - Index of the anomaly
+     * @param {number} originalWidth - Original image width
+     * @param {number} originalHeight - Original image height
+     */
+    setupMouseTracking(canvas, anomalyIndex, originalWidth, originalHeight) {
+        const coords = document.getElementById(`coords-${anomalyIndex}`);
+        if (!coords) return;
 
-        const canvas = gallery.canvas;
-        const coordsElement = document.getElementById(`coords-${anomalyIndex}`);
-        
-        if (!coordsElement) return;
-
-        // Remove existing mouse listeners to avoid duplicates
-        canvas.removeEventListener('mousemove', gallery.mouseMoveHandler);
-        canvas.removeEventListener('mouseleave', gallery.mouseLeaveHandler);
-
-        // Create mouse move handler
-        gallery.mouseMoveHandler = (event) => {
+        const handleMouseMove = (e) => {
             const rect = canvas.getBoundingClientRect();
-            const canvasX = event.clientX - rect.left;
-            const canvasY = event.clientY - rect.top;
+            const canvasX = e.clientX - rect.left;
+            const canvasY = e.clientY - rect.top;
             
             // Convert canvas coordinates to original image coordinates
-            const originalX = Math.round(canvasX / gallery.scaleX);
-            const originalY = Math.round(canvasY / gallery.scaleY);
+            const scaleX = originalWidth / canvas.width;
+            const scaleY = originalHeight / canvas.height;
+            const originalX = Math.round(canvasX * scaleX);
+            const originalY = Math.round(canvasY * scaleY);
             
-            // Update coordinates display in JSON format
-            coordsElement.textContent = `Canvas: (${Math.round(canvasX)}, ${Math.round(canvasY)}) | Original: {"x": ${originalX}, "y": ${originalY}}`;
+            coords.textContent = `Canvas: (${Math.round(canvasX)}, ${Math.round(canvasY)}) | Original: (${originalX}, ${originalY})`;
         };
 
-        // Create mouse leave handler
-        gallery.mouseLeaveHandler = () => {
-            coordsElement.textContent = `Canvas: (0, 0) | Original: {"x": 0, "y": 0}`;
+        const handleMouseLeave = () => {
+            coords.textContent = 'Canvas: (0, 0) | Original: (0, 0)';
         };
 
-        // Add event listeners
-        canvas.addEventListener('mousemove', gallery.mouseMoveHandler);
-        canvas.addEventListener('mouseleave', gallery.mouseLeaveHandler);
+        // Remove existing listeners
+        canvas.removeEventListener('mousemove', handleMouseMove);
+        canvas.removeEventListener('mouseleave', handleMouseLeave);
+        
+        // Add new listeners
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('mouseleave', handleMouseLeave);
     },
 
-    updateGalleryCounter(anomalyIndex) {
-        const gallery = this.galleries[anomalyIndex];
-        if (!gallery) return;
-
-        const counter = document.getElementById(`counter-${anomalyIndex}`);
-        if (counter) {
-            counter.textContent = `${gallery.currentIndex + 1} / ${gallery.images.length}`;
+    /**
+     * Show "no images" message
+     * @param {HTMLCanvasElement} canvas - The canvas element
+     * @param {HTMLElement} info - The info element
+     */
+    showNoImagesMessage(canvas, info) {
+        canvas.width = 400;
+        canvas.height = 200;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#374151';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('No images available', canvas.width / 2, canvas.height / 2);
+        
+        const imageType = info.querySelector('.image-type');
+        if (imageType) {
+            imageType.textContent = 'No images found';
         }
     },
 
+    /**
+     * Show error message
+     * @param {HTMLCanvasElement} canvas - The canvas element
+     * @param {HTMLElement} info - The info element
+     * @param {string} message - Error message to display
+     */
+    showErrorMessage(canvas, info, message) {
+        canvas.width = 400;
+        canvas.height = 200;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#dc2626';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Error loading image', canvas.width / 2, canvas.height / 2 - 10);
+        ctx.fillText(message, canvas.width / 2, canvas.height / 2 + 10);
+        
+        const imageType = info.querySelector('.image-type');
+        if (imageType) {
+            imageType.textContent = 'Error';
+        }
+    },
+
+    /**
+     * Set up gallery navigation event listeners
+     */
     setupGalleryNavigation() {
-        // Remove existing listeners first
+        // Remove existing listeners to prevent duplicates
         document.removeEventListener('click', this.galleryNavigationHandler);
         
-        // Add new listener
-        this.galleryNavigationHandler = (event) => {
-            if (event.target.classList.contains('gallery-nav-btn')) {
-                const galleryIndex = parseInt(event.target.dataset.gallery);
-                const direction = event.target.dataset.direction;
-                
-                const gallery = this.galleries[galleryIndex];
-                if (!gallery) return;
-
-                if (direction === 'next') {
-                    gallery.currentIndex = (gallery.currentIndex + 1) % gallery.images.length;
-                } else if (direction === 'prev') {
-                    gallery.currentIndex = (gallery.currentIndex - 1 + gallery.images.length) % gallery.images.length;
-                }
-
-                this.loadGalleryImage(galleryIndex, gallery.currentIndex);
-                this.updateGalleryCounter(galleryIndex);
-            }
-        };
-
+        // Create bound handler for reuse
+        this.galleryNavigationHandler = this.handleGalleryNavigation.bind(this);
+        
+        // Add event listener
         document.addEventListener('click', this.galleryNavigationHandler);
     },
 
-    // Test data (same as original script.js)
-    getTestData() {
-        return {
-            "analysis_summary": {
-                "target_area_id": "WizardIsland_20250621",
-                "anomalies_detected": true,
-                "number_of_anomalies": 3
-            },
-            "identified_anomalies": [
-                {
-                    "anomaly_id": "WizardIsland_Circle_01",
-                    "classification": {
-                        "type": "Settlement Platform",
-                        "subtype": "N/A"
-                    },
-                    "confidence": {
-                        "global_score": 0.95,
-                        "individual_scores": {
-                            "lrm": 0.9,
-                            "svf": 0.8,
-                            "slope": 1.0,
-                            "chm": 0.9,
-                            "ndvi": 0.2
-                        }
-                    },
-                    "evidence_per_image": {
-                        "lrm": "Bright, regular circular embanked ring with strong positive relief; inner depression subtle but present.",
-                        "svf": "High SVF values along the rim, indicating raised, open structure; rim clearly defined.",
-                        "slope": "Exceptionally sharp, continuous high-slope band forms a perfect ring; steep faces are unambiguous.",
-                        "chm": "Notably lower and more uniform canopy height within the ring, abrupt transition at rim.",
-                        "ndvi": "Slight vegetation anomaly inside ring; pattern is faint but detectable."
-                    },
-                    "archaeological_interpretation": "This is a large constructed earthen platform or mound, likely for settlement or ceremonial use, due to its regularity, topographic prominence, and vegetation modification.",
-                    "bounding_box_pixels": [
-                        { "x_min": 300, "y_min": 600, "x_max": 750, "y_max": 1050 }
-                    ]
-                },
-                {
-                    "anomaly_id": "WizardIsland_Arc_02",
-                    "classification": {
-                        "type": "Causeway",
-                        "subtype": "Curvilinear"
-                    },
-                    "confidence": {
-                        "global_score": 0.7,
-                        "individual_scores": {
-                            "lrm": 0.8,
-                            "svf": 0.6,
-                            "slope": 0.7,
-                            "chm": 0.5,
-                            "ndvi": 0.2
-                        }
-                    },
-                    "evidence_per_image": {
-                        "lrm": "Curving positive-relief line south/southwest of main circle, visible as a continuous arc.",
-                        "svf": "The arc is subtly defined; SVF contrast is weaker than the main circle but present.",
-                        "slope": "The arc shows as a moderately steep, continuous band, distinct from the background.",
-                        "chm": "Canopy is slightly lower and more uniform along the arc, especially toward the circle.",
-                        "ndvi": "Very faint vegetation anomaly, barely above background noise."
-                    },
-                    "archaeological_interpretation": "This is likely a causeway or raised path, connecting or encircling the main platform. Its geometry and continuity suggest intentional construction.",
-                    "bounding_box_pixels": [
-                        { "x_min": 120, "y_min": 900, "x_max": 700, "y_max": 1200 }
-                    ]
-                },
-                {
-                    "anomaly_id": "WizardIsland_Escarpment_03",
-                    "classification": {
-                        "type": "Settlement Platform",
-                        "subtype": "Edge/Escarpment"
-                    },
-                    "confidence": {
-                        "global_score": 0.8,
-                        "individual_scores": {
-                            "lrm": 0.7,
-                            "svf": 0.7,
-                            "slope": 0.95,
-                            "chm": 0.7,
-                            "ndvi": 0.1
-                        }
-                    },
-                    "evidence_per_image": {
-                        "lrm": "Sharp, elongated positive-relief feature along the eastern edge of the area; unnatural linearity.",
-                        "svf": "Strong SVF contrast at the scarp; open sky above the break.",
-                        "slope": "Very strong, continuous steep slope delineating the escarpment; stands out sharply.",
-                        "chm": "Lower canopy at the edge; abrupt transition visible.",
-                        "ndvi": "Virtually no vegetation anomaly detected."
-                    },
-                    "archaeological_interpretation": "This feature could be an artificial terrace, edge of a constructed settlement, or defensive earthwork, as shown by the abrupt topography and clear vegetation boundary.",
-                    "bounding_box_pixels": [
-                        { "x_min": 830, "y_min": 600, "x_max": 1100, "y_max": 1200 }
-                    ]
-                }
-            ]
-        };
-    }
+    /**
+     * Handle gallery navigation button clicks
+     * @param {Event} e - Click event
+     */
+    handleGalleryNavigation(e) {
+        if (!e.target.classList.contains('gallery-nav-btn')) {
+            return;
+        }
+
+        const galleryIndex = parseInt(e.target.dataset.gallery);
+        const direction = e.target.dataset.direction;
+
+        if (isNaN(galleryIndex) || !direction) {
+            return;
+        }
+
+        if (!this.galleryImages || !this.galleryImages[galleryIndex]) {
+            return;
+        }
+
+        const images = this.galleryImages[galleryIndex];
+        let currentIndex = this.currentImageIndex[galleryIndex] || 0;
+
+        if (direction === 'prev') {
+            currentIndex = currentIndex > 0 ? currentIndex - 1 : images.length - 1;
+        } else if (direction === 'next') {
+            currentIndex = currentIndex < images.length - 1 ? currentIndex + 1 : 0;
+        }
+
+        this.currentImageIndex[galleryIndex] = currentIndex;
+        this.displayImageInGallery(galleryIndex, currentIndex);
+
+        // Update button states
+        this.updateNavigationButtons(galleryIndex, currentIndex, images.length);
+    },
+
+    /**
+     * Update navigation button states
+     * @param {number} galleryIndex - Index of the gallery
+     * @param {number} currentIndex - Current image index
+     * @param {number} totalImages - Total number of images
+     */
+    updateNavigationButtons(galleryIndex, currentIndex, totalImages) {
+        const prevBtn = document.querySelector(`[data-gallery="${galleryIndex}"][data-direction="prev"]`);
+        const nextBtn = document.querySelector(`[data-gallery="${galleryIndex}"][data-direction="next"]`);
+
+        if (prevBtn && nextBtn) {
+            // Enable/disable buttons (for single image, you might want to disable)
+            if (totalImages <= 1) {
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
+            } else {
+                prevBtn.disabled = false;
+                nextBtn.disabled = false;
+            }
+        }
+    },
+
+    /**
+     * Draw bounding boxes on the canvas for detected anomalies
+     * @param {CanvasRenderingContext2D} ctx - The canvas rendering context
+     * @param {number} anomalyIndex - Index of the anomaly
+     * @param {number} canvasWidth - Canvas width (scaled)
+     * @param {number} canvasHeight - Canvas height (scaled)
+     * @param {number} originalWidth - Original image width
+     * @param {number} originalHeight - Original image height
+     */
+    drawBoundingBoxes(ctx, anomalyIndex, canvasWidth, canvasHeight, originalWidth, originalHeight) {
+        // Get the anomaly data for this gallery
+        if (!this.galleryAnomalies || !this.galleryAnomalies[anomalyIndex]) {
+            return;
+        }
+
+        const anomaly = this.galleryAnomalies[anomalyIndex];
+        
+        // Check if bounding box data exists
+        if (!anomaly.bounding_box_pixels || anomaly.bounding_box_pixels.length === 0) {
+            return;
+        }
+
+        // Calculate scale factors from original image to canvas
+        const scaleX = canvasWidth / originalWidth;
+        const scaleY = canvasHeight / originalHeight;
+
+        // Set up drawing style for bounding boxes
+        ctx.strokeStyle = '#ffffff'; // White color for visibility
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]); // Solid line
+        
+        // Draw each bounding box
+        anomaly.bounding_box_pixels.forEach((bbox, index) => {
+            // Scale bounding box coordinates to canvas size
+            const x = bbox.x_min * scaleX;
+            const y = bbox.y_min * scaleY;
+            const width = (bbox.x_max - bbox.x_min) * scaleX;
+            const height = (bbox.y_max - bbox.y_min) * scaleY;
+            
+            // Draw the bounding box rectangle
+            ctx.strokeRect(x, y, width, height);
+            
+            // Add a label for the bounding box
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '12px Arial';
+            ctx.fillText(`Anomaly ${index + 1}`, x + 2, y - 4);
+        });
+    },
 };
