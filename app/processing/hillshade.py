@@ -226,6 +226,31 @@ def generate_hillshade_with_params(
         
     print(f"   ✅ [REGION IDENTIFIED] Final effective region name for path construction: {effective_region_name}")
 
+    # 🔍 QUALITY MODE INTEGRATION: Check for clean LAZ file
+    actual_input_file = input_file
+    quality_mode_used = False
+    
+    print(f"\n🔍 [QUALITY MODE CHECK] Checking for clean LAZ file...")
+    # Look for clean LAZ file in output/{region}/cropped/{region}_cropped.las
+    potential_clean_laz_patterns = [
+        os.path.join("output", effective_region_name, "cropped", f"{effective_region_name}_cropped.las"),
+        os.path.join("output", effective_region_name, "cropped", f"{input_path.stem}_cropped.las"),
+        os.path.join("output", effective_region_name, "lidar", "cropped", f"{effective_region_name}_cropped.las"),
+        os.path.join("output", effective_region_name, "lidar", "cropped", f"{input_path.stem}_cropped.las")
+    ]
+    
+    for clean_laz_path in potential_clean_laz_patterns:
+        if os.path.exists(clean_laz_path):
+            print(f"   🎯 QUALITY MODE: Found clean LAZ file: {clean_laz_path}")
+            logger.info(f"Quality mode activated: Using clean LAZ file {clean_laz_path} instead of {input_file}")
+            actual_input_file = clean_laz_path
+            quality_mode_used = True
+            break
+    
+    if not quality_mode_used:
+        print(f"   📋 STANDARD MODE: Using original LAZ file (no clean LAZ found)")
+        logger.info(f"Standard mode: No clean LAZ file found, using original {input_file}")
+
     # Create output directory structure using the effective_region_name
     print(f"\n📁 [FOLDER CREATION] Setting up output directory structure...")
     output_dir = os.path.join("output", effective_region_name, "lidar", "Hillshade")
@@ -240,17 +265,22 @@ def generate_hillshade_with_params(
     actual_csf_res = dtm_csf_cloth_resolution if dtm_csf_cloth_resolution is not None else dtm_resolution
 
     base_name_for_hillshade = f"{laz_file_stem}_dtm{dtm_resolution}m_csf{actual_csf_res}m_Hillshade"
+    if quality_mode_used:
+        base_name_for_hillshade += "_clean"
     output_filename = f"{base_name_for_hillshade}_{suffix}.tif" if suffix else f"{base_name_for_hillshade}.tif"
 
     output_path = os.path.join(output_dir, output_filename)
     print(f"   📄 Generated filename: {output_filename}")
     print(f"   📂 Full output path: {output_path}")
+    print(f"   📄 Actual input file: {actual_input_file}")
+    if quality_mode_used:
+        print(f"   ✨ Quality mode: Clean Hillshade will be generated from clean DTM")
     
-    # DTM Generation Call
+    # DTM Generation Call (use actual input file for quality mode)
     # The dtm() function is called with region_name=effective_region_name to ensure its outputs also follow this.
     print(f"\n🏔️ [STEP 1] DTM Generation/Location using DTM Resolution: {dtm_resolution}m, CSF Cloth Res: {dtm_csf_cloth_resolution if dtm_csf_cloth_resolution is not None else dtm_resolution}m...")
     dtm_path = dtm(
-        input_file,
+        actual_input_file,  # Use actual input file (clean LAZ if available)
         region_name=effective_region_name, # Pass the determined region name
         resolution=dtm_resolution,
         csf_cloth_resolution=dtm_csf_cloth_resolution
@@ -332,8 +362,9 @@ def generate_hillshade_with_params(
         print(f"\n🔍 [STEP 3] Validating output file {output_path}...")
         if os.path.exists(output_path) and os.path.getsize(output_path) > 0: # Basic check
             output_size = os.path.getsize(output_path)
+            output_size_mb = output_size / (1024**2)
             print(f"   ✅ Output file created successfully.")
-            print(f"   📊 Output file size: {output_size:,} bytes ({output_size / (1024**2):.2f} MB).")
+            print(f"   📊 Output file size: {output_size:,} bytes ({output_size_mb:.2f} MB).")
             print(f"   📄 Output file path: {os.path.abspath(output_path)}")
             logger.info(f"Hillshade successfully generated: {output_path}, Size: {output_size_mb:.2f} MB")
         else:
@@ -343,6 +374,35 @@ def generate_hillshade_with_params(
         total_processing_time = time.time() - start_time
         print(f"\n✅ TOTAL HILLSHADE generation completed successfully in {total_processing_time:.2f} seconds.")
         print(f"🌄 Hillshade file: {output_path}")
+        
+        # 🎯 QUALITY MODE PNG GENERATION: Generate PNG for clean Hillshade if quality mode was used
+        if quality_mode_used:
+            print(f"\n🖼️ QUALITY MODE: Generating PNG for clean Hillshade")
+            try:
+                from ..convert import convert_geotiff_to_png
+                
+                # Create png_outputs directory structure
+                tif_dir = os.path.dirname(output_path)
+                base_output_dir = os.path.dirname(tif_dir)  # Go up from Hillshade/ to lidar/
+                png_output_dir = os.path.join(base_output_dir, "png_outputs")
+                os.makedirs(png_output_dir, exist_ok=True)
+                
+                # Generate PNG with standard filename
+                png_path = os.path.join(png_output_dir, "Hillshade.png")
+                convert_geotiff_to_png(
+                    output_path, 
+                    png_path, 
+                    enhanced_resolution=True,
+                    save_to_consolidated=False,  # Already in the right directory
+                    stretch_type="stddev",
+                    stretch_params={"percentile_low": 2, "percentile_high": 98}
+                )
+                print(f"✅ Quality mode Hillshade PNG file created: {png_path}")
+                logger.info(f"Quality mode Hillshade PNG generated: {png_path}")
+            except Exception as png_error:
+                print(f"⚠️ Quality mode Hillshade PNG generation failed: {png_error}")
+                logger.warning(f"Quality mode Hillshade PNG generation failed: {png_error}")
+        
         print(f"{'='*70}\n")
         
         return output_path

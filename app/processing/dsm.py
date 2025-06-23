@@ -73,31 +73,57 @@ def dsm(input_file: str, region_name: str = None) -> str:
             region_name = input_path.parent.name if input_path.parent.name != "input" else os.path.splitext(os.path.basename(input_file))[0]
     
     # Use provided region_name for output directory if available, otherwise use file_stem
-    
     output_folder_name = region_name if region_name else file_stem
     
     print(f"📁 Using output folder name: {output_folder_name} (from region_name: {region_name})")
     
+    # 🔍 QUALITY MODE INTEGRATION: Check for clean LAZ file
+    actual_input_file = input_file
+    quality_mode_used = False
     
+    # Look for clean LAZ file in output/{region}/cropped/{region}_cropped.las
+    potential_clean_laz_patterns = [
+        os.path.join("output", output_folder_name, "cropped", f"{output_folder_name}_cropped.las"),
+        os.path.join("output", output_folder_name, "cropped", f"{file_stem}_cropped.las"),
+        os.path.join("output", output_folder_name, "lidar", "cropped", f"{output_folder_name}_cropped.las"),
+        os.path.join("output", output_folder_name, "lidar", "cropped", f"{file_stem}_cropped.las")
+    ]
+    
+    for clean_laz_path in potential_clean_laz_patterns:
+        if os.path.exists(clean_laz_path):
+            print(f"🎯 QUALITY MODE: Found clean LAZ file: {clean_laz_path}")
+            logger.info(f"Quality mode activated: Using clean LAZ file {clean_laz_path} instead of {input_file}")
+            actual_input_file = clean_laz_path
+            quality_mode_used = True
+            break
+    
+    if not quality_mode_used:
+        print(f"📋 STANDARD MODE: Using original LAZ file (no clean LAZ found)")
+        logger.info(f"Standard mode: No clean LAZ file found, using original {input_file}")
     
     # Create output directory structure: output/<output_folder_name>/lidar/
-    
     output_dir = os.path.join("output", output_folder_name, "lidar", "DSM")
     os.makedirs(output_dir, exist_ok=True)
     
-    # Generate output filename: <file_stem>_DSM.tif
-    output_filename = f"{file_stem}_DSM.tif"
+    # Generate output filename: <file_stem>_DSM.tif (add _clean suffix if quality mode)
+    output_filename = f"{file_stem}_DSM"
+    if quality_mode_used:
+        output_filename += "_clean"
+    output_filename += ".tif"
     output_path = os.path.join(output_dir, output_filename)
     
     print(f"📂 Output directory: {output_dir}")
+    print(f"📄 Actual input file: {actual_input_file}")
     print(f"📄 Output file: {output_path}")
+    if quality_mode_used:
+        print(f"✨ Quality mode: Clean DSM will be generated")
     
     # Check if DSM already exists and is up-to-date (caching optimization)
-    if os.path.exists(output_path) and os.path.exists(input_file):
+    if os.path.exists(output_path) and os.path.exists(actual_input_file):
         try:
             # Compare modification times
             dsm_mtime = os.path.getmtime(output_path)
-            laz_mtime = os.path.getmtime(input_file)
+            laz_mtime = os.path.getmtime(actual_input_file)
             
             if dsm_mtime > laz_mtime:
                 # Validate the cached DSM file
@@ -121,13 +147,42 @@ def dsm(input_file: str, region_name: str = None) -> str:
     resolution = 1.0
     
     # Call the conversion function with detailed logging
-    success, message = convert_las_to_dsm(input_file, output_path, resolution)
+    success, message = convert_las_to_dsm(actual_input_file, output_path, resolution)
     
     processing_time = time.time() - start_time
     
     if success:
         print(f"✅ DSM conversion completed successfully in {processing_time:.2f} seconds")
         print(f"📊 Message: {message}")
+        
+        # 🎯 QUALITY MODE PNG GENERATION: Generate PNG for clean DSM if quality mode was used
+        if quality_mode_used:
+            print(f"\n🖼️ QUALITY MODE: Generating PNG for clean DSM")
+            try:
+                from ..convert import convert_geotiff_to_png
+                
+                # Create png_outputs directory structure
+                tif_dir = os.path.dirname(output_path)
+                base_output_dir = os.path.dirname(tif_dir)  # Go up from DSM/ to lidar/
+                png_output_dir = os.path.join(base_output_dir, "png_outputs")
+                os.makedirs(png_output_dir, exist_ok=True)
+                
+                # Generate PNG with standard filename
+                png_path = os.path.join(png_output_dir, "DSM.png")
+                convert_geotiff_to_png(
+                    output_path, 
+                    png_path, 
+                    enhanced_resolution=True,
+                    save_to_consolidated=False,  # Already in the right directory
+                    stretch_type="stddev",
+                    stretch_params={"percentile_low": 2, "percentile_high": 98}
+                )
+                print(f"✅ Quality mode DSM PNG file created: {png_path}")
+                logger.info(f"Quality mode DSM PNG generated: {png_path}")
+            except Exception as png_error:
+                print(f"⚠️ Quality mode DSM PNG generation failed: {png_error}")
+                logger.warning(f"Quality mode DSM PNG generation failed: {png_error}")
+        
         return output_path
     else:
         print(f"❌ DSM conversion failed after {processing_time:.2f} seconds")

@@ -1,0 +1,7 @@
+{
+  "test_laz_file": "input/LAZ/PRGL1260C9597_2014.laz",
+  "region_name": "PRGL1260C9597_2014",
+  "clean_laz_available": false,
+  "clean_laz_path": null,
+  "quality_mode": false
+}

@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException, Form
 from fastapi.responses import JSONResponse
 from typing import Optional, Dict
 import json
+import os
+from pathlib import Path
 from ..convert import convert_geotiff_to_png_base64
 from ..processing.dtm import dtm
 from ..processing.dsm import dsm
@@ -181,12 +183,13 @@ async def api_dtm(
     display_region_name: str = Form(None),
     dtm_resolution: float = Form(1.0),
     dtm_csf_cloth_resolution: Optional[float] = Form(None),
+    quality_mode: bool = Form(False),
     stretch_type: Optional[str] = Form("stddev"),
     stretch_params_json: Optional[str] = Form(None)
 ):
     """Convert LAZ to DTM (ground points only)"""
     print(f"\n🎯 API CALL: /api/dtm")
-    logger.info(f"/api/dtm called with: region_name={region_name}, input_file={input_file}, dtm_res={dtm_resolution}, csf_res={dtm_csf_cloth_resolution}, stretch={stretch_type}")
+    logger.info(f"/api/dtm called with: region_name={region_name}, input_file={input_file}, dtm_res={dtm_resolution}, csf_res={dtm_csf_cloth_resolution}, quality_mode={quality_mode}, stretch={stretch_type}")
     
     effective_input_file = input_file
     if region_name and processing_type:
@@ -196,6 +199,13 @@ async def api_dtm(
 
     try:
         output_region_for_path = display_region_name if display_region_name else region_name
+        
+        # Quality mode disabled - always use standard DTM generation
+        if quality_mode:
+            print(f"⚠️ Quality mode requested but disabled - using standard DTM generation")
+            logger.info(f"Quality mode disabled - proceeding with standard DTM generation")
+        
+        # Generate DTM using standard process (no quality mode)
         tif_path = dtm(
             effective_input_file,
             output_region_for_path,

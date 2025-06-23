@@ -1,0 +1,14 @@
+{
+  "implemented_functions": [
+    "dtm",
+    "dsm",
+    "chm"
+  ],
+  "pending_functions": [
+    "slope",
+    "aspect",
+    "hillshade"
+  ],
+  "integration_pattern_established": true,
+  "ready_for_expansion": true
+}

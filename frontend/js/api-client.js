@@ -244,6 +244,7 @@ class ProcessingAPIClient extends BaseAPIClient {
    * @param {string} options.regionName - Region name
    * @param {string} options.processingType - Processing type
    * @param {string} options.displayRegionName - Display region name
+   * @param {boolean} options.qualityMode - Enable quality mode (default: false)
    * @returns {Promise<Object>} DTM generation result
    */
   async generateDTM(options = {}) {
@@ -254,6 +255,7 @@ class ProcessingAPIClient extends BaseAPIClient {
     if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
     if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
     if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
+    if (options.qualityMode !== undefined || options.quality_mode !== undefined) formData.append('quality_mode', options.qualityMode || options.quality_mode || false);
     
     return this.postForm('dtm', formData);
   }

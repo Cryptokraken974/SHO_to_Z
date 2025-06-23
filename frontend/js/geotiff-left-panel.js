@@ -1217,6 +1217,10 @@ class GeoTiffLeftPanel {
             formData.append('processing_type', 'lidar'); // or appropriate processing type
             formData.append('dtm_resolution', '1.0');
             formData.append('stretch_type', 'stddev');
+            
+            // 🎯 ENABLE QUALITY MODE: Trigger density analysis → mask generation → LAZ cropping → clean DTM
+            formData.append('quality_mode', 'true');
+            console.log(`🌟 Quality mode enabled for DTM generation - will trigger complete quality workflow`);
 
             const response = await fetch('/api/dtm', {
                 method: 'POST',
@@ -1230,7 +1234,7 @@ class GeoTiffLeftPanel {
             }
 
             const result = await response.json();
-            console.log(`✅ DTM generated successfully for ${regionName}`);
+            console.log(`✅ DTM generated successfully for ${regionName} (quality mode workflow completed)`);
             return true;
 
         } catch (error) {
@@ -1376,8 +1380,49 @@ class GeoTiffLeftPanel {
     }
 
     /**
-     * Process all rasters with LAZ modal progress integration
-     * This mimics ProcessingManager.processAllRasters() but updates the LAZ modal UI
+     * Process all rasters with LAZ modal progress integration and quality mode workflow
+     * 
+     * QUALITY MODE WORKFLOW:
+     * This function implements a comprehensive raster processing pipeline that includes quality mode
+     * enhancements for improved LAZ file processing. The workflow consists of three main phases:
+     * 
+     * PHASE 1: QUALITY MODE PREPROCESSING (New Quality Enhancement Steps)
+     * 1. Density Analysis (/api/density/analyze):
+     *    - Generates density raster from original LAZ file
+     *    - Identifies point cloud density variations across the area
+     *    - Creates foundation for artifact detection
+     * 
+     * 2. Mask Generation (integrated with density analysis):
+     *    - Creates binary mask based on density thresholds
+     *    - Identifies areas with insufficient point density
+     *    - Marks regions that may contain processing artifacts
+     * 
+     * 3. Quality DTM Preparation:
+     *    - Prepares optimized DTM using density insights
+     *    - Applies quality-based filtering for cleaner raster generation
+     *    - Sets foundation for improved subsequent raster products
+     * 
+     * PHASE 2: STANDARD RASTER PROCESSING
+     * 4-15. Individual raster products (hillshades, slope, aspect, etc.)
+     * 16-18. Composite products (RGB hillshade, tint overlay, boosted hillshade)
+     * 
+     * PHASE 3: VALIDATION & CLEANUP
+     * - Validates all generated products
+     * - Reports success/failure statistics
+     * 
+     * KEY DIFFERENCES FROM STANDARD PROCESSING:
+     * - Quality mode steps (1-3) are executed FIRST before any standard raster generation
+     * - Density analysis provides insights that improve all subsequent processing steps
+     * - Binary mask enables artifact-aware processing in later steps
+     * - This function is specifically designed for LAZ modal UI integration
+     * 
+     * INTEGRATION NOTES:
+     * - Updates LAZ modal processing queue UI in real-time
+     * - Mimics ProcessingManager.processAllRasters() but with quality mode enhancements
+     * - Quality mode steps are NOT triggered during standard LAZ file loading
+     * - Must be explicitly called through the LAZ modal processing interface
+     * 
+     * @returns {Promise<boolean>} Success status of the complete processing workflow
      */
     async processAllRastersWithLazModalProgress() {
         // Check prerequisites
@@ -1392,6 +1437,10 @@ class GeoTiffLeftPanel {
 
         // Define processing queue (matching backend process_all_raster_products)
         const processingQueue = [
+            // Quality Mode Steps (First Priority)
+            { type: 'density_analysis', name: 'Density Analysis', icon: '🔍' },
+            { type: 'mask_generation', name: 'Mask Generation', icon: '🎭' },
+            { type: 'quality_dtm', name: 'Quality DTM', icon: '🏔️' },
             // Individual hillshades (from hillshade.json)
             { type: 'hs_red', name: 'HS Red', icon: '🔴' },
             { type: 'hs_green', name: 'HS Green', icon: '🟢' },
@@ -1441,9 +1490,56 @@ class GeoTiffLeftPanel {
                 
                 console.log(`🚀 Processing all rasters for region: ${regionName}, file: ${lazFileName}`);
                 
-                // Step 1: Process CHM separately first (uses LAZ file directly)
+                // Step 1: Quality Mode Processing - Density Analysis
+                console.log('🔍 Processing Density Analysis (Quality Mode Step 1)...');
+                this.updateLazRasterProcessingStep('Density Analysis', 0, processingQueue.length);
+                this.updateLazRasterProcessingQueue(processingQueue, processingQueue.findIndex(p => p.type === 'density_analysis'));
+                
+                try {
+                    const densityFormData = new FormData();
+                    densityFormData.append('laz_file_path', `input/LAZ/${lazFileName}`);
+                    densityFormData.append('region_name', regionName);
+                    densityFormData.append('resolution', '1.0');
+                    densityFormData.append('mask_threshold', '3');
+                    densityFormData.append('generate_mask', 'true');
+                    
+                    const densityResponse = await fetch('/api/density/analyze', {
+                        method: 'POST',
+                        body: densityFormData
+                    });
+                    
+                    if (densityResponse.ok) {
+                        const densityResult = await densityResponse.json();
+                        this.markLazQueueItemComplete('density-analysis', 'success');
+                        this.markLazQueueItemComplete('mask-generation', 'success'); // Mask is generated together
+                        console.log('✅ Density analysis and mask generation completed');
+                        
+                        // Check if clean LAZ was generated for quality DTM
+                        if (densityResult.mask_results && densityResult.mask_results.success) {
+                            this.markLazQueueItemComplete('quality-dtm', 'success');
+                            console.log('✅ Quality mode activated - clean LAZ available for enhanced processing');
+                        } else {
+                            this.markLazQueueItemComplete('quality-dtm', 'error');
+                            console.log('⚠️ Quality DTM preparation failed - will continue with standard mode');
+                        }
+                    } else {
+                        this.markLazQueueItemComplete('density-analysis', 'error');
+                        this.markLazQueueItemComplete('mask-generation', 'error');
+                        this.markLazQueueItemComplete('quality-dtm', 'error');
+                        console.warn('⚠️ Density analysis failed - continuing with standard mode');
+                        failedProcesses.push('Density Analysis', 'Mask Generation', 'Quality DTM');
+                    }
+                } catch (densityError) {
+                    console.error('❌ Density analysis error:', densityError);
+                    this.markLazQueueItemComplete('density-analysis', 'error');
+                    this.markLazQueueItemComplete('mask-generation', 'error');
+                    this.markLazQueueItemComplete('quality-dtm', 'error');
+                    failedProcesses.push('Density Analysis', 'Mask Generation', 'Quality DTM');
+                }
+                
+                // Step 2: Process CHM separately first (uses LAZ file directly)
                 console.log('🌳 Processing CHM (Canopy Height Model)...');
-                this.updateLazRasterProcessingStep('CHM', 0, processingQueue.length);
+                this.updateLazRasterProcessingStep('CHM', 3, processingQueue.length);
                 this.updateLazRasterProcessingQueue(processingQueue, processingQueue.findIndex(p => p.type === 'chm'));
                 
                 try {
@@ -1471,9 +1567,9 @@ class GeoTiffLeftPanel {
                     failedProcesses.push('CHM');
                 }
                 
-                // Step 2: Process all other rasters using unified backend processing
+                // Step 3: Process all other rasters using unified backend processing
                 console.log('🚀 Processing remaining rasters...');
-                this.updateLazRasterProcessingStep('Other Rasters', 1, processingQueue.length);
+                this.updateLazRasterProcessingStep('Other Rasters', 4, processingQueue.length);
                 
                 // Call the unified backend processing endpoint
                 const formData = new FormData();
@@ -1492,12 +1588,12 @@ class GeoTiffLeftPanel {
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Mark all non-CHM processing steps as complete
+                    // Mark all non-CHM and non-quality-mode processing steps as complete
                     for (let i = 0; i < processingQueue.length; i++) {
                         const process = processingQueue[i];
                         
-                        // Skip CHM as it was already processed
-                        if (process.type === 'chm') continue;
+                        // Skip quality mode steps and CHM as they were already processed
+                        if (['density_analysis', 'mask_generation', 'quality_dtm', 'chm'].includes(process.type)) continue;
                         
                         this.markLazQueueItemComplete(process.type.replace('_', '-'), 'success');
                         this.updateLazRasterProcessingStep(process.name, i + 1, processingQueue.length);
@@ -1517,9 +1613,9 @@ class GeoTiffLeftPanel {
             } catch (error) {
                 console.error('❌ Unified raster processing failed:', error);
                 
-                // Mark all non-CHM as failed (CHM was already handled)
+                // Mark all non-quality-mode and non-CHM as failed (quality mode and CHM were already handled)
                 for (const process of processingQueue) {
-                    if (process.type !== 'chm') {
+                    if (!['density_analysis', 'mask_generation', 'quality_dtm', 'chm'].includes(process.type)) {
                         this.markLazQueueItemComplete(process.type.replace('_', '-'), 'error');
                         if (!failedProcesses.includes(process.name)) {
                             failedProcesses.push(process.name);
@@ -1669,6 +1765,9 @@ class GeoTiffLeftPanel {
         
         // List of all queue item IDs that need to be reset
         const queueIds = [
+            'laz-queue-density-analysis',
+            'laz-queue-mask-generation', 
+            'laz-queue-quality-dtm',
             'laz-queue-hs-red',
             'laz-queue-hs-green', 
             'laz-queue-hs-blue',

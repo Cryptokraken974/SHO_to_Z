@@ -1,0 +1,309 @@
+{
+  "call_stack": [
+    {
+      "function": "load_laz_file",
+      "inputs": {
+        "laz_path": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/LAZ/PRGL1260C9597_2014.laz"
+      },
+      "outputs": {
+        "laz_loaded": true,
+        "point_count": 4627801
+      },
+      "step": 1
+    },
+    {
+      "function": "generate_density_raster",
+      "inputs": {
+        "laz_path": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/LAZ/PRGL1260C9597_2014.laz",
+        "resolution": 1.0
+      },
+      "outputs": {
+        "density_tiff": "output/PRGL1260C9597_2014/density/PRGL1260C9597_2014_density.tif"
+      },
+      "step": 2
+    },
+    {
+      "function": "_generate_binary_mask",
+      "inputs": {
+        "density_tiff": "PRGL1260C9597_2014_density.tif",
+        "threshold": 2.0
+      },
+      "outputs": {
+        "mask_tiff": "output/PRGL1260C9597_2014/density/masks/PRGL1260C9597_2014_valid_mask.tif"
+      },
+      "step": 3
+    },
+    {
+      "function": "_generate_polygon_from_mask",
+      "inputs": {
+        "mask_path": "PRGL1260C9597_2014_valid_mask.tif"
+      },
+      "outputs": {
+        "polygon_path": "output/PRGL1260C9597_2014/vectors/PRGL1260C9597_2014_valid_footprint.geojson"
+      },
+      "step": 4
+    },
+    {
+      "function": "_crop_original_laz",
+      "inputs": {
+        "laz_path": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/LAZ/PRGL1260C9597_2014.laz",
+        "polygon_path": "PRGL1260C9597_2014_valid_footprint.geojson"
+      },
+      "outputs": {
+        "cropped_laz": "output/PRGL1260C9597_2014/cropped/PRGL1260C9597_2014_cropped.las"
+      },
+      "step": 5
+    },
+    {
+      "function": "dtm(clean_laz_path, region_name)",
+      "inputs": {
+        "clean_laz_path": "output/PRGL1260C9597_2014/cropped/PRGL1260C9597_2014_cropped.las",
+        "region_name": "PRGL1260C9597_2014"
+      },
+      "outputs": {
+        "dtm_path": "output/PRGL1260C9597_2014/lidar/DTM/filled/PRGL1260C9597_2014_cropped_DTM_1.0m_csf1.0m_filled.tif"
+      },
+      "step": 6
+    },
+    {
+      "function": "dsm(clean_laz_path, region_name)",
+      "inputs": {
+        "clean_laz_path": "output/PRGL1260C9597_2014/cropped/PRGL1260C9597_2014_cropped.las",
+        "region_name": "PRGL1260C9597_2014"
+      },
+      "outputs": {
+        "dsm_path": "output/PRGL1260C9597_2014/lidar/DSM/PRGL1260C9597_2014_cropped_DSM.tif"
+      },
+      "step": 7
+    },
+    {
+      "function": "chm(clean_laz_path, region_name)",
+      "inputs": {
+        "clean_laz_path": "output/PRGL1260C9597_2014/cropped/PRGL1260C9597_2014_cropped.las",
+        "region_name": "PRGL1260C9597_2014"
+      },
+      "outputs": {
+        "chm_path": "output/PRGL1260C9597_2014/lidar/CHM/PRGL1260C9597_2014_cropped_CHM.tif"
+      },
+      "step": 8
+    },
+    {
+      "function": "slope(clean_laz_path, region_name)",
+      "inputs": {
+        "clean_laz_path": "output/PRGL1260C9597_2014/cropped/PRGL1260C9597_2014_cropped.las",
+        "region_name": "PRGL1260C9597_2014"
+      },
+      "outputs": {
+        "slope_path": "output/PRGL1260C9597_2014/lidar/Slope/PRGL1260C9597_2014_cropped_Slope.tif"
+      },
+      "step": 9
+    },
+    {
+      "function": "aspect(clean_laz_path, region_name)",
+      "inputs": {
+        "clean_laz_path": "output/PRGL1260C9597_2014/cropped/PRGL1260C9597_2014_cropped.las",
+        "region_name": "PRGL1260C9597_2014"
+      },
+      "outputs": {
+        "aspect_path": "output/PRGL1260C9597_2014/lidar/Aspect/PRGL1260C9597_2014_cropped_Aspect.tif"
+      },
+      "step": 10
+    },
+    {
+      "function": "hillshade(clean_laz_path, region_name)",
+      "inputs": {
+        "clean_laz_path": "output/PRGL1260C9597_2014/cropped/PRGL1260C9597_2014_cropped.las",
+        "region_name": "PRGL1260C9597_2014"
+      },
+      "outputs": {
+        "hillshade_path": "output/PRGL1260C9597_2014/lidar/Hillshade/PRGL1260C9597_2014_cropped_dtm1.0m_csf1.0m_Hillshade_standard_az315_alt45_z1.tif"
+      },
+      "step": 11
+    },
+    {
+      "function": "generate_png_from_clean_raster [MISSING]",
+      "inputs": {
+        "clean_dtm": "PRGL1260C9597_2014_cropped_DTM_1.0m_csf1.0m_filled.tif"
+      },
+      "outputs": {
+        "png_path": "output/PRGL1260C9597_2014/png_outputs/DTM/PRGL1260C9597_2014_DTM.png"
+      },
+      "step": 12
+    },
+    {
+      "function": "generate_png_from_clean_raster [MISSING]",
+      "inputs": {
+        "clean_dsm": "PRGL1260C9597_2014_cropped_DSM.tif"
+      },
+      "outputs": {
+        "png_path": "output/PRGL1260C9597_2014/png_outputs/DSM/PRGL1260C9597_2014_DSM.png"
+      },
+      "step": 13
+    },
+    {
+      "function": "generate_png_from_clean_raster [MISSING]",
+      "inputs": {
+        "clean_raster": "PRGL1260C9597_2014_cropped_CHM.tif"
+      },
+      "outputs": {
+        "png_path": "output/PRGL1260C9597_2014/png_outputs/CHM/PRGL1260C9597_2014_CHM.png"
+      },
+      "step": 14
+    },
+    {
+      "function": "generate_png_from_clean_raster [MISSING]",
+      "inputs": {
+        "clean_raster": "PRGL1260C9597_2014_cropped_Slope.tif"
+      },
+      "outputs": {
+        "png_path": "output/PRGL1260C9597_2014/png_outputs/Slope/PRGL1260C9597_2014_Slope.png"
+      },
+      "step": 15
+    },
+    {
+      "function": "generate_png_from_clean_raster [MISSING]",
+      "inputs": {
+        "clean_raster": "PRGL1260C9597_2014_cropped_Aspect.tif"
+      },
+      "outputs": {
+        "png_path": "output/PRGL1260C9597_2014/png_outputs/Aspect/PRGL1260C9597_2014_Aspect.png"
+      },
+      "step": 16
+    },
+    {
+      "function": "generate_png_from_clean_raster [MISSING]",
+      "inputs": {
+        "clean_raster": "PRGL1260C9597_2014_cropped_Hillshade.tif"
+      },
+      "outputs": {
+        "png_path": "output/PRGL1260C9597_2014/png_outputs/Hillshade/PRGL1260C9597_2014_Hillshade.png"
+      },
+      "step": 17
+    }
+  ],
+  "data_flow": [
+    {
+      "source": "User Upload",
+      "destination": "Processing Pipeline",
+      "file_type": "LAZ",
+      "clean_status": "Original (Uncleaned)",
+      "step": 1
+    },
+    {
+      "source": "Original LAZ",
+      "destination": "Density Analysis",
+      "file_type": "TIFF",
+      "clean_status": "Analysis Product",
+      "step": 2
+    },
+    {
+      "source": "Density TIFF",
+      "destination": "Mask Generation",
+      "file_type": "Binary Mask",
+      "clean_status": "Quality Control",
+      "step": 3
+    },
+    {
+      "source": "Binary Mask",
+      "destination": "Vector Operations",
+      "file_type": "GeoJSON",
+      "clean_status": "Crop Boundary",
+      "step": 4
+    },
+    {
+      "source": "Original LAZ + Polygon",
+      "destination": "LAZ Cropping",
+      "file_type": "LAS",
+      "clean_status": "CLEAN (Artifacts Removed)",
+      "step": 5
+    },
+    {
+      "source": "Clean LAZ",
+      "destination": "DTM Generation",
+      "file_type": "DTM TIFF",
+      "clean_status": "CLEAN RASTER",
+      "step": 6
+    },
+    {
+      "source": "Clean LAZ",
+      "destination": "DSM Generation",
+      "file_type": "DSM TIFF",
+      "clean_status": "CLEAN RASTER",
+      "step": 7
+    },
+    {
+      "source": "Clean LAZ",
+      "destination": "CHM Generation",
+      "file_type": "CHM TIFF",
+      "clean_status": "CLEAN RASTER",
+      "step": 8
+    },
+    {
+      "source": "Clean DTM",
+      "destination": "Slope Analysis",
+      "file_type": "Slope TIFF",
+      "clean_status": "CLEAN DERIVATIVE",
+      "step": 9
+    },
+    {
+      "source": "Clean DTM",
+      "destination": "Aspect Analysis",
+      "file_type": "Aspect TIFF",
+      "clean_status": "CLEAN DERIVATIVE",
+      "step": 10
+    },
+    {
+      "source": "Clean DTM",
+      "destination": "Hillshade Generation",
+      "file_type": "Hillshade TIFF",
+      "clean_status": "CLEAN VISUALIZATION",
+      "step": 11
+    },
+    {
+      "source": "Clean DTM TIFF",
+      "destination": "PNG Generation [MISSING]",
+      "file_type": "PNG",
+      "clean_status": "CLEAN VISUALIZATION",
+      "step": 12
+    },
+    {
+      "source": "Clean DSM TIFF",
+      "destination": "PNG Generation [MISSING]",
+      "file_type": "PNG",
+      "clean_status": "CLEAN VISUALIZATION",
+      "step": 13
+    },
+    {
+      "source": "Clean CHM TIFF",
+      "destination": "PNG Generation [MISSING]",
+      "file_type": "PNG",
+      "clean_status": "CLEAN VISUALIZATION",
+      "step": 14
+    },
+    {
+      "source": "Clean Slope TIFF",
+      "destination": "PNG Generation [MISSING]",
+      "file_type": "PNG",
+      "clean_status": "CLEAN VISUALIZATION",
+      "step": 15
+    },
+    {
+      "source": "Clean Aspect TIFF",
+      "destination": "PNG Generation [MISSING]",
+      "file_type": "PNG",
+      "clean_status": "CLEAN VISUALIZATION",
+      "step": 16
+    },
+    {
+      "source": "Clean Hillshade TIFF",
+      "destination": "PNG Generation [MISSING]",
+      "file_type": "PNG",
+      "clean_status": "CLEAN VISUALIZATION",
+      "step": 17
+    }
+  ],
+  "clean_laz_generated": true,
+  "clean_rasters_generated": true,
+  "clean_pngs_generated": false,
+  "missing_implementation": "PNG generation from clean rasters"
+}

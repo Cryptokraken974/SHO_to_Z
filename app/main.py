@@ -134,6 +134,7 @@ from .endpoints.laz_processing import router as laz_router
 from .endpoints.overlays import router as overlays_router
 from .endpoints.prompts import router as prompts_router
 from .endpoints.openai_interaction import router as openai_router
+from .endpoints.density_processing import router as density_router
 # from .endpoints.lidar_acquisition import router as lidar_router
 # from .endpoints.data_acquisition import router as data_router
 from .endpoints.elevation_api import router as elevation_router
@@ -152,6 +153,7 @@ app.include_router(chat_router)
 app.include_router(json_pipelines_router)
 app.include_router(laz_router)
 app.include_router(overlays_router)
+app.include_router(density_router)
 # app.include_router(lidar_router)
 # app.include_router(data_router)
 app.include_router(elevation_router)

@@ -186,23 +186,53 @@ def aspect(input_file: str, region_name: str = None) -> str:
     output_folder_name = region_name if region_name else file_stem
     print(f"📁 Using output folder name: {output_folder_name} (from region_name: {region_name})")
     
+    # 🔍 QUALITY MODE INTEGRATION: Check for clean LAZ file
+    actual_input_file = input_file
+    quality_mode_used = False
+    
+    # Look for clean LAZ file in output/{region}/cropped/{region}_cropped.las
+    potential_clean_laz_patterns = [
+        os.path.join("output", output_folder_name, "cropped", f"{output_folder_name}_cropped.las"),
+        os.path.join("output", output_folder_name, "cropped", f"{file_stem}_cropped.las"),
+        os.path.join("output", output_folder_name, "lidar", "cropped", f"{output_folder_name}_cropped.las"),
+        os.path.join("output", output_folder_name, "lidar", "cropped", f"{file_stem}_cropped.las")
+    ]
+    
+    for clean_laz_path in potential_clean_laz_patterns:
+        if os.path.exists(clean_laz_path):
+            print(f"🎯 QUALITY MODE: Found clean LAZ file: {clean_laz_path}")
+            logger.info(f"Quality mode activated: Using clean LAZ file {clean_laz_path} instead of {input_file}")
+            actual_input_file = clean_laz_path
+            quality_mode_used = True
+            break
+    
+    if not quality_mode_used:
+        print(f"📋 STANDARD MODE: Using original LAZ file (no clean LAZ found)")
+        logger.info(f"Standard mode: No clean LAZ file found, using original {input_file}")
+    
     # Create default output directory structure: output/<output_folder_name>/lidar/Aspect/
     # This is where the synchronous function will save its output by default.
     default_output_dir = os.path.join("output", output_folder_name, "lidar", "Aspect")
     os.makedirs(default_output_dir, exist_ok=True)
     
-    # Generate default output filename: <file_stem>_Aspect.tif
-    default_output_filename = f"{file_stem}_Aspect.tif"
+    # Generate default output filename: <file_stem>_Aspect.tif (add _clean suffix if quality mode)
+    default_output_filename = f"{file_stem}_Aspect"
+    if quality_mode_used:
+        default_output_filename += "_clean"
+    default_output_filename += ".tif"
     default_output_path = os.path.join(default_output_dir, default_output_filename)
     
     print(f"📂 Default output directory (sync): {default_output_dir}")
+    print(f"📄 Actual input file: {actual_input_file}")
     print(f"📄 Default output file (sync): {default_output_path}")
+    if quality_mode_used:
+        print(f"✨ Quality mode: Clean Aspect will be generated from clean DTM")
     
     try:
-        # First, we need to generate or get the DTM
+        # First, we need to generate or get the DTM (use actual input file for quality mode)
         print(f"🏔️ [DTM REQUIRED] Getting DTM for aspect calculation...")
         dtm_call_start_time = time.time()
-        dtm_path = dtm(input_file, region_name) # Call the synchronous dtm function with region_name parameter
+        dtm_path = dtm(actual_input_file, region_name) # Call the synchronous dtm function with region_name parameter
         dtm_call_time = time.time() - dtm_call_start_time
         print(f"✅ DTM ready in {dtm_call_time:.2f} seconds: {dtm_path}")
         
@@ -301,6 +331,34 @@ def aspect(input_file: str, region_name: str = None) -> str:
         print(f"✅ Aspect analysis (sync) completed successfully in {total_sync_time:.2f} seconds")
         print(f"   ⏱️ DTM call time: {dtm_call_time:.2f}s")
         print(f"   ⏱️ GDAL aspect calculation: {gdal_aspect_time:.2f}s")
+        
+        # 🎯 QUALITY MODE PNG GENERATION: Generate PNG for clean Aspect if quality mode was used
+        if quality_mode_used:
+            print(f"\n🖼️ QUALITY MODE: Generating PNG for clean Aspect")
+            try:
+                from ..convert import convert_geotiff_to_png
+                
+                # Create png_outputs directory structure
+                tif_dir = os.path.dirname(default_output_path)
+                base_output_dir = os.path.dirname(tif_dir)  # Go up from Aspect/ to lidar/
+                png_output_dir = os.path.join(base_output_dir, "png_outputs")
+                os.makedirs(png_output_dir, exist_ok=True)
+                
+                # Generate PNG with standard filename
+                png_path = os.path.join(png_output_dir, "Aspect.png")
+                convert_geotiff_to_png(
+                    default_output_path, 
+                    png_path, 
+                    enhanced_resolution=True,
+                    save_to_consolidated=False,  # Already in the right directory
+                    stretch_type="stddev",
+                    stretch_params={"percentile_low": 2, "percentile_high": 98}
+                )
+                print(f"✅ Quality mode Aspect PNG file created: {png_path}")
+                logger.info(f"Quality mode Aspect PNG generated: {png_path}")
+            except Exception as png_error:
+                print(f"⚠️ Quality mode Aspect PNG generation failed: {png_error}")
+                logger.warning(f"Quality mode Aspect PNG generation failed: {png_error}")
         
         return str(default_output_path) # Return path to the generated file
         

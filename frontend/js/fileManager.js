@@ -211,6 +211,9 @@ window.FileManager = {
    * @param {Array} regions - Array of region information
    */
   createRegionMarkers(regions) { // MODIFIED to createRegionMarkers
+    Utils.log('info', `🎯 createRegionMarkers called with ${regions.length} regions`);
+    Utils.log('debug', '📊 Full regions data:', regions);
+    
     // Check if map is available before creating markers
     if (!MapManager.map || !MapManager.getMap()) {
       Utils.log('warn', 'Map not yet initialized, storing regions for later marker creation');
@@ -220,6 +223,8 @@ window.FileManager = {
     
     // Clear existing markers
     this.clearRegionMarkers(); // MODIFIED to clearRegionMarkers
+    
+    Utils.log('info', `🗺️ Map is ready, processing ${regions.length} regions for markers and LAZ coverage rectangles`);
     
     regions.forEach((regionInfo) => {
       const regionName = regionInfo.name;
@@ -246,37 +251,96 @@ window.FileManager = {
         Utils.log('info', `Added marker for region ${regionName} at ${coords.lat}, ${coords.lng}`);
       }
 
-      // Draw bounds rectangle
-      if (regionInfo.bounds &&
-          typeof regionInfo.bounds.min_lat === 'number' &&
-          typeof regionInfo.bounds.min_lng === 'number' &&
-          typeof regionInfo.bounds.max_lat === 'number' &&
-          typeof regionInfo.bounds.max_lng === 'number') {
+      // Draw bounds rectangle - Enhanced Debug Version
+      Utils.log('debug', `🔍 Checking bounds for region ${regionName}:`, regionInfo.bounds);
+      
+      // Handle both property name formats: {min_lat, min_lng, max_lat, max_lng} and {north, south, east, west}
+      let boundsData = null;
+      
+      if (regionInfo.bounds) {
+        // Check for {min_lat, min_lng, max_lat, max_lng} format
+        if (typeof regionInfo.bounds.min_lat === 'number' &&
+            typeof regionInfo.bounds.min_lng === 'number' &&
+            typeof regionInfo.bounds.max_lat === 'number' &&
+            typeof regionInfo.bounds.max_lng === 'number') {
+          
+          boundsData = {
+            south: regionInfo.bounds.min_lat,
+            west: regionInfo.bounds.min_lng,
+            north: regionInfo.bounds.max_lat,
+            east: regionInfo.bounds.max_lng
+          };
+          Utils.log('debug', `📏 Using min/max format bounds for ${regionName}:`, boundsData);
+          
+        } 
+        // Check for {north, south, east, west} format
+        else if (typeof regionInfo.bounds.north === 'number' &&
+                 typeof regionInfo.bounds.south === 'number' &&
+                 typeof regionInfo.bounds.east === 'number' &&
+                 typeof regionInfo.bounds.west === 'number') {
+          
+          boundsData = {
+            south: regionInfo.bounds.south,
+            west: regionInfo.bounds.west,
+            north: regionInfo.bounds.north,
+            east: regionInfo.bounds.east
+          };
+          Utils.log('debug', `📏 Using north/south/east/west format bounds for ${regionName}:`, boundsData);
+        }
+      }
+      
+      if (boundsData) {
+        const { south, west, north, east } = boundsData;
 
-        const south = regionInfo.bounds.min_lat;
-        const west = regionInfo.bounds.min_lng;
-        const north = regionInfo.bounds.max_lat;
-        const east = regionInfo.bounds.max_lng;
+        Utils.log('debug', `📏 Extracted bounds for ${regionName}: N=${north}, S=${south}, E=${east}, W=${west}`);
 
         // Ensure coordinates are valid before creating rectangle
-        // Using a simple check for validity here. Utils.isValidCoordinate typically checks single points.
         if (isFinite(north) && isFinite(south) && isFinite(east) && isFinite(west) &&
             north >= -90 && north <= 90 && south >= -90 && south <= 90 &&
             east >= -180 && east <= 180 && west >= -180 && west <= 180 &&
             north > south && east > west) { // Basic sanity check for bounds
 
           const leafletBounds = [[south, west], [north, east]];
+          Utils.log('info', `🟦 Creating blue LAZ coverage rectangle for ${regionName}`, leafletBounds);
+          
           const rectangle = L.rectangle(leafletBounds, {
             color: "#3388ff",
-            weight: 1,        // Thinner weight for less visual clutter
-            fillOpacity: 0.05,  // More transparent
+            weight: 2,        // Make more visible for debugging
+            fillOpacity: 0.1,  // Make more visible for debugging
             interactive: false
           }).addTo(MapManager.getMap());
 
           this.regionBoundRectangles.push(rectangle);
+          Utils.log('success', `✅ Successfully added LAZ coverage rectangle for ${regionName}. Total rectangles: ${this.regionBoundRectangles.length}`);
         } else {
-          Utils.log('warn', `Invalid or inconsistent bounds for region ${regionInfo.name}:`, regionInfo.bounds);
+          Utils.log('warn', `❌ Invalid or inconsistent bounds for region ${regionInfo.name}:`, {
+            bounds: boundsData,
+            checks: {
+              finiteCheck: [isFinite(north), isFinite(south), isFinite(east), isFinite(west)],
+              latRange: [`${south} >= -90: ${south >= -90}`, `${south} <= 90: ${south <= 90}`, `${north} >= -90: ${north >= -90}`, `${north} <= 90: ${north <= 90}`],
+              lngRange: [`${west} >= -180: ${west >= -180}`, `${west} <= 180: ${west <= 180}`, `${east} >= -180: ${east >= -180}`, `${east} <= 180: ${east <= 180}`],
+              orderCheck: [`north > south: ${north > south}`, `east > west: ${east > west}`]
+            }
+          });
         }
+      } else {
+        Utils.log('warn', `🚫 No valid bounds data for region ${regionName}:`, {
+          hasBounds: !!regionInfo.bounds,
+          boundsType: typeof regionInfo.bounds,
+          boundsData: regionInfo.bounds,
+          boundsKeys: regionInfo.bounds ? Object.keys(regionInfo.bounds) : 'No bounds object',
+          typeChecks: regionInfo.bounds ? {
+            min_lat: typeof regionInfo.bounds.min_lat,
+            min_lng: typeof regionInfo.bounds.min_lng,
+            max_lat: typeof regionInfo.bounds.max_lat,
+            max_lng: typeof regionInfo.bounds.max_lng,
+            // Also check for alternative property names
+            north: typeof regionInfo.bounds.north,
+            south: typeof regionInfo.bounds.south,
+            east: typeof regionInfo.bounds.east,
+            west: typeof regionInfo.bounds.west
+          } : 'No bounds object'
+        });
       }
     });
     

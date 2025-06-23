@@ -1,0 +1,27 @@
+{
+  "test_laz_file": "input/LAZ/PRGL1260C9597_2014.laz",
+  "region_name": "PRGL1260C9597_2014",
+  "clean_laz_available": false,
+  "clean_laz_path": null,
+  "integration_results": {
+    "DTM": {
+      "imported": true,
+      "quality_mode_available": false,
+      "expected_clean_output": "output/PRGL1260C9597_2014/lidar/DTM/PRGL1260C9597_2014_DTM.tif",
+      "expected_png": null
+    },
+    "DSM": {
+      "imported": true,
+      "quality_mode_available": false,
+      "expected_clean_output": "output/PRGL1260C9597_2014/lidar/DSM/PRGL1260C9597_2014_DSM.tif",
+      "expected_png": null
+    },
+    "CHM": {
+      "imported": true,
+      "quality_mode_available": false,
+      "expected_clean_output": "output/PRGL1260C9597_2014/lidar/CHM/PRGL1260C9597_2014_CHM.tif",
+      "expected_png": null
+    }
+  },
+  "quality_mode": false
+}

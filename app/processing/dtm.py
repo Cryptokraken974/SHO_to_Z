@@ -177,6 +177,14 @@ def dtm(input_file: str, region_name: str = None, resolution: float = 1.0, csf_c
     input_path = Path(input_file)
     file_stem = input_path.stem
     output_folder_name = region_name if region_name else file_stem
+    
+    # Quality mode disabled - always use original input file
+    actual_input_file = input_file
+    quality_mode_used = False
+    
+    print(f"📋 STANDARD MODE: Using original LAZ file (quality mode disabled)")
+    logger.info(f"Quality mode disabled: Using original {input_file}")
+    
     output_dir = os.path.join("output", output_folder_name, "lidar", "DTM")
     os.makedirs(output_dir, exist_ok=True)
     
@@ -187,23 +195,25 @@ def dtm(input_file: str, region_name: str = None, resolution: float = 1.0, csf_c
     os.makedirs(filled_dtm_subfolder, exist_ok=True)
 
     output_filename_base = f"{file_stem}_DTM_{resolution}m_csf{csf_cloth_resolution}m"
+    
     output_path_dtm_raw = os.path.join(raw_dtm_subfolder, f"{output_filename_base}_raw.tif")
     output_path_dtm_filled = os.path.join(filled_dtm_subfolder, f"{output_filename_base}_filled.tif")
     
     print(f"📂 Output directory: {output_dir}")
+    print(f"📄 Actual input file: {actual_input_file}")
     print(f"📄 Raw DTM file: {output_path_dtm_raw}")
     print(f"📄 Filled DTM file: {output_path_dtm_filled}")
 
     # --- DTM Generation ---
-    if os.path.exists(output_path_dtm_raw) and os.path.exists(input_file) and \
-       os.path.getmtime(output_path_dtm_raw) > os.path.getmtime(input_file) and \
+    if os.path.exists(output_path_dtm_raw) and os.path.exists(actual_input_file) and \
+       os.path.getmtime(output_path_dtm_raw) > os.path.getmtime(actual_input_file) and \
        validate_dtm_cache(output_path_dtm_raw):
         print(f"🚀 Raw DTM cache hit for {output_path_dtm_raw}. Using existing file.")
         logger.info(f"Raw DTM cache hit for {output_path_dtm_raw}.")
         raw_dtm_generated_path = output_path_dtm_raw
     else:
         print(f"📝 Generating new raw DTM: {output_path_dtm_raw}")
-        success, message = convert_las_to_dtm(input_file, output_path_dtm_raw, resolution, csf_cloth_resolution)
+        success, message = convert_las_to_dtm(actual_input_file, output_path_dtm_raw, resolution, csf_cloth_resolution)
         if not success:
             raise Exception(f"DTM generation failed for {output_path_dtm_raw}: {message}")
         raw_dtm_generated_path = output_path_dtm_raw
@@ -269,6 +279,7 @@ def dtm(input_file: str, region_name: str = None, resolution: float = 1.0, csf_c
     
     processing_time_total = time.time() - start_time
     print(f"✅ DTM processing for {input_file} completed in {processing_time_total:.2f} seconds. Final DTM: {final_dtm_path}")
+    
     return final_dtm_path
 
 
