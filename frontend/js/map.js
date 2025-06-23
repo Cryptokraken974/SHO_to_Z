@@ -7,6 +7,22 @@ window.MapManager = {
   drawnItems: null,
   drawControl: null,
   sentinel2TestMarker: null,
+  
+  // Path building functionality
+  pathBuildingMode: false,
+  currentPath: null,
+  pathPoints: [],
+  tempMarkers: [],
+  
+  // Box drawing functionality
+  boxDrawingMode: false,
+  currentBox: null,
+  boxStartPoint: null,
+  boxStartMarker: null,
+  boxPreview: null,
+  
+  // Map mode management
+  currentMode: 'move', // 'move', 'path', 'box'
 
   /**
    * Clean up existing map instance
@@ -57,6 +73,11 @@ window.MapManager = {
     
     // Setup event handlers
     this.setupEventHandlers();
+    
+    // Setup path building handlers (with a small delay to ensure buttons are rendered)
+    setTimeout(() => {
+      this.setupPathBuildingHandlers();
+    }, 100);
 
     // Create pending region markers if any exist
     if (window.FileManager && typeof FileManager.createPendingRegionMarkers === 'function') {
@@ -149,6 +170,18 @@ window.MapManager = {
 
     // Capture coordinates on map click
     this.map.on('click', (e) => {
+      // Check if we're in path building mode
+      if (this.pathBuildingMode) {
+        this.addPathPoint(e.latlng);
+        return; // Don't run normal coordinate capture when building paths
+      }
+      
+      // Check if we're in box drawing mode
+      if (this.boxDrawingMode) {
+        this.handleBoxDrawingClick(e.latlng);
+        return; // Don't run normal coordinate capture when drawing boxes
+      }
+      
       const lat = e.latlng.lat.toFixed(6);
       const lng = e.latlng.lng.toFixed(6);
       
@@ -338,5 +371,519 @@ window.MapManager = {
    */
   getMap() {
     return this.map;
+  },
+
+  /**
+   * Set map mode (move, path, or box)
+   * @param {string} mode - The mode to set ('move', 'path', 'box')
+   */
+  setMapMode(mode) {
+    // Exit current mode first
+    this.exitCurrentMode();
+    
+    // Update current mode
+    this.currentMode = mode;
+    
+    // Update checkbox states
+    this.updateModeCheckboxes();
+    
+    // Enter new mode
+    switch (mode) {
+      case 'move':
+        this.enterMoveMode();
+        break;
+      case 'path':
+        this.enterPathMode();
+        break;
+      case 'box':
+        this.enterBoxMode();
+        break;
+      default:
+        Utils.log('warn', `Unknown mode: ${mode}`);
+        this.currentMode = 'move';
+        this.enterMoveMode();
+    }
+    
+    // Update clear button visibility
+    this.updateClearButtonVisibility();
+  },
+
+  /**
+   * Exit current mode and reset states
+   */
+  exitCurrentMode() {
+    // Reset cursor
+    this.map.getContainer().style.cursor = '';
+    
+    // Exit specific mode states
+    this.pathBuildingMode = false;
+    this.boxDrawingMode = false;
+  },
+
+  /**
+   * Enter move mode
+   */
+  enterMoveMode() {
+    Utils.log('info', 'Move mode activated');
+    Utils.showNotification('Move mode activated', 'info', 2000);
+  },
+
+  /**
+   * Enter path building mode
+   */
+  enterPathMode() {
+    this.pathBuildingMode = true;
+    
+    // Change cursor
+    this.map.getContainer().style.cursor = 'crosshair';
+    
+    // Initialize path if first time
+    if (!this.currentPath) {
+      this.pathPoints = [];
+    }
+    
+    Utils.log('info', 'Path mode activated - Click points on the map to build a path');
+    Utils.showNotification('Path mode activated - Click points on the map', 'info', 3000);
+  },
+
+  /**
+   * Enter box drawing mode
+   */
+  enterBoxMode() {
+    this.boxDrawingMode = true;
+    
+    // Change cursor
+    this.map.getContainer().style.cursor = 'crosshair';
+    
+    // Reset box state
+    this.boxStartPoint = null;
+    if (this.boxStartMarker) {
+      this.map.removeLayer(this.boxStartMarker);
+      this.boxStartMarker = null;
+    }
+    if (this.boxPreview) {
+      this.map.removeLayer(this.boxPreview);
+      this.boxPreview = null;
+    }
+    
+    Utils.log('info', 'Box mode activated - Click to set start point, then click again for opposite corner');
+    Utils.showNotification('Box mode activated - Click to set start point, then click again for opposite corner', 'info', 4000);
+  },
+
+  /**
+   * Update mode checkbox visual states
+   */
+  updateModeCheckboxes() {
+    const modes = ['move', 'path', 'box'];
+    
+    modes.forEach(mode => {
+      const checkbox = document.querySelector(`#${mode}-mode-checkbox`);
+      const customDiv = checkbox?.nextElementSibling;
+      
+      if (customDiv) {
+        if (this.currentMode === mode) {
+          // Active state
+          customDiv.classList.remove('inactive', 'bg-[#303030]', 'hover:bg-[#404040]');
+          customDiv.classList.add('active', 'bg-[#28a745]', 'hover:bg-[#218838]');
+          checkbox.checked = true;
+        } else {
+          // Inactive state
+          customDiv.classList.remove('active', 'bg-[#28a745]', 'hover:bg-[#218838]');
+          customDiv.classList.add('inactive', 'bg-[#303030]', 'hover:bg-[#404040]');
+          checkbox.checked = false;
+        }
+      }
+    });
+  },
+
+  /**
+   * Update clear button visibility based on current content and mode
+   */
+  updateClearButtonVisibility() {
+    const clearPathBtn = document.getElementById('clear-path-btn');
+    const clearBoxBtn = document.getElementById('clear-box-btn');
+    const getLazBtn = document.getElementById('get-box-laz-btn');
+    
+    // Show Clear Path button if there's a path or we're in path mode
+    if (clearPathBtn) {
+      if (this.currentPath || this.pathBuildingMode) {
+        clearPathBtn.classList.remove('hidden');
+      } else {
+        clearPathBtn.classList.add('hidden');
+      }
+    }
+    
+    // Show Clear Box button if there's a box or we're in box mode
+    if (clearBoxBtn) {
+      if (this.currentBox || this.boxDrawingMode) {
+        clearBoxBtn.classList.remove('hidden');
+      } else {
+        clearBoxBtn.classList.add('hidden');
+      }
+    }
+    
+    // Show Get LAZ button if there's a path or box (regardless of mode)
+    if (getLazBtn) {
+      if (this.currentPath || this.currentBox) {
+        getLazBtn.classList.remove('hidden');
+      } else {
+        getLazBtn.classList.add('hidden');
+      }
+    }
+  },
+
+  /**
+   * Add a point to the current path
+   * @param {L.LatLng} latlng - Point coordinates
+   */
+  addPathPoint(latlng) {
+    if (!this.pathBuildingMode) return;
+    
+    this.pathPoints.push(latlng);
+    
+    // Add a temporary marker for the point
+    const marker = L.circleMarker(latlng, {
+      radius: 6,
+      fillColor: '#ff7800',
+      color: '#fff',
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.8
+    }).addTo(this.map);
+    
+    // Add popup with point info
+    marker.bindPopup(`Point ${this.pathPoints.length}<br>Lat: ${latlng.lat.toFixed(6)}<br>Lng: ${latlng.lng.toFixed(6)}`);
+    
+    this.tempMarkers.push(marker);
+    
+    // Update or create the path line
+    this.updatePath();
+    
+    Utils.log('info', `Added path point ${this.pathPoints.length}: ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`);
+  },
+
+  /**
+   * Update the path polyline
+   */
+  updatePath() {
+    if (this.pathPoints.length < 2) return;
+    
+    // Remove existing path
+    if (this.currentPath) {
+      this.map.removeLayer(this.currentPath);
+    }
+    
+    // Create new path
+    this.currentPath = L.polyline(this.pathPoints, {
+      color: '#ff7800',
+      weight: 4,
+      opacity: 0.8,
+      smoothFactor: 1
+    }).addTo(this.map);
+    
+    // Add popup to show path info
+    const totalDistance = this.calculatePathDistance();
+    this.currentPath.bindPopup(`
+      <strong>Path Information</strong><br>
+      Points: ${this.pathPoints.length}<br>
+      Total Distance: ${totalDistance.toFixed(2)} km<br>
+      <small>Click points to continue building</small>
+    `);
+    
+    // Update clear button visibility
+    this.updateClearButtonVisibility();
+  },
+
+  /**
+   * Calculate total path distance
+   * @returns {number} Distance in kilometers
+   */
+  calculatePathDistance() {
+    if (this.pathPoints.length < 2) return 0;
+    
+    let totalDistance = 0;
+    for (let i = 1; i < this.pathPoints.length; i++) {
+      totalDistance += this.pathPoints[i-1].distanceTo(this.pathPoints[i]) / 1000; // Convert to km
+    }
+    return totalDistance;
+  },
+
+  /**
+   * Clear the current path
+   */
+  clearPath() {
+    // Remove path line
+    if (this.currentPath) {
+      this.map.removeLayer(this.currentPath);
+      this.currentPath = null;
+    }
+    
+    // Remove temporary markers
+    this.tempMarkers.forEach(marker => {
+      this.map.removeLayer(marker);
+    });
+    this.tempMarkers = [];
+    
+    // Clear points array
+    this.pathPoints = [];
+    
+    // Update clear button visibility
+    this.updateClearButtonVisibility();
+    
+    Utils.log('info', 'Path cleared');
+    Utils.showNotification('Path cleared', 'success', 2000);
+  },
+
+  /**
+   * Handle box drawing clicks (two-click approach)
+   * @param {L.LatLng} latlng - Click coordinates
+   */
+  handleBoxDrawingClick(latlng) {
+    if (!this.boxDrawingMode) return;
+    
+    if (!this.boxStartPoint) {
+      // First click - set start point
+      this.boxStartPoint = latlng;
+      
+      // Add a temporary marker for the start point
+      this.boxStartMarker = L.circleMarker(latlng, {
+        radius: 8,
+        fillColor: '#007bff',
+        color: '#fff',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.8
+      }).addTo(this.map);
+      
+      this.boxStartMarker.bindPopup(`Box Start Point<br>Lat: ${latlng.lat.toFixed(6)}<br>Lng: ${latlng.lng.toFixed(6)}`);
+      
+      Utils.log('info', `Box start point set: ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`);
+      Utils.showNotification('Box start point set - Click again to set opposite corner', 'info', 3000);
+    } else {
+      // Second click - finish the box
+      this.finishBoxDrawing(latlng);
+    }
+  },
+
+  /**
+   * Start drawing a box (now handled by first click)
+   * @param {L.LatLng} latlng - Starting point coordinates
+   */
+  startBoxDrawing(latlng) {
+    // This function is now handled by handleBoxDrawingClick
+    // Keeping for compatibility but functionality moved to handleBoxDrawingClick
+  },
+
+  /**
+   * Update box preview during mouse move (removed - no longer needed for click approach)
+   * @param {L.LatLng} latlng - Current mouse position
+   */
+  updateBoxPreview(latlng) {
+    // No longer needed for click-based approach
+    // Keeping for compatibility but no functionality
+  },
+
+  /**
+   * Finish drawing the box
+   * @param {L.LatLng} latlng - End point coordinates
+   */
+  finishBoxDrawing(latlng) {
+    if (!this.boxDrawingMode || !this.boxStartPoint) return;
+    
+    // Remove start marker
+    if (this.boxStartMarker) {
+      this.map.removeLayer(this.boxStartMarker);
+      this.boxStartMarker = null;
+    }
+    
+    // Remove preview (legacy support)
+    if (this.boxPreview) {
+      this.map.removeLayer(this.boxPreview);
+      this.boxPreview = null;
+    }
+    
+    // Create final rectangle bounds
+    const bounds = L.latLngBounds(this.boxStartPoint, latlng);
+    
+    // Remove existing box
+    if (this.currentBox) {
+      this.map.removeLayer(this.currentBox);
+    }
+    
+    // Create final box
+    this.currentBox = L.rectangle(bounds, {
+      color: '#007bff',
+      weight: 3,
+      opacity: 1,
+      fillColor: '#007bff',
+      fillOpacity: 0.3
+    }).addTo(this.map);
+    
+    // Calculate area and dimensions
+    const area = this.calculateBoxArea(bounds);
+    const dimensions = this.calculateBoxDimensions(bounds);
+    
+    // Add popup with box info
+    this.currentBox.bindPopup(`
+      <strong>Box Information</strong><br>
+      North: ${bounds.getNorth().toFixed(6)}<br>
+      South: ${bounds.getSouth().toFixed(6)}<br>
+      East: ${bounds.getEast().toFixed(6)}<br>
+      West: ${bounds.getWest().toFixed(6)}<br>
+      Width: ${dimensions.width.toFixed(2)} km<br>
+      Height: ${dimensions.height.toFixed(2)} km<br>
+      Area: ${area.toFixed(2)} km²
+    `);
+    
+    // Reset drawing state
+    this.boxStartPoint = null;
+    
+    // Update clear button visibility
+    this.updateClearButtonVisibility();
+    
+    Utils.log('info', `Box drawn: ${bounds.getSouth().toFixed(6)}, ${bounds.getWest().toFixed(6)} to ${bounds.getNorth().toFixed(6)}, ${bounds.getEast().toFixed(6)}`);
+    Utils.showNotification('Box drawn successfully', 'success', 2000);
+  },
+
+  /**
+   * Calculate box area in square kilometers
+   * @param {L.LatLngBounds} bounds - Box bounds
+   * @returns {number} Area in square kilometers
+   */
+  calculateBoxArea(bounds) {
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    const se = L.latLng(sw.lat, ne.lng);
+    const nw = L.latLng(ne.lat, sw.lng);
+    
+    const width = sw.distanceTo(se) / 1000; // Convert to km
+    const height = sw.distanceTo(nw) / 1000; // Convert to km
+    
+    return width * height;
+  },
+
+  /**
+   * Calculate box dimensions in kilometers
+   * @param {L.LatLngBounds} bounds - Box bounds
+   * @returns {object} Object with width and height in kilometers
+   */
+  calculateBoxDimensions(bounds) {
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    const se = L.latLng(sw.lat, ne.lng);
+    const nw = L.latLng(ne.lat, sw.lng);
+    
+    const width = sw.distanceTo(se) / 1000; // Convert to km
+    const height = sw.distanceTo(nw) / 1000; // Convert to km
+    
+    return { width, height };
+  },
+
+  /**
+   * Clear the current box
+   */
+  clearBox() {
+    // Remove box
+    if (this.currentBox) {
+      this.map.removeLayer(this.currentBox);
+      this.currentBox = null;
+    }
+    
+    // Remove start marker
+    if (this.boxStartMarker) {
+      this.map.removeLayer(this.boxStartMarker);
+      this.boxStartMarker = null;
+    }
+    
+    // Remove preview if exists (legacy support)
+    if (this.boxPreview) {
+      this.map.removeLayer(this.boxPreview);
+      this.boxPreview = null;
+    }
+    
+    // Reset drawing state
+    this.boxStartPoint = null;
+    
+    // Update clear button visibility
+    this.updateClearButtonVisibility();
+    
+    Utils.log('info', 'Box cleared');
+    Utils.showNotification('Box cleared', 'success', 2000);
+  },
+
+  /**
+   * Setup path building and box drawing event handlers
+   */
+  setupPathBuildingHandlers() {
+    // Mode selection checkboxes
+    const moveCheckbox = document.getElementById('move-mode-checkbox');
+    const pathCheckbox = document.getElementById('path-mode-checkbox');
+    const boxCheckbox = document.getElementById('box-mode-checkbox');
+    
+    if (moveCheckbox) {
+      moveCheckbox.addEventListener('change', () => {
+        if (moveCheckbox.checked) {
+          this.setMapMode('move');
+        }
+      });
+    }
+    
+    if (pathCheckbox) {
+      pathCheckbox.addEventListener('change', () => {
+        if (pathCheckbox.checked) {
+          this.setMapMode('path');
+        }
+      });
+    }
+    
+    if (boxCheckbox) {
+      boxCheckbox.addEventListener('change', () => {
+        if (boxCheckbox.checked) {
+          this.setMapMode('box');
+        }
+      });
+    }
+    
+    // Alternative: Handle clicks on the custom divs
+    const moveCustomDiv = document.querySelector('#move-mode-checkbox + .mode-checkbox-custom');
+    const pathCustomDiv = document.querySelector('#path-mode-checkbox + .mode-checkbox-custom');
+    const boxCustomDiv = document.querySelector('#box-mode-checkbox + .mode-checkbox-custom');
+    
+    if (moveCustomDiv) {
+      moveCustomDiv.addEventListener('click', () => {
+        this.setMapMode('move');
+      });
+    }
+    
+    if (pathCustomDiv) {
+      pathCustomDiv.addEventListener('click', () => {
+        this.setMapMode('path');
+      });
+    }
+    
+    if (boxCustomDiv) {
+      boxCustomDiv.addEventListener('click', () => {
+        this.setMapMode('box');
+      });
+    }
+    
+    // Clear path button
+    const clearBtn = document.getElementById('clear-path-btn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        this.clearPath();
+      });
+    }
+    
+    // Clear box button
+    const clearBoxBtn = document.getElementById('clear-box-btn');
+    if (clearBoxBtn) {
+      clearBoxBtn.addEventListener('click', () => {
+        this.clearBox();
+      });
+    }
+    
+    // Initialize default mode
+    this.setMapMode('move');
   }
 };

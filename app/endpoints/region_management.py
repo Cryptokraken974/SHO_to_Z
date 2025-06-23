@@ -769,6 +769,17 @@ async def create_region(data: dict):
         
         # Create metadata file in output folder
         metadata_file = output_folder / "metadata.txt"
+        
+        # Handle bounds data if provided
+        bounds_info = data.get('bounds', {})
+        bounds_section = ""
+        if bounds_info and all(k in bounds_info for k in ['north', 'south', 'east', 'west']):
+            bounds_section = f"""
+North Bound: {bounds_info['north']}
+South Bound: {bounds_info['south']}
+East Bound: {bounds_info['east']}
+West Bound: {bounds_info['west']}"""
+        
         metadata_content = f"""# Region Created from Saved Place
 # Created: {data.get('created_at', 'Unknown')}
 # Original Place Name: {place_name or safe_region_name}
@@ -776,7 +787,7 @@ async def create_region(data: dict):
 Region Name: {safe_region_name}
 Display Name: {place_name or safe_region_name}
 Center Latitude: {coordinates['lat']}
-Center Longitude: {coordinates['lng']}
+Center Longitude: {coordinates['lng']}{bounds_section}
 Source: saved_place
 NDVI Enabled: {str(ndvi_enabled).lower()}
 Created: {data.get('created_at', 'Unknown')}

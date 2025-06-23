@@ -9,7 +9,7 @@ window.componentManager.register('file-modal', (props = {}) => {
     const { title = 'Select Region' } = props;
     
     return `
-        <div id="file-modal" class="modal fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center hidden z-50">
+        <div id="file-modal" class="modal fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center hidden z-[9999]">
             <div class="modal-content bg-[#2c2c2c] p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
                 <div class="flex justify-between items-center mb-4">
                     <h4 class="text-white text-lg font-semibold m-0">${title}</h4>
@@ -48,7 +48,7 @@ window.componentManager.register('progress-modal', (props = {}) => {
     } = props;
     
     return `
-        <div id="progress-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div id="progress-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center">
             <div class="modal-content bg-[#1a1a1a] border border-[#303030] rounded-lg w-[90%] max-w-md">
                 <div class="modal-header flex justify-between items-center p-6 border-b border-[#303030]">
                     <h3 class="text-white text-lg font-semibold" id="progress-title">${title}</h3>

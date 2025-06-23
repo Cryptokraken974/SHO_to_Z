@@ -368,7 +368,7 @@ class GeoTiffMainCanvas {
      */
     async showCropDialog(filePath) {
         const dialog = document.createElement('div');
-        dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]';
         dialog.innerHTML = `
             <div class="bg-[#2a2a2a] rounded-lg p-6 max-w-md w-full mx-4">
                 <h3 class="text-white text-lg font-semibold mb-4">Crop GeoTIFF</h3>
@@ -435,7 +435,7 @@ class GeoTiffMainCanvas {
      */
     async showConversionDialog(filePath) {
         const dialog = document.createElement('div');
-        dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]';
         dialog.innerHTML = `
             <div class="bg-[#2a2a2a] rounded-lg p-6 max-w-md w-full mx-4">
                 <h3 class="text-white text-lg font-semibold mb-4">Convert GeoTIFF</h3>
@@ -570,7 +570,7 @@ class GeoTiffMainCanvas {
      */
     async showResampleDialog(filePath) {
         const dialog = document.createElement('div');
-        dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]';
         dialog.innerHTML = `
             <div class="bg-[#2a2a2a] rounded-lg p-6 max-w-md w-full mx-4">
                 <h3 class="text-white text-lg font-semibold mb-4">Resample GeoTIFF</h3>
@@ -625,7 +625,7 @@ class GeoTiffMainCanvas {
      */
     showSuccessMessage(message) {
         const notification = document.createElement('div');
-        notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50';
+        notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-[9999]';
         notification.textContent = message;
         document.body.appendChild(notification);
         setTimeout(() => {
@@ -641,7 +641,7 @@ class GeoTiffMainCanvas {
      */
     showErrorMessage(message) {
         const notification = document.createElement('div');
-        notification.className = 'fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded shadow-lg z-50';
+        notification.className = 'fixed top-4 right-4 bg-red-600 text-white px-4 py-2 rounded shadow-lg z-[9999]';
         notification.textContent = message;
         document.body.appendChild(notification);
         setTimeout(() => {

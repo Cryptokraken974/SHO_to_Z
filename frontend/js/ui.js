@@ -59,6 +59,12 @@ window.UIManager = {
         }
         if (window.SavedPlaces && typeof SavedPlaces.init === 'function') SavedPlaces.init(); // May need context
 
+        // Initialize Get Box LAZ Modal
+        if (window.GetBoxLazModal && typeof GetBoxLazModal.init === 'function') {
+            console.log('*** Initializing Get Box LAZ Modal ***');
+            GetBoxLazModal.init();
+        }
+
         // Initialize galleries if they are specific to this tab
         if (window.RasterOverlayGallery && document.getElementById('gallery')) {
             console.log('Initializing RasterOverlayGallery for #gallery element');
@@ -2210,7 +2216,7 @@ window.UIManager = {
       if (modalsPlaceholder) {
         // Load progress modal HTML
         const progressModalHTML = `
-          <div id="progress-modal" class="modal fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div id="progress-modal" class="modal fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center">
             <div class="modal-content bg-[#1a1a1a] border border-[#303030] rounded-lg w-[90%] max-w-md">
               <div class="modal-header flex justify-between items-center p-6 border-b border-[#303030]">
                 <h3 class="text-white text-lg font-semibold" id="progress-title">Processing</h3>

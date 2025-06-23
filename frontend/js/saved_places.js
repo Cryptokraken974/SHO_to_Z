@@ -49,7 +49,7 @@ window.SavedPlaces = {
    */
   createSaveModal() {
     const modalHTML = `
-      <div id="save-place-modal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-75 flex items-center justify-center">
+      <div id="save-place-modal" class="fixed inset-0 z-[9999] hidden bg-black bg-opacity-75 flex items-center justify-center">
         <div class="bg-[#1a1a1a] border border-[#303030] rounded-lg p-6 w-96 max-w-[90vw]">
           <h3 class="text-white text-lg font-semibold mb-4">Save Current Location</h3>
           

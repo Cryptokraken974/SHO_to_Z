@@ -11,3 +11,73 @@ html, body {
   height: 100vh;
   overflow: hidden;
 }
+
+/* Notification styles */
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 500;
+  z-index: 10000;
+  max-width: 350px;
+  word-wrap: break-word;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: slideInRight 0.3s ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.notification-info {
+  background-color: #2196F3;
+  color: white;
+  border-left: 4px solid #1976D2;
+}
+
+.notification-success {
+  background-color: #4CAF50;
+  color: white;
+  border-left: 4px solid #2E7D32;
+}
+
+.notification-error {
+  background-color: #f44336;
+  color: white;
+  border-left: 4px solid #C62828;
+}
+
+.notification-warning {
+  background-color: #FF9800;
+  color: white;
+  border-left: 4px solid #E65100;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.notification-close:hover {
+  opacity: 1;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}

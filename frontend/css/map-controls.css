@@ -39,3 +39,127 @@
   font-size: 12px;
   border-radius: 4px;
 }
+
+/* Path building controls */
+.map-controls {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Mode selection styling */
+.mode-checkbox-custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  min-width: 120px;
+  justify-content: flex-start;
+}
+
+.mode-checkbox-custom:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.mode-checkbox-custom:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Active state for mode checkboxes */
+.mode-checkbox-custom.active {
+  background-color: #28a745 !important;
+}
+
+.mode-checkbox-custom.active:hover {
+  background-color: #218838 !important;
+}
+
+/* Inactive state for mode checkboxes */
+.mode-checkbox-custom.inactive {
+  background-color: #303030 !important;
+}
+
+.mode-checkbox-custom.inactive:hover {
+  background-color: #404040 !important;
+}
+
+.path-control-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+.path-control-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.path-control-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Path building mode specific styles */
+.map-container.path-building {
+  cursor: crosshair !important;
+}
+
+.map-container.path-building .leaflet-container {
+  cursor: crosshair !important;
+}
+
+/* Path point markers */
+.path-point-marker {
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Path line styles */
+.path-line {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+/* Box drawing mode specific styles */
+.map-container.box-drawing {
+  cursor: crosshair !important;
+}
+
+.map-container.box-drawing .leaflet-container {
+  cursor: crosshair !important;
+}
+
+/* Box preview styles */
+.box-preview {
+  pointer-events: none;
+}
+
+/* Box final styles */
+.box-final {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
