@@ -29,7 +29,10 @@ window.AnomaliesDashboard = {
             <div id="anomaliesDashboard" class="anomalies-dashboard">
                 <header class="anomalies-header">
                     <h1 class="anomalies-title">Anomaly Analysis Report</h1>
-                    <button id="anomalies-export-btn" class="anomalies-export-btn">Export</button>
+                    <div class="export-buttons">
+                        <button id="anomalies-export-btn" class="anomalies-export-btn">Export HTML</button>
+                        <button id="anomalies-pdf-btn" class="anomalies-export-btn anomalies-pdf-btn">Download PDF</button>
+                    </div>
                 </header>
                 
                 <section id="analysisSummary" class="analysis-summary-section">
@@ -266,6 +269,7 @@ window.AnomaliesDashboard = {
      * Set up export button functionality
      */
     setupExportButton() {
+        // HTML Export button
         const exportBtn = document.getElementById('anomalies-export-btn');
         if (exportBtn) {
             exportBtn.addEventListener('click', () => {
@@ -277,7 +281,24 @@ window.AnomaliesDashboard = {
                 this.exportReport().finally(() => {
                     // Re-enable button when export is complete
                     exportBtn.disabled = false;
-                    exportBtn.textContent = 'Export';
+                    exportBtn.textContent = 'Export HTML';
+                });
+            });
+        }
+
+        // PDF Export button
+        const pdfBtn = document.getElementById('anomalies-pdf-btn');
+        if (pdfBtn) {
+            pdfBtn.addEventListener('click', () => {
+                // Disable button during export
+                pdfBtn.disabled = true;
+                pdfBtn.textContent = 'Generating...';
+                
+                this.showExportModal();
+                this.exportPDF().finally(() => {
+                    // Re-enable button when export is complete
+                    pdfBtn.disabled = false;
+                    pdfBtn.textContent = 'Download PDF';
                 });
             });
         }
@@ -556,14 +577,21 @@ window.AnomaliesDashboard = {
                 // Generate images with bounding boxes for each image type
                 for (const imageType of standardImageTypes) {
                     const imagePath = `/llm/logs/${this.currentAnalysisFolder}/sent_images/${imageType}`;
+                    console.log(`Processing image: ${imageType} for anomaly ${index + 1}`);
+                    console.log(`Image path: ${imagePath}`);
+                    console.log(`Anomaly bounding boxes:`, anomaly.bounding_box_pixels);
+                    
                     const imageWithBoundingBox = await this.generateImageWithBoundingBoxes(imagePath, anomaly);
                     
                     if (imageWithBoundingBox) {
+                        console.log(`Successfully generated image with bounding box for: ${imageType}`);
                         imagesWithBoundingBoxes.push({
                             name: imageType.replace('.png', ''),
                             dataUrl: imageWithBoundingBox,
                             description: this.getImageDescription(imageType.replace('.png', ''))
                         });
+                    } else {
+                        console.warn(`Failed to generate image with bounding box for: ${imageType}`);
                     }
                 }
                 
@@ -1389,10 +1417,15 @@ showReportPreview(htmlContent) {
      */
     async generateImageWithBoundingBoxes(imagePath, anomaly) {
         return new Promise((resolve, reject) => {
+            console.log(`Generating image with bounding boxes for: ${imagePath}`);
+            console.log(`Anomaly bounding boxes:`, anomaly.bounding_box_pixels);
+            
             const img = new Image();
             img.crossOrigin = 'anonymous'; // Handle CORS issues
             
             img.onload = () => {
+                console.log(`Image loaded successfully: ${imagePath} (${img.width}x${img.height})`);
+                
                 // Create canvas
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
@@ -1406,10 +1439,16 @@ showReportPreview(htmlContent) {
                 
                 // Draw bounding boxes if available
                 if (anomaly.bounding_box_pixels && anomaly.bounding_box_pixels.length > 0) {
+                    console.log(`Drawing ${anomaly.bounding_box_pixels.length} bounding boxes`);
+                    
                     // Set up drawing style for bounding boxes
                     ctx.strokeStyle = '#ffffff'; // White color for visibility
-                    ctx.lineWidth = 3; // Slightly thicker for report visibility
+                    ctx.lineWidth = Math.max(3, Math.min(img.width, img.height) / 200); // Adaptive line width
                     ctx.setLineDash([]); // Solid line
+                    ctx.shadowColor = '#000000'; // Black shadow for better visibility
+                    ctx.shadowBlur = 2;
+                    ctx.shadowOffsetX = 1;
+                    ctx.shadowOffsetY = 1;
                     
                     // Draw each bounding box
                     anomaly.bounding_box_pixels.forEach((bbox, index) => {
@@ -1418,36 +1457,186 @@ showReportPreview(htmlContent) {
                         const width = bbox.x_max - bbox.x_min;
                         const height = bbox.y_max - bbox.y_min;
                         
-                        // Draw the bounding box rectangle
-                        ctx.strokeRect(x, y, width, height);
+                        console.log(`Drawing bounding box ${index + 1}: x=${x}, y=${y}, w=${width}, h=${height}`);
                         
-                        // Add a label for the bounding box
-                        ctx.fillStyle = '#ffffff';
-                        ctx.font = 'bold 16px Arial';
-                        ctx.fillText(`Anomaly ${index + 1}`, x + 5, y - 8);
-                        
-                        // Add a semi-transparent background for the label
-                        const labelWidth = ctx.measureText(`Anomaly ${index + 1}`).width;
-                        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                        ctx.fillRect(x, y - 25, labelWidth + 10, 20);
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillText(`Anomaly ${index + 1}`, x + 5, y - 8);
+                        // Validate bounding box coordinates
+                        if (x >= 0 && y >= 0 && width > 0 && height > 0 && 
+                            x + width <= img.width && y + height <= img.height) {
+                            
+                            // Draw the bounding box rectangle
+                            ctx.strokeRect(x, y, width, height);
+                            
+                            // Add a label for the bounding box
+                            const fontSize = Math.max(12, Math.min(img.width, img.height) / 40);
+                            ctx.font = `bold ${fontSize}px Arial`;
+                            const labelText = `Anomaly ${index + 1}`;
+                            const labelWidth = ctx.measureText(labelText).width;
+                            
+                            // Draw label background
+                            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                            ctx.fillRect(x, y - fontSize - 8, labelWidth + 12, fontSize + 8);
+                            
+                            // Draw label text
+                            ctx.fillStyle = '#ffffff';
+                            ctx.fillText(labelText, x + 6, y - 6);
+                        } else {
+                            console.warn(`Invalid bounding box coordinates for box ${index + 1}:`, bbox);
+                        }
                     });
+                    
+                    // Reset shadow
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 0;
+                } else {
+                    console.log('No bounding boxes to draw for this anomaly');
                 }
                 
                 // Convert canvas to base64
                 const base64DataUrl = canvas.toDataURL('image/png', 0.9);
+                console.log(`Successfully generated image with bounding boxes for: ${imagePath}`);
                 resolve(base64DataUrl);
             };
             
-            img.onerror = () => {
-                // If image fails to load, resolve with null
-                console.warn(`Failed to load image for bounding box generation: ${imagePath}`);
-                resolve(null);
+            img.onerror = (error) => {
+                console.error(`Failed to load image for bounding box generation: ${imagePath}`, error);
+                console.log('Attempting to load image without CORS...');
+                
+                // Try loading without CORS as fallback
+                const fallbackImg = new Image();
+                fallbackImg.onload = () => {
+                    console.log(`Fallback image loaded: ${imagePath}`);
+                    
+                    // Create canvas and draw without bounding boxes as last resort
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = fallbackImg.width;
+                    canvas.height = fallbackImg.height;
+                    ctx.drawImage(fallbackImg, 0, 0);
+                    
+                    const base64DataUrl = canvas.toDataURL('image/png', 0.9);
+                    console.warn(`Returning image without bounding boxes for: ${imagePath}`);
+                    resolve(base64DataUrl);
+                };
+                
+                fallbackImg.onerror = () => {
+                    console.error(`Complete failure to load image: ${imagePath}`);
+                    resolve(null);
+                };
+                
+                fallbackImg.src = imagePath;
             };
             
             // Try loading the image
             img.src = imagePath;
         });
+    },
+
+    /**
+     * Export PDF report - generates HTML first if needed, then converts to PDF
+     */
+    async exportPDF() {
+        try {
+            if (!this.originalAnomaliesData) {
+                this.hideExportModal();
+                window.Utils?.showNotification('No data available to export', 'warning');
+                return;
+            }
+
+            // Extract metadata from current analysis folder
+            const metadata = await this.extractAnalysisMetadata();
+            const reportFileName = this.generateReportFileName(metadata);
+            
+            // Check if HTML report already exists
+            let htmlExists = false;
+            try {
+                const checkResponse = await fetch(`/api/anomalies/reports/${reportFileName}`);
+                htmlExists = checkResponse.ok;
+            } catch (error) {
+                console.log('HTML report does not exist, will generate it first');
+            }
+
+            // Generate HTML report if it doesn't exist
+            if (!htmlExists) {
+                console.log('Generating HTML report first...');
+                const htmlContent = await this.generateHTMLReport(this.originalAnomaliesData, metadata);
+                
+                // Save HTML report
+                const htmlResponse = await fetch('/api/anomalies/export-report', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        htmlContent: htmlContent,
+                        fileName: reportFileName,
+                        metadata: metadata
+                    })
+                });
+
+                if (!htmlResponse.ok) {
+                    const errorText = await htmlResponse.text();
+                    throw new Error(`Failed to generate HTML report: ${htmlResponse.status} ${htmlResponse.statusText} - ${errorText}`);
+                }
+            }
+
+            // Generate PDF from HTML
+            console.log('Converting HTML to PDF...');
+            const pdfResponse = await fetch(`/api/anomalies/generate-pdf/${reportFileName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (pdfResponse.ok) {
+                const result = await pdfResponse.json();
+                const pdfFileName = result.pdfFileName;
+                
+                // Download the PDF
+                const downloadResponse = await fetch(`/api/anomalies/download-pdf/${pdfFileName}`);
+                if (downloadResponse.ok) {
+                    const blob = await downloadResponse.blob();
+                    
+                    // Create download link
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = pdfFileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    this.hideExportModal();
+                    window.Utils?.showNotification(
+                        `PDF report downloaded successfully: ${pdfFileName}`, 
+                        'success'
+                    );
+                } else {
+                    throw new Error(`Failed to download PDF: ${downloadResponse.statusText}`);
+                }
+            } else {
+                const errorText = await pdfResponse.text();
+                console.error('PDF generation response error:', {
+                    status: pdfResponse.status,
+                    statusText: pdfResponse.statusText,
+                    body: errorText
+                });
+                
+                // Check if it's a WeasyPrint availability issue
+                if (pdfResponse.status === 503) {
+                    throw new Error('PDF generation is not available on this server. Please try the HTML export instead.');
+                } else {
+                    throw new Error(`PDF generation failed: ${pdfResponse.status} ${pdfResponse.statusText} - ${errorText}`);
+                }
+            }
+        } catch (error) {
+            console.error('PDF export error:', error);
+            this.hideExportModal();
+            window.Utils?.showNotification(`PDF export failed: ${error.message}`, 'error');
+        }
     },
 };

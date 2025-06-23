@@ -24,6 +24,12 @@
     align-items: center;
 }
 
+.export-buttons {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0; /* Prevent buttons from shrinking */
+}
+
 .anomalies-title {
     color: #f3f4f6; /* Light gray title */
     margin: 0;
@@ -44,11 +50,18 @@
     cursor: pointer;
     transition: background-color 0.2s ease;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-    flex-shrink: 0; /* Prevent button from shrinking */
+}
+
+.anomalies-pdf-btn {
+    background-color: #dc2626; /* Red background for PDF button */
 }
 
 .anomalies-export-btn:hover {
     background-color: #2563eb;
+}
+
+.anomalies-pdf-btn:hover {
+    background-color: #b91c1c; /* Darker red on hover */
 }
 
 .anomalies-export-btn:active {
@@ -398,6 +411,11 @@
         font-size: 1.25rem;
     }
 
+    .export-buttons {
+        flex-direction: column;
+        gap: 5px;
+    }
+
     .anomalies-export-btn {
         padding: 6px 12px;
         font-size: 0.75rem;
@@ -417,10 +435,14 @@
         font-size: 1.125rem;
     }
 
+    .export-buttons {
+        flex-direction: column;
+        gap: 4px;
+    }
+
     .anomalies-export-btn {
         padding: 4px 8px;
         font-size: 0.7rem;
-        right: 8px;
     }
 
     .section-title {
