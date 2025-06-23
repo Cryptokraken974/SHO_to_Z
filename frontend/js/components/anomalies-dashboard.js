@@ -269,8 +269,142 @@ window.AnomaliesDashboard = {
         const exportBtn = document.getElementById('anomalies-export-btn');
         if (exportBtn) {
             exportBtn.addEventListener('click', () => {
-                this.exportReport();
+                // Disable button during export
+                exportBtn.disabled = true;
+                exportBtn.textContent = 'Exporting...';
+                
+                this.showExportModal();
+                this.exportReport().finally(() => {
+                    // Re-enable button when export is complete
+                    exportBtn.disabled = false;
+                    exportBtn.textContent = 'Export';
+                });
             });
+        }
+    },
+
+    /**
+     * Show export loading modal
+     */
+    showExportModal() {
+        // Remove existing modal if any
+        this.hideExportModal();
+        
+        const modal = document.createElement('div');
+        modal.id = 'export-modal';
+        modal.className = 'export-modal-overlay';
+        modal.innerHTML = `
+            <div class="export-modal-content">
+                <div class="export-spinner"></div>
+                <h3 class="export-modal-title">Generating Report</h3>
+                <p class="export-modal-message">Please wait while we generate your comprehensive anomaly analysis report...</p>
+                <div class="export-progress-dots">
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Add styles dynamically if not already added
+        if (!document.getElementById('export-modal-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'export-modal-styles';
+            styles.textContent = `
+                .export-modal-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: rgba(0, 0, 0, 0.7);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 10000;
+                    backdrop-filter: blur(3px);
+                }
+                
+                .export-modal-content {
+                    background-color: #1f2937;
+                    border: 1px solid #374151;
+                    border-radius: 12px;
+                    padding: 40px 30px;
+                    text-align: center;
+                    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+                    max-width: 400px;
+                    width: 90%;
+                }
+                
+                .export-spinner {
+                    width: 50px;
+                    height: 50px;
+                    border: 4px solid #374151;
+                    border-top: 4px solid #3b82f6;
+                    border-radius: 50%;
+                    animation: export-spin 1s linear infinite;
+                    margin: 0 auto 20px;
+                }
+                
+                @keyframes export-spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                
+                .export-modal-title {
+                    color: #f3f4f6;
+                    font-size: 1.25rem;
+                    font-weight: 600;
+                    margin: 0 0 10px 0;
+                }
+                
+                .export-modal-message {
+                    color: #d1d5db;
+                    font-size: 0.95rem;
+                    line-height: 1.5;
+                    margin: 0 0 20px 0;
+                }
+                
+                .export-progress-dots {
+                    display: flex;
+                    justify-content: center;
+                    gap: 8px;
+                }
+                
+                .export-progress-dots .dot {
+                    width: 8px;
+                    height: 8px;
+                    background-color: #3b82f6;
+                    border-radius: 50%;
+                    animation: export-bounce 1.4s infinite ease-in-out both;
+                }
+                
+                .export-progress-dots .dot:nth-child(1) { animation-delay: -0.32s; }
+                .export-progress-dots .dot:nth-child(2) { animation-delay: -0.16s; }
+                .export-progress-dots .dot:nth-child(3) { animation-delay: 0s; }
+                
+                @keyframes export-bounce {
+                    0%, 80%, 100% {
+                        transform: scale(0);
+                    }
+                    40% {
+                        transform: scale(1);
+                    }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+    },
+
+    /**
+     * Hide export loading modal
+     */
+    hideExportModal() {
+        const modal = document.getElementById('export-modal');
+        if (modal) {
+            modal.remove();
         }
     },
 
@@ -280,6 +414,7 @@ window.AnomaliesDashboard = {
     async exportReport() {
         try {
             if (!this.originalAnomaliesData) {
+                this.hideExportModal();
                 window.Utils?.showNotification('No data available to export', 'warning');
                 return;
             }
@@ -288,7 +423,7 @@ window.AnomaliesDashboard = {
             const metadata = await this.extractAnalysisMetadata();
             
             // Generate the HTML report
-            const htmlContent = this.generateHTMLReport(this.originalAnomaliesData, metadata);
+            const htmlContent = await this.generateHTMLReport(this.originalAnomaliesData, metadata);
             
             // Save the report to llm/reports folder
             const reportFileName = this.generateReportFileName(metadata);
@@ -308,6 +443,7 @@ window.AnomaliesDashboard = {
 
             if (response.ok) {
                 const result = await response.json();
+                this.hideExportModal();
                 window.Utils?.showNotification(
                     `Report exported successfully: ${reportFileName}`, 
                     'success'
@@ -316,10 +452,17 @@ window.AnomaliesDashboard = {
                 // Optionally open the report in a new tab
                 this.showReportPreview(htmlContent);
             } else {
-                throw new Error(`Export failed: ${response.statusText}`);
+                const errorText = await response.text();
+                console.error('Export response error:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    body: errorText
+                });
+                throw new Error(`Export failed: ${response.status} ${response.statusText} - ${errorText}`);
             }
         } catch (error) {
             console.error('Export error:', error);
+            this.hideExportModal();
             window.Utils?.showNotification(`Export failed: ${error.message}`, 'error');
         }
     },
@@ -391,9 +534,45 @@ window.AnomaliesDashboard = {
     /**
      * Generate comprehensive HTML report
      */
-    generateHTMLReport(anomalyData, metadata) {
+    async generateHTMLReport(anomalyData, metadata) {
         const reportDate = new Date().toLocaleDateString();
         const sentDate = new Date(metadata.sentDate).toLocaleDateString();
+        
+        // Generate images with bounding boxes for all anomalies
+        const anomaliesWithImages = await Promise.all(
+            (anomalyData.identified_anomalies || []).map(async (anomaly, index) => {
+                const imagesWithBoundingBoxes = [];
+                
+                // Standard image types in sent_images folder
+                const standardImageTypes = [
+                    'CHM.png',
+                    'HillshadeRGB.png', 
+                    'LRM.png',
+                    'Slope.png',
+                    'SVF.png',
+                    'TintOverlay.png'
+                ];
+                
+                // Generate images with bounding boxes for each image type
+                for (const imageType of standardImageTypes) {
+                    const imagePath = `/llm/logs/${this.currentAnalysisFolder}/sent_images/${imageType}`;
+                    const imageWithBoundingBox = await this.generateImageWithBoundingBoxes(imagePath, anomaly);
+                    
+                    if (imageWithBoundingBox) {
+                        imagesWithBoundingBoxes.push({
+                            name: imageType.replace('.png', ''),
+                            dataUrl: imageWithBoundingBox,
+                            description: this.getImageDescription(imageType.replace('.png', ''))
+                        });
+                    }
+                }
+                
+                return {
+                    ...anomaly,
+                    imagesWithBoundingBoxes
+                };
+            })
+        );
         
         return `<!DOCTYPE html>
 <html lang="en">
@@ -725,7 +904,7 @@ window.AnomaliesDashboard = {
 
         <section class="section">
             <h2>🚨 Identified Anomalies</h2>
-            ${anomalyData.identified_anomalies?.map((anomaly, index) => `
+            ${anomaliesWithImages?.map((anomaly, index) => `
             <div class="anomaly-card">
                 <div class="anomaly-header">
                     <h3 class="anomaly-title">${anomaly.anomaly_id || `Anomaly ${index + 1}`}</h3>
@@ -747,6 +926,14 @@ window.AnomaliesDashboard = {
                             <div>${(value * 100).toFixed(0)}%</div>
                         </div>
                         `).join('')}
+                        
+                        <h4>Bounding Box Coordinates</h4>
+                        ${anomaly.bounding_box_pixels?.map(bb => `
+                        <div class="evidence-item">
+                            <div class="evidence-label">Detection Area</div>
+                            <div>X: ${bb.x_min}-${bb.x_max}, Y: ${bb.y_min}-${bb.y_max}</div>
+                        </div>
+                        `).join('') || '<p>No bounding box data available.</p>'}
                     </div>
                     
                     <div class="detail-section">
@@ -764,6 +951,25 @@ window.AnomaliesDashboard = {
                         <p>${anomaly.archaeological_interpretation || 'No interpretation provided'}</p>
                     </div>
                 </div>
+                
+                ${anomaly.imagesWithBoundingBoxes && anomaly.imagesWithBoundingBoxes.length > 0 ? `
+                <div class="anomaly-images-section">
+                    <h4>📸 Detection Evidence Images</h4>
+                    <p class="image-section-description">Images showing the detected anomaly with white bounding box overlays indicating the precise location of archaeological features.</p>
+                    <div class="images-grid">
+                        ${anomaly.imagesWithBoundingBoxes.map(img => `
+                        <div class="image-card">
+                            <img src="${img.dataUrl}" alt="${img.name} with anomaly detection overlay" style="width: 100%; height: 250px; object-fit: contain; border: 2px solid #3498db;">
+                            <div class="image-info">
+                                <div class="image-title">${img.name.toUpperCase()}</div>
+                                <div class="image-description">${img.description}</div>
+                                <div class="detection-note">🎯 White boxes show detected anomaly locations</div>
+                            </div>
+                        </div>
+                        `).join('')}
+                    </div>
+                </div>
+                ` : ''}
             </div>
             `).join('') || '<p>No anomalies identified in this analysis.</p>'}
         </section>
@@ -1176,51 +1382,72 @@ showReportPreview(htmlContent) {
     },
 
     /**
-     * Draw bounding boxes on the canvas for detected anomalies
-     * @param {CanvasRenderingContext2D} ctx - The canvas rendering context
-     * @param {number} anomalyIndex - Index of the anomaly
-     * @param {number} canvasWidth - Canvas width (scaled)
-     * @param {number} canvasHeight - Canvas height (scaled)
-     * @param {number} originalWidth - Original image width
-     * @param {number} originalHeight - Original image height
+     * Generate base64 image with bounding boxes drawn for report
+     * @param {string} imagePath - Path to the source image
+     * @param {Object} anomaly - Anomaly data containing bounding box information
+     * @returns {Promise<string>} - Base64 data URL of image with bounding boxes
      */
-    drawBoundingBoxes(ctx, anomalyIndex, canvasWidth, canvasHeight, originalWidth, originalHeight) {
-        // Get the anomaly data for this gallery
-        if (!this.galleryAnomalies || !this.galleryAnomalies[anomalyIndex]) {
-            return;
-        }
-
-        const anomaly = this.galleryAnomalies[anomalyIndex];
-        
-        // Check if bounding box data exists
-        if (!anomaly.bounding_box_pixels || anomaly.bounding_box_pixels.length === 0) {
-            return;
-        }
-
-        // Calculate scale factors from original image to canvas
-        const scaleX = canvasWidth / originalWidth;
-        const scaleY = canvasHeight / originalHeight;
-
-        // Set up drawing style for bounding boxes
-        ctx.strokeStyle = '#ffffff'; // White color for visibility
-        ctx.lineWidth = 2;
-        ctx.setLineDash([]); // Solid line
-        
-        // Draw each bounding box
-        anomaly.bounding_box_pixels.forEach((bbox, index) => {
-            // Scale bounding box coordinates to canvas size
-            const x = bbox.x_min * scaleX;
-            const y = bbox.y_min * scaleY;
-            const width = (bbox.x_max - bbox.x_min) * scaleX;
-            const height = (bbox.y_max - bbox.y_min) * scaleY;
+    async generateImageWithBoundingBoxes(imagePath, anomaly) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous'; // Handle CORS issues
             
-            // Draw the bounding box rectangle
-            ctx.strokeRect(x, y, width, height);
+            img.onload = () => {
+                // Create canvas
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set canvas size to match image
+                canvas.width = img.width;
+                canvas.height = img.height;
+                
+                // Draw the original image
+                ctx.drawImage(img, 0, 0);
+                
+                // Draw bounding boxes if available
+                if (anomaly.bounding_box_pixels && anomaly.bounding_box_pixels.length > 0) {
+                    // Set up drawing style for bounding boxes
+                    ctx.strokeStyle = '#ffffff'; // White color for visibility
+                    ctx.lineWidth = 3; // Slightly thicker for report visibility
+                    ctx.setLineDash([]); // Solid line
+                    
+                    // Draw each bounding box
+                    anomaly.bounding_box_pixels.forEach((bbox, index) => {
+                        const x = bbox.x_min;
+                        const y = bbox.y_min;
+                        const width = bbox.x_max - bbox.x_min;
+                        const height = bbox.y_max - bbox.y_min;
+                        
+                        // Draw the bounding box rectangle
+                        ctx.strokeRect(x, y, width, height);
+                        
+                        // Add a label for the bounding box
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = 'bold 16px Arial';
+                        ctx.fillText(`Anomaly ${index + 1}`, x + 5, y - 8);
+                        
+                        // Add a semi-transparent background for the label
+                        const labelWidth = ctx.measureText(`Anomaly ${index + 1}`).width;
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                        ctx.fillRect(x, y - 25, labelWidth + 10, 20);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillText(`Anomaly ${index + 1}`, x + 5, y - 8);
+                    });
+                }
+                
+                // Convert canvas to base64
+                const base64DataUrl = canvas.toDataURL('image/png', 0.9);
+                resolve(base64DataUrl);
+            };
             
-            // Add a label for the bounding box
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '12px Arial';
-            ctx.fillText(`Anomaly ${index + 1}`, x + 2, y - 4);
+            img.onerror = () => {
+                // If image fails to load, resolve with null
+                console.warn(`Failed to load image for bounding box generation: ${imagePath}`);
+                resolve(null);
+            };
+            
+            // Try loading the image
+            img.src = imagePath;
         });
     },
 };
