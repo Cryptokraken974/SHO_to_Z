@@ -1,37 +1,22 @@
 {
   "pipeline": [
     "input/default.laz",
+    { "type": "filters.outlier", "method": "statistical", "mean_k": 8, "multiplier": 3 },
+    { "type": "filters.voxelgrid", "leaf_x": 0.5, "leaf_y": 0.5, "leaf_z": 0.5 },
+    { "type": "filters.assign", "assignment": "Classification[:]=0" },
     {
-      "type": "filters.outlier",
-      "method": "statistical",
-      "multiplier": 3,
-      "mean_k": 8
+      "type": "filters.smrf",
+      "scalar": 1.25,
+      "slope": 0.15,
+      "window": 16.0,
+      "threshold": 0.45
     },
-    {
-      "type": "filters.assign",
-      "assignment": "Classification[:]=0"
-    },
-    {
-        "type": "filters.csf",
-        "ignore": "Classification[7:7]",
-        "threshold": 0.35,
-        "resolution": "__CLOTH_RESOLUTION__",
-        "rigidness": 1,
-        "iterations": 500
-    },
-    {
-      "type": "filters.range",
-      "limits": "Classification![135:146],Z[-10:3000]"
-    },
-    {
-      "type": "filters.range",
-      "limits": "Classification[2:2]"
-    },
+    { "type": "filters.range", "limits": "Classification[2:2]" },
     {
       "type": "writers.gdal",
       "filename": "output/default_DTM.tif",
-      "resolution": "__RESOLUTION__",
-      "output_type": "min",
+      "resolution": 1.0,
+      "output_type": "idw",
       "nodata": -9999,
       "gdaldriver": "GTiff"
     }

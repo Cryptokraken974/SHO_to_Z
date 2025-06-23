@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NDVI Modal Debug Test</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body { 
+            background: #141414; 
+            color: white; 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+        }
+        .modal { 
+            position: fixed; 
+            inset: 0; 
+            background: rgba(0,0,0,0.5); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+        }
+        .modal-content { 
+            background: #1a1a1a; 
+            border: 1px solid #303030; 
+            border-radius: 8px; 
+            padding: 20px; 
+            max-width: 500px; 
+            width: 90%; 
+        }
+        .hidden { 
+            display: none !important; 
+        }
+        .btn { 
+            background: #8e44ad; 
+            color: white; 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            margin: 5px;
+        }
+        .btn:hover { 
+            background: #7d3c98; 
+        }
+        .debug-section {
+            background: #262626;
+            border: 1px solid #404040;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { color: #22c55e; }
+        .error { color: #ef4444; }
+        .warning { color: #fbbf24; }
+    </style>
+</head>
+<body>
+    <h1>NDVI Modal Debug Test</h1>
+    
+    <div class="debug-section">
+        <h2>Test NDVI Checkbox Loading</h2>
+        <button id="test-laz-file-modal" class="btn">Test LAZ File Modal</button>
+        <button id="test-laz-folder-modal" class="btn">Test LAZ Folder Modal</button>
+        <button id="clear-modal" class="btn">Clear Modal</button>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Debug Output</h2>
+        <div id="debug-log"></div>
+    </div>
+    
+    <!-- Modal placeholder -->
+    <div id="modals-placeholder"></div>
+
+    <script>
+        console.log('NDVI Modal Debug Test loaded');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const debugLog = document.getElementById('debug-log');
+            const className = type === 'error' ? 'error' : type === 'warning' ? 'warning' : type === 'success' ? 'success' : '';
+            debugLog.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        // Mock loadModule function for testing
+        async function loadModule(modulePath, targetElementId) {
+            log(`Testing loadModule: ${modulePath} -> ${targetElementId}`);
+            try {
+                // Use fetch to get the modal HTML from the static server
+                const response = await fetch(`/static/${modulePath}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const html = await response.text();
+                document.getElementById(targetElementId).innerHTML = html;
+                log(`✅ Modal loaded successfully: ${modulePath}`, 'success');
+                return true;
+            } catch (error) {
+                log(`❌ Error loading modal: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        // Make it global
+        window.loadModule = loadModule;
+        
+        document.getElementById('test-laz-file-modal').addEventListener('click', async () => {
+            log('🧪 Testing LAZ File Modal...', 'info');
+            
+            const success = await loadModule('modules/modals/laz-file-modal.html', 'modals-placeholder');
+            if (success) {
+                const modal = document.getElementById('laz-file-modal');
+                if (modal) {
+                    log('✅ LAZ File Modal found in DOM', 'success');
+                    modal.classList.remove('hidden');
+                    
+                    // Check for NDVI checkbox
+                    const ndviCheckbox = document.getElementById('laz-ndvi-enabled');
+                    if (ndviCheckbox) {
+                        log('✅ NDVI checkbox found: laz-ndvi-enabled', 'success');
+                        log(`Checkbox type: ${ndviCheckbox.type}`, 'info');
+                        log(`Checkbox checked: ${ndviCheckbox.checked}`, 'info');
+                        log(`Checkbox visible: ${!ndviCheckbox.hidden && ndviCheckbox.style.display !== 'none'}`, 'info');
+                        
+                        // Get the parent container
+                        const parent = ndviCheckbox.closest('div');
+                        if (parent) {
+                            log(`Parent element classes: ${parent.className}`, 'info');
+                            log(`Parent element visible: ${!parent.hidden && parent.style.display !== 'none'}`, 'info');
+                        }
+                    } else {
+                        log('❌ NDVI checkbox NOT found: laz-ndvi-enabled', 'error');
+                        
+                        // Search for any checkbox in the modal
+                        const allCheckboxes = modal.querySelectorAll('input[type="checkbox"]');
+                        log(`Found ${allCheckboxes.length} checkboxes total in modal`, 'warning');
+                        allCheckboxes.forEach((cb, index) => {
+                            log(`Checkbox ${index}: id="${cb.id}", name="${cb.name}"`, 'info');
+                        });
+                        
+                        // Search for NDVI text
+                        const modalHTML = modal.innerHTML;
+                        if (modalHTML.includes('NDVI')) {
+                            log('✅ NDVI text found in modal HTML', 'success');
+                        } else {
+                            log('❌ NDVI text NOT found in modal HTML', 'error');
+                        }
+                    }
+                } else {
+                    log('❌ LAZ File Modal NOT found in DOM after loading', 'error');
+                }
+            }
+        });
+        
+        document.getElementById('test-laz-folder-modal').addEventListener('click', async () => {
+            log('🧪 Testing LAZ Folder Modal...', 'info');
+            
+            const success = await loadModule('modules/modals/laz-folder-modal.html', 'modals-placeholder');
+            if (success) {
+                const modal = document.getElementById('laz-folder-modal');
+                if (modal) {
+                    log('✅ LAZ Folder Modal found in DOM', 'success');
+                    modal.classList.remove('hidden');
+                    
+                    // Check for NDVI checkbox
+                    const ndviCheckbox = document.getElementById('laz-folder-ndvi-enabled');
+                    if (ndviCheckbox) {
+                        log('✅ NDVI checkbox found: laz-folder-ndvi-enabled', 'success');
+                        log(`Checkbox type: ${ndviCheckbox.type}`, 'info');
+                        log(`Checkbox checked: ${ndviCheckbox.checked}`, 'info');
+                        log(`Checkbox visible: ${!ndviCheckbox.hidden && ndviCheckbox.style.display !== 'none'}`, 'info');
+                        
+                        // Get the parent container
+                        const parent = ndviCheckbox.closest('div');
+                        if (parent) {
+                            log(`Parent element classes: ${parent.className}`, 'info');
+                            log(`Parent element visible: ${!parent.hidden && parent.style.display !== 'none'}`, 'info');
+                        }
+                    } else {
+                        log('❌ NDVI checkbox NOT found: laz-folder-ndvi-enabled', 'error');
+                        
+                        // Search for any checkbox in the modal
+                        const allCheckboxes = modal.querySelectorAll('input[type="checkbox"]');
+                        log(`Found ${allCheckboxes.length} checkboxes total in modal`, 'warning');
+                        allCheckboxes.forEach((cb, index) => {
+                            log(`Checkbox ${index}: id="${cb.id}", name="${cb.name}"`, 'info');
+                        });
+                        
+                        // Search for NDVI text
+                        const modalHTML = modal.innerHTML;
+                        if (modalHTML.includes('NDVI')) {
+                            log('✅ NDVI text found in modal HTML', 'success');
+                        } else {
+                            log('❌ NDVI text NOT found in modal HTML', 'error');
+                        }
+                    }
+                } else {
+                    log('❌ LAZ Folder Modal NOT found in DOM after loading', 'error');
+                }
+            }
+        });
+        
+        document.getElementById('clear-modal').addEventListener('click', () => {
+            document.getElementById('modals-placeholder').innerHTML = '';
+            log('🗑️ Modal placeholder cleared', 'info');
+        });
+    </script>
+</body>
+</html>

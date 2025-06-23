@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NDVI Checkbox Visibility Test</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            background: #141414;
+            color: white;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .test-section {
+            background: #1a1a1a;
+            border: 1px solid #303030;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .success { color: #27ae60; }
+        .error { color: #e74c3c; }
+        .warning { color: #f39c12; }
+        .info { color: #3498db; }
+        .btn {
+            background: #8e44ad;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        .btn:hover { background: #7d3c98; }
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: #1a1a1a;
+            border: 1px solid #303030;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            width: 90%;
+        }
+        .hidden { display: none !important; }
+        #modals-placeholder {
+            position: relative;
+            z-index: 1001;
+        }
+        pre {
+            background: #0a0a0a;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔬 NDVI Checkbox Visibility Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Status</h2>
+        <div id="test-status">
+            <p class="info">Ready to test modal loading and NDVI checkbox visibility...</p>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test Controls</h2>
+        <button id="test-file-modal" class="btn">Load LAZ File Modal</button>
+        <button id="test-folder-modal" class="btn">Load LAZ Folder Modal</button>
+        <button id="inspect-dom" class="btn">Inspect Current DOM</button>
+        <button id="clear-results" class="btn">Clear Results</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Results</h2>
+        <div id="test-results">
+            <p class="info">No tests run yet.</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>DOM Inspection</h2>
+        <div id="dom-inspection">
+            <p class="info">Click "Inspect Current DOM" to see current modal content.</p>
+        </div>
+    </div>
+
+    <!-- Modal placeholder -->
+    <div id="modals-placeholder"></div>
+
+    <script>
+        // Mock loadModule function for testing
+        async function loadModule(modulePath, targetElementId) {
+            try {
+                log(`Loading module: ${modulePath} into ${targetElementId}`, 'info');
+                const response = await fetch(`/static/${modulePath}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const html = await response.text();
+                log(`Module loaded successfully. HTML length: ${html.length}`, 'success');
+                
+                const targetElement = document.getElementById(targetElementId);
+                if (targetElement) {
+                    targetElement.innerHTML = html;
+                    log(`Content injected into ${targetElementId}`, 'success');
+                    return true;
+                } else {
+                    throw new Error(`Target element ${targetElementId} not found`);
+                }
+            } catch (error) {
+                log(`Error loading module: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        // Make it global
+        window.loadModule = loadModule;
+
+        function log(message, type = 'info') {
+            const resultsDiv = document.getElementById('test-results');
+            const timestamp = new Date().toLocaleTimeString();
+            resultsDiv.innerHTML += `<p class="${type}">[${timestamp}] ${message}</p>`;
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function testNdviCheckbox(modalId, checkboxId, modalName) {
+            const modal = document.getElementById(modalId);
+            const checkbox = document.getElementById(checkboxId);
+            
+            log(`Testing ${modalName}:`, 'info');
+            log(`  Modal (${modalId}): ${modal ? '✅ Found' : '❌ Not found'}`, modal ? 'success' : 'error');
+            log(`  NDVI Checkbox (${checkboxId}): ${checkbox ? '✅ Found' : '❌ Not found'}`, checkbox ? 'success' : 'error');
+            
+            if (modal && checkbox) {
+                // Test visibility
+                const isVisible = !checkbox.closest('.hidden') && 
+                                getComputedStyle(checkbox).display !== 'none' &&
+                                getComputedStyle(checkbox).visibility !== 'hidden';
+                log(`  Checkbox visibility: ${isVisible ? '✅ Visible' : '❌ Hidden'}`, isVisible ? 'success' : 'error');
+                
+                // Test functionality
+                const originalChecked = checkbox.checked;
+                checkbox.checked = !originalChecked;
+                const newChecked = checkbox.checked;
+                checkbox.checked = originalChecked; // Restore
+                
+                log(`  Checkbox functionality: ${newChecked !== originalChecked ? '✅ Working' : '❌ Not working'}`, 
+                    newChecked !== originalChecked ? 'success' : 'error');
+                
+                return true;
+            }
+            return false;
+        }
+
+        function inspectModalContent() {
+            const placeholder = document.getElementById('modals-placeholder');
+            const inspectionDiv = document.getElementById('dom-inspection');
+            
+            if (!placeholder) {
+                inspectionDiv.innerHTML = '<p class="error">❌ modals-placeholder not found</p>';
+                return;
+            }
+
+            const content = placeholder.innerHTML;
+            if (!content.trim()) {
+                inspectionDiv.innerHTML = '<p class="warning">⚠️ modals-placeholder is empty</p>';
+                return;
+            }
+
+            // Look for NDVI sections
+            const hasFileNdvi = content.includes('laz-ndvi-enabled');
+            const hasFolderNdvi = content.includes('laz-folder-ndvi-enabled');
+            
+            inspectionDiv.innerHTML = `
+                <h3>Modal Placeholder Content Analysis</h3>
+                <p class="info">Content length: ${content.length} characters</p>
+                <p class="${hasFileNdvi ? 'success' : 'error'}">
+                    File modal NDVI checkbox: ${hasFileNdvi ? '✅ Present' : '❌ Missing'}
+                </p>
+                <p class="${hasFolderNdvi ? 'success' : 'error'}">
+                    Folder modal NDVI checkbox: ${hasFolderNdvi ? '✅ Present' : '❌ Missing'}
+                </p>
+                <h4>Full HTML Content:</h4>
+                <pre>${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+            `;
+        }
+
+        // Event listeners
+        document.getElementById('test-file-modal').addEventListener('click', async () => {
+            log('=== Testing LAZ File Modal ===', 'info');
+            const success = await loadModule('modules/modals/laz-file-modal.html', 'modals-placeholder');
+            
+            if (success) {
+                // Small delay to ensure DOM is updated
+                setTimeout(() => {
+                    testNdviCheckbox('laz-file-modal', 'laz-ndvi-enabled', 'LAZ File Modal');
+                    
+                    // Show the modal for visual inspection
+                    const modal = document.getElementById('laz-file-modal');
+                    if (modal) {
+                        modal.classList.remove('hidden');
+                        log('Modal displayed for visual inspection', 'success');
+                    }
+                }, 100);
+            }
+        });
+
+        document.getElementById('test-folder-modal').addEventListener('click', async () => {
+            log('=== Testing LAZ Folder Modal ===', 'info');
+            const success = await loadModule('modules/modals/laz-folder-modal.html', 'modals-placeholder');
+            
+            if (success) {
+                setTimeout(() => {
+                    testNdviCheckbox('laz-folder-modal', 'laz-folder-ndvi-enabled', 'LAZ Folder Modal');
+                    
+                    // Show the modal for visual inspection
+                    const modal = document.getElementById('laz-folder-modal');
+                    if (modal) {
+                        modal.classList.remove('hidden');
+                        log('Modal displayed for visual inspection', 'success');
+                    }
+                }, 100);
+            }
+        });
+
+        document.getElementById('inspect-dom').addEventListener('click', inspectModalContent);
+
+        document.getElementById('clear-results').addEventListener('click', () => {
+            document.getElementById('test-results').innerHTML = '<p class="info">Results cleared.</p>';
+            document.getElementById('dom-inspection').innerHTML = '<p class="info">DOM inspection cleared.</p>';
+            document.getElementById('modals-placeholder').innerHTML = '';
+        });
+
+        // Close modal when clicking outside
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.add('hidden');
+                log('Modal closed', 'info');
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const visibleModals = document.querySelectorAll('.modal:not(.hidden)');
+                visibleModals.forEach(modal => {
+                    modal.classList.add('hidden');
+                    log('Modal closed with Escape key', 'info');
+                });
+            }
+        });
+
+        log('NDVI Checkbox Visibility Test initialized', 'success');
+    </script>
+</body>
+</html>

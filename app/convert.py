@@ -329,26 +329,36 @@ def convert_sentinel2_to_png(data_dir: str, region_name: str) -> dict:
             except Exception as e_band: results['errors'].append(f"Error processing band {band_name}: {e_band}")
 
         if "RED_B04" in extracted_band_paths and "NIR_B08" in extracted_band_paths:
+            # Check if NDVI is enabled for this region before processing
             try:
-                from .processing.ndvi_processing import NDVIProcessor
-                ndvi_tif_path = output_dir / f"{latest_tif.stem}_NDVI.tif"
-                if NDVIProcessor().calculate_ndvi(extracted_band_paths["RED_B04"], extracted_band_paths["NIR_B08"], str(ndvi_tif_path)) and os.path.exists(ndvi_tif_path):
-                    # Create NDVI PNG in png_outputs directory for consistency
-                    png_outputs_dir = Path("output") / region_name / "lidar" / "png_outputs"
-                    png_outputs_dir.mkdir(parents=True, exist_ok=True)
-                    ndvi_png_path = png_outputs_dir / f"{latest_tif.stem}_NDVI.png"
-                    
-                    actual_ndvi_png = convert_geotiff_to_png(str(ndvi_tif_path), str(ndvi_png_path))
-                    if os.path.exists(actual_ndvi_png):
-                        results['files'].append({'band': 'NDVI', 'tif_path': str(ndvi_tif_path), 'png_path': actual_ndvi_png, 'size_mb': os.path.getsize(actual_ndvi_png)/(1024*1024)})
+                from .endpoints.region_management import isRegionNDVI
+                ndvi_enabled = isRegionNDVI(region_name)
+                print(f"🔍 NDVI status for region {region_name}: {'enabled' if ndvi_enabled else 'disabled'}")
+                
+                if ndvi_enabled:
+                    print(f"🌱 NDVI is enabled - proceeding with NDVI calculation for {region_name}")
+                    from .processing.ndvi_processing import NDVIProcessor
+                    ndvi_tif_path = output_dir / f"{latest_tif.stem}_NDVI.tif"
+                    if NDVIProcessor().calculate_ndvi(extracted_band_paths["RED_B04"], extracted_band_paths["NIR_B08"], str(ndvi_tif_path)) and os.path.exists(ndvi_tif_path):
+                        # Create NDVI PNG in png_outputs directory for consistency
+                        png_outputs_dir = Path("output") / region_name / "lidar" / "png_outputs"
+                        png_outputs_dir.mkdir(parents=True, exist_ok=True)
+                        ndvi_png_path = png_outputs_dir / f"{latest_tif.stem}_NDVI.png"
                         
-                        # 🛰️ Trigger satellite gallery refresh - NDVI processing completed
-                        results['ndvi_completed'] = True
-                        results['trigger_satellite_refresh'] = region_name
-                        print(f"✅ NDVI PNG processing completed - satellite gallery should refresh for region: {region_name}")
-                    else: results['errors'].append("Failed to create PNG for NDVI")
-                else: results['errors'].append(f"Failed to calculate NDVI from {latest_tif.stem}")
-            except Exception as ndvi_e: results['errors'].append(f"Error generating NDVI: {ndvi_e}")
+                        actual_ndvi_png = convert_geotiff_to_png(str(ndvi_tif_path), str(ndvi_png_path))
+                        if os.path.exists(actual_ndvi_png):
+                            results['files'].append({'band': 'NDVI', 'tif_path': str(ndvi_tif_path), 'png_path': actual_ndvi_png, 'size_mb': os.path.getsize(actual_ndvi_png)/(1024*1024)})
+                            
+                            # 🛰️ Trigger satellite gallery refresh - NDVI processing completed
+                            results['ndvi_completed'] = True
+                            results['trigger_satellite_refresh'] = region_name
+                            print(f"✅ NDVI PNG processing completed - satellite gallery should refresh for region: {region_name}")
+                        else: results['errors'].append("Failed to create PNG for NDVI")
+                    else: results['errors'].append(f"Failed to calculate NDVI from {latest_tif.stem}")
+                else:
+                    print(f"🚫 NDVI is disabled for region {region_name} - skipping NDVI calculation")
+                    
+            except Exception as ndvi_e: results['errors'].append(f"Error processing NDVI: {ndvi_e}")
         results['success'] = len(results['files']) > 0 and not results['errors']
     except Exception as e: results['errors'].append(f"S2 conversion main error: {e}")
     logger.info(f"S2 to PNG conversion finished. Success: {results['success']}. Files: {len(results['files'])}, Errors: {len(results['errors'])}")

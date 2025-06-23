@@ -85,6 +85,7 @@ def _generate_metadata_content(region: dict) -> str:
     region_name = region.get("name", "Unknown")
     source = region.get("source", "unknown")
     file_path = region.get("file_path", "")
+    ndvi_enabled = region.get("ndvi_enabled", False)
     
     # Determine the source type for better metadata
     if file_path.lower().endswith(('.laz', '.las')):
@@ -100,7 +101,8 @@ def _generate_metadata_content(region: dict) -> str:
 # Source: {source_type}
 
 Region Name: {region_name}
-Source: {source}"""
+Source: {source}
+NDVI Enabled: {str(ndvi_enabled).lower()}"""
     
     if file_path:
         content += f"""
@@ -140,6 +142,71 @@ Center Latitude: N/A
 Center Longitude: N/A"""
     
     return content
+
+def isRegionNDVI(region_name: str) -> bool:
+    """Check if a region was created with NDVI enabled by reading its metadata.txt file or .settings.json file.
+    
+    Args:
+        region_name: Name of the region to check
+        
+    Returns:
+        True if the region was created with NDVI enabled, False otherwise
+    """
+    try:
+        # First, try to read from metadata.txt file (preferred location)
+        metadata_file = os.path.join("output", region_name, "metadata.txt")
+        if os.path.exists(metadata_file):
+            with open(metadata_file, 'r') as f:
+                content = f.read()
+
+            # Look for NDVI Enabled line
+            lines = content.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('NDVI Enabled:'):
+                    value = line.split('NDVI Enabled:')[1].strip().lower()
+                    return value == 'true'
+        
+        # If metadata.txt doesn't exist or doesn't contain NDVI info,
+        # check for .settings.json file in input/LAZ directory
+        import json
+        from pathlib import Path
+        
+        # Try to find corresponding LAZ file settings
+        input_laz_dir = Path("input/LAZ")
+        # Ensure directory exists
+        input_laz_dir.mkdir(parents=True, exist_ok=True)
+        
+        if input_laz_dir.exists():
+            # Look for any .settings.json file that matches the region name
+            for settings_file in input_laz_dir.glob(f"{region_name}.settings.json"):
+                try:
+                    with open(settings_file, 'r') as f:
+                        settings = json.load(f)
+                    return settings.get('ndvi_enabled', False)
+                except Exception as e:
+                    print(f"  ⚠️  Error reading settings file {settings_file}: {str(e)}")
+                    continue
+            
+            # Also try pattern matching for similar filenames
+            for settings_file in input_laz_dir.glob("*.settings.json"):
+                try:
+                    with open(settings_file, 'r') as f:
+                        settings = json.load(f)
+                    # Check if the filename (without extension) matches the region name
+                    settings_filename = settings.get('filename', '')
+                    if settings_filename and Path(settings_filename).stem == region_name:
+                        return settings.get('ndvi_enabled', False)
+                except Exception as e:
+                    continue
+        
+        # If no NDVI information found in either location, default to False
+        return False
+        
+    except Exception as e:
+        print(f"  ⚠️  Error reading NDVI status for {region_name}: {str(e)}")
+        return False
+
 
 @router.get("/api/list-regions")
 async def list_regions(source: str = None):
@@ -471,6 +538,25 @@ async def list_regions(source: str = None):
     
     return {"regions": regions_with_metadata}
 
+@router.get("/api/regions/{region_name}/ndvi-status")
+async def check_region_ndvi_status(region_name: str):
+    """Check if a region was created with NDVI enabled.
+    
+    Args:
+        region_name: Name of the region to check
+        
+    Returns:
+        JSON object with NDVI status: {"ndvi_enabled": true/false, "region_name": "..."}
+    """
+    try:
+        ndvi_enabled = isRegionNDVI(region_name)
+        return {
+            "ndvi_enabled": ndvi_enabled,
+            "region_name": region_name
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to check NDVI status: {str(e)}")
+
 @router.get("/api/get_spatial_metadata")
 async def get_spatial_metadata(filePath: str):
     """Extract spatial metadata (coordinates) from a LAZ file path
@@ -657,6 +743,7 @@ async def create_region(data: dict):
         region_name = data.get('region_name')
         coordinates = data.get('coordinates', {})
         place_name = data.get('place_name')
+        ndvi_enabled = data.get('ndvi_enabled', False)
         
         if not region_name:
             raise HTTPException(status_code=400, detail="region_name is required")
@@ -691,6 +778,7 @@ Display Name: {place_name or safe_region_name}
 Center Latitude: {coordinates['lat']}
 Center Longitude: {coordinates['lng']}
 Source: saved_place
+NDVI Enabled: {str(ndvi_enabled).lower()}
 Created: {data.get('created_at', 'Unknown')}
 
 # This region was created by saving a place location

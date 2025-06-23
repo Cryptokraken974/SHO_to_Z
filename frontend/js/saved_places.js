@@ -89,6 +89,17 @@ window.SavedPlaces = {
               <input type="text" id="save-region-display" readonly 
                      class="w-full bg-[#141414] border border-[#404040] rounded-lg px-3 py-2 text-white text-sm font-mono">
             </div>
+
+            <!-- NDVI Enable Option -->
+            <div class="bg-[#1a1a1a] border border-[#404040] rounded-lg p-3">
+              <div class="flex items-center gap-3">
+                <input type="checkbox" id="save-ndvi-enabled" class="w-4 h-4 text-[#00bfff] bg-[#262626] border-[#404040] rounded focus:ring-[#00bfff] focus:ring-2">
+                <div>
+                  <label for="save-ndvi-enabled" class="text-white font-medium cursor-pointer">NDVI Enabled</label>
+                  <p class="text-[#ababab] text-xs mt-1">Enable NDVI processing for vegetation analysis</p>
+                </div>
+              </div>
+            </div>
           </div>
           
           <!-- Action Buttons -->
@@ -339,6 +350,7 @@ window.SavedPlaces = {
     const lat = parseFloat(document.getElementById('save-lat-display').value);
     const lng = parseFloat(document.getElementById('save-lng-display').value);
     const regionName = document.getElementById('save-region-display').value;
+    const ndviEnabled = document.getElementById('save-ndvi-enabled').checked;
 
     // Show loading state
     const confirmBtn = document.getElementById('confirm-save-btn');
@@ -355,6 +367,7 @@ window.SavedPlaces = {
           lng: lng
         },
         place_name: placeName,
+        ndvi_enabled: ndviEnabled,
         created_at: new Date().toISOString()
       };
 

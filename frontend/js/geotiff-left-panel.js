@@ -909,6 +909,11 @@ class GeoTiffLeftPanel {
                 console.log('📂 Selected LAZ files before transition:', this.selectedLazFiles);
                 console.log('📂 Selected LAZ files count:', this.selectedLazFiles ? this.selectedLazFiles.length : 'undefined');
                 
+                // Capture NDVI setting from folder modal
+                const folderNdviCheckbox = document.getElementById('laz-folder-ndvi-enabled');
+                const folderNdviEnabled = folderNdviCheckbox ? folderNdviCheckbox.checked : false;
+                console.log('📂 Folder NDVI enabled:', folderNdviEnabled);
+                
                 // Store files temporarily to ensure they persist
                 const filesToTransfer = this.selectedLazFiles ? [...this.selectedLazFiles] : [];
                 console.log('📂 Files to transfer:', filesToTransfer.length);
@@ -923,6 +928,14 @@ class GeoTiffLeftPanel {
                     // Open file modal with pre-selected files and start loading automatically
                     this.openLazFileModal(false).then(() => {
                         console.log('📂 File modal opened, files available:', this.selectedLazFiles ? this.selectedLazFiles.length : 0);
+                        
+                        // Transfer NDVI setting from folder modal to file modal
+                        const fileNdviCheckbox = document.getElementById('laz-ndvi-enabled');
+                        if (fileNdviCheckbox) {
+                            fileNdviCheckbox.checked = folderNdviEnabled;
+                            console.log('📂 Transferred NDVI setting to file modal:', folderNdviEnabled);
+                        }
+                        
                         this.updateLazFilesList();
                         this.updateLoadButton();
                         
@@ -1086,10 +1099,18 @@ class GeoTiffLeftPanel {
             this.showLazProgress(true);
             this.updateLazProgress(0, 'Starting upload...');
 
+            // Capture NDVI checkbox state
+            const ndviCheckbox = document.getElementById('laz-ndvi-enabled');
+            const ndviEnabled = ndviCheckbox ? ndviCheckbox.checked : false;
+            console.log('📂 NDVI enabled:', ndviEnabled);
+
             const formData = new FormData();
             files.forEach(file => {
                 formData.append('files', file);
             });
+            
+            // Add NDVI parameter to form data
+            formData.append('ndvi_enabled', ndviEnabled.toString());
 
             console.log('📂 Sending files to /api/laz/upload...');
             

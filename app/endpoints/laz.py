@@ -41,13 +41,14 @@ LAZ_INPUT_DIR.mkdir(parents=True, exist_ok=True)
 LAZ_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _create_laz_metadata_file(file_name: str, response_data: Dict[str, Any], source_crs_info: str = None) -> bool:
+def _create_laz_metadata_file(file_name: str, response_data: Dict[str, Any], source_crs_info: str = None, ndvi_enabled: bool = False) -> bool:
     """Create metadata.txt file for LAZ region with coordinate information.
     
     Args:
         file_name: Name of the LAZ file
         response_data: Response data containing bounds and center
         source_crs_info: Source CRS information from PDAL
+        ndvi_enabled: Whether NDVI processing is enabled for this region
         
     Returns:
         True if metadata file was created successfully, False otherwise
@@ -93,6 +94,7 @@ Source CRS: {source_crs_info or debug_info.get('source_crs_wkt', 'N/A')}
 Native Bounds: {debug_info.get('native_bounds', 'N/A')}
 
 # Processing Information
+NDVI Enabled: {str(ndvi_enabled).lower()}
 PDAL Command: {debug_info.get('pdal_command', 'N/A')}
 Extraction Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 """
@@ -290,6 +292,10 @@ def guess_crs_from_coordinates(minx: float, miny: float, maxx: float, maxy: floa
 async def load_laz_file(file: UploadFile = File(...)):
     """Load a LAZ/LAS file into input/LAZ and create output directory"""
     try:
+        # Ensure LAZ input directory exists
+        LAZ_INPUT_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info(f"LAZ input directory ensured: {LAZ_INPUT_DIR}")
+        
         # Validate file type
         allowed_extensions = ['.laz', '.las']
         file_ext = Path(file.filename).suffix.lower()
@@ -345,6 +351,10 @@ async def upload_and_process_laz(
 ):
     """Upload and process a LAZ/LAS file"""
     try:
+        # Ensure LAZ input directory exists
+        LAZ_INPUT_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info(f"LAZ input directory ensured: {LAZ_INPUT_DIR}")
+        
         # Validate file type
         allowed_extensions = ['.laz', '.las']
         file_ext = Path(file.filename).suffix.lower()
@@ -1436,10 +1446,15 @@ async def serve_debug_tool():
 
 @router.post("/upload")
 async def upload_multiple_laz_files(
-    files: List[UploadFile] = File(...)
+    files: List[UploadFile] = File(...),
+    ndvi_enabled: bool = Form(False)
 ):
     """Upload multiple LAZ/LAS files"""
     try:
+        # Ensure LAZ input directory exists
+        LAZ_INPUT_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info(f"LAZ input directory ensured: {LAZ_INPUT_DIR}")
+        
         if not files:
             raise HTTPException(status_code=400, detail="No files provided")
         
@@ -1480,6 +1495,21 @@ async def upload_multiple_laz_files(
                 f.write(content)
             
             logger.info(f"Uploaded LAZ file: {upload_path}")
+            
+            # Store NDVI setting in .settings.json file alongside the LAZ file
+            settings_file = upload_path.with_suffix('.settings.json')
+            settings_data = {
+                "ndvi_enabled": ndvi_enabled,
+                "upload_timestamp": datetime.now().isoformat(),
+                "filename": upload_path.name
+            }
+            
+            try:
+                with open(settings_file, 'w') as sf:
+                    json.dump(settings_data, sf, indent=2)
+                logger.info(f"Created settings file: {settings_file} with NDVI enabled: {ndvi_enabled}")
+            except Exception as e:
+                logger.warning(f"Failed to create settings file for {upload_path.name}: {e}")
             
             # Create output directory structure
             file_stem = upload_path.stem
@@ -1700,11 +1730,33 @@ async def _get_laz_bounds_data_internal(file_name: str) -> Dict[str, Any]:
 @router.post("/generate-metadata")
 async def generate_laz_metadata(
     region_name: str = Form(...),
-    file_name: str = Form(...)
+    file_name: str = Form(...),
+    ndvi_enabled: bool = Form(False)
 ):
     """Generate metadata.txt file for a LAZ region after raster processing is complete"""
     try:
         logger.info(f"Generating metadata for region: {region_name}, file: {file_name}")
+        
+        # Try to read NDVI setting from stored settings file first
+        laz_file_path = LAZ_INPUT_DIR / file_name
+        settings_file = laz_file_path.with_suffix('.settings.json')
+        
+        final_ndvi_enabled = ndvi_enabled  # Default to form parameter
+        
+        if settings_file.exists():
+            try:
+                import json
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+                    stored_ndvi = settings.get('ndvi_enabled', False)
+                    final_ndvi_enabled = stored_ndvi
+                    logger.info(f"Retrieved stored NDVI setting: {stored_ndvi} for {file_name}")
+            except Exception as e:
+                logger.warning(f"Could not read settings file for {file_name}: {e}")
+        else:
+            logger.info(f"No settings file found for {file_name}, using form parameter: {ndvi_enabled}")
+        
+        logger.info(f"Final NDVI enabled setting: {final_ndvi_enabled}")
         
         # Get LAZ file bounds and coordinates using internal function
         response_data = await _get_laz_bounds_data_internal(file_name)
@@ -1713,7 +1765,7 @@ async def generate_laz_metadata(
             raise HTTPException(status_code=500, detail="Failed to get LAZ coordinates")
         
         # Create metadata file
-        success = _create_laz_metadata_file(file_name, response_data, response_data.get("_debug_info", {}).get("source_crs_wkt"))
+        success = _create_laz_metadata_file(file_name, response_data, response_data.get("_debug_info", {}).get("source_crs_wkt"), final_ndvi_enabled)
         
         if success:
             # Get the metadata file path for response
@@ -1721,104 +1773,109 @@ async def generate_laz_metadata(
             metadata_path = region_output_dir / "metadata.txt"
             
             # 🛰️ SENTINEL-2 ACQUISITION INTEGRATION
-            # After successful metadata creation, automatically acquire Sentinel-2 imagery
+            # After successful metadata creation, conditionally acquire Sentinel-2 imagery based on NDVI setting
             sentinel2_result = None
-            try:
-                logger.info(f"🛰️ Starting automatic Sentinel-2 acquisition for region: {region_name}")
-                
-                # Extract coordinates from LAZ bounds
-                bounds = response_data.get("bounds", {})
-                center = response_data.get("center", {})
-                
-                if center.get("lat") and center.get("lng"):
-                    # Import satellite service dependencies
-                    from ..api.satellite_service import SatelliteService
-                    from datetime import datetime, timedelta
+            
+            if final_ndvi_enabled:
+                logger.info(f"🛰️ NDVI is enabled - Starting automatic Sentinel-2 acquisition for region: {region_name}")
+                try:
+                    # Extract coordinates from LAZ bounds
+                    bounds = response_data.get("bounds", {})
+                    center = response_data.get("center", {})
                     
-                    # Create satellite service instance
-                    satellite_service = SatelliteService()
-                    
-                    # Calculate date range (last 2 years for better scene availability)
-                    end_date = datetime.now()
-                    start_date = end_date - timedelta(days=730)  # 2 years back
-                    
-                    # Prepare Sentinel-2 request
-                    satellite_request = {
-                        "lat": center["lat"],
-                        "lng": center["lng"], 
-                        "buffer_km": 5.0,  # 5km buffer around center point
-                        "start_date": start_date.strftime("%Y-%m-%d"),
-                        "end_date": end_date.strftime("%Y-%m-%d"),
-                        "bands": ["B04", "B08"],  # Red and NIR bands
-                        "region_name": region_name,
-                        "cloud_cover_max": 30
-                    }
-                    
-                    logger.info(f"🛰️ Sentinel-2 request: center=({center['lat']:.6f}, {center['lng']:.6f}), buffer=5km")
-                    
-                    # Extract the WGS84 bounds for Sentinel-2 request
-                    laz_wgs84_bounds_dict = response_data.get("bounds", {}) # This is {"min_lng": ..., "min_lat": ..., ...}
-
-                    from app.data_acquisition.utils.coordinates import BoundingBox # Ensure import
-                    laz_bbox_obj = BoundingBox(
-                        north=laz_wgs84_bounds_dict.get("max_lat"),
-                        south=laz_wgs84_bounds_dict.get("min_lat"),
-                        east=laz_wgs84_bounds_dict.get("max_lng"),
-                        west=laz_wgs84_bounds_dict.get("min_lng")
-                    )
-
-                    if not all([laz_bbox_obj.north, laz_bbox_obj.south, laz_bbox_obj.east, laz_bbox_obj.west]):
-                        logger.error(f"⚠️ Could not extract valid WGS84 bounding box from LAZ metadata for Sentinel-2. Data: {laz_wgs84_bounds_dict}")
-                        raise ValueError("Invalid WGS84 bounding box extracted from LAZ metadata.")
-
-                    laz_area_sq_km = laz_bbox_obj.get_area_sq_km()
-                    MAX_RECOMMENDED_S2_AREA_SQ_KM = 625.0 # approx 25km x 25km
-
-                    if laz_area_sq_km > MAX_RECOMMENDED_S2_AREA_SQ_KM:
-                        logger.warning(f"LAZ file {file_name} has a large bounding box ({laz_area_sq_km:.2f} sq km), which exceeds the recommended max area of {MAX_RECOMMENDED_S2_AREA_SQ_KM:.2f} sq km for Sentinel-2 acquisition. Proceeding with full LAZ extent.")
-
-                    sentinel2_request_bbox_dict = {
-                        "north": laz_bbox_obj.north,
-                        "south": laz_bbox_obj.south,
-                        "east": laz_bbox_obj.east,
-                        "west": laz_bbox_obj.west
-                    }
-                    logger.info(f"🛰️ Sentinel-2 request (using LAZ BBox): North={laz_bbox_obj.north:.4f}, South={laz_bbox_obj.south:.4f}, East={laz_bbox_obj.east:.4f}, West={laz_bbox_obj.west:.4f}")
-
-                    # Download Sentinel-2 data with LAZ bounding box
-                    sentinel2_result = await satellite_service.download_sentinel2_data(
-                        bounding_box=sentinel2_request_bbox_dict, # Pass the LAZ BBox
-                        start_date=start_date.strftime("%Y-%m-%d"),
-                        end_date=end_date.strftime("%Y-%m-%d"),
-                        bands=satellite_request.get("bands", ["B04", "B08"]), # Use bands from previous dict or default
-                        cloud_cover_max=satellite_request.get("cloud_cover_max", 30), # Use cloud cover from previous dict or default
-                        region_name=region_name
-                    )
-                    
-                    if sentinel2_result and sentinel2_result.get("success"):
-                        logger.info(f"✅ Sentinel-2 acquisition completed successfully")
+                    if center.get("lat") and center.get("lng"):
+                        # Import satellite service dependencies
+                        from ..api.satellite_service import SatelliteService
+                        from datetime import datetime, timedelta
                         
-                        # Auto-convert to PNG if we have a region name
-                        try:
-                            conversion_result = await satellite_service.convert_sentinel2_images(region_name)
-                            if conversion_result and conversion_result.get("success"):
-                                logger.info(f"✅ Sentinel-2 PNG conversion completed")
-                            else:
-                                logger.warning(f"⚠️ Sentinel-2 PNG conversion failed: {conversion_result}")
-                        except Exception as conv_error:
-                            logger.warning(f"⚠️ Sentinel-2 PNG conversion error: {conv_error}")
-                            # Don't fail the entire process for conversion errors
+                        # Create satellite service instance
+                        satellite_service = SatelliteService()
                         
+                        # Calculate date range (last 2 years for better scene availability)
+                        end_date = datetime.now()
+                        start_date = end_date - timedelta(days=730)  # 2 years back
+                        
+                        # Prepare Sentinel-2 request
+                        satellite_request = {
+                            "lat": center["lat"],
+                            "lng": center["lng"], 
+                            "buffer_km": 5.0,  # 5km buffer around center point
+                            "start_date": start_date.strftime("%Y-%m-%d"),
+                            "end_date": end_date.strftime("%Y-%m-%d"),
+                            "bands": ["B04", "B08"],  # Red and NIR bands
+                            "region_name": region_name,
+                            "cloud_cover_max": 30
+                        }
+                        
+                        logger.info(f"🛰️ Sentinel-2 request: center=({center['lat']:.6f}, {center['lng']:.6f}), buffer=5km")
+                        
+                        # Extract the WGS84 bounds for Sentinel-2 request
+                        laz_wgs84_bounds_dict = response_data.get("bounds", {}) # This is {"min_lng": ..., "min_lat": ..., ...}
+
+                        from app.data_acquisition.utils.coordinates import BoundingBox # Ensure import
+                        laz_bbox_obj = BoundingBox(
+                            north=laz_wgs84_bounds_dict.get("max_lat"),
+                            south=laz_wgs84_bounds_dict.get("min_lat"),
+                            east=laz_wgs84_bounds_dict.get("max_lng"),
+                            west=laz_wgs84_bounds_dict.get("min_lng")
+                        )
+
+                        if not all([laz_bbox_obj.north, laz_bbox_obj.south, laz_bbox_obj.east, laz_bbox_obj.west]):
+                            logger.error(f"⚠️ Could not extract valid WGS84 bounding box from LAZ metadata for Sentinel-2. Data: {laz_wgs84_bounds_dict}")
+                            raise ValueError("Invalid WGS84 bounding box extracted from LAZ metadata.")
+
+                        laz_area_sq_km = laz_bbox_obj.get_area_sq_km()
+                        MAX_RECOMMENDED_S2_AREA_SQ_KM = 625.0 # approx 25km x 25km
+
+                        if laz_area_sq_km > MAX_RECOMMENDED_S2_AREA_SQ_KM:
+                            logger.warning(f"LAZ file {file_name} has a large bounding box ({laz_area_sq_km:.2f} sq km), which exceeds the recommended max area of {MAX_RECOMMENDED_S2_AREA_SQ_KM:.2f} sq km for Sentinel-2 acquisition. Proceeding with full LAZ extent.")
+
+                        sentinel2_request_bbox_dict = {
+                            "north": laz_bbox_obj.north,
+                            "south": laz_bbox_obj.south,
+                            "east": laz_bbox_obj.east,
+                            "west": laz_bbox_obj.west
+                        }
+                        logger.info(f"🛰️ Sentinel-2 request (using LAZ BBox): North={laz_bbox_obj.north:.4f}, South={laz_bbox_obj.south:.4f}, East={laz_bbox_obj.east:.4f}, West={laz_bbox_obj.west:.4f}")
+
+                        # Download Sentinel-2 data with LAZ bounding box
+                        sentinel2_result = await satellite_service.download_sentinel2_data(
+                            bounding_box=sentinel2_request_bbox_dict, # Pass the LAZ BBox
+                            start_date=start_date.strftime("%Y-%m-%d"),
+                            end_date=end_date.strftime("%Y-%m-%d"),
+                            bands=satellite_request.get("bands", ["B04", "B08"]), # Use bands from previous dict or default
+                            cloud_cover_max=satellite_request.get("cloud_cover_max", 30), # Use cloud cover from previous dict or default
+                            region_name=region_name
+                        )
+                        
+                        if sentinel2_result and sentinel2_result.get("success"):
+                            logger.info(f"✅ Sentinel-2 acquisition completed successfully")
+                            
+                            # Auto-convert to PNG if we have a region name
+                            try:
+                                conversion_result = await satellite_service.convert_sentinel2_images(region_name)
+                                if conversion_result and conversion_result.get("success"):
+                                    logger.info(f"✅ Sentinel-2 PNG conversion completed")
+                                else:
+                                    logger.warning(f"⚠️ Sentinel-2 PNG conversion failed: {conversion_result}")
+                            except Exception as conv_error:
+                                logger.warning(f"⚠️ Sentinel-2 PNG conversion error: {conv_error}")
+                                # Don't fail the entire process for conversion errors
+                            
+                        else:
+                            logger.warning(f"⚠️ Sentinel-2 acquisition failed: {sentinel2_result}")
+                            
                     else:
-                        logger.warning(f"⚠️ Sentinel-2 acquisition failed: {sentinel2_result}")
+                        logger.warning(f"⚠️ No valid coordinates found for Sentinel-2 acquisition")
+                        sentinel2_result = {"success": False, "error": "No valid coordinates found"}
                         
-                else:
-                    logger.warning(f"⚠️ No valid coordinates found for Sentinel-2 acquisition")
-                    
-            except Exception as satellite_error:
-                logger.error(f"❌ Sentinel-2 acquisition error: {satellite_error}")
-                # Don't fail the metadata generation for satellite acquisition errors
-                sentinel2_result = {"success": False, "error": str(satellite_error)}
+                except Exception as satellite_error:
+                    logger.error(f"❌ Sentinel-2 acquisition error: {satellite_error}")
+                    # Don't fail the metadata generation for satellite acquisition errors
+                    sentinel2_result = {"success": False, "error": str(satellite_error)}
+            else:
+                logger.info(f"🚫 NDVI is disabled - Skipping Sentinel-2 acquisition for region: {region_name}")
+                sentinel2_result = {"success": False, "skipped": True, "reason": "NDVI disabled"}
             
             # Return comprehensive response including satellite acquisition status
             response = {

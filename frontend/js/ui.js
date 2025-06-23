@@ -2020,39 +2020,62 @@ window.UIManager = {
         // Continue with next step even if CHM fails
       }
 
-      // Step 4: Acquire Sentinel-2 data
-      Utils.log('info', 'Step 4/4: Acquiring Sentinel-2 satellite data...');
-      this.showProgress('🛰️ Step 4/4: Acquiring Sentinel-2 satellite data...');
+      // Step 4: Check if NDVI is enabled before acquiring Sentinel-2 data
+      Utils.log('info', 'Step 4/4: Checking NDVI status before Sentinel-2 acquisition...');
+      this.showProgress('🛰️ Step 4/4: Checking NDVI status...');
       
       try {
-        const sentinelRequestData = {
-          region_name: effectiveRegionName || `${Math.abs(latNum).toFixed(2)}${latNum >= 0 ? 'N' : 'S'}_${Math.abs(lngNum).toFixed(2)}${lngNum >= 0 ? 'E' : 'W'}`,
-          latitude: latNum,
-          longitude: lngNum,
-          buffer_km: 5.0
-        };
-
-        const sentinelResponse = await fetch('/api/download-sentinel2', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(sentinelRequestData)
-        });
-
-        if (!sentinelResponse.ok) {
-          const errorData = await sentinelResponse.json();
-          throw new Error(errorData.detail || `HTTP ${sentinelResponse.status}: ${sentinelResponse.statusText}`);
-        }
-
-        const sentinelResult = await sentinelResponse.json();
+        const regionNameForCheck = effectiveRegionName || `${Math.abs(latNum).toFixed(2)}${latNum >= 0 ? 'N' : 'S'}_${Math.abs(lngNum).toFixed(2)}${lngNum >= 0 ? 'E' : 'W'}`;
         
-        if (!sentinelResult.success) {
-          throw new Error(sentinelResult.message || 'Sentinel-2 acquisition failed');
+        // Check if NDVI is enabled for this region
+        const ndviCheckResponse = await fetch(`/api/regions/${encodeURIComponent(regionNameForCheck)}/ndvi-status`);
+        let ndviEnabled = false;
+        
+        if (ndviCheckResponse.ok) {
+          const ndviData = await ndviCheckResponse.json();
+          ndviEnabled = ndviData.ndvi_enabled;
+          Utils.log('info', `NDVI status for region ${regionNameForCheck}: ${ndviEnabled}`);
+        } else {
+          Utils.log('warn', `Could not check NDVI status for region ${regionNameForCheck}, defaulting to false`);
         }
+        
+        if (ndviEnabled) {
+          Utils.log('info', '🌱 NDVI is enabled - Acquiring Sentinel-2 satellite data...');
+          this.showProgress('🛰️ Step 4/4: NDVI enabled - Acquiring Sentinel-2 satellite data...');
+          
+          const sentinelRequestData = {
+            region_name: regionNameForCheck,
+            latitude: latNum,
+            longitude: lngNum,
+            buffer_km: 5.0
+          };
 
-        Utils.log('info', 'Step 4/4: Sentinel-2 acquisition completed successfully');
-        Utils.showNotification('Step 4/4: Sentinel-2 data acquired successfully!', 'success', 3000);
+          const sentinelResponse = await fetch('/api/download-sentinel2', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(sentinelRequestData)
+          });
+
+          if (!sentinelResponse.ok) {
+            const errorData = await sentinelResponse.json();
+            throw new Error(errorData.detail || `HTTP ${sentinelResponse.status}: ${sentinelResponse.statusText}`);
+          }
+
+          const sentinelResult = await sentinelResponse.json();
+          
+          if (!sentinelResult.success) {
+            throw new Error(sentinelResult.message || 'Sentinel-2 acquisition failed');
+          }
+
+          Utils.log('info', 'Step 4/4: Sentinel-2 acquisition completed successfully');
+          Utils.showNotification('Step 4/4: Sentinel-2 data acquired successfully!', 'success', 3000);
+        } else {
+          Utils.log('info', '🚫 NDVI is disabled - Skipping Sentinel-2 acquisition');
+          this.showProgress('🚫 Step 4/4: NDVI disabled - Skipping Sentinel-2 acquisition...');
+          Utils.showNotification('Step 4/4: NDVI disabled - Skipping Sentinel-2 data acquisition', 'info', 3000);
+        }
       } catch (sentinelError) {
         Utils.log('warn', 'Step 4/4: Sentinel-2 acquisition failed:', sentinelError);
         Utils.showNotification(`Step 4/4: Sentinel-2 failed: ${sentinelError.message}`, 'warning', 4000);
