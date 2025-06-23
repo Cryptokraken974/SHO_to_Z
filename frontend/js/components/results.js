@@ -1,6 +1,5 @@
 window.ResultsManager = {
     logListContainerId: 'results-log-list', // ID of the div in results-tab's left panel
-    selectAllButtonId: 'results-select-all-btn',
     deleteButtonId: 'results-delete-btn',
     mainDashboardContainerId: 'results-main-panel', // ID of the div for the dashboard
     initialized: false,
@@ -26,13 +25,6 @@ window.ResultsManager = {
     },
 
     attachEventListeners() {
-        const selectAllButton = document.getElementById(this.selectAllButtonId);
-        if (selectAllButton) {
-            selectAllButton.addEventListener('click', () => {
-                this.handleSelectAll();
-            });
-        }
-        
         const deleteButton = document.getElementById(this.deleteButtonId);
         if (deleteButton) {
             deleteButton.addEventListener('click', () => {
@@ -385,33 +377,6 @@ window.ResultsManager = {
                (data.analysis_summary || data.identified_anomalies) ||
                (data.anomalies_detected !== undefined) ||
                (data.number_of_anomalies !== undefined);
-    },
-
-    handleSelectAll() {
-        Utils.log('info', '"Select All" clicked.');
-        
-        // Clear selection and hide delete button
-        this.hideDeleteButton();
-        
-        // Remove selection styling from all items
-        const logListContainer = document.getElementById(this.logListContainerId);
-        if (logListContainer) {
-            logListContainer.querySelectorAll('li').forEach(item => {
-                item.classList.remove('bg-blue-600', 'bg-blue-700');
-                item.classList.add('bg-gray-700');
-            });
-        }
-        
-        const dashboardContainer = document.getElementById(this.mainDashboardContainerId);
-        if (dashboardContainer) {
-            dashboardContainer.innerHTML = `
-                <h2 class="text-white text-lg font-semibold mb-3">Aggregated Archaeological Analysis Dashboard</h2>
-                <p class="text-gray-300 mb-2">Loading aggregated anomaly analysis results...</p>
-            `;
-
-            // Try to fetch aggregated results
-            this.fetchAndDisplayAggregatedResults(dashboardContainer);
-        }
     },
 
     showDeleteButton() {

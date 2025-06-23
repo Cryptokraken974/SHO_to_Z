@@ -43,29 +43,30 @@ async def send_to_openai(payload: SendPayload):
         import datetime
         import shutil
         
+        print(f"🔍 DEBUG send: Starting OpenAI send process")
+        print(f"   - Region: {payload.laz_name}")
+        print(f"   - Images count: {len(payload.images) if payload.images else 0}")
+        print(f"   - Temp folder name: {payload.temp_folder_name}")
+        
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
 
-        # Prepare content array for multimodal input.
-        # The content array combines text prompts and image URLs.
-        # It starts with the text prompt, followed by image URL objects for each image.
+        # Prepare content array for multimodal input
         content_list = [{"type": "text", "text": payload.prompt}]
         for image_url in payload.images:
-            # OpenAI expects the image URL to be in a specific format
             content_list.append({
                 "type": "image_url", 
                 "image_url": {
-                    "url": image_url  # This can be either a data URL or HTTP URL
+                    "url": image_url
                 }
             })
 
         messages = [
             {
                 "role": "user",
-                "content": content_list  # Combined text and image inputs
+                "content": content_list
             }
         ]
-        # Use the model_name from the payload if provided, otherwise default to "gpt-4o-mini".
-        # This allows the client to specify which OpenAI model to use for the API call.
+        
         selected_model = payload.model_name or "gpt-4o-mini"
         
         response = client.chat.completions.create(
@@ -74,13 +75,12 @@ async def send_to_openai(payload: SendPayload):
         )
         content = response.choices[0].message.content
         
-        # Automatically create log entry after successful OpenAI response
+        # Create log folder structure
         region_name = payload.laz_name or "unknown_region"
         model_name = payload.model_name or "gpt-4o-mini"
         date_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         unique_id = uuid.uuid4().hex[:8]
         
-        # Create folder structure: llm/logs/OR_WizardIsland_gpt4omini_20250621_a1b2c3d4/
         clean_region = "".join(c for c in region_name if c.isalnum() or c in "_-")
         clean_model = "".join(c for c in model_name.replace("-", "").replace(".", "") if c.isalnum())
         
@@ -88,7 +88,15 @@ async def send_to_openai(payload: SendPayload):
         log_folder = LOG_DIR / folder_name
         log_folder.mkdir(parents=True, exist_ok=True)
         
-        # Prepare log entry with images (convert file paths to proper format)
+        print(f"📁 DEBUG send: Created log folder: {log_folder}")
+        
+        # Create sent_images folder in the final log directory
+        sent_images_folder = log_folder / "sent_images"
+        sent_images_folder.mkdir(parents=True, exist_ok=True)
+        
+        print(f"📁 DEBUG send: Created sent_images folder: {sent_images_folder}")
+        
+        # Prepare log entry
         log_entry = {
             "laz_name": payload.laz_name,
             "coordinates": payload.coordinates,
@@ -97,68 +105,82 @@ async def send_to_openai(payload: SendPayload):
             "model_name": payload.model_name
         }
         
-        # Check if there's a specific temp folder to use for images
+        # Copy images to the sent_images folder
+        images_copied = False
+        
+        # Method 1: Copy from temp folder if provided
         if payload.temp_folder_name:
+            print(f"🔍 DEBUG send: Looking for temp folder: {payload.temp_folder_name}")
             temp_folder = LOG_DIR / payload.temp_folder_name
-            sent_images_folder = temp_folder / "sent_images"
+            temp_sent_images = temp_folder / "sent_images"
             
-            if sent_images_folder.exists():
-                # Move the sent_images folder to the final log folder
-                final_images_folder = log_folder / "sent_images"
-                shutil.move(str(sent_images_folder), str(final_images_folder))
+            if temp_sent_images.exists():
+                print(f"📋 DEBUG send: Found temp images, copying to final location")
                 
-                # Create image entries for the log
-                if final_images_folder.exists():
-                    for img_file in final_images_folder.glob("*.png"):
-                        log_entry["images"].append({
-                            "name": img_file.stem.lower().replace("-", "_"),
-                            "path": str(Path("llm/logs") / folder_name / "sent_images" / img_file.name),
-                            "filename": img_file.name,
-                            "size": img_file.stat().st_size
-                        })
-                
-                # Clean up temp folder
-                try:
-                    temp_folder.rmdir()  # Will only work if empty
-                except OSError:
-                    pass  # Folder not empty, leave it
-        else:
-            # Fallback: Check if there are any temp image folders to rename and link
-            temp_pattern = f"{clean_region}_temp_*"
-            temp_folders = list(LOG_DIR.glob(temp_pattern))
-            
-            if temp_folders:
-                # Use the most recent temp folder
-                temp_folder = max(temp_folders, key=lambda p: p.stat().st_mtime)
-                sent_images_folder = temp_folder / "sent_images"
-                
-                if sent_images_folder.exists():
-                    # Move the sent_images folder to the final log folder
-                    final_images_folder = log_folder / "sent_images"
-                    shutil.move(str(sent_images_folder), str(final_images_folder))
+                # Copy each image file individually
+                for img_file in temp_sent_images.glob("*.png"):
+                    final_img_path = sent_images_folder / img_file.name
+                    shutil.copy2(img_file, final_img_path)
                     
-                    # Create image entries for the log
-                    if final_images_folder.exists():
-                        for img_file in final_images_folder.glob("*.png"):
-                            log_entry["images"].append({
-                                "name": img_file.stem.lower().replace("-", "_"),
-                                "path": str(Path("llm/logs") / folder_name / "sent_images" / img_file.name),
-                                "filename": img_file.name,
-                                "size": img_file.stat().st_size
-                            })
+                    # Add to log entry
+                    log_entry["images"].append({
+                        "name": img_file.stem.lower().replace("-", "_"),
+                        "path": str(Path("llm/logs") / folder_name / "sent_images" / img_file.name),
+                        "filename": img_file.name,
+                        "size": final_img_path.stat().st_size
+                    })
+                    
+                    print(f"💾 DEBUG send: Copied image: {img_file.name}")
+                
+                images_copied = True
                 
                 # Clean up temp folder
                 try:
-                    temp_folder.rmdir()  # Will only work if empty
-                except OSError:
-                    pass  # Folder not empty, leave it
+                    shutil.rmtree(temp_folder)
+                    print(f"🧹 DEBUG send: Cleaned up temp folder: {temp_folder}")
+                except Exception as e:
+                    print(f"⚠️ DEBUG send: Could not clean up temp folder: {e}")
+            else:
+                print(f"⚠️ DEBUG send: Temp sent_images folder not found: {temp_sent_images}")
+        
+        # Method 2: Copy from region's png_outputs folder if temp folder method didn't work
+        if not images_copied and payload.laz_name:
+            print(f"🔍 DEBUG send: Looking for region images in png_outputs folder")
+            region_png_outputs = Path("output") / payload.laz_name / "lidar" / "png_outputs"
+            
+            if region_png_outputs.exists():
+                print(f"📋 DEBUG send: Found region png_outputs folder: {region_png_outputs}")
+                
+                # Copy all PNG files from the region's png_outputs folder
+                for img_file in region_png_outputs.glob("*.png"):
+                    final_img_path = sent_images_folder / img_file.name
+                    shutil.copy2(img_file, final_img_path)
+                    
+                    # Add to log entry
+                    log_entry["images"].append({
+                        "name": img_file.stem.lower().replace("-", "_"),
+                        "path": str(Path("llm/logs") / folder_name / "sent_images" / img_file.name),
+                        "filename": img_file.name,
+                        "size": final_img_path.stat().st_size
+                    })
+                    
+                    print(f"💾 DEBUG send: Copied region image: {img_file.name}")
+                
+                images_copied = True
+            else:
+                print(f"⚠️ DEBUG send: Region png_outputs folder not found: {region_png_outputs}")
+        
+        if not images_copied:
+            print(f"⚠️ DEBUG send: No images were copied - neither temp folder nor region png_outputs found")
+        
+        print(f"✅ DEBUG send: Final log entry has {len(log_entry['images'])} images")
         
         # Save main log file
         log_filename = log_folder / "request_log.json"
         with open(log_filename, "w", encoding="utf-8") as f:
             json.dump(log_entry, f, indent=2)
         
-        # Also create a response file for the Results tab
+        # Create response file for Results tab
         response_entry = {
             "response": content,
             "log_file": str(Path("llm/logs") / folder_name / "request_log.json")
@@ -176,6 +198,7 @@ async def send_to_openai(payload: SendPayload):
         }
         
     except Exception as e:
+        print(f"❌ DEBUG send: Error occurred: {e}")
         content = f"OpenAI call failed: {e}"
         return {"response": content, "error": str(e)}
 
@@ -287,7 +310,10 @@ async def save_images_for_analysis(payload: dict):
         region_name = payload.get("region_name", "unknown_region") 
         images_data = payload.get("images", [])  # List of {name: str, data: str (base64)}
         
+        print(f"🔍 DEBUG save_images: region_name={region_name}, images_count={len(images_data)}")
+        
         if not images_data:
+            print("⚠️ DEBUG save_images: No images provided, returning empty result")
             return {"saved_images": [], "image_folder": None}
         
         # Generate folder structure similar to log creation
@@ -300,6 +326,8 @@ async def save_images_for_analysis(payload: dict):
         temp_folder_name = f"{clean_region}_temp_{date_str}_{unique_id}"
         images_folder = LOG_DIR / temp_folder_name / "sent_images"
         images_folder.mkdir(parents=True, exist_ok=True)
+        
+        print(f"📁 DEBUG save_images: Created temp folder: {images_folder}")
         
         saved_images = []
         
@@ -324,18 +352,21 @@ async def save_images_for_analysis(payload: dict):
                 
                 saved_images.append({
                     "name": img_name,
-                    "path": str(img_path.relative_to(Path.cwd())),  # Relative path from project root
+                    "path": str(img_path),  # Use absolute path instead of relative
                     "filename": img_filename,
                     "size": len(img_bytes)
                 })
                 
+                print(f"💾 DEBUG save_images: Saved image {img_name} to {img_path}")
+                
             except Exception as e:
-                print(f"Error saving image {img_name}: {e}")
+                print(f"❌ DEBUG save_images: Error saving image {img_name}: {e}")
                 continue
         
+        print(f"✅ DEBUG save_images: Saved {len(saved_images)} images to temp folder {temp_folder_name}")
         return {
             "saved_images": saved_images,
-            "image_folder": str(images_folder.relative_to(Path.cwd())),
+            "image_folder": str(images_folder),  # Use absolute path
             "temp_folder_name": temp_folder_name
         }
         

@@ -3,25 +3,6 @@
   <div id="results-left-panel" class="w-1/4 bg-[#1e1e1e] p-4 overflow-y-auto">
     <h2 class="text-white text-lg font-semibold mb-4">Result Logs</h2>
     
-    <!-- Status Legend -->
-    <div class="mb-4 p-3 bg-[#2a2a2a] rounded-lg">
-      <h3 class="text-white text-sm font-medium mb-2">📊 Status Legend</h3>
-      <div class="space-y-1 text-xs">
-        <div class="flex items-center">
-          <span class="text-green-400 font-bold mr-2">✓</span>
-          <span class="text-gray-300">Anomalies Detected</span>
-        </div>
-        <div class="flex items-center">
-          <span class="text-red-400 font-bold mr-2">✗</span>
-          <span class="text-gray-300">No Anomalies</span>
-        </div>
-        <div class="flex items-center">
-          <span class="text-gray-400 font-bold mr-2">?</span>
-          <span class="text-gray-300">Status Unknown</span>
-        </div>
-      </div>
-    </div>
-    
     <!-- Anomaly Type Filter -->
     <div id="anomaly-filter-section" class="mb-4 p-3 bg-[#2a2a2a] rounded-lg">
       <h3 class="text-white text-sm font-medium mb-2">🔍 Filter by Anomaly Type</h3>
@@ -38,8 +19,6 @@
       </div>
     </div>
     
-    <button id="results-select-all-btn" class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mb-4">Select All</button>
-    
     <!-- Delete Button (hidden by default) -->
     <button id="results-delete-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded mb-4 hidden">
       <i class="fas fa-trash-alt mr-2"></i>Delete Selected
@@ -53,7 +32,7 @@
   <!-- Main Panel: Dashboard -->
   <div id="results-main-panel" class="w-3/4 p-6 overflow-y-auto">
     <h1 class="text-white text-xl font-bold">Results Dashboard</h1>
-    <p class="text-gray-300">Select a result from the left panel to view details, or click "Select All" for a summary.</p>
+    <p class="text-gray-300">Select a result from the left panel to view details.</p>
     <!-- Dashboard content will be populated here -->
   </div>
 </div>
