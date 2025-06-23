@@ -1,0 +1,6 @@
+{
+  "module_type": "workflow_step",
+  "step_number": 5,
+  "step_name": "Archaeological Interpretation",
+  "content": "Based on your classification and the detailed evidence profile, formulate a plausible archaeological interpretation for the anomaly. Use the rich, multi-layer information to describe its form, potential function, and relationship to the landscape and other features. Your interpretation should be more nuanced now, referencing which data layers provided the strongest evidence (e.g., 'While topographically subtle, the feature's existence is strongly supported by its clear definition in the slope raster and its persistent influence on vegetation height visible in the CHM')."
+}

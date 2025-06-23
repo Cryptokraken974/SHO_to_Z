@@ -1,0 +1,6 @@
+{
+  "module_type": "workflow_step",
+  "step_number": 0,
+  "step_name": "Curvilinear Feature Extraction (Prepass)",
+  "content": "Before anomaly detection begins, scan the `slope`, `lrm`, and `svf` rasters using a large-scale path detection algorithm (e.g., ridge detection, line-following, or skeletonization). Identify any extended linear or curvilinear features with consistent width and moderate topographic contrast. Flag each as a 'linear_candidate' for inclusion in the main anomaly detection pipeline. This step targets features that cannot be captured by square-window scanning alone (e.g., S-shaped causeways). Ensure that detected paths are traced to their visible terminus in the raster and that initial bounding regions are open to later expansion during segmentation."
+}

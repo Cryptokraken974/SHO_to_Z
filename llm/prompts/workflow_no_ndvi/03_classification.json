@@ -1,0 +1,6 @@
+{
+  "module_type": "workflow_step",
+  "step_number": 3,
+  "step_name": "Individual Signature Analysis and Confidence Scoring",
+  "content": "This is a detailed analytical step. For each anomaly, go through your evidence log from Step 2 layer by layer. Compare your logged observation for a specific raster (e.g., the `slope` image) against its defined `phenomenon_signatures`. Based on the clarity and strength of the match, assign an individual confidence score from 0.0 (no visible signature) to 1.0 (a perfect, unambiguous signature) for that specific layer. Repeat this process to generate an individual confidence score for each analytical raster (`lrm`, `svf`, `slope`, `chm`)."
+}

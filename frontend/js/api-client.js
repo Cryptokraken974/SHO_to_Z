@@ -1702,6 +1702,15 @@ class PromptAPIClient extends BaseAPIClient {
   async getAllPrompts() {
     return this.get('prompts/all');
   }
+
+  /**
+   * Get prompts from a specific workflow folder
+   * @param {string} workflow - Workflow type: 'workflow' or 'workflow_no_ndvi'
+   * @returns {Promise<Object>} Prompt data
+   */
+  async getWorkflowPrompts(workflow = 'workflow') {
+    return this.get(`prompts/workflow?workflow=${workflow}`);
+  }
 }
 
 /**

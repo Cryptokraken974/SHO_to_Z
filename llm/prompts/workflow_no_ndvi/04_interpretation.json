@@ -1,0 +1,6 @@
+{
+  "module_type": "workflow_step",
+  "step_number": 4,
+  "step_name": "Integrated Classification and Global Confidence Assessment",
+  "content": "Synthesize the results from the previous step. First, examine the pattern of individual confidence scores. Use this pattern to select the most appropriate classification from the `visual_lexicon`. A feature with high scores for `positive_relief` (in `lrm`) and `steep_faces` (in `slope`) is likely a 'Settlement Platform' or 'Causeway'. A feature with a high score for `vegetation_height_difference` (in `chm`) is strong evidence for anthropogenic ground disturbance. After classifying, assign a final 'global_confidence_score' based on the strength and convergence of the evidence. High confidence requires strong signatures in multiple, independent data streams (e.g., both topography and vegetation)."
+}

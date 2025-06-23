@@ -1,0 +1,48 @@
+{
+  "module_type": "workflow_step",
+  "step_number": 6,
+  "step_name": "Generate Final Report",
+  "content": {
+    "instruction": "Your final task is to compile all your findings into a single JSON object. The structure must strictly adhere to the following revised format, which includes a granular, multi-layered confidence assessment and is compatible with the provided set of rasters.",
+    "json_format": {
+      "analysis_summary": {
+        "target_area_id": "unique_identifier_for_the_analyzed_area",
+        "anomalies_detected": "<true or false>",
+        "number_of_anomalies": "<DYNAMICALLY_DETECTED_COUNT>"
+      },
+      "identified_anomalies": [
+        {
+          "anomaly_id": "<unique_id_for_this_anomaly>",
+          "classification": {
+            "type": "<archaeological_feature_type>",
+            "subtype": "<optional_subtype>"
+          },
+          "confidence": {
+            "global_score": "<global_confidence_score>",
+            "individual_scores": {
+              "lrm": "<individual_score_for_lrm>",
+              "svf": "<individual_score_for_svf>",
+              "slope": "<individual_score_for_slope>",
+              "chm": "<individual_score_for_chm>"
+            }
+          },
+          "evidence_per_image": {
+            "lrm": "<Evidence description based on the LRM's specific signatures.>",
+            "svf": "<Evidence description based on the SVF's specific signatures.>",
+            "slope": "<Evidence description based on the Slope raster's specific signatures.>",
+            "chm": "<Evidence description based on the CHM's specific signatures.>"
+          },
+          "archaeological_interpretation": "<Your synthesis and plausible archaeological interpretation, informed by the multi-layer evidence.>",
+          "bounding_box_pixels": [
+            {
+              "x_min": 0,
+              "y_min": 0,
+              "x_max": 0,
+              "y_max": 0
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

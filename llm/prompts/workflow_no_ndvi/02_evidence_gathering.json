@@ -1,0 +1,6 @@
+{
+  "module_type": "workflow_step",
+  "step_number": 2,
+  "step_name": "Multi-Layer Evidence Logging",
+  "content": "For each 'potential anomaly' you identified, you must now systematically document its appearance across ALL available analytical rasters (`lrm`, `svf`, `slope`, `chm`). Describe the visual evidence from each layer in neutral, factual terms, referencing the specific location of the anomaly. This is a comprehensive data-gathering step; interpretation will come later. For example: 'At the anomaly's location, the LRM shows a subtle positive linear feature. The slope raster shows two parallel dark lines. The CHM shows consistent vegetation height depression over the shape.'"
+}

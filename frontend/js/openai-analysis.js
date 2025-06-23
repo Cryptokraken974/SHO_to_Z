@@ -12,6 +12,8 @@ class OpenAIAnalysis {
         this.selectedRegions = [];
         this.regionGalleries = {};
         this.availableRegions = [];
+        this.allRegions = []; // Store all regions before filtering
+        this.ndviFilterEnabled = false; // Track NDVI filter state
         this.promptParts = []; // Store loaded prompt parts
         this.currentPromptIndex = 0; // Track current prompt part
 
@@ -124,6 +126,19 @@ class OpenAIAnalysis {
             const data = JSON.parse(e.dataTransfer.getData('text/plain'));
             if (data.from === 'available') this.moveToSelected([data.region]);
         });
+
+        // NDVI Filter checkbox event listener
+        const ndviFilterCheckbox = document.getElementById('ndvi-filter-checkbox');
+        ndviFilterCheckbox?.addEventListener('change', (e) => {
+            this.ndviFilterEnabled = e.target.checked;
+            console.log('🌱 NDVI filter', this.ndviFilterEnabled ? 'enabled' : 'disabled');
+            
+            // Reload prompts for the appropriate workflow
+            this.loadPrompts();
+            
+            // Apply region filter
+            this.applyNdviFilter();
+        });
     }
     
     initializeGalleries() {
@@ -176,7 +191,21 @@ class OpenAIAnalysis {
                 if (titleElement) titleElement.textContent = currentPrompt.title;
                 if (counterElement) counterElement.textContent = `${this.currentPromptIndex + 1} / ${this.promptParts.length}`;
                 if (textareaElement) {
-                    textareaElement.value = currentPrompt.content;
+                    // Ensure content is a string
+                    let content = '';
+                    if (typeof currentPrompt.content === 'string') {
+                        content = currentPrompt.content;
+                    } else if (typeof currentPrompt.content === 'object') {
+                        if (currentPrompt.content && currentPrompt.content.content) {
+                            content = String(currentPrompt.content.content);
+                        } else {
+                            content = JSON.stringify(currentPrompt.content, null, 2);
+                        }
+                    } else if (currentPrompt.content) {
+                        content = String(currentPrompt.content);
+                    }
+                    
+                    textareaElement.value = content;
                     textareaElement.placeholder = `Editing: ${currentPrompt.title}`;
                 }
                 
@@ -191,7 +220,21 @@ class OpenAIAnalysis {
             if (titleElement) titleElement.textContent = currentPrompt.title;
             if (counterElement) counterElement.textContent = `${this.currentPromptIndex + 1} / ${this.promptParts.length}`;
             if (textareaElement) {
-                textareaElement.value = currentPrompt.content;
+                // Ensure content is a string
+                let content = '';
+                if (typeof currentPrompt.content === 'string') {
+                    content = currentPrompt.content;
+                } else if (typeof currentPrompt.content === 'object') {
+                    if (currentPrompt.content && currentPrompt.content.content) {
+                        content = String(currentPrompt.content.content);
+                    } else {
+                        content = JSON.stringify(currentPrompt.content, null, 2);
+                    }
+                } else if (currentPrompt.content) {
+                    content = String(currentPrompt.content);
+                }
+                
+                textareaElement.value = content;
                 textareaElement.placeholder = `Editing: ${currentPrompt.title}`;
             }
         }
@@ -212,14 +255,42 @@ class OpenAIAnalysis {
             this.promptParts[this.currentPromptIndex].content = currentTextarea.value;
         }
 
-        // Collect all prompt parts
-        let promptParts = [];
-        this.promptParts.forEach(promptPart => {
-            if (promptPart.content.trim()) {
-                promptParts.push(promptPart.content.trim());
+        // Debug: Log the prompt parts to see what we're working with
+        console.log('📋 Prompt parts for preview:', this.promptParts);
+
+        // Collect all prompt parts with titles
+        let promptSections = [];
+        this.promptParts.forEach((promptPart, index) => {
+            // Ensure content is a string and handle different data types
+            let content = '';
+            if (typeof promptPart.content === 'string') {
+                content = promptPart.content.trim();
+            } else if (typeof promptPart.content === 'object') {
+                // If content is an object, try to extract the content field or stringify it
+                if (promptPart.content && promptPart.content.content) {
+                    content = String(promptPart.content.content).trim();
+                } else {
+                    content = JSON.stringify(promptPart.content, null, 2);
+                }
+            } else if (promptPart.content) {
+                // Convert to string if it's some other type
+                content = String(promptPart.content).trim();
+            }
+
+            if (content) {
+                // Add section header with title
+                promptSections.push(`=== ${promptPart.title || `Part ${index + 1}`} ===`);
+                promptSections.push(content);
+                promptSections.push(''); // Empty line between sections
             }
         });
-        const completePrompt = promptParts.join('\n\n');
+        
+        // Remove the last empty line
+        if (promptSections.length > 0 && promptSections[promptSections.length - 1] === '') {
+            promptSections.pop();
+        }
+        
+        const completePrompt = promptSections.join('\n');
 
         // Update modal content
         const modal = document.getElementById('prompt-preview-modal');
@@ -313,9 +384,27 @@ class OpenAIAnalysis {
             // Collect all prompt parts
             let promptParts = [];
             this.promptParts.forEach(promptPart => {
-                promptParts.push(promptPart.content);
+                // Ensure content is a string and handle different data types
+                let content = '';
+                if (typeof promptPart.content === 'string') {
+                    content = promptPart.content.trim();
+                } else if (typeof promptPart.content === 'object') {
+                    // If content is an object, try to extract the content field or stringify it
+                    if (promptPart.content && promptPart.content.content) {
+                        content = String(promptPart.content.content).trim();
+                    } else {
+                        content = JSON.stringify(promptPart.content, null, 2);
+                    }
+                } else if (promptPart.content) {
+                    // Convert to string if it's some other type
+                    content = String(promptPart.content).trim();
+                }
+
+                if (content) {
+                    promptParts.push(content);
+                }
             });
-            const prompt = promptParts.join('\n');
+            const prompt = promptParts.join('\n\n');
 
             if (!prompt.trim()) {
                 window.Utils?.showNotification('No prompt content loaded or entered', 'warning');
@@ -467,10 +556,20 @@ class OpenAIAnalysis {
         }
     }
 
-    async loadPrompts() {
+    async loadPrompts(forceWorkflow = null) {
         try {
             console.log('📋 Loading prompts for OpenAI analysis...');
-            const response = await prompts().getAllPrompts(); // Expects {"prompts": [{"title": "...", "content": "..."}, ...]}
+            
+            // Determine which workflow to use
+            let workflow = forceWorkflow;
+            if (!workflow) {
+                // Use NDVI filter state to determine workflow
+                workflow = this.ndviFilterEnabled ? 'workflow' : 'workflow_no_ndvi';
+            }
+            
+            console.log(`📋 Loading prompts from workflow: ${workflow}`);
+            
+            const response = await prompts().getWorkflowPrompts(workflow);
             const promptData = response.prompts;
 
             const container = document.getElementById('dynamic-prompt-parts-container');
@@ -483,7 +582,7 @@ class OpenAIAnalysis {
             console.log('✅ Prompt container found');
 
             if (promptData && Array.isArray(promptData) && promptData.length > 0) {
-                console.log(`📋 Loading ${promptData.length} prompt parts...`);
+                console.log(`📋 Loading ${promptData.length} prompt parts from ${workflow}...`);
                 
                 // Store prompt parts
                 this.promptParts = promptData.map(part => ({
@@ -497,7 +596,7 @@ class OpenAIAnalysis {
                 // Display the first prompt
                 this.displayCurrentPrompt();
                 
-                console.log('✅ Prompt parts loaded successfully');
+                console.log(`✅ Prompt parts loaded successfully from ${workflow} workflow`);
             } else {
                 console.error('Failed to load prompts or prompts data is not in the expected format:', response);
                 
@@ -534,11 +633,12 @@ class OpenAIAnalysis {
             const data = await regions().listRegions('output');
             console.log('📊 API response:', data);
             
-            this.availableRegions = (data.regions || []).map(r => r.name);
-            console.log('📋 Available regions from output folder:', this.availableRegions);
+            // Store all regions with their metadata
+            this.allRegions = data.regions || [];
+            console.log('📋 All regions loaded from output folder:', this.allRegions.map(r => r.name));
             
-            this.renderRegionLists();
-            this.updateSelectedRegionsInfo();
+            // Apply initial filter (will set this.availableRegions)
+            this.applyNdviFilter();
             
             console.log('✅ Regions loaded successfully from output folder');
         } catch (err) {
@@ -548,6 +648,81 @@ class OpenAIAnalysis {
             if (availList) {
                 availList.innerHTML = '<li class="text-red-400 p-2">Failed to load regions</li>';
             }
+        }
+    }
+
+    async applyNdviFilter() {
+        try {
+            if (!this.allRegions || this.allRegions.length === 0) {
+                console.log('🔄 No regions loaded yet, filter will be applied after loading');
+                return;
+            }
+
+            console.log('🌱 Applying NDVI filter...', this.ndviFilterEnabled ? 'SHOW NDVI-ENABLED' : 'SHOW NDVI-DISABLED');
+            
+            // Show loading state during filter
+            const availList = document.getElementById('available-region-list');
+            if (availList) {
+                availList.innerHTML = '<li class="text-[#ababab] p-2">🔄 Checking NDVI status...</li>';
+            }
+            
+            // Always filter regions based on NDVI status
+            console.log('🔍 Checking NDVI status for each region...');
+            
+            const filteredRegions = [];
+            
+            for (const region of this.allRegions) {
+                try {
+                    // Check NDVI status for this region
+                    const response = await fetch(`/api/regions/${encodeURIComponent(region.name)}/ndvi-status`);
+                    
+                    if (response.ok) {
+                        const ndviData = await response.json();
+                        const ndviEnabled = ndviData.ndvi_enabled;
+                        
+                        console.log(`   📊 ${region.name}: NDVI ${ndviEnabled ? 'enabled' : 'disabled'}`);
+                        
+                        // Include region based on filter toggle
+                        if (this.ndviFilterEnabled && ndviEnabled) {
+                            // Show only NDVI-enabled regions
+                            filteredRegions.push(region.name);
+                        } else if (!this.ndviFilterEnabled && !ndviEnabled) {
+                            // Show only NDVI-disabled regions
+                            filteredRegions.push(region.name);
+                        }
+                    } else {
+                        console.warn(`   ⚠️ Could not check NDVI status for ${region.name}`);
+                        // Include region if we can't check (fail open)
+                        filteredRegions.push(region.name);
+                    }
+                } catch (error) {
+                    console.warn(`   ❌ Error checking NDVI status for ${region.name}:`, error);
+                    // Include region if there's an error (fail open)
+                    filteredRegions.push(region.name);
+                }
+            }
+            
+            this.availableRegions = filteredRegions.filter(regionName => 
+                !this.selectedRegions.includes(regionName)
+            );
+            
+            if (this.ndviFilterEnabled) {
+                console.log(`✅ NDVI filter applied: Showing ${filteredRegions.length}/${this.allRegions.length} NDVI-enabled regions`);
+            } else {
+                console.log(`✅ NDVI filter applied: Showing ${filteredRegions.length}/${this.allRegions.length} NDVI-disabled regions`);
+            }
+            
+            this.renderRegionLists();
+            this.updateSelectedRegionsInfo();
+            
+        } catch (error) {
+            console.error('❌ Error applying NDVI filter:', error);
+            // Fall back to showing all regions
+            this.availableRegions = this.allRegions
+                .map(r => r.name)
+                .filter(regionName => !this.selectedRegions.includes(regionName));
+            this.renderRegionLists();
+            this.updateSelectedRegionsInfo();
         }
     }
 
@@ -671,13 +846,12 @@ class OpenAIAnalysis {
 
     moveToAvailable(regions) {
         regions.forEach(r => {
-            if (!this.availableRegions.includes(r)) {
-                this.availableRegions.push(r);
+            if (this.selectedRegions.includes(r)) {
                 this.selectedRegions = this.selectedRegions.filter(s => s !== r);
             }
         });
-        this.renderRegionLists();
-        this.updateSelectedRegionsInfo();
+        // Re-apply filter to ensure the moved regions appear in available list based on current filter
+        this.applyNdviFilter();
     }
 
     // Loading overlay methods
