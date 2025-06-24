@@ -8,6 +8,9 @@ import numpy as np # Added numpy
 import logging
 import tempfile # Added tempfile for base64 conversion temp file
 from pathlib import Path # Added pathlib for Sentinel-2 processing
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -500,3 +503,203 @@ def extract_sentinel2_band(input_tif: str, output_tif: str, band_number: int) ->
         if result.returncode == 0 and os.path.exists(output_tif) and os.path.getsize(output_tif) > 0: return True
         else: logger.error(f"gdal_translate for band {band_number} failed or output empty. RC: {result.returncode}. Stderr: {result.stderr}"); return False
     except Exception as e: logger.error(f"Exception during band extraction {input_tif} b{band_number}: {e}", exc_info=True); return False
+
+def convert_chm_to_viridis_png(
+    tif_path: str,
+    png_path: Optional[str] = None,
+    enhanced_resolution: bool = True,
+    save_to_consolidated: bool = True
+) -> str:
+    """
+    Convert CHM GeoTIFF to PNG with viridis colormap and min-max normalization.
+    Specifically designed for Canopy Height Model visualization.
+    
+    Args:
+        tif_path: Path to CHM TIF file
+        png_path: Optional output PNG path  
+        enhanced_resolution: Use enhanced processing
+        save_to_consolidated: Copy to consolidated directory
+        
+    Returns:
+        Path to generated PNG file
+    """
+    print(f"\n🌳 CHM VIRIDIS COLORIZATION: {os.path.basename(tif_path)}")
+    logger.info(f"CHM viridis colorization for {tif_path}")
+    
+    start_time = time.time()
+    
+    try:
+        # Generate output path if not provided
+        if png_path is None:
+            png_path = os.path.splitext(tif_path)[0] + "_viridis.png"
+        
+        # Ensure output directory exists
+        output_dir = os.path.dirname(png_path)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            print(f"📁 Created output directory: {output_dir}")
+        
+        # Open and read CHM data
+        ds = gdal.Open(tif_path)
+        if ds is None:
+            raise Exception(f"Failed to open CHM TIF: {tif_path}")
+        
+        band = ds.GetRasterBand(1)
+        chm_data = band.ReadAsArray()
+        
+        # Get georeference info for world file
+        geotransform = ds.GetGeoTransform()
+        width = ds.RasterXSize
+        height = ds.RasterYSize
+        
+        ds = None
+        band = None
+        
+        print(f"📏 CHM dimensions: {width}x{height} pixels")
+        print(f"📊 CHM data range: {np.nanmin(chm_data):.2f} to {np.nanmax(chm_data):.2f} meters")
+        
+        # Handle NoData values
+        nodata_mask = chm_data == -9999
+        chm_data[nodata_mask] = np.nan
+        
+        # Min-max normalization across entire image
+        valid_data = chm_data[~np.isnan(chm_data)]
+        if len(valid_data) == 0:
+            print("⚠️ No valid CHM data found")
+            # Create empty image
+            fig, ax = plt.subplots(figsize=(10, 8))
+            ax.text(0.5, 0.5, 'No CHM Data Available', ha='center', va='center', 
+                   fontsize=16, transform=ax.transAxes)
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+        else:
+            # Apply min-max scaling
+            data_min = np.nanmin(valid_data)
+            data_max = np.nanmax(valid_data)
+            
+            print(f"🎨 Applying min-max normalization:")
+            print(f"   Min height: {data_min:.2f}m (dark purple)")
+            print(f"   Max height: {data_max:.2f}m (bright yellow-green)")
+            
+            # Normalize to 0-1 range
+            if data_max > data_min:
+                normalized_data = (chm_data - data_min) / (data_max - data_min)
+            else:
+                normalized_data = np.zeros_like(chm_data)
+            
+            # Create figure with high quality settings
+            if enhanced_resolution:
+                fig, ax = plt.subplots(figsize=(16, 12), dpi=300)
+            else:
+                fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
+            
+            # Apply viridis colormap
+            # Low canopy (0) = dark purple (#440154)
+            # High vegetation (1) = bright yellow-green (#fde725)
+            cmap = plt.cm.viridis
+            
+            # Create masked array to handle NaN values
+            masked_data = np.ma.masked_where(np.isnan(normalized_data), normalized_data)
+            
+            # Display with viridis colormap
+            im = ax.imshow(masked_data, cmap=cmap, vmin=0, vmax=1, 
+                          aspect='equal', interpolation='nearest')
+            
+            # Add colorbar with meaningful labels
+            cbar = plt.colorbar(im, ax=ax, shrink=0.6, pad=0.02)
+            cbar.set_label('Canopy Height (m)', rotation=270, labelpad=20, fontsize=12)
+            
+            # Set colorbar ticks to show actual height values
+            if data_max > data_min:
+                tick_positions = np.linspace(0, 1, 6)
+                tick_labels = [f"{data_min + pos * (data_max - data_min):.1f}" 
+                              for pos in tick_positions]
+                cbar.set_ticks(tick_positions)
+                cbar.set_ticklabels(tick_labels)
+            
+            # Set title and remove axes for clean visualization
+            ax.set_title(f"CHM - Canopy Height Model\n{os.path.basename(tif_path)}", 
+                        fontsize=14, fontweight='bold', pad=20)
+            ax.set_xlabel("Pixels (East)", fontsize=10)
+            ax.set_ylabel("Pixels (North)", fontsize=10)
+            
+            # Add explanatory text
+            textstr = f'Colormap: Viridis\nDark purple: Low canopy areas\nBright yellow-green: High vegetation\nRange: {data_min:.1f}m - {data_max:.1f}m'
+            props = dict(boxstyle='round', facecolor='white', alpha=0.8)
+            ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=9,
+                   verticalalignment='top', bbox=props)
+        
+        # Save PNG with high quality
+        plt.tight_layout()
+        if enhanced_resolution:
+            plt.savefig(png_path, dpi=300, bbox_inches='tight', 
+                       facecolor='white', edgecolor='none', format='PNG')
+        else:
+            plt.savefig(png_path, dpi=150, bbox_inches='tight', 
+                       facecolor='white', edgecolor='none', format='PNG')
+        
+        plt.close()
+        
+        # Create world file for georeferencing
+        if geotransform:
+            world_file_path = os.path.splitext(png_path)[0] + ".pgw"
+            with open(world_file_path, 'w') as f:
+                f.write(f"{geotransform[1]:.10f}\n")  # pixel size x
+                f.write(f"{geotransform[2]:.10f}\n")  # rotation y
+                f.write(f"{geotransform[4]:.10f}\n")  # rotation x
+                f.write(f"{geotransform[5]:.10f}\n")  # pixel size y (negative)
+                f.write(f"{geotransform[0]:.10f}\n")  # top left x
+                f.write(f"{geotransform[3]:.10f}\n")  # top left y
+            print(f"🌍 Created world file: {os.path.basename(world_file_path)}")
+        
+        # Transform world file to WGS84 if possible
+        world_file_path = os.path.splitext(png_path)[0] + ".pgw"
+        if os.path.exists(world_file_path):
+            success = create_wgs84_world_file(world_file_path, tif_path, png_path)
+            if success:
+                print(f"✅ WGS84 world file created for proper overlay scaling")
+        
+        # Copy to consolidated directory if requested
+        if save_to_consolidated:
+            try:
+                path_parts = tif_path.split(os.sep)
+                region_name = "UnknownRegion"
+                if "output" in path_parts:
+                    idx = path_parts.index("output")
+                    if idx + 1 < len(path_parts): 
+                        region_name = path_parts[idx+1]
+                
+                consolidated_dir = os.path.join("output", region_name, "lidar", "png_outputs")
+                os.makedirs(consolidated_dir, exist_ok=True)
+                
+                # Check if PNG is already in the target directory
+                png_normalized = os.path.normpath(png_path)
+                consolidated_normalized = os.path.normpath(consolidated_dir)
+                
+                if consolidated_normalized not in png_normalized:
+                    import shutil
+                    consolidated_png_path = os.path.join(consolidated_dir, "CHM_viridis.png")
+                    shutil.copy2(png_path, consolidated_png_path)
+                    
+                    # Copy world files too
+                    for ext in [".pgw", ".wld", "_wgs84.wld"]:
+                        src_world = os.path.splitext(png_path)[0] + ext
+                        if os.path.exists(src_world):
+                            dst_world = os.path.splitext(consolidated_png_path)[0] + ext
+                            shutil.copy2(src_world, dst_world)
+                    
+                    print(f"✅ Copied CHM viridis PNG to consolidated directory")
+                
+            except Exception as e:
+                logger.warning(f"Failed to copy CHM PNG to consolidated directory: {e}")
+        
+        processing_time = time.time() - start_time
+        print(f"✅ CHM viridis colorization completed in {processing_time:.2f} seconds")
+        print(f"🌈 Result: {os.path.basename(png_path)}")
+        
+        return png_path
+        
+    except Exception as e:
+        error_msg = f"CHM viridis colorization failed for {tif_path}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        raise Exception(error_msg)

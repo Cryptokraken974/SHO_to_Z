@@ -321,9 +321,9 @@ async def generate_coordinate_chm(data: dict):
             
             logger.info(f"✅ CHM generated successfully: {chm_output_file}")
             
-            # Generate PNG visualization
+            # Generate PNG visualization with viridis colormap
             try:
-                from convert import convert_geotiff_to_png
+                from convert import convert_chm_to_viridis_png
                 
                 # Create png_outputs directory
                 png_output_dir = region_dir / "png_outputs"
@@ -331,12 +331,11 @@ async def generate_coordinate_chm(data: dict):
                 
                 png_path = png_output_dir / "CHM.png"
                 
-                convert_geotiff_to_png(
+                convert_chm_to_viridis_png(
                     chm_output_file,
                     str(png_path),
                     enhanced_resolution=True,
-                    save_to_consolidated=False,
-                    stretch_type="stddev"
+                    save_to_consolidated=False
                 )
                 
                 logger.info(f"🖼️ CHM PNG created: {png_path}")

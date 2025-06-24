@@ -298,9 +298,9 @@ async def api_chm(
 
         parsed_stretch_params = _parse_stretch_params(stretch_params_json)
         
-        # Generate permanent PNG file for the raster gallery
+        # Generate permanent PNG file for the raster gallery with viridis colormap
         try:
-            from convert import convert_geotiff_to_png
+            from convert import convert_chm_to_viridis_png
             import os
             
             # Create png_outputs directory structure
@@ -309,15 +309,13 @@ async def api_chm(
             png_output_dir = os.path.join(base_output_dir, "png_outputs")
             os.makedirs(png_output_dir, exist_ok=True)
             
-            # Generate PNG with standard filename
+            # Generate PNG with viridis colormap and min-max normalization
             png_path = os.path.join(png_output_dir, "CHM.png")
-            convert_geotiff_to_png(
+            convert_chm_to_viridis_png(
                 tif_path, 
                 png_path, 
                 enhanced_resolution=True,
-                save_to_consolidated=False,  # Already in the right directory
-                stretch_type=stretch_type if stretch_type else "stddev",
-                stretch_params=parsed_stretch_params
+                save_to_consolidated=False  # Already in the right directory
             )
             print(f"✅ CHM PNG file created: {png_path}")
         except Exception as png_error:
