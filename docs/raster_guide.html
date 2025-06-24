@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Understanding Rasters - User Documentation</title>
+    <link rel="stylesheet" href="style.css"> <!-- Link to a shared CSS file -->
+    <style>
+        /* Basic styles from index.html for standalone viewing */
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; line-height: 1.6; }
+        .container { width: 80%; margin: auto; overflow: hidden; padding: 0 20px; }
+        header { background: #333; color: #fff; padding-top: 30px; min-height: 70px; border-bottom: #0779e4 3px solid; }
+        header a { color: #fff; text-decoration: none; text-transform: uppercase; font-size: 16px; }
+        header ul { padding: 0; margin: 0; list-style: none; float: right; }
+        header li { display: inline; padding: 0 20px 0 20px; }
+        header #branding { float: left; }
+        header #branding h1 { margin: 0; }
+        nav { background: #444; padding: 10px 0; color: #fff; text-align: center; }
+        nav a { color: #fff; padding: 5px 15px; text-decoration: none; }
+        nav a:hover { background: #0779e4; }
+        .main-content { padding: 20px; background: #fff; margin-top: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #333; }
+        h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+        .raster-type { margin-bottom: 25px; padding-bottom:15px; border-bottom: 1px dotted #ccc; }
+        .raster-type h3 { margin-top: 0; color: #0779e4; }
+        .param-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .param-table th, .param-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .param-table th { background-color: #f0f0f0; }
+        .note { background-color: #fff3cd; border-left: 5px solid #ffeeba; padding: 10px; margin: 15px 0; }
+        .tip { background-color: #d1ecf1; border-left: 5px solid #bee5eb; padding: 10px; margin: 15px 0; }
+        code { background: #eee; padding: 2px 4px; border-radius: 3px; font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; }
+        footer { text-align: center; padding: 20px; margin-top: 20px; color: #fff; background: #333; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div id="branding">
+                <h1><a href="index.html" style="color:#fff; text-decoration:none;">GeoArchaeology Terrain Processor</a></h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="laz_loading.html">Loading LAZ</a></li>
+                    <li><a href="map_regions.html">Map Regions</a></li>
+                    <li><a href="data_retrieval.html">Get Data</a></li>
+                    <li><a href="ndvi_analysis.html">NDVI Analysis</a></li>
+                    <li><a href="raster_guide.html" style="color:#0779e4; font-weight:bold;">Raster Guide</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="main-content">
+            <a href="index.html">&larr; Back to Home</a>
+            <h2>Understanding Generated Rasters</h2>
+            <p>The application generates a variety of raster data products to help you visualize and analyze terrain for archaeological prospection. These rasters are primarily derived from Digital Elevation Models (DEMs), which can be created from your <a href="laz_loading.html">uploaded LAZ files</a> or fetched via the <a href="data_retrieval.html">"Get Data" function</a> for manually defined regions.</p>
+            <p>Once a base DEM (typically a DTM) is available for a region, most of the following raster types are generated automatically.</p>
+
+            <div class="note">
+                <p><strong>File Formats:</strong> Generated rasters are typically stored as GeoTIFF (<code>.tif</code>) files for analysis and PNG (<code>.png</code>) files for web display and quick visualization within the application.</p>
+            </div>
+
+            <section id="raster-types">
+                <h3>Common Raster Types and Their Archaeological Relevance</h3>
+
+                <article class="raster-type" id="dtm">
+                    <h3>Digital Terrain Model (DTM)</h3>
+                    <p><strong>Description:</strong> A DTM represents the bare earth surface, with vegetation, buildings, and other non-ground objects removed. It's a foundational dataset for most terrain analysis.</p>
+                    <p><strong>Archaeological Relevance:</strong> Crucial for detecting subtle earthworks, mounds, depressions, ancient field systems, and other topographic features that might be obscured by vegetation or are too subtle to see on the ground.</p>
+                    <p><strong>Generation Parameters:</strong>
+                        <ul>
+                            <li><strong>Input:</strong> LAZ point cloud (ground-classified points) or other elevation data sources.</li>
+                            <li><strong>Resolution:</strong> Configurable (e.g., 0.5m, 1.0m). Higher resolution provides more detail. For LAZ files, this is influenced by the <code>dtm_resolution</code> parameter.</li>
+                            <li><strong>Filtering:</strong> Often involves algorithms like Cloth Simulation Filter (CSF) to separate ground from non-ground points in LiDAR data. The <code>dtm_csf_cloth_resolution</code> parameter can influence this.</li>
+                        </ul>
+                    </p>
+                </article>
+
+                <article class="raster-type" id="dsm">
+                    <h3>Digital Surface Model (DSM)</h3>
+                    <p><strong>Description:</strong> A DSM represents the elevation of the top surfaces of all features on the landscape, including vegetation canopy, buildings, and the ground.</p>
+                    <p><strong>Archaeological Relevance:</strong> Useful for understanding the current state of the landscape, assessing vegetation cover over sites, and as a basis for deriving the Canopy Height Model (CHM). It can also help in identifying upstanding ruins or structures still visible on the surface.</p>
+                    <p><strong>Generation Parameters:</strong>
+                        <ul>
+                            <li><strong>Input:</strong> LAZ point cloud (all points) or global DSM sources (e.g., Copernicus GLO-30/GLO-90).</li>
+                            <li><strong>Resolution:</strong> Configurable.</li>
+                        </ul>
+                    </p>
+                </article>
+
+                <article class="raster-type" id="chm">
+                    <h3>Canopy Height Model (CHM)</h3>
+                    <p><strong>Description:</strong> Calculated as DSM - DTM. It represents the height of objects above the ground, primarily vegetation canopy height.</p>
+                    <p><strong>Archaeological Relevance:</strong> Helps in identifying areas of different vegetation structure or clearings that might be related to archaeological sites. Can also aid in assessing site visibility and accessibility. Anomalies in canopy height might sometimes correlate with underlying features affecting growth.</p>
+                </article>
+
+                <article class="raster-type" id="hillshade">
+                    <h3>Hillshade (Shaded Relief)</h3>
+                    <p><strong>Description:</strong> Simulates lighting and shadows on a terrain model as if illuminated from a specific direction (azimuth) and angle (altitude). It creates a 2.5D effect that enhances the perception of topographic features.</p>
+                    <p><strong>Archaeological Relevance:</strong> One of the most effective visualizations for identifying subtle earthworks, mounds, ditches, ramparts, and other low-relief archaeological features. Changing the illumination direction can reveal different sets of features.</p>
+                    <p><strong>Generation Parameters:</strong>
+                        <ul>
+                            <li><strong>Input DEM:</strong> Usually a DTM.</li>
+                            <li><strong>Azimuth:</strong> The direction of the light source (0-360 degrees, e.g., 315° for NW light). The application may generate Hillshades from multiple azimuths (e.g., standard, 315°, 225°) automatically.</li>
+                            <li><strong>Altitude:</strong> The angle of the light source above the horizon (0-90 degrees, e.g., 45°).</li>
+                            <li><strong>Z-Factor:</strong> Vertical exaggeration factor.</li>
+                        </ul>
+                    </p>
+                    <div class="tip">
+                        <p>Experiment with viewing Hillshades generated from different light directions. Some features are only clearly visible when illuminated from a particular angle.</p>
+                    </div>
+                </article>
+
+                <article class="raster-type" id="slope">
+                    <h3>Slope</h3>
+                    <p><strong>Description:</strong> Calculates the steepness of the terrain at each point, usually expressed in degrees or percent.</p>
+                    <p><strong>Archaeological Relevance:</strong> Helps identify man-made slopes such as terraces, ramparts, ditches, and platforms. Can also highlight natural slopes that might have influenced site location or construction techniques.</p>
+                </article>
+
+                <article class="raster-type" id="aspect">
+                    <h3>Aspect</h3>
+                    <p><strong>Description:</strong> Indicates the compass direction that a slope faces (e.g., North, South-East). Usually represented by values from 0-360 degrees or categorized into cardinal directions.</p>
+                    <p><strong>Archaeological Relevance:</strong> Can be relevant for understanding site placement choices (e.g., preference for south-facing slopes for warmth or specific agricultural purposes), exposure to sun/wind, and visibility.</p>
+                </article>
+
+                <article class="raster-type" id="color-relief">
+                    <h3>Color Relief (Hypsometric Tinting)</h3>
+                    <p><strong>Description:</strong> Assigns different colors to different elevation ranges, providing an intuitive visual representation of the topography.</p>
+                    <p><strong>Archaeological Relevance:</strong> Useful for quickly understanding the overall lay of the land, identifying broad topographic features like river valleys, hills, and plateaus, and contextualizing archaeological sites within their wider landscape setting.</p>
+                    <p><strong>Generation Parameters:</strong>
+                        <ul>
+                            <li><strong>Input DEM:</strong> Usually a DTM.</li>
+                            <li><strong>Color Ramp:</strong> A predefined sequence of colors mapped to elevation values (e.g., the application might use an "arch_subtle" ramp designed for archaeological visualization).</li>
+                        </ul>
+                    </p>
+                </article>
+
+                <article class="raster-type" id="tpi">
+                    <h3>Topographic Position Index (TPI)</h3>
+                    <p><strong>Description:</strong> Measures the relative elevation of a point compared to the average elevation within a specified neighborhood around that point. Positive values indicate ridges or hilltops; negative values indicate valleys or depressions.</p>
+                    <p><strong>Archaeological Relevance:</strong> Can help identify subtle ridges, mounds (positive TPI), ditches, and depressions (negative TPI) that might be archaeological features.</p>
+                </article>
+
+                <article class="raster-type" id="tri">
+                    <h3>Terrain Ruggedness Index (TRI)</h3>
+                    <p><strong>Description:</strong> Quantifies the amount of elevation difference between adjacent cells in a DEM. It measures local terrain heterogeneity.</p>
+                    <p><strong>Archaeological Relevance:</strong> Can highlight areas of complex or disturbed terrain, which might be indicative of archaeological activity (e.g., dense structural remains, quarrying) or natural features that influenced site selection.</p>
+                </article>
+
+                <article class="raster-type" id="roughness">
+                    <h3>Roughness</h3>
+                    <p><strong>Description:</strong> Measures the texture or bumpiness of the terrain surface. Similar to TRI but can be calculated using different methods.</p>
+                    <p><strong>Archaeological Relevance:</strong> Useful for identifying areas with irregular surfaces, which could correspond to collapsed structures, rubble spreads, or dense earthworks.</p>
+                </article>
+
+                <article class="raster-type" id="svf">
+                    <h3>Sky View Factor (SVF) / Openness</h3>
+                    <p><strong>Description:</strong> Represents the portion of the sky visible from a point on the ground. Values range from 0 (completely obscured) to 1 (completely open sky). It's sensitive to how enclosed a location is by surrounding topography.</p>
+                    <p><strong>Archaeological Relevance:</strong> Excellent for highlighting enclosed spaces like ditches, pits, hollow ways, and enclosures, as these features will have lower SVF values (less sky visible). Can also help identify subtle mounds or banks as areas with slightly higher openness compared to their immediate surroundings.</p>
+                </article>
+
+                <article class="raster-type" id="composites">
+                    <h3>Composite Rasters (e.g., HillshadeRGB, DTM-Hillshade Blend)</h3>
+                    <p><strong>Description:</strong> These are visualizations created by combining two or more raster layers to enhance feature visibility.</p>
+                    <ul>
+                        <li><strong>DTM-Hillshade Blend:</strong> Drapes a semi-transparent color relief (from DTM) over a hillshade, combining intuitive elevation coloring with detailed relief shading.</li>
+                        <li><strong>HillshadeRGB:</strong> Combines multiple hillshades (e.g., from NW, NE, and N light sources, assigned to Red, Green, and Blue channels) into a single color image. This can reveal features oriented in different directions simultaneously.</li>
+                    </ul>
+                    <p><strong>Archaeological Relevance:</strong> Composite images often provide a more comprehensive and interpretable view of the terrain than any single raster layer alone, making it easier to detect and understand complex archaeological landscapes.</p>
+                </article>
+
+                <article class="raster-type" id="ndvi-raster">
+                    <h3>NDVI (Normalized Difference Vegetation Index)</h3>
+                    <p><strong>Description:</strong> Calculated from Red and Near-Infrared (NIR) satellite imagery (typically Sentinel-2). Values range from -1 to +1, indicating vegetation health and density.</p>
+                    <p><strong>Archaeological Relevance:</strong> Can reveal "crop marks" or other vegetation anomalies caused by buried archaeological features affecting soil moisture, nutrients, or depth. See the <a href="ndvi_analysis.html">NDVI Analysis</a> section for more details.</p>
+                </article>
+            </section>
+
+            <div class="tip">
+                <p><strong>Combining Visualizations:</strong> The most effective archaeological prospection often involves viewing multiple raster layers simultaneously, adjusting their transparency, and comparing the patterns visible in each. Experiment with different combinations to maximize your chances of discovery!</p>
+            </div>
+            <p><a href="index.html">&larr; Back to Home</a></p>
+        </div>
+    </div>
+
+    <footer>
+        <p>GeoArchaeology Terrain Processor &copy; 2024</p>
+    </footer>
+</body>
+</html>

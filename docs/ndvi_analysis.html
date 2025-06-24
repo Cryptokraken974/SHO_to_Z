@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NDVI Analysis - User Documentation</title>
+    <link rel="stylesheet" href="style.css"> <!-- Link to a shared CSS file -->
+    <style>
+        /* Basic styles from index.html for standalone viewing */
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; line-height: 1.6; }
+        .container { width: 80%; margin: auto; overflow: hidden; padding: 0 20px; }
+        header { background: #333; color: #fff; padding-top: 30px; min-height: 70px; border-bottom: #0779e4 3px solid; }
+        header a { color: #fff; text-decoration: none; text-transform: uppercase; font-size: 16px; }
+        header ul { padding: 0; margin: 0; list-style: none; float: right; }
+        header li { display: inline; padding: 0 20px 0 20px; }
+        header #branding { float: left; }
+        header #branding h1 { margin: 0; }
+        nav { background: #444; padding: 10px 0; color: #fff; text-align: center; }
+        nav a { color: #fff; padding: 5px 15px; text-decoration: none; }
+        nav a:hover { background: #0779e4; }
+        .main-content { padding: 20px; background: #fff; margin-top: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #333; }
+        h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+        .param-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .param-table th, .param-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .param-table th { background-color: #f0f0f0; }
+        .note { background-color: #fff3cd; border-left: 5px solid #ffeeba; padding: 10px; margin: 15px 0; }
+        .tip { background-color: #d1ecf1; border-left: 5px solid #bee5eb; padding: 10px; margin: 15px 0; }
+        code { background: #eee; padding: 2px 4px; border-radius: 3px; font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; }
+        footer { text-align: center; padding: 20px; margin-top: 20px; color: #fff; background: #333; }
+        .workflow-step { margin-bottom: 10px; padding-left: 20px; position: relative; }
+        .workflow-step::before { content: counter(step-counter); counter-increment: step-counter; background-color: #0779e4; color: white; border-radius: 50%; width: 25px; height: 25px; display: inline-block; text-align: center; line-height: 25px; position: absolute; left: -10px; top: 0; }
+        .workflow-steps { list-style: none; padding-left: 10px; counter-reset: step-counter; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div id="branding">
+                <h1><a href="index.html" style="color:#fff; text-decoration:none;">GeoArchaeology Terrain Processor</a></h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="laz_loading.html">Loading LAZ</a></li>
+                    <li><a href="map_regions.html">Map Regions</a></li>
+                    <li><a href="data_retrieval.html">Get Data</a></li>
+                    <li><a href="ndvi_analysis.html" style="color:#0779e4; font-weight:bold;">NDVI Analysis</a></li>
+                    <li><a href="raster_guide.html">Raster Guide</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="main-content">
+            <a href="index.html">&larr; Back to Home</a>
+            <h2>NDVI (Normalized Difference Vegetation Index) Analysis</h2>
+            <p>The Normalized Difference Vegetation Index (NDVI) is a powerful tool for assessing vegetation health and density. In archaeology, NDVI can help identify subtle variations in plant growth that may be indicative of buried archaeological features, differences in soil composition due to past human activity, or historic land use patterns.</p>
+
+            <section id="enabling-ndvi">
+                <h3>1. Enabling NDVI for a Region</h3>
+                <p>To perform NDVI analysis, you must first enable it when defining your region of interest:</p>
+                <ul>
+                    <li><strong>When <a href="laz_loading.html">Loading LAZ/LAS Files</a>:</strong> Check the "<strong>🌿 Enable NDVI Processing</strong>" box in the LAZ upload modal.</li>
+                    <li><strong>When <a href="map_regions.html">Creating Regions from the Map</a>:</strong> Check the "<strong>🌿 Enable NDVI Processing</strong>" box in the region creation dialog (for points, paths, or boxes).</li>
+                </ul>
+                <p>Enabling this option flags the region for Sentinel-2 satellite imagery acquisition.</p>
+            </section>
+
+            <section id="sentinel2-acquisition">
+                <h3>2. Sentinel-2 Satellite Image Acquisition</h3>
+                <p>NDVI calculation relies on specific spectral bands from Sentinel-2 satellite imagery: <strong>Red (Band 4)</strong> and <strong>Near-Infrared (NIR) (Band 8)</strong>.</p>
+                <ul>
+                    <li><strong>Automated Trigger (LAZ Uploads):</strong> If NDVI was enabled during LAZ file upload, the system automatically attempts to download Sentinel-2 imagery for the LAZ file's geographic extent. This happens after the LAZ metadata (bounds, CRS) is processed.</li>
+                    <li><strong>Manual Trigger ("Get Data"):</strong> For manually created map regions with NDVI enabled, clicking the "Get Data (Elevation + Satellite)" button will initiate the Sentinel-2 imagery download.</li>
+                </ul>
+                <h4>Key Acquisition Parameters:</h4>
+                <table class="param-table">
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Data Source</td>
+                            <td>Copernicus Sentinel-2 mission, accessed via the Copernicus Data Space Ecosystem (CDSE). Requires administrator-configured credentials.</td>
+                        </tr>
+                        <tr>
+                            <td>Area of Interest (AOI)</td>
+                            <td>The WGS84 bounding box of the defined region (either from LAZ extent or manual map drawing).</td>
+                        </tr>
+                        <tr>
+                            <td>Bands Requested</td>
+                            <td>Primarily <strong>Red (Band 4, ~0.665 &micro;m)</strong> and <strong>NIR (Band 8, ~0.842 &micro;m)</strong>. The system may download a multi-band GeoTIFF which also includes Blue (Band 2) and Green (Band 3) for context.</td>
+                        </tr>
+                        <tr>
+                            <td>Spatial Resolution</td>
+                            <td>Sentinel-2 Bands 4 and 8 typically have a <strong>10-meter</strong> spatial resolution.</td>
+                        </tr>
+                        <tr>
+                            <td>Time Window</td>
+                            <td>The system searches for the best available (lowest cloud cover) scenes, usually within the last 1-2 years, to provide recent and relevant data.</td>
+                        </tr>
+                        <tr>
+                            <td>Cloud Cover</td>
+                            <td>Aims for scenes with less than 30% cloud cover. May accept up to 80% if cleaner imagery is unavailable. High cloud cover can significantly impact NDVI results.</td>
+                        </tr>
+                        <tr>
+                            <td>Atmospheric Correction</td>
+                            <td>The system typically requests Level-2A Sentinel-2 products, which are atmospherically corrected to Bottom-Of-Atmosphere (BOA) reflectance. This is important for more accurate NDVI calculations.</td>
+                        </tr>
+                        <tr>
+                            <td>Storage &amp; Format</td>
+                            <td>Downloaded Sentinel-2 data is stored as GeoTIFF files, typically in <code>input/&lt;region_name&gt;/sentinel2/</code>. PNG previews of bands are often generated.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section id="ndvi-calculation-process">
+                <h3>3. NDVI Calculation</h3>
+                <p>Once the Red and NIR band data from Sentinel-2 are available for your region, the NDVI can be calculated.</p>
+                <ul>
+                    <li><strong>Formula:</strong>
+                        <p><code>NDVI = (NIR - Red) / (NIR + Red)</code></p>
+                        <p>NDVI values range from -1 to +1.</p>
+                    </li>
+                    <li><strong>Triggering Calculation:</strong>
+                        <ul>
+                            <li>After Sentinel-2 data acquisition, there will likely be an option in the UI such as "Analyze NDVI" or "Generate NDVI Map" for the specific region.</li>
+                            <li>This action calls a backend processing service (likely using <code>app/processing/ndvi_processing.py</code>) that takes the Red and NIR band rasters as input.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Output:</strong>
+                        <ul>
+                            <li>A new GeoTIFF raster file representing the NDVI map is generated. This is typically saved in a path like <code>output/&lt;region_name&gt;/lidar/NDVI/&lt;region_name&gt;_NDVI.tif</code>.</li>
+                            <li>A PNG version of the NDVI map is also created for display within the application. This PNG is usually styled with a specific color ramp to make interpretation easier.</li>
+                        </ul>
+                    </li>
+                </ul>
+            </section>
+
+            <section id="interpreting-ndvi">
+                <h3>4. Interpreting NDVI for Archaeology</h3>
+                <p>NDVI maps are typically visualized using a color ramp where different colors represent different ranges of NDVI values:</p>
+                <ul>
+                    <li><strong>High Positive Values (e.g., 0.6 to 1.0, often shown in dark greens):</strong> Indicate dense and healthy vegetation.</li>
+                    <li><strong>Moderate Positive Values (e.g., 0.2 to 0.5, often light greens/yellows):</strong> Indicate sparse vegetation, grasslands, or crops under stress.</li>
+                    <li><strong>Values Around Zero (e.g., -0.1 to 0.1, often browns/tans):</strong> Can represent bare soil, rock, sand, or man-made surfaces.</li>
+                    <li><strong>Negative Values (e.g., -1.0 to -0.2, often blues):</strong> Typically correspond to water, snow, or clouds.</li>
+                </ul>
+                <div class="tip">
+                    <p><strong>Archaeological Significance:</strong> Archaeologists look for <strong>anomalous patterns</strong> in the NDVI map that deviate from the surrounding natural or modern agricultural landscape. These can include:</p>
+                    <ul>
+                        <li><strong>Linear Features:</strong> Lines of higher or lower NDVI might suggest buried ditches (often higher NDVI due to moisture retention) or walls/foundations (often lower NDVI due to shallower soil and poorer growth). These are classic "crop marks."</li>
+                        <li><strong>Geometric Shapes:</strong> Rectangular, circular, or other geometric patterns in vegetation health can indicate the outlines of former enclosures, buildings, field systems, or other anthropogenic structures.</li>
+                        <li><strong>Differential Growth Patches:</strong> Areas of consistently healthier or more stressed vegetation compared to their surroundings can point to altered soil conditions from past human activity (e.g., middens, compacted surfaces, areas of intense burning).</li>
+                    </ul>
+                </div>
+                <div class="note">
+                    <p><strong>Context is Key:</strong> NDVI is a powerful prospection tool, but its interpretation requires careful consideration of local environmental conditions, seasonality, modern land use, and integration with other datasets like DTM, Hillshade, and historical maps. What constitutes an "anomaly" can vary greatly between different environments and times of the year.</p>
+                    <p><strong>Temporal Analysis:</strong> If the application supports acquiring Sentinel-2 imagery from different dates or seasons, comparing NDVI maps over time can be very revealing, as some archaeological features only become apparent in vegetation under specific moisture or growth conditions.</p>
+                </div>
+            </section>
+            <p><a href="index.html">&larr; Back to Home</a></p>
+        </div>
+    </div>
+
+    <footer>
+        <p>GeoArchaeology Terrain Processor &copy; 2024</p>
+    </footer>
+</body>
+</html>

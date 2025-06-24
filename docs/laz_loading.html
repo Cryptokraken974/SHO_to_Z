@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading LAZ/LAS Files - User Documentation</title>
+    <link rel="stylesheet" href="style.css"> <!-- Link to a shared CSS file -->
+    <style>
+        /* Basic styles from index.html for standalone viewing */
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; line-height: 1.6; }
+        .container { width: 80%; margin: auto; overflow: hidden; padding: 0 20px; }
+        header { background: #333; color: #fff; padding-top: 30px; min-height: 70px; border-bottom: #0779e4 3px solid; }
+        header a { color: #fff; text-decoration: none; text-transform: uppercase; font-size: 16px; }
+        header ul { padding: 0; margin: 0; list-style: none; float: right; }
+        header li { display: inline; padding: 0 20px 0 20px; }
+        header #branding { float: left; }
+        header #branding h1 { margin: 0; }
+        nav { background: #444; padding: 10px 0; color: #fff; text-align: center; }
+        nav a { color: #fff; padding: 5px 15px; text-decoration: none; }
+        nav a:hover { background: #0779e4; }
+        .main-content { padding: 20px; background: #fff; margin-top: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #333; }
+        h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+        .param-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .param-table th, .param-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .param-table th { background-color: #f0f0f0; }
+        .note { background-color: #fff3cd; border-left: 5px solid #ffeeba; padding: 10px; margin: 15px 0; }
+        .tip { background-color: #d1ecf1; border-left: 5px solid #bee5eb; padding: 10px; margin: 15px 0; }
+        code { background: #eee; padding: 2px 4px; border-radius: 3px; font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; }
+        footer { text-align: center; padding: 20px; margin-top: 20px; color: #fff; background: #333; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div id="branding">
+                <h1><a href="index.html" style="color:#fff; text-decoration:none;">GeoArchaeology Terrain Processor</a></h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="laz_loading.html" style="color:#0779e4; font-weight:bold;">Loading LAZ</a></li>
+                    <li><a href="map_regions.html">Map Regions</a></li>
+                    <li><a href="data_retrieval.html">Get Data</a></li>
+                    <li><a href="ndvi_analysis.html">NDVI Analysis</a></li>
+                    <li><a href="raster_guide.html">Raster Guide</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="main-content">
+            <a href="index.html">&larr; Back to Home</a>
+            <h2>Loading Your LiDAR Data (LAZ/LAS Files)</h2>
+            <p>This section explains how to import your own LiDAR point cloud data (in <code>.laz</code> or <code>.las</code> format) into the application. Once loaded, these files create new "regions" that you can analyze.</p>
+
+            <section id="how-to-load">
+                <h3>How to Load LAZ/LAS Files</h3>
+                <p>You can load LiDAR data in two ways:</p>
+                <ul>
+                    <li><strong>Load Single/Multiple LAZ/LAS Files:</strong>
+                        <ol>
+                            <li>Locate and click the "Load LAZ File" button (or a similar button, often depicted with a file icon) in the application's interface. This will open the "Browse for LAZ Files" modal.</li>
+                            <li>In the modal, you can either drag and drop your <code>.laz</code> or <code>.las</code> files into the designated area or click the "Browse Files" button to open your system's file explorer.</li>
+                            <li>Select one or more files. They will appear in a list within the modal.</li>
+                            <li>Optionally, check the "<strong>🌿 Enable NDVI Processing</strong>" box if you plan to perform vegetation analysis for these areas. This will trigger the download of Sentinel-2 satellite imagery corresponding to each LAZ file's extent.</li>
+                            <li>Click the "Load Files" button to begin the upload and processing.</li>
+                        </ol>
+                    </li>
+                    <li><strong>Load a Folder of LAZ/LAS Files:</strong>
+                        <ol>
+                            <li>Click the "Load LAZ Folder" button (or similar, often with a folder icon). This opens the "Browse for LAZ Folder" modal.</li>
+                            <li>Drag and drop a folder into the modal or click "Browse Folder" to select a folder from your system. The application will search for <code>.laz</code> and <code>.las</code> files within this folder.</li>
+                            <li>Optionally, check the "<strong>🌿 Enable NDVI Processing</strong>" box. This setting will apply to all valid LiDAR files found in the folder.</li>
+                            <li>Click "Done" (or a similar confirmation button) to upload the files.</li>
+                        </ol>
+                    </li>
+                </ul>
+                <div class="note">
+                    <p><strong>File Format:</strong> The application supports both compressed (<code>.laz</code>) and uncompressed (<code>.las</code>) LiDAR point cloud formats.</p>
+                    <p><strong>Duplicate Names:</strong> If you upload a file with a name that already exists in the system's input directory (<code>input/LAZ/</code>), a numeric suffix (e.g., <code>_1</code>, <code>_2</code>) will be appended to the new file's name to ensure uniqueness.</p>
+                </div>
+            </section>
+
+            <section id="after-upload">
+                <h3>What Happens After Uploading</h3>
+                <ol>
+                    <li>
+                        <strong>File Storage:</strong> Your uploaded LAZ/LAS files are securely stored in the <code>input/LAZ/</code> directory on the application server.
+                    </li>
+                    <li>
+                        <strong>Region Creation & Metadata Extraction:</strong>
+                        <ul>
+                            <li>Each uploaded LAZ file is treated as a new <strong>region</strong>. The region is automatically named after the original filename (e.g., a file named <code>MySite_Survey.laz</code> will create a region named <code>MySite_Survey</code>).</li>
+                            <li>The system analyzes each LAZ file using PDAL (Point Data Abstraction Library) to extract crucial metadata:
+                                <ul>
+                                    <li><strong>Native Coordinate Reference System (CRS):</strong> The original projection of your LiDAR data. If this is missing, the system will attempt to infer it from the coordinate values.</li>
+                                    <li><strong>Spatial Bounding Box:</strong> The geographic extent of the point cloud in its native CRS.</li>
+                                    <li><strong>WGS84 Transformation:</strong> The native bounds are then reprojected to WGS84 (EPSG:4326), the standard for web mapping.</li>
+                                </ul>
+                            </li>
+                            <li>A detailed <code>metadata.txt</code> file is generated and stored in the region's output directory (e.g., <code>output/MySite_Survey/metadata.txt</code>). This human-readable file includes:
+                                <ul>
+                                    <li>Region Name</li>
+                                    <li>Original LAZ file path</li>
+                                    <li>Center coordinates (Latitude, Longitude) in WGS84</li>
+                                    <li>Bounding box (North, South, East, West) in WGS84</li>
+                                    <li>Source CRS information (e.g., WKT string, EPSG code)</li>
+                                    <li>Native bounds (in the original CRS)</li>
+                                    <li><strong>NDVI Enabled status</strong> (true or false, based on your selection during upload)</li>
+                                    <li>Timestamp of metadata generation</li>
+                                </ul>
+                            </li>
+                            <li>Key metadata (WGS84 center and bounds) is also cached in a local database for faster access.</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>Map Display:</strong>
+                        <ul>
+                            <li>A marker pin is placed on the application's map at the calculated center of your LAZ file's extent.</li>
+                            <li>A blue rectangle is drawn on the map, visually representing the WGS84 bounding box of your LAZ data.</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>Automatic Sentinel-2 Satellite Imagery Acquisition (if NDVI was enabled):</strong>
+                        <ul>
+                            <li>If you checked "Enable NDVI Processing" during upload, this step is automatically initiated.</li>
+                            <li><strong>Purpose:</strong> To download the necessary satellite imagery (Red and Near-Infrared bands from Sentinel-2) that will be used later to calculate the NDVI.</li>
+                            <li><strong>Data Source:</strong> Copernicus Data Space Ecosystem (CDSE).</li>
+                            <li><strong>Area of Interest:</strong> The precise WGS84 bounding box of your LAZ file.</li>
+                            <li><strong>Imagery Selection:</strong>
+                                <ul>
+                                    <li><strong>Bands:</strong> Red (Band 4) and NIR (Band 8) are the primary bands for NDVI. The system may download a multi-band product that includes these.</li>
+                                    <li><strong>Time Window:</strong> The system searches for the best quality (lowest cloud cover) scenes acquired within approximately the last two years.</li>
+                                    <li><strong>Cloud Cover:</strong> It prioritizes scenes with less than 30% cloud cover but may use scenes with up to 80% if cleaner imagery is not available.</li>
+                                </ul>
+                            </li>
+                            <li><strong>Storage:</strong> The downloaded Sentinel-2 GeoTIFF files are stored in <code>input/&lt;region_name&gt;/sentinel2/</code>.</li>
+                            <li><strong>Preview Generation:</strong> PNG versions of the downloaded bands are often created for quick visualization.</li>
+                        </ul>
+                        <div class="tip">
+                            <p><strong>Authentication for CDSE:</strong> Accessing Sentinel-2 data via CDSE requires authentication. Ensure the application administrator has configured the necessary CDSE OAuth2 Client ID and Secret, or a legacy CDSE token, in the application settings.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <strong>Raster Generation (DTM, Hillshade, etc.):</strong>
+                        <ul>
+                            <li>The initial upload and metadata extraction process for a LAZ file <strong>does not</strong> immediately generate terrain rasters like DTM or Hillshades.</li>
+                            <li>These detailed terrain visualizations are typically generated once a Digital Terrain Model (DTM) is created from your LAZ file. This might be an automatic step following the LAZ processing or a step you initiate (e.g., by clicking a "Generate DTM" button for the new LAZ region).</li>
+                            <li><strong>DTM Generation Parameters:</strong> Key parameters for DTM creation from LAZ include:
+                                <ul>
+                                    <li><code>dtm_resolution</code>: The grid cell size of the output DTM (e.g., 1.0 meters).</li>
+                                    <li><code>dtm_csf_cloth_resolution</code>: A parameter for the Cloth Simulation Filter (CSF), a common algorithm for ground point filtering in LiDAR data.</li>
+                                </ul>
+                            </li>
+                            <li>Once the DTM is available, the system can then generate a comprehensive suite of raster products. See the <a href="raster_guide.html">Raster Guide</a> for more details on these products.</li>
+                        </ul>
+                        <div class="note">
+                            <p><strong>Archaeologist's Workflow:</strong> After loading your LAZ file, your next step will likely be to generate a DTM for it. This will then unlock the ability to create various hillshades, slope maps, and other terrain visualizations crucial for archaeological interpretation.</p>
+                        </div>
+                    </li>
+                </ol>
+            </section>
+
+            <section id="arch-relevance">
+                <h3>Why This is Important for Archaeologists</h3>
+                <ul>
+                    <li><strong>Utilize Your Own Survey Data:</strong> Directly use high-resolution LiDAR data you may have collected from field surveys, acquired from archives, or received from other projects.</li>
+                    <li><strong>Immediate Spatial Awareness:</strong> Instantly visualize the location and extent of your LiDAR data on a map, providing crucial spatial context.</li>
+                    <li><strong>Unlock Vegetation Analysis:</strong> By enabling NDVI, you prepare the ground for analyzing vegetation patterns over your site. These patterns can sometimes reveal subtle archaeological features (e.g., crop marks) or differences in soil conditions influenced by buried remains.</li>
+                    <li><strong>Foundation for In-Depth Terrain Analysis:</strong> Loading your LAZ data is the essential first step to generating a suite of powerful terrain visualizations (DTM, Hillshades, Slope maps, etc.). These are indispensable tools for identifying, interpreting, and documenting archaeological earthworks, structures, and landscape modifications.</li>
+                </ul>
+            </section>
+            <p><a href="index.html">&larr; Back to Home</a></p>
+        </div>
+    </div>
+
+    <footer>
+        <p>GeoArchaeology Terrain Processor &copy; 2024</p>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoArchaeology Terrain Processor - User Documentation</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; line-height: 1.6; }
+        .container { width: 80%; margin: auto; overflow: hidden; padding: 0 20px; }
+        header { background: #333; color: #fff; padding-top: 30px; min-height: 70px; border-bottom: #0779e4 3px solid; }
+        header a { color: #fff; text-decoration: none; text-transform: uppercase; font-size: 16px; }
+        header ul { padding: 0; margin: 0; list-style: none; float: right; }
+        header li { display: inline; padding: 0 20px 0 20px; }
+        header #branding { float: left; }
+        header #branding h1 { margin: 0; }
+        nav { background: #444; padding: 10px 0; color: #fff; text-align: center; }
+        nav a { color: #fff; padding: 5px 15px; text-decoration: none; }
+        nav a:hover { background: #0779e4; }
+        .main-content { padding: 20px; background: #fff; margin-top: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #333; }
+        h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+        .use-case { margin-bottom: 20px; padding: 15px; background: #eef; border-left: 5px solid #0779e4; }
+        .use-case h3 { margin-top: 0; }
+        footer { text-align: center; padding: 20px; margin-top: 20px; color: #fff; background: #333; }
+        code { background: #eee; padding: 2px 4px; border-radius: 3px; font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; }
+        .param-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .param-table th, .param-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .param-table th { background-color: #f0f0f0; }
+        .note { background-color: #fff3cd; border-left: 5px solid #ffeeba; padding: 10px; margin: 15px 0; }
+        .tip { background-color: #d1ecf1; border-left: 5px solid #bee5eb; padding: 10px; margin: 15px 0; }
+        .warning { background-color: #f8d7da; border-left: 5px solid #f5c6cb; padding: 10px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div id="branding">
+                <h1>GeoArchaeology Terrain Processor</h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="laz_loading.html">Loading LAZ</a></li>
+                    <li><a href="map_regions.html">Map Regions</a></li>
+                    <li><a href="data_retrieval.html">Get Data</a></li>
+                    <li><a href="ndvi_analysis.html">NDVI Analysis</a></li>
+                    <li><a href="raster_guide.html">Raster Guide</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <nav id="sub-nav">
+        <div class="container">
+            <a href="#introduction">Introduction</a>
+            <a href="#main-use-cases">Main Use Cases</a>
+            <a href="#getting-started">Getting Started</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="main-content">
+            <section id="introduction">
+                <h2>Welcome!</h2>
+                <p>This documentation provides a guide to using the GeoArchaeology Terrain Processor application. This powerful tool is designed to help archaeologists and researchers analyze terrain and satellite imagery to discover, investigate, and document archaeological sites and landscapes.</p>
+                <p>Whether you are working with your own LiDAR data (LAZ/LAS files) or defining areas of interest directly on the map, this application offers a suite of tools to generate insightful raster visualizations and perform vegetation analysis.</p>
+            </section>
+
+            <section id="main-use-cases">
+                <h2>Main Use Cases</h2>
+                <p>The application supports several key workflows for archaeological investigation:</p>
+                <div class="use-case">
+                    <h3>1. Loading Your Own LiDAR Data (LAZ/LAS Files)</h3>
+                    <p>Import individual LAZ/LAS files or entire folders of LiDAR data. The system automatically processes this data, determines its geographic extent, and prepares it for further analysis. You can also enable NDVI processing to acquire corresponding satellite imagery.</p>
+                    <p><a href="laz_loading.html">Learn more about Loading LAZ/LAS Files...</a></p>
+                </div>
+                <div class="use-case">
+                    <h3>2. Defining Regions of Interest from the Map</h3>
+                    <p>Interactively define study areas by clicking a single point, drawing a path (for transects or linear features), or drawing a box (for broader areas). You can specify how many sub-regions to create from paths/boxes and enable NDVI processing.</p>
+                    <p><a href="map_regions.html">Learn more about Creating Regions from the Map...</a></p>
+                </div>
+                <div class="use-case">
+                    <h3>3. Retrieving Elevation and Satellite Data</h3>
+                    <p>For regions defined on the map, use the "Get Data" function to fetch relevant elevation data (e.g., DTM from USGS 3DEP) and Sentinel-2 satellite imagery (if NDVI is enabled). This automatically triggers the generation of various terrain rasters.</p>
+                    <p><a href="data_retrieval.html">Learn more about the "Get Data" Function...</a></p>
+                </div>
+                 <div class="use-case">
+                    <h3>4. NDVI Analysis for Vegetation Insights</h3>
+                    <p>Leverage Sentinel-2 satellite imagery to calculate and visualize the Normalized Difference Vegetation Index (NDVI). This can help identify subtle vegetation patterns related to buried archaeological features or past land use.</p>
+                    <p><a href="ndvi_analysis.html">Learn more about NDVI Analysis...</a></p>
+                </div>
+                <div class="use-case">
+                    <h3>5. Analyzing Generated Raster Visualizations</h3>
+                    <p>Explore a rich set of automatically generated raster products like Digital Terrain Models (DTM), Hillshades, Slope maps, Aspect maps, Color Relief, and more. These visualizations are crucial for identifying and interpreting archaeological features.</p>
+                    <p><a href="raster_guide.html">Learn more about Understanding Rasters...</a></p>
+                </div>
+            </section>
+
+            <section id="getting-started">
+                <h2>Getting Started</h2>
+                <p>To begin, you can either:</p>
+                <ul>
+                    <li>Go to the <a href="laz_loading.html">Loading LAZ/LAS Files</a> section if you have your own LiDAR data.</li>
+                    <li>Or, learn how to <a href="map_regions.html">Create Regions from the Map</a> if you want to define new areas of interest.</li>
+                </ul>
+                <p>For understanding the various data products you'll be working with, refer to the <a href="raster_guide.html">Raster Guide</a>.</p>
+            </section>
+        </div>
+    </div>
+
+    <footer>
+        <p>GeoArchaeology Terrain Processor &copy; 2024</p>
+    </footer>
+</body>
+</html>
