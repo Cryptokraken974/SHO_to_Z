@@ -3,8 +3,10 @@ from fastapi.responses import JSONResponse
 from typing import Optional, Dict
 import json
 import os
+import base64
 from pathlib import Path
 from ..convert import convert_geotiff_to_png_base64
+from ..convert import convert_lrm_to_coolwarm_png
 from ..processing.dtm import dtm
 from ..processing.dsm import dsm
 from ..processing.chm import chm
@@ -12,6 +14,7 @@ from ..processing.hillshade import hillshade, hillshade_315_45_08, hillshade_225
 from ..processing.slope import slope
 from ..processing.aspect import aspect
 from ..processing.color_relief import color_relief
+from ..processing.lrm import lrm
 from ..processing.tpi import tpi
 from ..processing.roughness import roughness
 from ..processing.sky_view_factor import sky_view_factor
@@ -574,14 +577,18 @@ async def api_composite_dtm_hillshade_blend(
 
 @router.post("/api/slope")
 async def api_slope(
-    input_file: str = Form(None), region_name: str = Form(None),
-    processing_type: str = Form(None), display_region_name: str = Form(None),
+    input_file: str = Form(None), 
+    region_name: str = Form(None),
+    processing_type: str = Form(None), 
+    display_region_name: str = Form(None),
+    use_inferno_colormap: bool = Form(True),  # Default to enhanced inferno visualization
+    max_slope_degrees: float = Form(60.0),    # Archaeological analysis range
     stretch_type: Optional[str] = Form("stddev"),
     stretch_params_json: Optional[str] = Form(None)
 ):
-    """Generate slope from LAZ file"""
-    print(f"\n🎯 API CALL: /api/slope")
-    logger.info(f"/api/slope called for region: {region_name}, file: {input_file}, stretch: {stretch_type}")
+    """Generate enhanced slope analysis from LAZ file with inferno colormap for archaeological terrain analysis"""
+    print(f"\n🎯 API CALL: /api/slope (Enhanced)")
+    logger.info(f"/api/slope called for region: {region_name}, file: {input_file}, inferno: {use_inferno_colormap}, max_degrees: {max_slope_degrees}")
     effective_input_file = input_file
     if region_name and processing_type:
         effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
@@ -593,14 +600,61 @@ async def api_slope(
         tif_path = slope(effective_input_file, output_region)
         print(f"✅ Slope TIF generated: {tif_path}")
 
-        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
-        image_b64 = convert_geotiff_to_png_base64(
-            tif_path,
-            stretch_type=stretch_type if stretch_type else "stddev",
-            stretch_params=parsed_stretch_params
-        )
-        print(f"✅ Base64 conversion complete")
-        return {"image": image_b64}
+        # Use enhanced inferno visualization for archaeological analysis
+        if use_inferno_colormap:
+            print(f"🔥 ENHANCED INFERNO VISUALIZATION: Archaeological terrain analysis")
+            print(f"   📐 0°-{max_slope_degrees}° linear rescaling for optimal contrast")
+            print(f"   🎨 Inferno colormap: Dark (flat) → Bright (steep)")
+            print(f"   🏛️ Archaeological features highlighted: Terraces, scarps, causeway edges")
+            
+            # Create PNG output path
+            png_dir = os.path.join("output", output_region, "lidar", "png_outputs")
+            os.makedirs(png_dir, exist_ok=True)
+            png_path = os.path.join(png_dir, "Slope_inferno.png")
+            
+            # Import the enhanced slope conversion function
+            from ..convert import convert_slope_to_inferno_png
+            
+            # Generate enhanced slope PNG for archaeological analysis
+            final_png_path = convert_slope_to_inferno_png(
+                tif_path, 
+                png_path,
+                enhanced_resolution=True,
+                save_to_consolidated=False,  # Already in the right directory
+                max_slope_degrees=max_slope_degrees
+            )
+            print(f"✅ Enhanced slope inferno PNG generated: {final_png_path}")
+            print(f"🎯 Features optimized for: Flat areas (0°-5°), Moderate slopes (5°-20°), Steep terrain (20°+)")
+            
+            # Convert PNG to base64 for display
+            with open(final_png_path, 'rb') as f:
+                png_data = f.read()
+                image_b64 = base64.b64encode(png_data).decode('utf-8')
+            
+            print(f"✅ Enhanced inferno base64 conversion complete")
+            return {
+                "image": image_b64,
+                "visualization_type": "enhanced_inferno_archaeological",
+                "max_slope_degrees": max_slope_degrees,
+                "colormap": "inferno",
+                "analysis_focus": "slope_defined_anomalies"
+            }
+        else:
+            print(f"📊 STANDARD VISUALIZATION: Traditional slope analysis")
+            # Use standard visualization
+            parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+            image_b64 = convert_geotiff_to_png_base64(
+                tif_path,
+                stretch_type=stretch_type if stretch_type else "stddev",
+                stretch_params=parsed_stretch_params
+            )
+            print(f"✅ Standard base64 conversion complete")
+            return {
+                "image": image_b64,
+                "visualization_type": "standard",
+                "max_slope_degrees": max_slope_degrees
+            }
+            
     except Exception as e:
         logger.error(f"Error in api_slope: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Slope processing failed: {str(e)}")
@@ -799,3 +853,115 @@ async def api_sky_view_factor(
     except Exception as e:
         logger.error(f"Error in api_sky_view_factor: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Sky View Factor processing failed: {str(e)}")
+
+@router.post("/api/lrm")
+async def api_lrm(
+    input_file: str = Form(None), 
+    region_name: str = Form(None),
+    processing_type: str = Form(None), 
+    display_region_name: str = Form(None),
+    window_size: int = Form(None),  # None for auto-sizing
+    filter_type: str = Form("uniform"),  # "uniform" or "gaussian"
+    auto_sizing: bool = Form(True),  # Enable adaptive window sizing
+    enhanced_normalization: bool = Form(False),  # Enhanced normalization
+    use_coolwarm_colormap: bool = Form(True),
+    percentile_clip_min: float = Form(2.0),
+    percentile_clip_max: float = Form(98.0),
+    stretch_type: Optional[str] = Form("stddev"),
+    stretch_params_json: Optional[str] = Form(None)
+):
+    """Generate Enhanced Local Relief Model (LRM) from LAZ file with adaptive algorithms for archaeological analysis"""
+    print(f"\n🎯 API CALL: /api/lrm (Enhanced)")
+    logger.info(f"/api/lrm called for region: {region_name}, file: {input_file}, window_size: {window_size}, filter: {filter_type}, auto_sizing: {auto_sizing}, enhanced_norm: {enhanced_normalization}")
+    effective_input_file = input_file
+    if region_name and processing_type:
+        effective_input_file = resolve_laz_file_from_region(region_name, processing_type)
+    elif not input_file:
+        raise HTTPException(status_code=400, detail="Either 'input_file' or both 'region_name' and 'processing_type' must be provided")
+
+    try:
+        output_region = display_region_name if display_region_name else region_name
+        
+        # Generate enhanced LRM TIF using the enhanced function
+        tif_path = lrm(
+            effective_input_file, 
+            output_region, 
+            window_size=window_size,
+            filter_type=filter_type,
+            auto_sizing=auto_sizing,
+            enhanced_normalization_enabled=enhanced_normalization
+        )
+        print(f"✅ Enhanced LRM TIF generated: {tif_path}")
+
+        # Use specialized coolwarm visualization if requested (default for archaeological analysis)
+        if use_coolwarm_colormap:
+            print(f"🌈 ENHANCED COOLWARM VISUALIZATION: Archaeological LRM analysis")
+            print(f"   🎨 Coolwarm colormap: Blue (negative relief) → Red (positive relief)")
+            print(f"   📊 Percentile clipping range: {percentile_clip_min}%-{percentile_clip_max}%")
+            print(f"   🏛️ Archaeological features optimized for: Ditches, mounds, platform edges")
+            
+            # Create PNG output path
+            png_dir = os.path.join("output", output_region, "lidar", "png_outputs")
+            os.makedirs(png_dir, exist_ok=True)
+            
+            # Include processing parameters in filename for clarity
+            filter_suffix = "_gaussian" if filter_type == "gaussian" else ""
+            auto_suffix = "_adaptive" if auto_sizing else ""
+            norm_suffix = "_enhanced" if enhanced_normalization else ""
+            png_filename = f"LRM_coolwarm{filter_suffix}{auto_suffix}{norm_suffix}.png"
+            png_path = os.path.join(png_dir, png_filename)
+            
+            # Generate specialized coolwarm PNG for archaeological analysis
+            final_png_path = convert_lrm_to_coolwarm_png(
+                tif_path, 
+                png_path,
+                enhanced_resolution=True,
+                save_to_consolidated=False,  # Already in the right directory
+                percentile_clip=(percentile_clip_min, percentile_clip_max)
+            )
+            print(f"✅ Enhanced LRM coolwarm PNG generated: {final_png_path}")
+            print(f"🎯 Enhancement features applied:")
+            if filter_type == "gaussian":
+                print(f"   🔥 Gaussian filtering for better edge preservation")
+            if auto_sizing:
+                print(f"   📐 Adaptive window sizing based on pixel resolution")
+            if enhanced_normalization:
+                print(f"   🎨 Enhanced normalization with percentile clipping")
+            
+            # Convert PNG to base64 for display
+            with open(final_png_path, 'rb') as f:
+                png_data = f.read()
+                image_b64 = base64.b64encode(png_data).decode('utf-8')
+            
+            print(f"✅ Enhanced coolwarm base64 conversion complete")
+            return {
+                "image": image_b64,
+                "visualization_type": "enhanced_coolwarm_archaeological",
+                "percentile_range": f"{percentile_clip_min}%-{percentile_clip_max}%",
+                "window_size": window_size if window_size else "adaptive",
+                "filter_type": filter_type,
+                "auto_sizing": auto_sizing,
+                "enhanced_normalization": enhanced_normalization
+            }
+        else:
+            print(f"📊 STANDARD VISUALIZATION: Traditional LRM analysis")
+            # Use standard visualization
+            parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+            image_b64 = convert_geotiff_to_png_base64(
+                tif_path,
+                stretch_type=stretch_type if stretch_type else "stddev",
+                stretch_params=parsed_stretch_params
+            )
+            print(f"✅ Standard base64 conversion complete")
+            return {
+                "image": image_b64,
+                "visualization_type": "standard",
+                "window_size": window_size if window_size else "adaptive",
+                "filter_type": filter_type,
+                "auto_sizing": auto_sizing,
+                "enhanced_normalization": enhanced_normalization
+            }
+            
+    except Exception as e:
+        logger.error(f"Error in api_lrm: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"LRM processing failed: {str(e)}")

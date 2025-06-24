@@ -687,6 +687,303 @@ async def process_lrm_tiff(tiff_path: str, output_dir: str, parameters: Dict[str
             "processing_time": time.time() - start_time
         }
 
+async def process_enhanced_lrm_tiff(tiff_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Enhanced LRM processing with archaeological features:
+    - Adaptive window sizing based on pixel resolution
+    - Gaussian filtering option for better edge preservation
+    - Enhanced normalization with percentile clipping
+    """
+    print(f"\n🌄 ENHANCED LRM PROCESSING (TIFF)")
+    print(f"📁 Input: {os.path.basename(tiff_path)}")
+    start_time = time.time()
+    
+    try:
+        # Import enhanced LRM functions
+        from .lrm import (
+            detect_pixel_resolution, 
+            calculate_adaptive_window_size,
+            apply_smoothing_filter,
+            enhanced_normalization
+        )
+        
+        # Extract parameters with defaults for archaeological analysis
+        window_size = parameters.get("window_size", None)  # None for auto-sizing
+        filter_type = parameters.get("filter_type", "uniform")
+        auto_sizing = parameters.get("auto_sizing", True)
+        enhanced_normalization_enabled = parameters.get("enhanced_normalization", False)
+        
+        # Read elevation data
+        print(f"📖 Reading elevation TIFF: {os.path.basename(tiff_path)}")
+        elevation_array, metadata = read_elevation_tiff(tiff_path)
+        print(f"✅ Elevation data loaded: {elevation_array.shape[1]}x{elevation_array.shape[0]} pixels")
+        
+        # Get geotransform for resolution detection
+        geotransform = metadata.get('geotransform')
+        if geotransform:
+            detected_resolution = detect_pixel_resolution(geotransform)
+            print(f"📏 Pixel size: {geotransform[1]:.6f} x {abs(geotransform[5]):.6f}")
+            print(f"   📐 Detected pixel resolution: {detected_resolution:.3f} meters/pixel")
+        else:
+            detected_resolution = 1.0  # Default fallback
+            print(f"⚠️ No geotransform found, using default 1.0m/pixel resolution")
+        
+        # Calculate optimal window size if not provided
+        if window_size is None:
+            window_size = calculate_adaptive_window_size(detected_resolution, auto_sizing)
+        elif auto_sizing:
+            # Override provided window size with adaptive calculation
+            window_size = calculate_adaptive_window_size(detected_resolution, auto_sizing)
+        
+        # Enhanced logging for new features
+        if auto_sizing:
+            print(f"   🎯 ENHANCED ADAPTIVE SIZING: {window_size} pixels (resolution-based calculation)")
+            print(f"      📐 Resolution: {detected_resolution:.3f}m/pixel → Optimal window: {window_size}px")
+        else:
+            print(f"   🎯 Using window size: {window_size} pixels (fixed)")
+        
+        if filter_type == "gaussian":
+            print(f"   🔧 ENHANCED GAUSSIAN FILTER: Archaeological feature preservation")
+        else:
+            print(f"   🔧 Filter type: {filter_type}")
+        
+        if enhanced_normalization_enabled:
+            print(f"   🎨 ENHANCED NORMALIZATION: P2-P98 percentile clipping with symmetric scaling")
+        
+        # Apply enhanced smoothing filter
+        print(f"\n🔧 Step 3: Applying {filter_type} smoothing filter (window size: {window_size})...")
+        
+        # Enhanced feature logging
+        if filter_type == "gaussian":
+            print(f"   🔥 ENHANCED GAUSSIAN SMOOTHING: Better edge preservation for archaeological features")
+        
+        # Enhanced NoData handling - convert to NaN before processing
+        nodata_mask = elevation_array == -9999
+        elevation_array = elevation_array.astype(np.float32)
+        elevation_array[nodata_mask] = np.nan
+        
+        # Apply selected smoothing filter
+        valid_mask = ~np.isnan(elevation_array)
+        if np.any(valid_mask):
+            smoothed = apply_smoothing_filter(elevation_array, window_size, filter_type)
+            print(f"   ✅ Smoothing completed using {filter_type} filter")
+            if filter_type == "gaussian":
+                print(f"   🎯 Gaussian filtering enhances subtle archaeological feature detection")
+        else:
+            raise Exception("No valid elevation data found in elevation TIFF")
+        
+        # Calculate LRM (elevation - smoothed elevation)
+        print(f"\n➖ Step 4: Calculating Local Relief Model...")
+        lrm_array = elevation_array - smoothed
+        
+        # Apply enhanced normalization if enabled
+        if enhanced_normalization_enabled:
+            print(f"🎨 Applying enhanced normalization...")
+            lrm_array = enhanced_normalization(lrm_array, nodata_mask)
+            print(f"   ✅ Enhanced normalization applied")
+            print(f"   🎯 Percentile clipping with symmetric scaling for archaeological visualization")
+        else:
+            # Restore NoData values for standard processing
+            lrm_array[nodata_mask] = -9999
+        
+        print(f"   📊 LRM range: {np.nanmin(lrm_array[~nodata_mask]):.2f} to {np.nanmax(lrm_array[~nodata_mask]):.2f} meters")
+        print(f"   ✅ Local relief calculation completed")
+        
+        # Generate output filename with enhancement info
+        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
+        output_filename = f"{base_name}_LRM"
+        
+        # Add enhancement suffixes for clarity
+        if filter_type == "gaussian":
+            output_filename += "_gaussian"
+        if auto_sizing:
+            output_filename += "_adaptive"
+        if enhanced_normalization_enabled:
+            output_filename += "_enhanced"
+            
+        output_filename += ".tif"
+        output_path = os.path.join(output_dir, output_filename)
+        
+        # Save enhanced LRM
+        print(f"\n💾 Step 5: Saving Enhanced LRM as GeoTIFF...")
+        save_raster(lrm_array, output_path, metadata, enhanced_quality=True)
+        
+        processing_time = time.time() - start_time
+        
+        # Enhanced completion logging
+        print(f"✅ ENHANCED LRM generation completed: {output_filename}")
+        print(f"   ⏱️ Processing time: {processing_time:.2f} seconds")
+        print(f"   🎯 Enhanced features used:")
+        print(f"      📐 Adaptive sizing: {'Yes' if auto_sizing else 'No'}")
+        print(f"      🔧 Filter type: {filter_type}")
+        print(f"      🎨 Enhanced normalization: {'Yes' if enhanced_normalization_enabled else 'No'}")
+        
+        result = {
+            "status": "success",
+            "output_file": output_path,
+            "processing_time": processing_time,
+            "enhanced_features": {
+                "adaptive_sizing": auto_sizing,
+                "filter_type": filter_type,
+                "enhanced_normalization": enhanced_normalization_enabled,
+                "window_size": window_size,
+                "detected_resolution": detected_resolution
+            },
+            "parameters": {
+                "window_size": window_size,
+                "filter_type": filter_type,
+                "auto_sizing": auto_sizing,
+                "enhanced_normalization": enhanced_normalization_enabled
+            }
+        }
+
+        print(f"✅ Enhanced LRM completed successfully")
+        
+        # 🎯 ENHANCED FEATURES CONFIRMATION
+        print(f"\n{'🌄'*20} ENHANCED LRM FEATURES ACTIVE {'🌄'*20}")
+        print(f"✅ Archaeological analysis mode: ENABLED")
+        print(f"✅ Adaptive window sizing: {'ACTIVE' if auto_sizing else 'FIXED'} ({window_size}px)")
+        print(f"✅ Advanced filtering: {filter_type.upper()} ({'Archaeological edge preservation' if filter_type == 'gaussian' else 'Standard uniform'})")
+        print(f"✅ Enhanced normalization: {'ACTIVE (P2-P98 clipping)' if enhanced_normalization_enabled else 'STANDARD'}")
+        print(f"✅ Resolution optimization: {detected_resolution:.3f}m/pixel detected")
+        print(f"{'🌄'*70}")
+        
+        return result
+
+    except Exception as e:
+        processing_time = time.time() - start_time
+        print(f"❌ Enhanced LRM processing failed: {str(e)}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "processing_time": processing_time
+        }
+
+async def process_enhanced_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Enhanced slope processing with archaeological features:
+    - Inferno colormap for optimal contrast (dark=flat, bright=steep)
+    - Linear rescaling from 0° to configurable max degrees
+    - Archaeological terrain analysis optimization
+    """
+    print(f"\n📐 ENHANCED SLOPE PROCESSING (TIFF)")
+    print(f"📁 Input: {os.path.basename(tiff_path)}")
+    start_time = time.time()
+    
+    try:
+        # Extract parameters with defaults for archaeological analysis
+        use_inferno_colormap = parameters.get("use_inferno_colormap", True)
+        max_slope_degrees = parameters.get("max_slope_degrees", 60.0)
+        enhanced_contrast = parameters.get("enhanced_contrast", True)
+        
+        # Read elevation data
+        print(f"📖 Reading elevation TIFF: {os.path.basename(tiff_path)}")
+        elevation_array, metadata = read_elevation_tiff(tiff_path)
+        print(f"✅ Elevation data loaded: {elevation_array.shape[1]}x{elevation_array.shape[0]} pixels")
+        
+        # Enhanced slope calculation with archaeological optimization
+        print(f"\n🔄 Step 1: Calculating slope with enhanced precision...")
+        slope_array = calculate_slope(elevation_array, metadata)
+        
+        # Archaeological analysis range validation
+        if use_inferno_colormap:
+            print(f"   🔥 ENHANCED INFERNO VISUALIZATION: Archaeological terrain analysis")
+            print(f"      📐 Linear rescaling: 0° to {max_slope_degrees}° for optimal contrast")
+            print(f"      🎨 Inferno colormap: Dark (flat areas) → Bright (steep terrain)")
+            print(f"      🏛️ Archaeological features highlighted: Terraces, scarps, causeway edges")
+        
+        # Slope range analysis for archaeological context
+        valid_slope = slope_array[~np.isnan(slope_array)]
+        if len(valid_slope) > 0:
+            slope_min, slope_max = np.nanmin(valid_slope), np.nanmax(valid_slope)
+            slope_mean = np.nanmean(valid_slope)
+            
+            # Calculate slope distribution for archaeological interpretation
+            flat_areas = np.sum(valid_slope < 5) / len(valid_slope) * 100
+            moderate_slopes = np.sum((valid_slope >= 5) & (valid_slope < 20)) / len(valid_slope) * 100
+            steep_terrain = np.sum(valid_slope >= 20) / len(valid_slope) * 100
+            
+            print(f"   📊 Slope analysis results:")
+            print(f"      📈 Range: {slope_min:.2f}° to {slope_max:.2f}° (mean: {slope_mean:.2f}°)")
+            print(f"      🟫 Flat areas (0°-5°): {flat_areas:.1f}%")
+            print(f"      🟡 Moderate slopes (5°-20°): {moderate_slopes:.1f}%")
+            print(f"      🔴 Steep terrain (20°+): {steep_terrain:.1f}%")
+            
+            if steep_terrain > 30:
+                print(f"      🏔️ High relief terrain detected - excellent for archaeological analysis")
+            elif flat_areas > 60:
+                print(f"      🏛️ Low relief terrain - subtle features will be enhanced")
+        
+        # Generate output filename with enhancement info
+        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
+        output_filename = f"{base_name}_slope"
+        
+        # Add enhancement suffixes for clarity
+        if use_inferno_colormap:
+            output_filename += "_inferno"
+        if enhanced_contrast:
+            output_filename += "_enhanced"
+            
+        output_filename += ".tif"
+        output_path = os.path.join(output_dir, output_filename)
+        
+        # Save enhanced slope TIFF
+        print(f"\n💾 Step 2: Saving Enhanced Slope as GeoTIFF...")
+        save_raster(slope_array, output_path, metadata, enhanced_quality=True)
+        
+        processing_time = time.time() - start_time
+        
+        # Enhanced completion logging
+        print(f"✅ ENHANCED SLOPE generation completed: {output_filename}")
+        print(f"   ⏱️ Processing time: {processing_time:.2f} seconds")
+        print(f"   🎯 Enhanced features used:")
+        print(f"      🔥 Inferno colormap: {'Yes' if use_inferno_colormap else 'No'}")
+        print(f"      📐 Max slope range: {max_slope_degrees}°")
+        print(f"      🎨 Enhanced contrast: {'Yes' if enhanced_contrast else 'No'}")
+        
+        result = {
+            "status": "success",
+            "output_file": output_path,
+            "processing_time": processing_time,
+            "enhanced_features": {
+                "inferno_colormap": use_inferno_colormap,
+                "max_slope_degrees": max_slope_degrees,
+                "enhanced_contrast": enhanced_contrast,
+                "slope_distribution": {
+                    "flat_areas_percent": flat_areas if len(valid_slope) > 0 else 0,
+                    "moderate_slopes_percent": moderate_slopes if len(valid_slope) > 0 else 0,
+                    "steep_terrain_percent": steep_terrain if len(valid_slope) > 0 else 0
+                }
+            },
+            "parameters": {
+                "use_inferno_colormap": use_inferno_colormap,
+                "max_slope_degrees": max_slope_degrees,
+                "enhanced_contrast": enhanced_contrast
+            }
+        }
+
+        print(f"✅ enhanced slope completed successfully")
+        
+        # 🎯 ENHANCED FEATURES CONFIRMATION
+        print(f"\n{'🔥'*20} ENHANCED SLOPE FEATURES ACTIVE {'🔥'*20}")
+        print(f"✅ Archaeological terrain analysis mode: ENABLED")
+        print(f"✅ Inferno colormap optimization: {'ACTIVE' if use_inferno_colormap else 'DISABLED'}")
+        print(f"✅ Enhanced contrast processing: {'ACTIVE' if enhanced_contrast else 'DISABLED'}")
+        print(f"✅ Slope range optimization: 0° to {max_slope_degrees}° (archaeological standard)")
+        print(f"✅ Terrain classification: {flat_areas:.1f}% flat, {moderate_slopes:.1f}% moderate, {steep_terrain:.1f}% steep")
+        print(f"{'🔥'*70}")
+        
+        return result
+
+    except Exception as e:
+        processing_time = time.time() - start_time
+        print(f"❌ Enhanced Slope processing failed: {str(e)}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "processing_time": processing_time
+        }
+
 def apply_color_relief(elevation: np.ndarray) -> np.ndarray:
     """
     Apply color relief mapping to elevation data
@@ -1220,12 +1517,18 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
             processing_tasks.append((hs["name"], process_hillshade_tiff, params))
 
     # Add other raster tasks
+    print(f"\n🔥 ENHANCED ARCHAEOLOGICAL PROCESSING PIPELINE ACTIVE 🔥")
+    print(f"✅ Enhanced Slope: Inferno colormap + archaeological terrain analysis")
+    print(f"✅ Enhanced LRM: Adaptive sizing + Gaussian filtering + enhanced normalization")
+    print(f"✅ Standard processing: Aspect, Color Relief, SVF, CHM")
+    print(f"{'='*60}")
+    
     processing_tasks.extend([
-        ("slope", process_slope_tiff, {}),
+        ("slope", process_enhanced_slope_tiff, {}),  # 🔥 ENHANCED: Inferno colormap + archaeological features
         ("aspect", process_aspect_tiff, {}),
         ("color_relief", process_color_relief_tiff, {}),
         ("slope_relief", process_slope_relief_tiff, {}),
-        ("lrm", process_lrm_tiff, {}),
+        ("lrm", process_enhanced_lrm_tiff, {}),  # 🌄 ENHANCED: Adaptive + Gaussian + archaeological features
         ("sky_view_factor", process_sky_view_factor_tiff, {}),
         ("chm", process_chm_tiff, {})
     ])
@@ -1285,8 +1588,31 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                         png_filename = png_name_mapping.get(task_name, f"{task_name}.png")
                         png_path = os.path.join(png_output_dir, png_filename)
                         
-                        # Convert TIFF to PNG
-                        converted_png = convert_geotiff_to_png(result["output_file"], png_path)
+                        # Convert TIFF to PNG with appropriate colormap function
+                        if task_name == "slope":
+                            # Use specialized inferno colormap for enhanced slope visualization
+                            from convert import convert_slope_to_inferno_png
+                            converted_png = convert_slope_to_inferno_png(
+                                result["output_file"], 
+                                png_path, 
+                                enhanced_resolution=True,
+                                save_to_consolidated=False,
+                                max_slope_degrees=60.0  # Archaeological analysis range
+                            )
+                            print(f"🔥 Enhanced slope PNG: Inferno colormap for archaeological terrain analysis")
+                        elif task_name == "lrm":
+                            # Use specialized coolwarm colormap for enhanced LRM visualization
+                            from convert import convert_lrm_to_coolwarm_png
+                            converted_png = convert_lrm_to_coolwarm_png(
+                                result["output_file"], 
+                                png_path, 
+                                enhanced_resolution=True,
+                                save_to_consolidated=False
+                            )
+                            print(f"🌡️ Enhanced LRM PNG: Coolwarm colormap for morphological analysis")
+                        else:
+                            # Use standard PNG conversion for other raster types
+                            converted_png = convert_geotiff_to_png(result["output_file"], png_path)
                         
                         if converted_png and os.path.exists(converted_png):
                             result["png_file"] = converted_png

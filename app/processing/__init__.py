@@ -9,6 +9,7 @@ from .hillshade import hillshade, hillshade_315_45_08, hillshade_225_45_08
 from .slope import slope
 from .aspect import aspect
 from .color_relief import color_relief
+from .lrm import lrm
 from .tri import tri
 from .tpi import tpi
 from .roughness import roughness
@@ -25,6 +26,7 @@ __all__ = [
     'slope',
     'aspect',
     'color_relief',
+    'lrm',
     'tri',
     'tpi',
     'roughness',

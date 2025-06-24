@@ -1,7 +1,7 @@
 from osgeo import gdal, osr
 import os
 import time
-from typing import Optional, Dict # Added Dict
+from typing import Optional, Dict, Tuple # Added Dict and Tuple
 import base64
 import subprocess
 import numpy as np # Added numpy
@@ -701,5 +701,436 @@ def convert_chm_to_viridis_png(
         
     except Exception as e:
         error_msg = f"CHM viridis colorization failed for {tif_path}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        raise Exception(error_msg)
+
+def convert_lrm_to_coolwarm_png(
+    tif_path: str,
+    png_path: Optional[str] = None,
+    enhanced_resolution: bool = True,
+    save_to_consolidated: bool = True,
+    percentile_clip: Tuple[float, float] = (2.0, 98.0),
+    enhanced_normalization_mode: bool = False
+) -> str:
+    """
+    Convert LRM GeoTIFF to PNG with enhanced coolwarm diverging colormap and advanced contrast stretching.
+    Specifically designed for Local Relief Model visualization for archaeological analysis.
+    
+    Args:
+        tif_path: Path to LRM TIF file
+        png_path: Optional output PNG path  
+        enhanced_resolution: Use enhanced processing
+        save_to_consolidated: Copy to consolidated directory
+        percentile_clip: Tuple of (min_percentile, max_percentile) for contrast stretching
+        enhanced_normalization_mode: Whether the input data is already normalized to [-1, 1]
+        
+    Returns:
+        Path to generated PNG file
+    """
+    print(f"\n🌄 ENHANCED LRM COOLWARM COLORIZATION: {os.path.basename(tif_path)}")
+    logger.info(f"Enhanced LRM coolwarm colorization for {tif_path}")
+    
+    start_time = time.time()
+    
+    try:
+        # Generate output path if not provided
+        if png_path is None:
+            png_path = os.path.splitext(tif_path)[0] + "_enhanced_coolwarm.png"
+        
+        # Ensure output directory exists
+        output_dir = os.path.dirname(png_path)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            print(f"📁 Created output directory: {output_dir}")
+        
+        # Open and read LRM data
+        ds = gdal.Open(tif_path)
+        if ds is None:
+            raise Exception(f"Failed to open LRM TIF: {tif_path}")
+        
+        band = ds.GetRasterBand(1)
+        lrm_data = band.ReadAsArray()
+        
+        # Get georeference info for world file
+        geotransform = ds.GetGeoTransform()
+        width = ds.RasterXSize
+        height = ds.RasterYSize
+        
+        ds = None
+        band = None
+        
+        print(f"📏 LRM dimensions: {width}x{height} pixels")
+        print(f"📊 LRM data range: {np.nanmin(lrm_data):.3f} to {np.nanmax(lrm_data):.3f} meters")
+        
+        # Handle NoData values
+        nodata_mask = lrm_data == -9999
+        lrm_data[nodata_mask] = np.nan
+        
+        # Apply enhanced contrast stretching based on normalization mode
+        valid_data = lrm_data[~np.isnan(lrm_data)]
+        if len(valid_data) == 0:
+            print("⚠️ No valid LRM data found")
+            # Create empty image
+            fig, ax = plt.subplots(figsize=(10, 8))
+            ax.text(0.5, 0.5, 'No LRM Data Available', ha='center', va='center', 
+                   fontsize=16, transform=ax.transAxes)
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+        else:
+            if enhanced_normalization_mode:
+                # Data is already normalized to [-1, 1], use directly
+                print(f"🎨 Using pre-normalized data (enhanced normalization mode)")
+                print(f"   📊 Data range: {np.nanmin(valid_data):.3f} to {np.nanmax(valid_data):.3f}")
+                normalized_data = np.clip(lrm_data, -1, 1)
+                max_abs_value = 1.0  # For colorbar labels
+            else:
+                # Apply standard percentile-based clipping and normalization
+                p_min, p_max = np.percentile(valid_data, percentile_clip)
+                
+                print(f"🎨 Applying percentile-based contrast stretching ({percentile_clip[0]}%-{percentile_clip[1]}%):")
+                print(f"   P{percentile_clip[0]}: {p_min:.3f}m (blue - depressions)")
+                print(f"   P{percentile_clip[1]}: {p_max:.3f}m (red - elevated terrain)")
+                print(f"   Center (0): White (neutral relief)")
+                
+                # Clip data to percentile range
+                lrm_clipped = np.clip(lrm_data, p_min, p_max)
+                
+                # Normalize to symmetric range around zero for diverging colormap
+                # Find the maximum absolute value to create symmetric scaling
+                max_abs_value = max(abs(p_min), abs(p_max))
+                
+                if max_abs_value > 0:
+                    normalized_data = lrm_clipped / max_abs_value
+                    # Ensure the range is exactly [-1, 1] for proper colormap application
+                    normalized_data = np.clip(normalized_data, -1, 1)
+                else:
+                    normalized_data = np.zeros_like(lrm_clipped)
+            
+            # Create figure with high quality settings
+            if enhanced_resolution:
+                fig, ax = plt.subplots(figsize=(16, 12), dpi=300)
+            else:
+                fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
+            
+            # Apply coolwarm diverging colormap
+            # Blue (negative, -1) = depressions/valleys
+            # White (zero, 0) = neutral/flat areas  
+            # Red (positive, +1) = elevated terrain/ridges
+            cmap = plt.cm.coolwarm
+            
+            # Create masked array to handle NaN values
+            masked_data = np.ma.masked_where(np.isnan(normalized_data), normalized_data)
+            
+            # Display with coolwarm colormap
+            im = ax.imshow(masked_data, cmap=cmap, vmin=-1, vmax=1, 
+                          aspect='equal', interpolation='nearest')
+            
+            # Add colorbar with meaningful labels for archaeological interpretation
+            cbar = plt.colorbar(im, ax=ax, shrink=0.6, pad=0.02)
+            cbar.set_label('Local Relief (m)', rotation=270, labelpad=20, fontsize=12)
+            
+            # Set colorbar ticks to show actual relief values
+            tick_positions = np.linspace(-1, 1, 7)  # -1, -0.67, -0.33, 0, 0.33, 0.67, 1
+            tick_labels = [f"{pos * max_abs_value:.2f}" for pos in tick_positions]
+            cbar.set_ticks(tick_positions)
+            cbar.set_ticklabels(tick_labels)
+            
+            # Set title and labels for archaeological context
+            title_suffix = " (Enhanced)" if enhanced_normalization_mode else ""
+            ax.set_title(f"LRM - Local Relief Model (Archaeological Enhancement){title_suffix}\n{os.path.basename(tif_path)}", 
+                        fontsize=14, fontweight='bold', pad=20)
+            ax.set_xlabel("Pixels (East)", fontsize=10)
+            ax.set_ylabel("Pixels (North)", fontsize=10)
+            
+            # Add explanatory text for archaeological interpretation
+            textstr = f'Colormap: Coolwarm Diverging\nBlue: Depressions/valleys (potential features)\nWhite: Neutral relief\nRed: Elevated terrain/ridges\nRange: {p_min:.2f}m to {p_max:.2f}m\nClipped: {percentile_clip[0]}%-{percentile_clip[1]}% percentiles'
+            props = dict(boxstyle='round', facecolor='white', alpha=0.8)
+            ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=9,
+                   verticalalignment='top', bbox=props)
+        
+        # Save PNG with high quality
+        plt.tight_layout()
+        if enhanced_resolution:
+            plt.savefig(png_path, dpi=300, bbox_inches='tight', 
+                       facecolor='white', edgecolor='none', format='PNG')
+        else:
+            plt.savefig(png_path, dpi=150, bbox_inches='tight', 
+                       facecolor='white', edgecolor='none', format='PNG')
+        
+        plt.close()
+        
+        # Create world file for georeferencing
+        if geotransform:
+            world_file_path = os.path.splitext(png_path)[0] + ".pgw"
+            with open(world_file_path, 'w') as f:
+                f.write(f"{geotransform[1]:.10f}\n")  # pixel size x
+                f.write(f"{geotransform[2]:.10f}\n")  # rotation y
+                f.write(f"{geotransform[4]:.10f}\n")  # rotation x
+                f.write(f"{geotransform[5]:.10f}\n")  # pixel size y (negative)
+                f.write(f"{geotransform[0]:.10f}\n")  # top left x
+                f.write(f"{geotransform[3]:.10f}\n")  # top left y
+            print(f"🌍 Created world file: {os.path.basename(world_file_path)}")
+        
+        # Transform world file to WGS84 if possible
+        world_file_path = os.path.splitext(png_path)[0] + ".pgw"
+        if os.path.exists(world_file_path):
+            success = create_wgs84_world_file(world_file_path, tif_path, png_path)
+            if success:
+                print(f"✅ WGS84 world file created for proper overlay scaling")
+        
+        # Copy to consolidated directory if requested
+        if save_to_consolidated:
+            try:
+                path_parts = tif_path.split(os.sep)
+                region_name = "UnknownRegion"
+                if "output" in path_parts:
+                    idx = path_parts.index("output")
+                    if idx + 1 < len(path_parts): 
+                        region_name = path_parts[idx+1]
+                
+                consolidated_dir = os.path.join("output", region_name, "lidar", "png_outputs")
+                os.makedirs(consolidated_dir, exist_ok=True)
+                
+                # Check if PNG is already in the target directory
+                png_normalized = os.path.normpath(png_path)
+                consolidated_normalized = os.path.normpath(consolidated_dir)
+                
+                if consolidated_normalized not in png_normalized:
+                    import shutil
+                    consolidated_png_path = os.path.join(consolidated_dir, "LRM_coolwarm.png")
+                    shutil.copy2(png_path, consolidated_png_path)
+                    
+                    # Copy world files too
+                    for ext in [".pgw", ".wld", "_wgs84.wld"]:
+                        src_world = os.path.splitext(png_path)[0] + ext
+                        if os.path.exists(src_world):
+                            dst_world = os.path.splitext(consolidated_png_path)[0] + ext
+                            shutil.copy2(src_world, dst_world)
+                    
+                    print(f"✅ Copied LRM coolwarm PNG to consolidated directory")
+                
+            except Exception as e:
+                logger.warning(f"Failed to copy LRM PNG to consolidated directory: {e}")
+        
+        processing_time = time.time() - start_time
+        print(f"✅ LRM coolwarm colorization completed in {processing_time:.2f} seconds")
+        print(f"🌈 Result: {os.path.basename(png_path)}")
+        
+        return png_path
+        
+    except Exception as e:
+        error_msg = f"LRM coolwarm colorization failed for {tif_path}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        raise Exception(error_msg)
+
+def convert_slope_to_inferno_png(
+    tif_path: str,
+    png_path: Optional[str] = None,
+    enhanced_resolution: bool = True,
+    save_to_consolidated: bool = True,
+    max_slope_degrees: float = 60.0
+) -> str:
+    """
+    Convert Slope GeoTIFF to PNG with inferno colormap and 0-60 degree linear rescaling.
+    Specifically designed for archaeological terrain analysis where slope-defined anomalies 
+    like causeway edges, terraces, or hillside platforms need to be highlighted.
+    
+    Args:
+        tif_path: Path to Slope TIF file
+        png_path: Optional output PNG path  
+        enhanced_resolution: Use enhanced processing
+        save_to_consolidated: Copy to consolidated directory
+        max_slope_degrees: Maximum slope angle for linear rescaling (default: 60.0)
+        
+    Returns:
+        Path to generated PNG file
+    """
+    print(f"\n🔥 ENHANCED SLOPE INFERNO COLORIZATION: {os.path.basename(tif_path)}")
+    logger.info(f"Enhanced slope inferno colorization for {tif_path}")
+    
+    start_time = time.time()
+    
+    try:
+        # Generate output path if not provided
+        if png_path is None:
+            png_path = os.path.splitext(tif_path)[0] + "_inferno.png"
+        
+        # Ensure output directory exists
+        output_dir = os.path.dirname(png_path)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            print(f"📁 Created output directory: {output_dir}")
+        
+        # Open and read Slope data
+        ds = gdal.Open(tif_path)
+        if ds is None:
+            raise Exception(f"Failed to open Slope TIF: {tif_path}")
+        
+        band = ds.GetRasterBand(1)
+        slope_data = band.ReadAsArray()
+        
+        # Get georeference info for world file
+        geotransform = ds.GetGeoTransform()
+        width = ds.RasterXSize
+        height = ds.RasterYSize
+        
+        ds = None
+        band = None
+        
+        print(f"📏 Slope dimensions: {width}x{height} pixels")
+        print(f"📊 Slope data range: {np.nanmin(slope_data):.2f}° to {np.nanmax(slope_data):.2f}°")
+        
+        # Handle NoData values
+        nodata_mask = slope_data == -9999
+        slope_data[nodata_mask] = np.nan
+        
+        # Apply enhanced slope visualization for archaeological analysis
+        valid_data = slope_data[~np.isnan(slope_data)]
+        if len(valid_data) == 0:
+            print("⚠️ No valid slope data found")
+            # Create empty image
+            fig, ax = plt.subplots(figsize=(10, 8))
+            ax.text(0.5, 0.5, 'No Slope Data Available', ha='center', va='center', 
+                   fontsize=16, transform=ax.transAxes)
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+        else:
+            # Enhanced linear rescaling from 0 to max_slope_degrees
+            actual_min = np.nanmin(valid_data)
+            actual_max = np.nanmax(valid_data)
+            
+            print(f"🎨 Applying enhanced linear rescaling (0° to {max_slope_degrees}°):")
+            print(f"   📊 Actual data range: {actual_min:.2f}° to {actual_max:.2f}°")
+            print(f"   📐 Target range: 0° to {max_slope_degrees}°")
+            print(f"   🔥 Colormap: Inferno (dark for flat, bright for steep)")
+            
+            # Clip slopes to the archaeological analysis range (0-60 degrees typical)
+            slope_clipped = np.clip(slope_data, 0, max_slope_degrees)
+            
+            # Linear rescaling to [0, 1] range for optimal inferno colormap application
+            normalized_data = slope_clipped / max_slope_degrees
+            
+            # Ensure normalized data is properly bounded
+            normalized_data = np.clip(normalized_data, 0, 1)
+            
+            print(f"   ✅ Normalized range: {np.nanmin(normalized_data[~np.isnan(normalized_data)]):.3f} to {np.nanmax(normalized_data[~np.isnan(normalized_data)]):.3f}")
+            
+            # Create figure with high quality settings
+            if enhanced_resolution:
+                fig, ax = plt.subplots(figsize=(16, 12), dpi=300)
+            else:
+                fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
+            
+            # Apply inferno colormap for archaeological slope analysis
+            # Dark purple/black (0) = flat areas (0°)
+            # Bright yellow/white (1) = steep terrain (60°+)
+            # Perfect for highlighting slope-defined archaeological features
+            cmap = plt.cm.inferno
+            
+            # Create masked array to handle NaN values
+            masked_data = np.ma.masked_where(np.isnan(normalized_data), normalized_data)
+            
+            # Display with inferno colormap
+            im = ax.imshow(masked_data, cmap=cmap, vmin=0, vmax=1, 
+                          aspect='equal', interpolation='nearest')
+            
+            # Add colorbar with meaningful labels for archaeological interpretation
+            cbar = plt.colorbar(im, ax=ax, shrink=0.6, pad=0.02)
+            cbar.set_label('Slope Angle (degrees)', rotation=270, labelpad=20, fontsize=12)
+            
+            # Set colorbar ticks to show actual slope values
+            tick_positions = np.linspace(0, 1, 7)  # 0, 0.17, 0.33, 0.5, 0.67, 0.83, 1.0
+            tick_labels = [f"{pos * max_slope_degrees:.0f}°" for pos in tick_positions]
+            cbar.set_ticks(tick_positions)
+            cbar.set_ticklabels(tick_labels)
+            
+            # Set title and labels for archaeological context
+            ax.set_title(f"Slope Analysis - Inferno Enhanced (Archaeological)\n{os.path.basename(tif_path)}", 
+                        fontsize=14, fontweight='bold', pad=20)
+            ax.set_xlabel("Pixels (East)", fontsize=10)
+            ax.set_ylabel("Pixels (North)", fontsize=10)
+            
+            # Add explanatory text for archaeological interpretation
+            flat_areas_pct = np.sum(slope_clipped < 5) / np.sum(~np.isnan(slope_clipped)) * 100
+            moderate_areas_pct = np.sum((slope_clipped >= 5) & (slope_clipped < 20)) / np.sum(~np.isnan(slope_clipped)) * 100
+            steep_areas_pct = np.sum(slope_clipped >= 20) / np.sum(~np.isnan(slope_clipped)) * 100
+            
+            textstr = f'Colormap: Inferno\nDark: Flat areas (0°-5°) - {flat_areas_pct:.1f}%\nMedium: Moderate slopes (5°-20°) - {moderate_areas_pct:.1f}%\nBright: Steep terrain (20°+) - {steep_areas_pct:.1f}%\nRange: 0° to {max_slope_degrees}°\nHighlights: Terraces, scarps, causeway edges'
+            props = dict(boxstyle='round', facecolor='white', alpha=0.8)
+            ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=9,
+                   verticalalignment='top', bbox=props)
+        
+        # Save PNG with high quality
+        plt.tight_layout()
+        if enhanced_resolution:
+            plt.savefig(png_path, dpi=300, bbox_inches='tight', 
+                       facecolor='white', edgecolor='none', format='PNG')
+        else:
+            plt.savefig(png_path, dpi=150, bbox_inches='tight', 
+                       facecolor='white', edgecolor='none', format='PNG')
+        
+        plt.close()
+        
+        # Create world file for georeferencing
+        if geotransform:
+            world_file_path = os.path.splitext(png_path)[0] + ".pgw"
+            with open(world_file_path, 'w') as f:
+                f.write(f"{geotransform[1]:.10f}\n")  # pixel size x
+                f.write(f"{geotransform[2]:.10f}\n")  # rotation y
+                f.write(f"{geotransform[4]:.10f}\n")  # rotation x
+                f.write(f"{geotransform[5]:.10f}\n")  # pixel size y (negative)
+                f.write(f"{geotransform[0]:.10f}\n")  # top left x
+                f.write(f"{geotransform[3]:.10f}\n")  # top left y
+            print(f"🌍 Created world file: {os.path.basename(world_file_path)}")
+        
+        # Transform world file to WGS84 if possible
+        world_file_path = os.path.splitext(png_path)[0] + ".pgw"
+        if os.path.exists(world_file_path):
+            success = create_wgs84_world_file(world_file_path, tif_path, png_path)
+            if success:
+                print(f"✅ WGS84 world file created for proper overlay scaling")
+        
+        # Copy to consolidated directory if requested
+        if save_to_consolidated:
+            try:
+                path_parts = tif_path.split(os.sep)
+                region_name = "UnknownRegion"
+                if "output" in path_parts:
+                    idx = path_parts.index("output")
+                    if idx + 1 < len(path_parts): 
+                        region_name = path_parts[idx+1]
+                
+                consolidated_dir = os.path.join("output", region_name, "lidar", "png_outputs")
+                os.makedirs(consolidated_dir, exist_ok=True)
+                
+                # Check if PNG is already in the target directory
+                png_normalized = os.path.normpath(png_path)
+                consolidated_normalized = os.path.normpath(consolidated_dir)
+                
+                if consolidated_normalized not in png_normalized:
+                    import shutil
+                    consolidated_png_path = os.path.join(consolidated_dir, "Slope_inferno.png")
+                    shutil.copy2(png_path, consolidated_png_path)
+                    
+                    # Copy world files too
+                    for ext in [".pgw", ".wld", "_wgs84.wld"]:
+                        src_world = os.path.splitext(png_path)[0] + ext
+                        if os.path.exists(src_world):
+                            dst_world = os.path.splitext(consolidated_png_path)[0] + ext
+                            shutil.copy2(src_world, dst_world)
+                    
+                    print(f"✅ Copied slope inferno PNG to consolidated directory")
+                
+            except Exception as e:
+                logger.warning(f"Failed to copy slope PNG to consolidated directory: {e}")
+        
+        processing_time = time.time() - start_time
+        print(f"✅ Slope inferno colorization completed in {processing_time:.2f} seconds")
+        print(f"🔥 Result: {os.path.basename(png_path)}")
+        
+        return png_path
+        
+    except Exception as e:
+        error_msg = f"Slope inferno colorization failed for {tif_path}: {str(e)}"
         logger.error(error_msg, exc_info=True)
         raise Exception(error_msg)

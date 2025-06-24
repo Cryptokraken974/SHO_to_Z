@@ -118,6 +118,9 @@ window.ProcessingManager = {
         case 'sky_view_factor':
           data = await processing().generateSkyViewFactor(processingOptions);
           break;
+        case 'lrm':
+          data = await processing().generateLRM(processingOptions);
+          break;
         default:
           // Fallback to generic method for unknown processing types
           data = await processing().processRegion(processingType, processingOptions);
@@ -329,7 +332,8 @@ window.ProcessingManager = {
       'aspect': 'Aspect',
       'tpi': 'TPI',
       'roughness': 'Roughness',
-      'sky_view_factor': 'Sky View Factor'
+      'sky_view_factor': 'Sky View Factor',
+      'lrm': 'Local Relief Model'
     };
     
     return displayNames[processingType] || processingType.charAt(0).toUpperCase() + processingType.slice(1);
@@ -510,7 +514,8 @@ window.ProcessingManager = {
    */
   async processSlope(options = {}) {
     const defaultOptions = {
-      units: 'degrees'
+      units: 'degrees',
+      useInfernoColormap: true
     };
     
     return await this.sendProcess('slope', { ...defaultOptions, ...options });
@@ -546,6 +551,21 @@ window.ProcessingManager = {
    */
   async processTPI(options = {}) {
     return await this.sendProcess('tpi', options);
+  },
+
+  /**
+   * Process Local Relief Model (LRM) with archaeological visualization
+   * @param {Object} options - LRM processing options
+   */
+  async processLRM(options = {}) {
+    const defaultOptions = {
+      windowSize: 11,
+      useCoolwarmColormap: true,
+      percentileClipMin: 2.0,
+      percentileClipMax: 98.0
+    };
+    
+    return await this.sendProcess('lrm', { ...defaultOptions, ...options });
   },
 
   /**
@@ -658,6 +678,7 @@ window.ProcessingManager = {
       { type: 'aspect', name: 'Aspect', icon: '🧭' },
       { type: 'tpi', name: 'TPI', icon: '📈' },
       { type: 'roughness', name: 'Roughness', icon: '🪨' },
+      { type: 'lrm', name: 'LRM', icon: '📏' },
       { type: 'chm', name: 'CHM', icon: '🌳' },
       { type: 'sky_view_factor', name: 'Sky View Factor', icon: '☀️' }
     ];

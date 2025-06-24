@@ -329,13 +329,16 @@ class ProcessingAPIClient extends BaseAPIClient {
   }
 
   /**
-   * Generate slope analysis
+   * Generate enhanced slope analysis with inferno colormap for archaeological terrain analysis
    * @param {Object} options - Processing options
    * @param {string} options.inputFile - Input LAZ file path
    * @param {string} options.regionName - Region name
    * @param {string} options.processingType - Processing type
    * @param {string} options.displayRegionName - Display region name
-   * @returns {Promise<Object>} Slope analysis result
+   * @param {boolean} options.useInfernoColormap - Use enhanced inferno visualization (default: true)
+   * @param {number} options.maxSlopeDegrees - Maximum slope angle for rescaling (default: 60.0)
+   * @param {string} options.stretchType - Stretch type for standard visualization
+   * @returns {Promise<Object>} Enhanced slope analysis result
    */
   async generateSlope(options = {}) {
     const formData = new FormData();
@@ -345,6 +348,17 @@ class ProcessingAPIClient extends BaseAPIClient {
     if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
     if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
     if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
+    
+    // Enhanced slope-specific parameters
+    if (options.useInfernoColormap !== undefined || options.use_inferno_colormap !== undefined) {
+      formData.append('use_inferno_colormap', options.useInfernoColormap ?? options.use_inferno_colormap ?? true);
+    }
+    if (options.maxSlopeDegrees !== undefined || options.max_slope_degrees !== undefined) {
+      formData.append('max_slope_degrees', options.maxSlopeDegrees || options.max_slope_degrees || 60.0);
+    }
+    if (options.stretchType !== undefined || options.stretch_type !== undefined) {
+      formData.append('stretch_type', options.stretchType || options.stretch_type || 'stddev');
+    }
     
     return this.postForm('slope', formData);
   }
@@ -543,7 +557,8 @@ class ProcessingAPIClient extends BaseAPIClient {
       'color-relief': this.generateColorRelief,
       'tpi': this.generateTPI,
       'roughness': this.generateRoughness,
-      'sky_view_factor': this.generateSkyViewFactor
+      'sky_view_factor': this.generateSkyViewFactor,
+      'lrm': this.generateLRM
     };
 
     const method = methodMap[processingType];
@@ -559,6 +574,48 @@ class ProcessingAPIClient extends BaseAPIClient {
       });
       return this.postForm(processingType, formData);
     }
+  }
+
+  /**
+   * Generate Enhanced Local Relief Model (LRM) with adaptive algorithms for archaeological visualization
+   * @param {Object} options - Processing options
+   * @param {string} options.inputFile - Input LAZ file path
+   * @param {string} options.regionName - Region name
+   * @param {string} options.processingType - Processing type
+   * @param {string} options.displayRegionName - Display region name
+   * @param {number} options.windowSize - Smoothing filter window size (null for auto-sizing)
+   * @param {string} options.filterType - Filter type: "uniform" or "gaussian" (default: "uniform")
+   * @param {boolean} options.autoSizing - Enable adaptive window sizing (default: true)
+   * @param {boolean} options.enhancedNormalization - Enable enhanced normalization (default: false)
+   * @param {boolean} options.useCoolwarmColormap - Use archaeological coolwarm visualization (default: true)
+   * @param {number} options.percentileClipMin - Min percentile for contrast stretching (default: 2.0)
+   * @param {number} options.percentileClipMax - Max percentile for contrast stretching (default: 98.0)
+   * @returns {Promise<Object>} Enhanced LRM generation result
+   */
+  async generateLRM(options = {}) {
+    const formData = new FormData();
+    
+    // Support both camelCase and snake_case parameter names for flexibility
+    if (options.inputFile || options.input_file) formData.append('input_file', options.inputFile || options.input_file);
+    if (options.regionName || options.region_name) formData.append('region_name', options.regionName || options.region_name);
+    if (options.processingType || options.processing_type) formData.append('processing_type', options.processingType || options.processing_type);
+    if (options.displayRegionName || options.display_region_name) formData.append('display_region_name', options.displayRegionName || options.display_region_name);
+    
+    // Enhanced LRM-specific parameters
+    if (options.windowSize !== undefined || options.window_size !== undefined) {
+      const windowSize = options.windowSize || options.window_size;
+      if (windowSize !== null) formData.append('window_size', windowSize);
+    }
+    if (options.filterType !== undefined || options.filter_type !== undefined) formData.append('filter_type', options.filterType || options.filter_type || 'uniform');
+    if (options.autoSizing !== undefined || options.auto_sizing !== undefined) formData.append('auto_sizing', options.autoSizing ?? options.auto_sizing ?? true);
+    if (options.enhancedNormalization !== undefined || options.enhanced_normalization !== undefined) formData.append('enhanced_normalization', options.enhancedNormalization ?? options.enhanced_normalization ?? false);
+    
+    // Visualization parameters
+    if (options.useCoolwarmColormap !== undefined || options.use_coolwarm_colormap !== undefined) formData.append('use_coolwarm_colormap', options.useCoolwarmColormap ?? options.use_coolwarm_colormap ?? true);
+    if (options.percentileClipMin !== undefined || options.percentile_clip_min !== undefined) formData.append('percentile_clip_min', options.percentileClipMin || options.percentile_clip_min || 2.0);
+    if (options.percentileClipMax !== undefined || options.percentile_clip_max !== undefined) formData.append('percentile_clip_max', options.percentileClipMax || options.percentile_clip_max || 98.0);
+    
+    return this.postForm('lrm', formData);
   }
 }
 

@@ -327,11 +327,17 @@ def slope(input_file: str, region_name: str = None) -> str:
         print(f"✅ SLOPE analysis completed successfully in {total_time:.2f} seconds")
         print(f"📐 Slope file: {output_path}")
         
-        # 🎯 QUALITY MODE PNG GENERATION: Generate PNG for clean Slope if quality mode was used
-        if quality_mode_used:
-            print(f"\n🖼️ QUALITY MODE: Generating PNG for clean Slope")
+        # 🎯 ENHANCED SLOPE PNG GENERATION: Generate PNG with inferno colormap
+        # Check if enhanced TIFF was generated (look for _inferno_enhanced suffix)
+        use_enhanced_png = quality_mode_used or "_inferno_enhanced.tif" in output_path
+        
+        if use_enhanced_png:
+            print(f"\n🔥 ENHANCED MODE: Generating enhanced slope PNG with inferno colormap")
+            print(f"   📐 0°-60° linear rescaling for archaeological terrain analysis")
+            print(f"   🎨 Inferno colormap highlights slope-defined anomalies")
+            print(f"   🏛️ Target features: Terraces, scarps, causeway edges")
             try:
-                from ..convert import convert_geotiff_to_png
+                from ..convert import convert_slope_to_inferno_png
                 
                 # Create png_outputs directory structure
                 tif_dir = os.path.dirname(output_path)
@@ -339,21 +345,40 @@ def slope(input_file: str, region_name: str = None) -> str:
                 png_output_dir = os.path.join(base_output_dir, "png_outputs")
                 os.makedirs(png_output_dir, exist_ok=True)
                 
-                # Generate PNG with standard filename
+                # Generate PNG with enhanced slope visualization (inferno colormap, 0-60° scaling)
                 png_path = os.path.join(png_output_dir, "Slope.png")
-                convert_geotiff_to_png(
+                convert_slope_to_inferno_png(
                     output_path, 
                     png_path, 
                     enhanced_resolution=True,
                     save_to_consolidated=False,  # Already in the right directory
-                    stretch_type="stddev",
-                    stretch_params={"percentile_low": 2, "percentile_high": 98}
+                    max_slope_degrees=60.0  # Archaeological analysis range
                 )
-                print(f"✅ Quality mode Slope PNG file created: {png_path}")
-                logger.info(f"Quality mode Slope PNG generated: {png_path}")
+                print(f"✅ ENHANCED SLOPE INFERNO PNG created: {png_path}")
+                print(f"🔥 Features highlighted: Terraces, scarps, causeway edges")
+                print(f"🎯 Archaeological analysis: Dark (flat) → Bright (steep)")
+                logger.info(f"Enhanced slope inferno PNG generated: {png_path}")
             except Exception as png_error:
-                print(f"⚠️ Quality mode Slope PNG generation failed: {png_error}")
-                logger.warning(f"Quality mode Slope PNG generation failed: {png_error}")
+                print(f"⚠️ Enhanced slope PNG generation failed: {png_error}")
+                logger.warning(f"Enhanced slope PNG generation failed: {png_error}")
+                
+                # Fallback to standard PNG generation
+                try:
+                    from ..convert import convert_geotiff_to_png
+                    png_path = os.path.join(png_output_dir, "Slope.png")
+                    convert_geotiff_to_png(
+                        output_path, 
+                        png_path, 
+                        enhanced_resolution=True,
+                        save_to_consolidated=False,
+                        stretch_type="stddev",
+                        stretch_params={"num_stddev": 2.0}
+                    )
+                    print(f"✅ Fallback slope PNG created: {png_path}")
+                    logger.info(f"Fallback slope PNG generated: {png_path}")
+                except Exception as fallback_error:
+                    print(f"❌ Fallback slope PNG generation also failed: {fallback_error}")
+                    logger.error(f"Both enhanced and fallback slope PNG generation failed: {fallback_error}")
         
         return output_path
         
