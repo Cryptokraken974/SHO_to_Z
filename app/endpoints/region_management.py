@@ -348,7 +348,10 @@ async def list_regions(source: str = None):
             item_path = os.path.join(output_dir, item)
             if os.path.isdir(item_path):
                 metadata_file = os.path.join(item_path, "metadata.txt")
-                if os.path.exists(metadata_file):
+                lidar_folder = os.path.join(item_path, "lidar")
+                
+                # Only include regions that have both metadata.txt AND lidar folder (rasters generated)
+                if os.path.exists(metadata_file) and os.path.exists(lidar_folder) and os.path.isdir(lidar_folder):
                     # Check if this region is already in our list (avoid duplicates from input scan)
                     existing_region = next((r for r in regions_with_metadata if r["name"] == item), None)
                     
@@ -406,6 +409,10 @@ async def list_regions(source: str = None):
                         regions_with_metadata.append(region_info)
                     else:
                         print(f"  ↪️  Region {item} already found in input scan, skipping duplicate")
+                elif os.path.exists(metadata_file):
+                    # Region has metadata but no lidar folder - skip it for OpenAI analysis
+                    print(f"  ⏭️ Skipping region '{item}': has metadata but no raster data (missing lidar folder)")
+                    continue
     else:
         print(f"  ⏭️ Skipping output folder scan (source={source}, exists={os.path.exists(output_dir)})")
         
