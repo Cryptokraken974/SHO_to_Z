@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenAI Analysis - User Documentation</title>
+    <link rel="stylesheet" href="style.css"> <!-- Link to a shared CSS file -->
+    <style>
+        /* Basic styles from index.html for standalone viewing */
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; line-height: 1.6; }
+        .container { width: 80%; margin: auto; overflow: hidden; padding: 0 20px; }
+        header { background: #333; color: #fff; padding-top: 30px; min-height: 70px; border-bottom: #0779e4 3px solid; }
+        header a { color: #fff; text-decoration: none; text-transform: uppercase; font-size: 16px; }
+        header ul { padding: 0; margin: 0; list-style: none; float: right; }
+        header li { display: inline; padding: 0 20px 0 20px; }
+        header #branding { float: left; }
+        header #branding h1 { margin: 0; }
+        nav { background: #444; padding: 10px 0; color: #fff; text-align: center; }
+        nav a { color: #fff; padding: 5px 15px; text-decoration: none; }
+        nav a:hover { background: #0779e4; }
+        .main-content { padding: 20px; background: #fff; margin-top: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3, h4 { color: #333; }
+        h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+        h3 { margin-top: 25px; color: #0779e4; }
+        h4 { margin-top: 20px; }
+        .param-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .param-table th, .param-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .param-table th { background-color: #f0f0f0; }
+        .note { background-color: #fff3cd; border-left: 5px solid #ffeeba; padding: 10px; margin: 15px 0; }
+        .tip { background-color: #d1ecf1; border-left: 5px solid #bee5eb; padding: 10px; margin: 15px 0; }
+        .important { background-color: #e2e3e5; border-left: 5px solid #6c757d; padding: 10px; margin: 15px 0; }
+        code { background: #eee; padding: 2px 4px; border-radius: 3px; font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; }
+        pre { background: #eee; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        footer { text-align: center; padding: 20px; margin-top: 20px; color: #fff; background: #333; }
+        .workflow-step { margin-bottom: 10px; padding-left: 20px; position: relative; }
+        .workflow-step::before { content: counter(step-counter); counter-increment: step-counter; background-color: #0779e4; color: white; border-radius: 50%; width: 25px; height: 25px; display: inline-block; text-align: center; line-height: 25px; position: absolute; left: -10px; top: 0; }
+        .workflow-steps { list-style: none; padding-left: 10px; counter-reset: step-counter; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div id="branding">
+                <h1><a href="index.html" style="color:#fff; text-decoration:none;">GeoArchaeology Terrain Processor</a></h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="laz_loading.html">Loading LAZ</a></li>
+                    <li><a href="map_regions.html">Map Regions</a></li>
+                    <li><a href="data_retrieval.html">Get Data</a></li>
+                    <li><a href="ndvi_analysis.html">NDVI Analysis</a></li>
+                    <li><a href="raster_guide.html">Raster Guide</a></li>
+                    <li><a href="openai_analysis.html" style="color:#0779e4; font-weight:bold;">OpenAI Analysis</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="main-content">
+            <a href="index.html">&larr; Back to Home</a>
+            <h2>AI-Powered Analysis with OpenAI</h2>
+            <p>The "OpenAI Analysis" tab integrates advanced AI capabilities (from models like GPT-4o) to assist in the interpretation of your geospatial raster images. This feature allows you to construct detailed analytical prompts, send them along with selected imagery to an AI model, and receive structured JSON reports.</p>
+
+            <section id="overview-tab">
+                <h3>Overview of the OpenAI Analysis Tab</h3>
+                <p>The tab is designed to guide you through the process of:</p>
+                <ul>
+                    <li>Selecting one or more regions for analysis.</li>
+                    <li>Filtering regions based on whether NDVI data is relevant for the analysis.</li>
+                    <li>Browsing, reviewing, and customizing parts of a highly structured prompt.</li>
+                    <li>Previewing the complete prompt before sending.</li>
+                    <li>Choosing an appropriate AI model.</li>
+                    <li>Submitting the imagery and prompt for AI analysis.</li>
+                    <li>Ensuring the entire process is logged for transparency and repeatability.</li>
+                </ul>
+            </section>
+
+            <section id="workflow-guide">
+                <h3>Step-by-Step Guide to Using OpenAI Analysis</h3>
+                <ol class="workflow-steps">
+                    <li class="workflow-step">
+                        <strong>Navigate to the Tab:</strong> Select the "OpenAI Analysis" tab in the application.
+                    </li>
+                    <li class="workflow-step">
+                        <strong>Select Region(s) for Analysis:</strong>
+                        <ul>
+                            <li>The interface displays an "Available Regions" list (populated from your processed regions, typically found in the <code>output/</code> directory).</li>
+                            <li><strong>NDVI Filter:</strong> Use the "NDVI regions" checkbox to filter this list:
+                                <ul>
+                                    <li><strong>Checked:</strong> Shows only regions for which NDVI processing was enabled (and thus Sentinel-2 imagery is likely available). The system will load prompt components tailored for an NDVI-inclusive workflow (from <code>llm/prompts/workflow/</code>).</li>
+                                    <li><strong>Unchecked (Default):</strong> Shows regions where NDVI was not specifically enabled. The system loads prompt components for a workflow that does not assume NDVI data (from <code>llm/prompts/workflow_no_ndvi/</code>).</li>
+                                </ul>
+                                <div class="note"><p>Toggling the NDVI filter reloads both the region list and the available prompt parts.</p></div>
+                            </li>
+                            <li>Move desired regions from the "Available Regions" list to the "Selected Regions" list using the <code>&gt;&gt;</code> button or drag-and-drop. You can select multiple regions for batch analysis.</li>
+                            <li>For each selected region, accordion sections will appear below, showing image galleries (Raster and Satellite) associated with that region. This helps you confirm which visual data will be included in the analysis.</li>
+                        </ul>
+                    </li>
+                    <li class="workflow-step">
+                        <strong>Review and Customize the Analysis Prompt:</strong>
+                        <ul>
+                            <li>The system uses a sophisticated modular prompt structure. The prompt sent to the AI is assembled from various JSON files stored on the server (under <code>llm/prompts/</code>).</li>
+                            <li><strong>Browse Prompt Parts:</strong> Use the "← Previous" and "Next →" buttons (or Ctrl/Cmd + Left/Right arrow keys when the text area is focused) to navigate through the different components of the prompt. The title of each part (e.g., <code>preprompt/core_setup</code>, <code>input_images/hillshade_rgb</code>, <code>visual_lexicon/causeway</code>, <code>workflow/01_initial_survey</code>) is displayed.</li>
+                            <li><strong>Edit Content:</strong> The content of the currently selected prompt part is shown in a large textarea. You can directly edit this text to tailor the instructions or definitions for your specific analysis needs. Your edits are temporarily stored for the current session.</li>
+                        </ul>
+                    </li>
+                    <li class="workflow-step">
+                        <strong>Preview the Complete Prompt:</strong>
+                        <ul>
+                            <li>Click the "📄 Prompt Preview" button. A modal window will open, displaying the entire prompt as it will be sent to the AI. This is formed by concatenating all the (potentially edited) prompt parts.</li>
+                            <li>Review the full prompt carefully. Character and word counts are provided for reference.</li>
+                            <li>Use the "📋 Copy" button to copy the prompt to your clipboard if you wish to save it externally or test it elsewhere.</li>
+                        </ul>
+                    </li>
+                    <li class="workflow-step">
+                        <strong>Choose AI Model:</strong>
+                        <ul>
+                            <li>Select your preferred AI model from the "Model" dropdown list (e.g., "GPT-4o", "GPT-4o Mini"). The default is typically "GPT-4o Mini".</li>
+                        </ul>
+                    </li>
+                    <li class="workflow-step">
+                        <strong>Initiate Analysis:</strong>
+                        <ul>
+                            <li>Click the "Send to OpenAI" button.</li>
+                            <li>A loading overlay will appear, indicating that the analysis is in progress.</li>
+                            <li><strong>Backend Process:</strong>
+                                <ol>
+                                    <li>For each selected region, the relevant raster images (PNGs from its galleries) are prepared.</li>
+                                    <li>These images are temporarily saved on the server.</li>
+                                    <li>The assembled prompt and references to these saved images are sent to the chosen OpenAI model.</li>
+                                    <li>The AI's response is received by the backend.</li>
+                                    <li>Detailed logs of the request (prompt, images used) and the AI's response are saved (see <a href="#logging-monitoring">Logging and Monitoring</a> below).</li>
+                                </ol>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="workflow-step">
+                        <strong>View Results:</strong>
+                        <ul>
+                            <li>Upon completion, a notification will appear, and the application will automatically switch to the "Results" tab, where you can view the AI-generated analysis report (typically in JSON format).</li>
+                        </ul>
+                    </li>
+                </ol>
+            </section>
+
+            <section id="modular-prompts">
+                <h3>Understanding the Modular Prompt System</h3>
+                <p>The AI analysis relies on a structured, modular system for constructing prompts. This offers flexibility and power in guiding the AI. The core components are stored as JSON files on the server in the <code>llm/prompts/</code> directory:</p>
+                <ul>
+                    <li><strong><code>preprompt/core_setup.json</code>:</strong> Defines the LLM's fundamental persona (e.g., "expert computational archaeologist"), its primary mission, global output requirements (e.g., must return JSON), and critical conventions like the image coordinate system (<code>(0,0)</code> at top-left).</li>
+                    <li><strong><code>prompt_modules/input_images/</code>:</strong> Contains a JSON file for each type of raster image (e.g., <code>chm.json</code>, <code>hillshade_rgb.json</code>, <code>ndvi.json</code>). Each file typically describes the image type and lists "phenomenon signatures" – what kind of information or features that image helps reveal. This guides the AI in its interpretation of each visual input. The <code>ndvi.json</code> module is only included if the "NDVI regions" filter is active.</li>
+                    <li><strong><code>prompt_modules/visual_lexicon/</code>:</strong> This is a library of JSON files, each defining a specific type of archaeological feature or anomaly (e.g., <code>causeway.json</code>, <code>geoglyph.json</code>). These definitions include textual descriptions, required/expected visual signatures, and geometric/form characteristics (like typical width in pixels, linearity). This helps the AI identify and classify potential features based on a known typology.</li>
+                    <li><strong><code>workflow/</code> and <code>workflow_no_ndvi/</code>:</strong> These directories contain sequences of JSON files (e.g., <code>00_prepass.json</code>, <code>01_initial_survey.json</code>, etc.) that define a step-by-step analytical workflow for the AI to follow. Each file outlines specific tasks, which rasters to focus on at that stage, and how to process detections. The choice between these two workflow directories is determined by the "NDVI regions" filter.</li>
+                </ul>
+                <h4>Benefits of this Approach:</h4>
+                <ul>
+                    <li><strong>Flexibility & Customization:</strong> Prompts can be easily adapted by editing existing JSON files or adding new ones (e.g., for new image types or lexicon entries) without changing the core application code.</li>
+                    <li><strong>Consistency & Control:</strong> Standardized modules ensure the AI receives instructions in a predictable way, leading to more reliable results.</li>
+                    <li><strong>Clarity for the AI:</strong> Breaking down complex analytical tasks into smaller, well-defined modules and workflow steps helps the AI process information more effectively.</li>
+                    <li><strong>Transparency:</strong> The "Prompt Preview" feature allows users to see the exact instructions being given to the AI.</li>
+                </ul>
+            </section>
+
+            <section id="image-handling">
+                <h3>Image Handling in AI Analysis</h3>
+                <p>When you send a prompt for analysis:</p>
+                <ol>
+                    <li>The application identifies the raster images (as PNGs) associated with your selected region(s) from their respective galleries.</li>
+                    <li>These images are sent to the backend and temporarily saved on the server.</li>
+                    <li>The backend then sends these saved images (or references to them) along with your assembled prompt to the OpenAI model. The model needs to be capable of multimodal input (processing both text and images), like GPT-4o.</li>
+                    <li>For logging purposes, copies of these exact images are stored permanently alongside the prompt and the AI's response (see <a href="#logging-monitoring">Logging and Monitoring</a>).</li>
+                </ol>
+                 <div class="note">
+                    <p><strong>Coordinate System for Images:</strong> As defined in <code>core_setup.json</code>, the AI is instructed that the coordinate system for all provided images starts at <code>(0,0)</code> in the <strong>top-left corner</strong>, and all bounding boxes for detected features should be reported in pixel units relative to this origin.</p>
+                </div>
+            </section>
+
+            <section id="logging-monitoring">
+                <h3>Logging and Monitoring for Repeatability</h3>
+                <p>To ensure transparency, control, and the ability to reproduce analyses, the application maintains detailed logs for every OpenAI interaction.</p>
+                <ul>
+                    <li><strong>Log Storage:</strong> All logs are stored on the server within the <code>llm/</code> directory.
+                        <ul>
+                            <li><code>llm/logs/</code>: Contains a unique subfolder for each analysis run.
+                                <ul>
+                                    <li>Folder Naming: <code>&lt;RegionName&gt;_&lt;ModelName&gt;_&lt;Timestamp&gt;_&lt;UniqueID&gt;</code> (e.g., <code>MySite_gpt4omini_20240715_103000_abcdef12</code>).</li>
+                                    <li>Inside each folder:
+                                        <ul>
+                                            <li><strong><code>request_log.json</code>:</strong> Stores the full details of what was sent to the AI, including the complete prompt, the list of images used (with their names, paths within this log folder, and sizes), the region name, any coordinates, and the AI model used.</li>
+                                            <li><strong><code>sent_images/</code> (subfolder):</strong> Contains exact copies of all the PNG images that were provided to the AI for this specific analysis. This is crucial for later review and reproducibility.</li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                            </li>
+                            <li><code>llm/responses/</code>: Stores the raw JSON responses received from the OpenAI model.
+                                <ul>
+                                    <li>Filename: <code>&lt;RegionName&gt;_&lt;ModelName&gt;_&lt;Timestamp&gt;_&lt;UniqueID&gt;_response.json</code>.</li>
+                                    <li>Each response file includes the AI's output and a reference back to its corresponding <code>request_log.json</code>.</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+                    <li><strong>Benefits:</strong> This system allows you or an administrator to:
+                        <ul>
+                            <li>Review the exact inputs (prompt and images) for any past analysis.</li>
+                            <li>Verify the AI's response against those inputs.</li>
+                            <li>Reproduce analyses if needed.</li>
+                            <li>Debug unexpected results by examining the complete context provided to the AI.</li>
+                        </ul>
+                    </li>
+                </ul>
+                <div class="tip">
+                    <p>While direct access to these server-side logs is typically for administrators, the "Results" tab in the application provides a user-friendly way to view the outcomes of your AI analyses, which are sourced from these logged responses.</p>
+                </div>
+            </section>
+            <p><a href="index.html">&larr; Back to Home</a></p>
+        </div>
+    </div>
+
+    <footer>
+        <p>GeoArchaeology Terrain Processor &copy; 2024</p>
+    </footer>
+</body>
+</html>
