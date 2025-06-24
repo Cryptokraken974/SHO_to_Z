@@ -170,9 +170,9 @@ window.Utils = {
     const latDir = lat >= 0 ? 'N' : 'S';
     const lngDir = lng >= 0 ? 'E' : 'W';
 
-    // Format with 2 decimal places
-    const formattedLat = absLat.toFixed(2);
-    const formattedLng = absLng.toFixed(2);
+    // Format with 4 decimal places to preserve full precision (was toFixed(2))
+    const formattedLat = absLat.toFixed(4);
+    const formattedLng = absLng.toFixed(4);
 
     return `${formattedLat}${latDir}_${formattedLng}${lngDir}`;
   },

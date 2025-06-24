@@ -1,0 +1,132 @@
+{
+  "region": "PRGL1260C9597_2014",
+  "timestamp": "2025-06-24",
+  "overlay_scaling_status": "WORKING",
+  "overlays": [
+    {
+      "name": "CHM",
+      "status": "available",
+      "bounds": {
+        "north": -3.630694188824279,
+        "south": -3.6333092071134643,
+        "east": -78.35995866259248,
+        "west": -78.3658323842936,
+        "center_lat": -3.632001697968872,
+        "center_lng": -78.36289552344303,
+        "source": "metadata.txt_bounds"
+      },
+      "leaflet_bounds": [
+        [
+          -3.6333092071134643,
+          -78.3658323842936
+        ],
+        [
+          -3.630694188824279,
+          -78.35995866259248
+        ]
+      ],
+      "coverage": {
+        "width_degrees": 0.005874,
+        "height_degrees": 0.002615,
+        "area_km2": 0.19
+      },
+      "image_size_kb": 79,
+      "source": "metadata.txt_bounds"
+    },
+    {
+      "name": "HillshadeRGB",
+      "status": "available",
+      "bounds": {
+        "north": -3.630694188824279,
+        "south": -3.6333092071134643,
+        "east": -78.35995866259248,
+        "west": -78.3658323842936,
+        "center_lat": -3.632001697968872,
+        "center_lng": -78.36289552344303,
+        "source": "metadata.txt_bounds"
+      },
+      "leaflet_bounds": [
+        [
+          -3.6333092071134643,
+          -78.3658323842936
+        ],
+        [
+          -3.630694188824279,
+          -78.35995866259248
+        ]
+      ],
+      "coverage": {
+        "width_degrees": 0.005874,
+        "height_degrees": 0.002615,
+        "area_km2": 0.19
+      },
+      "image_size_kb": 302,
+      "source": "metadata.txt_bounds"
+    },
+    {
+      "name": "LRM",
+      "status": "available",
+      "bounds": {
+        "north": -3.630694188824279,
+        "south": -3.6333092071134643,
+        "east": -78.35995866259248,
+        "west": -78.3658323842936,
+        "center_lat": -3.632001697968872,
+        "center_lng": -78.36289552344303,
+        "source": "metadata.txt_bounds"
+      },
+      "leaflet_bounds": [
+        [
+          -3.6333092071134643,
+          -78.3658323842936
+        ],
+        [
+          -3.630694188824279,
+          -78.35995866259248
+        ]
+      ],
+      "coverage": {
+        "width_degrees": 0.005874,
+        "height_degrees": 0.002615,
+        "area_km2": 0.19
+      },
+      "image_size_kb": 26,
+      "source": "metadata.txt_bounds"
+    },
+    {
+      "name": "Slope",
+      "status": "available",
+      "bounds": {
+        "north": -3.630694188824279,
+        "south": -3.6333092071134643,
+        "east": -78.35995866259248,
+        "west": -78.3658323842936,
+        "center_lat": -3.632001697968872,
+        "center_lng": -78.36289552344303,
+        "source": "metadata.txt_bounds"
+      },
+      "leaflet_bounds": [
+        [
+          -3.6333092071134643,
+          -78.3658323842936
+        ],
+        [
+          -3.630694188824279,
+          -78.35995866259248
+        ]
+      ],
+      "coverage": {
+        "width_degrees": 0.005874,
+        "height_degrees": 0.002615,
+        "area_km2": 0.19
+      },
+      "image_size_kb": 129,
+      "source": "metadata.txt_bounds"
+    },
+    {
+      "name": "SVF",
+      "status": "not_available",
+      "error": "No overlay data found"
+    }
+  ]
+}

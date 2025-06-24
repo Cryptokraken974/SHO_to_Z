@@ -1,0 +1,62 @@
+/* Enhanced overlay visibility for small-scale overlays */
+.small-scale-overlay {
+  /* Ensure the overlay is rendered with high quality */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  
+  /* Enhance borders and contrast for small overlays */
+  filter: contrast(1.1) brightness(1.05);
+  
+  /* Prevent blurring on zoom */
+  -ms-interpolation-mode: nearest-neighbor;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -webkit-crisp-edges;
+  
+  /* Add subtle shadow for better visibility */
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Ensure overlays maintain quality at high zoom levels */
+.leaflet-image-layer {
+  /* Prevent image smoothing for better clarity at high zoom */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Debug styling for overlay bounds visualization */
+.overlay-debug-bounds {
+  border: 2px dashed #ff6b6b !important;
+  background-color: rgba(255, 107, 107, 0.1) !important;
+}
+
+/* Enhanced notification styling for overlay operations */
+.overlay-notification {
+  position: fixed;
+  top: 70px;
+  right: 20px;
+  background: rgba(42, 42, 42, 0.95);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  z-index: 1000;
+  max-width: 350px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.overlay-notification.success {
+  border-left: 4px solid #10b981;
+}
+
+.overlay-notification.error {
+  border-left: 4px solid #ef4444;
+}
+
+.overlay-notification.warning {
+  border-left: 4px solid #f59e0b;
+}
+
+.overlay-notification.info {
+  border-left: 4px solid #3b82f6;
+}

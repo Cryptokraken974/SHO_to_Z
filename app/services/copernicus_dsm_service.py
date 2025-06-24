@@ -41,7 +41,7 @@ class CopernicusDSMService:
                                 lat: float, 
                                 lng: float, 
                                 region_name: str,
-                                buffer_km: float = 5.0,
+                                buffer_km: float = 12.5,
                                 resolution: str = "30m") -> Dict:
         """
         Download DSM data for a region defined by coordinates

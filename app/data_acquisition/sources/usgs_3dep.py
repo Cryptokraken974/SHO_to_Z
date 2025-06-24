@@ -246,19 +246,30 @@ class USGS3DEPSource(BaseDataSource):
             f.write("- Check multiple sources if data is not available from one\n")
             f.write(f"- Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         
-        # Also create a metadata file in the lidar subfolder
-        lat_dir = 'S' if center_lat < 0 else 'N'
-        lng_dir = 'W' if center_lng < 0 else 'E'
-        region_name = f"{abs(center_lat):.2f}{lat_dir}_{abs(center_lng):.2f}{lng_dir}"
-        metadata_path = input_folder / f"metadata_{region_name}.txt"
+        # Also create a standardized metadata.txt file in the region root directory
+        # This ensures consistency with other data sources for PNG overlay scaling
+        region_root_dir = input_folder.parent  # Go up one level from lidar subfolder to region root
+        metadata_path = region_root_dir / "metadata.txt"
         
         with open(metadata_path, 'w') as f:
-            f.write(f"# USGS 3DEP Elevation Data\n")
-            f.write(f"# Region: {region_name}\n")
-            f.write(f"# Data Type: Instructions for {request.data_type.value}\n")
-            f.write(f"# Instructions File: {info_file_name}\n")
-            f.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"# Center: {center_lat:.6f}, {center_lng:.6f}\n")
+            f.write(f"# REQUESTED BOUNDS (WGS84 - EPSG:4326)\n")
+            f.write(f"# These bounds represent the REQUESTED AREA for LAZ acquisition\n")
+            f.write(f"North Bound: {request.bbox.north}\n")
+            f.write(f"South Bound: {request.bbox.south}\n")
+            f.write(f"East Bound: {request.bbox.east}\n")
+            f.write(f"West Bound: {request.bbox.west}\n")
+            f.write(f"# \n")
+            f.write(f"# Additional Information\n")
+            lat_dir = 'S' if center_lat < 0 else 'N'
+            lng_dir = 'W' if center_lng < 0 else 'E'
+            region_name = f"{abs(center_lat):.2f}{lat_dir}_{abs(center_lng):.2f}{lng_dir}"
+            f.write(f"Region Name: {request.region_name if request.region_name else region_name}\n")
+            f.write(f"Data Type: Instructions for {request.data_type.value}\n")
+            f.write(f"Instructions File: {info_file_name}\n")
+            f.write(f"Source: USGS 3DEP\n")
+            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Center Latitude: {center_lat:.6f}\n")
+            f.write(f"Center Longitude: {center_lng:.6f}\n")
         
         return info_file
     

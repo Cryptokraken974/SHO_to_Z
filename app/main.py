@@ -87,14 +87,14 @@ manager = ConnectionManager()
 class CoordinateRequest(BaseModel):
     lat: float
     lng: float
-    buffer_km: float = 1.0
+    buffer_km: float = 12.5
     data_types: Optional[List[str]] = None
     region_name: Optional[str] = None
 
 class DataAcquisitionRequest(BaseModel):
     lat: float
     lng: float
-    buffer_km: float = 1.0
+    buffer_km: float = 12.5
     data_sources: Optional[List[str]] = None
     max_file_size_mb: float = 500.0
     region_name: Optional[str] = None
@@ -102,7 +102,7 @@ class DataAcquisitionRequest(BaseModel):
 class Sentinel2Request(BaseModel):
     lat: float
     lng: float
-    buffer_km: float = 2.0  # 2km radius = 4km x 4km box (smaller for better processing)
+    buffer_km: float = 12.5  # 12.5km radius = 25km x 25km box (optimal for Copernicus)
     bands: Optional[List[str]] = ["B04", "B08"]  # Sentinel-2 red and NIR bands
     region_name: Optional[str] = None
 

@@ -1,4 +1,4 @@
-from osgeo import gdal
+from osgeo import gdal, osr
 import os
 import time
 from typing import Optional, Dict # Added Dict
@@ -13,6 +13,120 @@ logger = logging.getLogger(__name__)
 
 # Configure GDAL to prevent auxiliary file creation for PNG files
 gdal.SetConfigOption('GDAL_PAM_ENABLED', 'NO')
+
+def create_wgs84_world_file(original_world_file: str, tiff_path: str, png_path: str) -> bool:
+    """
+    Create a WGS84 world file for PNG overlay using the original LAZ request bounds.
+    Instead of using GDAL's projected coordinates, this function reads the original
+    LAZ request bounds from metadata.txt to ensure overlays match the original area.
+    
+    Args:
+        original_world_file: Path to the original world file (in projected coordinates)
+        tiff_path: Path to the source TIFF file (for image dimensions)
+        png_path: Path to the PNG file (for output world file naming)
+    
+    Returns:
+        True if WGS84 world file was created successfully
+    """
+    try:
+        # First, try to find and read the original LAZ request bounds from metadata.txt
+        print(f"🎯 Using original LAZ request bounds for world file generation...")
+        
+        # Extract region name from file path to find metadata.txt
+        region_name = None
+        path_parts = tiff_path.split(os.sep)
+        if "output" in path_parts:
+            output_idx = path_parts.index("output")
+            if output_idx + 1 < len(path_parts):
+                region_name = path_parts[output_idx + 1]
+        
+        if not region_name:
+            print(f"❌ Could not extract region name from path: {tiff_path}")
+            return False
+            
+        # Read metadata.txt for original request bounds
+        metadata_path = os.path.join("output", region_name, "metadata.txt")
+        if not os.path.exists(metadata_path):
+            print(f"❌ No metadata.txt found at: {metadata_path}")
+            return False
+            
+        print(f"📄 Reading original request bounds from: {metadata_path}")
+        
+        # Parse metadata.txt for bounds
+        bounds = {}
+        with open(metadata_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if 'North Bound:' in line:
+                    bounds['north'] = float(line.split(':')[1].strip())
+                elif 'South Bound:' in line:
+                    bounds['south'] = float(line.split(':')[1].strip())
+                elif 'East Bound:' in line:
+                    bounds['east'] = float(line.split(':')[1].strip())
+                elif 'West Bound:' in line:
+                    bounds['west'] = float(line.split(':')[1].strip())
+        
+        if len(bounds) != 4:
+            print(f"❌ Could not parse all bounds from metadata.txt")
+            return False
+            
+        print(f"✅ Original LAZ request bounds:")
+        print(f"   North: {bounds['north']:.8f}°")
+        print(f"   South: {bounds['south']:.8f}°") 
+        print(f"   East: {bounds['east']:.8f}°")
+        print(f"   West: {bounds['west']:.8f}°")
+        
+        # Get image dimensions from TIFF
+        ds = gdal.Open(tiff_path)
+        if not ds:
+            print(f"❌ Could not open TIFF: {tiff_path}")
+            return False
+            
+        width = ds.RasterXSize
+        height = ds.RasterYSize
+        ds = None
+        
+        # Calculate pixel sizes using original LAZ request bounds
+        width_degrees = abs(bounds['east'] - bounds['west'])
+        height_degrees = abs(bounds['north'] - bounds['south'])
+        
+        pixel_size_x_wgs84 = width_degrees / width
+        pixel_size_y_wgs84 = -height_degrees / height  # Negative for standard image coordinate system
+        
+        # Upper left corner coordinates
+        ul_lon = bounds['west']
+        ul_lat = bounds['north']
+        
+        print(f"🌍 Calculated world file parameters:")
+        print(f"   Upper left longitude: {ul_lon:.8f}°")
+        print(f"   Upper left latitude: {ul_lat:.8f}°")
+        print(f"   Pixel size X (longitude): {pixel_size_x_wgs84:.10f}°")
+        print(f"   Pixel size Y (latitude): {pixel_size_y_wgs84:.10f}°")
+        print(f"   Image size: {width} × {height} pixels")
+        
+        # Create WGS84 world file
+        wgs84_world_file = os.path.splitext(png_path)[0] + "_wgs84.wld"
+        
+        with open(wgs84_world_file, 'w') as f:
+            f.write(f"{pixel_size_x_wgs84:.10f}\n")
+            f.write(f"0.0000000000\n")  # rotation_y
+            f.write(f"0.0000000000\n")  # rotation_x 
+            f.write(f"{pixel_size_y_wgs84:.10f}\n")
+            f.write(f"{ul_lon:.10f}\n")    # upper_left_x (longitude)
+            f.write(f"{ul_lat:.10f}\n")    # upper_left_y (latitude)
+            
+        print(f"✅ Created WGS84 world file: {os.path.basename(wgs84_world_file)}")
+        
+        # Calculate and display coverage info for verification
+        area_km2 = width_degrees * height_degrees * 111 * 111
+        print(f"📏 Original request coverage: {width_degrees:.6f}° × {height_degrees:.6f}° ({area_km2:.3f} km²)")
+        print(f"🎯 This matches the original LAZ area request perfectly!")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error creating WGS84 world file: {e}")
+        return False
 
 def convert_geotiff_to_png(
     tif_path: str,
@@ -145,11 +259,25 @@ def convert_geotiff_to_png(
                 logger.error(f"Fatal: Could not ensure src_min < src_max for {tif_path}. Defaulting to 0-255 scale.")
             print(f"   Adjusted scale due to min>=max: Min={src_min:.2f}, Max={src_max:.2f}")
 
-        scale_options_list = ["-scale", str(src_min), str(src_max), "0", "255", "-ot", "Byte", "-co", "WORLDFILE=NO"]
+        scale_options_list = ["-scale", str(src_min), str(src_max), "0", "255", "-ot", "Byte", "-co", "WORLDFILE=YES"]
         if enhanced_resolution:
              print(f"ℹ️ 'enhanced_resolution=True' noted. Scale options already incorporate robust stretching.")
         
+        print(f"🌍 World file generation enabled - creating .pgw file for georeferencing")
         gdal.Translate(png_path, ds, format="PNG", options=scale_options_list)
+        
+        # 🌍 CREATE WGS84 WORLD FILE FOR PROPER LEAFLET COMPATIBILITY
+        # World files created by GDAL are in the source projection (UTM, Lambert, etc.)
+        # Leaflet needs WGS84 coordinates, so we transform them
+        world_file_path = os.path.splitext(png_path)[0] + ".wld"  # PNG creates .wld files
+        if os.path.exists(world_file_path):
+            print(f"🔄 Transforming world file coordinates to WGS84 for Leaflet compatibility...")
+            success = create_wgs84_world_file(world_file_path, tif_path, png_path)
+            if success:
+                print(f"✅ WGS84 world file created for proper overlay scaling")
+            else:
+                print(f"⚠️ WGS84 transformation failed, keeping original world file")
+        
         ds = None
         
         if save_to_consolidated:

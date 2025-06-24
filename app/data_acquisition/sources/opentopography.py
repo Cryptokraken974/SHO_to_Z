@@ -697,22 +697,32 @@ class OpenTopographySource(BaseDataSource):
         input_file_path = input_folder / filename
         shutil.copy2(cache_path, input_file_path)
         
-        # Create metadata file in the lidar subfolder
-        metadata_filename = f"metadata_{base_file_name}.txt"
-        metadata_path = input_folder / metadata_filename
+        # Create metadata.txt with REQUESTED BOUNDS in the region's root directory
+        # This ensures the bounds represent the REQUESTED AREA, not the actual file bounds
+        region_root_dir = input_folder.parent  # Go up one level from lidar subfolder to region root
+        metadata_path = region_root_dir / "metadata.txt"
+        
         with open(metadata_path, 'w') as f:
-            f.write(f"# OpenTopography 3DEP Data\n")
-            f.write(f"# Region Name: {request.region_name if request.region_name else 'N/A'}\n")
-            f.write(f"# Data Type: {'LIDAR Point Cloud' if request.data_type == DataType.LAZ else 'Elevation DTM'}\n")
-            f.write(f"# Resolution: {self._get_resolution_meters(request.resolution)}m\n")
-            f.write(f"# Source: USGS 3DEP via OpenTopography/PDAL\n")
-            f.write(f"# Downloaded: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"# Bounds: {request.bbox.west}, {request.bbox.south}, {request.bbox.east}, {request.bbox.north}\n")
-            if not request.region_name: # Only write center if region_name is not used for naming
-                center_lat = (request.bbox.north + request.bbox.south) / 2
-                center_lng = (request.bbox.east + request.bbox.west) / 2
-                f.write(f"# Center: {center_lat:.6f}, {center_lng:.6f}\n")
-            f.write(f"# File: {filename}\n")
+            f.write(f"# REQUESTED BOUNDS (WGS84 - EPSG:4326)\n")
+            f.write(f"# These bounds represent the REQUESTED AREA for LAZ acquisition\n")
+            f.write(f"North Bound: {request.bbox.north}\n")
+            f.write(f"South Bound: {request.bbox.south}\n")
+            f.write(f"East Bound: {request.bbox.east}\n")
+            f.write(f"West Bound: {request.bbox.west}\n")
+            f.write(f"# \n")
+            f.write(f"# Additional Information\n")
+            f.write(f"Region Name: {request.region_name if request.region_name else base_file_name}\n")
+            f.write(f"Data Type: {'LIDAR Point Cloud' if request.data_type == DataType.LAZ else 'Elevation DTM'}\n")
+            f.write(f"Resolution: {self._get_resolution_meters(request.resolution)}m\n")
+            f.write(f"Source: USGS 3DEP via OpenTopography/PDAL\n")
+            f.write(f"Downloaded: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            
+            # Calculate center coordinates for reference
+            center_lat = (request.bbox.north + request.bbox.south) / 2
+            center_lng = (request.bbox.east + request.bbox.west) / 2
+            f.write(f"Center Latitude: {center_lat:.6f}\n")
+            f.write(f"Center Longitude: {center_lng:.6f}\n")
+            f.write(f"File: {filename}\n")
         
         return input_file_path
     

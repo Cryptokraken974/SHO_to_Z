@@ -943,7 +943,7 @@ class SatelliteAPIClient extends BaseAPIClient {
       end_date: endDate,
       cloud_cover_max: cloudCoverMax,
       bands: bands,
-      buffer_km: 5.0
+      buffer_km: 12.5
     };
 
     if (regionName) {

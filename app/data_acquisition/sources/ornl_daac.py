@@ -74,7 +74,7 @@ class ORNLDAACSource(BaseDataSource):
         estimated_size = bbox_area * size_per_km2
         return min(estimated_size, request.max_file_size_mb)
     
-    async def download(self, request: DownloadRequest) -> DownloadResult:
+    async def download(self, request: DownloadRequest, progress_callback=None) -> DownloadResult:
         """Download data from ORNL DAAC."""
         try:
             if not await self.check_availability(request):

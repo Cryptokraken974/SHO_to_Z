@@ -457,6 +457,23 @@ async def list_regions(source: str = None):
                 should_create_metadata = True
                 print(f"  📄 Metadata file missing for {region_name} - will create")
             else:
+                # File exists, check if it's an elevation API metadata file (should not be overwritten)
+                with open(metadata_file, 'r') as f:
+                    existing_content = f.read()
+                
+                # Check if this is an elevation API metadata file
+                is_elevation_api_metadata = any(marker in existing_content for marker in [
+                    "# Source: Elevation API",
+                    "Buffer Distance (km):",
+                    "# REQUESTED BOUNDS (WGS84 - EPSG:4326)",
+                    "Download ID:"
+                ])
+                
+                if is_elevation_api_metadata:
+                    print(f"  🔒 Skipping elevation API metadata for {region_name} - preserving detailed bounds info")
+                    metadata_skipped_count += 1
+                    continue
+                
                 # File exists, check if it has coordinates and bounds
                 existing_data = _read_coordinates_from_metadata(region_name)
                 has_existing_coords = False
@@ -1042,7 +1059,7 @@ async def _auto_download_dsm_for_region(region_name: str, lat: float, lng: float
             lat=lat,
             lng=lng,
             region_name=region_name,
-            buffer_km=5.0,
+            buffer_km=12.5,
             resolution="30m"
         )
         
@@ -1102,11 +1119,11 @@ async def download_dsm_for_region(region_name: str, data: dict = None):
             )
         
         # Get optional parameters
-        buffer_km = 5.0
+        buffer_km = 12.5
         resolution = "30m"
         
         if data:
-            buffer_km = data.get('buffer_km', 5.0)
+            buffer_km = data.get('buffer_km', 12.5)
             resolution = data.get('resolution', '30m')
             
             # Validate parameters

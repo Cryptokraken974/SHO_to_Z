@@ -99,7 +99,7 @@ class OpenTopographySource(BaseDataSource):
         
         return min(size_mb, request.max_file_size_mb)
     
-    async def download(self, request: DownloadRequest) -> DownloadResult:
+    async def download(self, request: DownloadRequest, progress_callback=None) -> DownloadResult:
         """Download data using PDAL pipelines."""
         try:
             if not PDAL_AVAILABLE:

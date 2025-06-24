@@ -28,7 +28,7 @@ async def download_copernicus_dsm(
         "region_name": "MyRegion",
         "latitude": -14.87,
         "longitude": -39.38,
-        "buffer_km": 5.0,  # optional, default 5.0
+        "buffer_km": 12.5,  # optional, default 12.5
         "resolution": "30m"  # optional, "30m" or "90m", default "30m"
     }
     """
@@ -55,7 +55,7 @@ async def download_copernicus_dsm(
             raise HTTPException(status_code=400, detail="longitude must be between -180 and 180")
         
         # Optional parameters
-        buffer_km = data.get('buffer_km', 5.0)
+        buffer_km = data.get('buffer_km', 12.5)
         resolution = data.get('resolution', '30m')
         
         # Validate resolution

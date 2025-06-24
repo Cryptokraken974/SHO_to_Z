@@ -38,7 +38,7 @@ class ElevationService {
       
       // Set default buffer if not provided
       const enhancedRequest = {
-        buffer_km: 2.0,
+        buffer_km: 12.5,
         ...request
       };
 
@@ -365,14 +365,14 @@ class ElevationService {
    */
   _getOptimalBufferSize(regionType) {
     const bufferMap = {
-      amazon: 2.5,
-      atlantic_forest: 2.0,
-      cerrado: 2.0,
-      brazil_other: 2.0,
-      international: 1.5
+      amazon: 12.5,
+      atlantic_forest: 12.5,
+      cerrado: 12.5,
+      brazil_other: 12.5,
+      international: 12.5
     };
     
-    return bufferMap[regionType] || 2.0;
+    return bufferMap[regionType] || 12.5;
   }
 
   /**

@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     use_mock_sources: bool = False
     
     # Default acquisition settings
-    default_buffer_km: float = 1.0
+    default_buffer_km: float = 12.5
     max_file_size_mb: float = 500.0
     cache_expiry_days: int = 30
     max_concurrent_downloads: int = 3

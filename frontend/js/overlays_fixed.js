@@ -61,20 +61,53 @@ window.OverlayManager = {
         }
       }
 
-      // Create new overlay directly with simple approach
-      const overlay = L.imageOverlay(imagePath, bounds, {
+      // Calculate real-world dimensions for scale verification
+      const realWorldDimensions = this.calculateRealWorldDimensions(bounds);
+      Utils.log('info', `🗺️  Real-world dimensions for ${processingType}:`, realWorldDimensions);
+
+      // Create new overlay with enhanced configuration for small-scale overlays
+      const overlayOptions = {
         opacity: options.opacity || 0.8,
         interactive: false,
         ...options
-      }).addTo(map);
+      };
+
+      // For very small overlays, ensure proper display
+      if (boundsValidation.info.width < 0.01 && boundsValidation.info.height < 0.01) {
+        Utils.log('info', `🔍 Small overlay detected - enhancing visibility for ${processingType}`);
+        overlayOptions.className = 'small-scale-overlay';
+        overlayOptions.opacity = Math.max(overlayOptions.opacity, 0.9); // Increase opacity for small overlays
+      }
+
+      const overlay = L.imageOverlay(imagePath, bounds, overlayOptions).addTo(map);
 
       // Store overlay reference
       this.mapOverlays[processingType] = overlay;
 
-      // Fit map to overlay bounds for better visibility
+      // Enhanced map fitting with appropriate zoom for small overlays
       try {
-        map.fitBounds(bounds, { padding: [20, 20] });
-        Utils.log('info', `Map fitted to overlay bounds for ${processingType}`);
+        const boundsSize = Math.max(boundsValidation.info.width, boundsValidation.info.height);
+        let padding = [20, 20];
+        let maxZoom = 18;
+
+        // Adjust zoom and padding for very small overlays
+        if (boundsSize < 0.01) {
+          padding = [5, 5]; // Smaller padding for small overlays
+          maxZoom = 19; // Higher zoom for better visibility
+          Utils.log('info', `🔍 Using enhanced zoom settings for small overlay ${processingType}`);
+        }
+
+        map.fitBounds(bounds, { 
+          padding: padding,
+          maxZoom: maxZoom
+        });
+        
+        Utils.log('info', `Map fitted to overlay bounds for ${processingType} with zoom ${map.getZoom()}`);
+        
+        // Log current map state for debugging
+        Utils.log('info', `📍 Map center: [${map.getCenter().lat.toFixed(6)}, ${map.getCenter().lng.toFixed(6)}]`);
+        Utils.log('info', `🔍 Map zoom level: ${map.getZoom()}`);
+
       } catch (boundsError) {
         Utils.log('warn', `Could not fit map to bounds for ${processingType}:`, boundsError);
       }
@@ -980,6 +1013,49 @@ window.OverlayManager = {
     }
 
     return validation;
+  },
+
+  /**
+   * Calculate real-world dimensions from geographic bounds
+   * @param {Array} bounds - Leaflet bounds [[south, west], [north, east]]
+   * @returns {Object} Real-world dimensions in meters and area in km²
+   */
+  calculateRealWorldDimensions(bounds) {
+    try {
+      const [[south, west], [north, east]] = bounds;
+      
+      // Create Leaflet LatLng objects for distance calculation
+      const southwest = L.latLng(south, west);
+      const northeast = L.latLng(north, east);
+      const southeast = L.latLng(south, east);
+      const northwest = L.latLng(north, west);
+      
+      // Calculate width and height in meters
+      const widthMeters = southwest.distanceTo(southeast);
+      const heightMeters = southwest.distanceTo(northwest);
+      const areaKm2 = (widthMeters * heightMeters) / 1000000;
+      
+      return {
+        width: `${widthMeters.toFixed(1)}m`,
+        height: `${heightMeters.toFixed(1)}m`,
+        area: `${areaKm2.toFixed(3)} km²`,
+        widthMeters: widthMeters,
+        heightMeters: heightMeters,
+        areaKm2: areaKm2,
+        boundsInDegrees: {
+          width: Math.abs(east - west),
+          height: Math.abs(north - south)
+        }
+      };
+    } catch (error) {
+      Utils.log('error', 'Failed to calculate real-world dimensions:', error);
+      return {
+        width: 'N/A',
+        height: 'N/A',
+        area: 'N/A',
+        error: error.message
+      };
+    }
   },
 
   /**

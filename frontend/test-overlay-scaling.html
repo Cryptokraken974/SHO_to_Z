@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overlay Scaling Test</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+        #map { height: 600px; width: 100%; border: 1px solid #ccc; }
+        .controls { margin-bottom: 20px; }
+        .info { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 4px; }
+        button { margin: 5px; padding: 8px 16px; }
+    </style>
+</head>
+<body>
+    <h1>Overlay Scaling Test - OR_WizardIsland</h1>
+    
+    <div class="info">
+        <strong>Expected:</strong> OR_WizardIsland region should cover ~755m x 606m (0.46 km²)<br>
+        <strong>Bounds from metadata.txt:</strong><br>
+        North: 42.94179220100211, South: 42.93633170944012<br>
+        East: -122.13908465103168, West: -122.14837668567772<br>
+        <strong>Size in degrees:</strong> ~0.00546° x 0.00929°<br>
+    </div>
+
+    <div class="controls">
+        <button onclick="addCorrectOverlay()">Add Correct Scale Overlay</button>
+        <button onclick="addTestRectangle()">Add Test Rectangle (Same Bounds)</button>
+        <button onclick="calculateActualSize()">Calculate Actual Size</button>
+        <button onclick="clearOverlays()">Clear All</button>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="results" class="info" style="display:none;">
+        <h3>Results:</h3>
+        <div id="calculation-results"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        // Initialize map centered on OR_WizardIsland
+        const map = L.map('map').setView([42.9391, -122.1437], 16);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18
+        }).addTo(map);
+
+        // OR_WizardIsland bounds from metadata.txt
+        const bounds = [
+            [42.93633170944012, -122.14837668567772], // Southwest [south, west]
+            [42.94179220100211, -122.13908465103168]  // Northeast [north, east]
+        ];
+
+        let testOverlay = null;
+        let testRectangle = null;
+
+        function addCorrectOverlay() {
+            clearOverlays();
+            
+            // Create a simple test image (200x200 pixels, semi-transparent black with red border)
+            const canvas = document.createElement('canvas');
+            canvas.width = 200;
+            canvas.height = 200;
+            const ctx = canvas.getContext('2d');
+            
+            // Fill with semi-transparent black
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, 200, 200);
+            
+            // Add red border
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 5;
+            ctx.strokeRect(0, 0, 200, 200);
+            
+            // Add text
+            ctx.fillStyle = 'white';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('OR_WizardIsland', 100, 100);
+            ctx.fillText('755m x 606m', 100, 120);
+            
+            const imageUrl = canvas.toDataURL();
+            
+            // Add overlay with correct bounds
+            testOverlay = L.imageOverlay(imageUrl, bounds, {
+                opacity: 0.8,
+                interactive: false
+            }).addTo(map);
+            
+            // Fit map to bounds
+            map.fitBounds(bounds, { padding: [50, 50] });
+            
+            console.log('Added overlay with bounds:', bounds);
+        }
+
+        function addTestRectangle() {
+            if (testRectangle) {
+                map.removeLayer(testRectangle);
+            }
+            
+            // Add a rectangle with the same bounds for comparison
+            testRectangle = L.rectangle(bounds, {
+                color: 'blue',
+                weight: 3,
+                opacity: 1,
+                fillColor: 'blue',
+                fillOpacity: 0.2
+            }).addTo(map);
+            
+            // Add popup with information
+            testRectangle.bindPopup(`
+                <strong>Test Rectangle</strong><br>
+                Same bounds as overlay<br>
+                Should match overlay size
+            `);
+            
+            console.log('Added test rectangle with bounds:', bounds);
+        }
+
+        function calculateActualSize() {
+            const resultsDiv = document.getElementById('results');
+            const calculationDiv = document.getElementById('calculation-results');
+            
+            // Calculate actual size using Leaflet's distance calculation
+            const southwest = L.latLng(bounds[0][0], bounds[0][1]);
+            const northeast = L.latLng(bounds[1][0], bounds[1][1]);
+            const southeast = L.latLng(bounds[0][0], bounds[1][1]);
+            const northwest = L.latLng(bounds[1][0], bounds[0][1]);
+            
+            const width = southwest.distanceTo(southeast); // meters
+            const height = southwest.distanceTo(northwest); // meters
+            const area = (width * height) / 1000000; // km²
+            
+            const degreeWidth = Math.abs(bounds[1][1] - bounds[0][1]);
+            const degreeHeight = Math.abs(bounds[1][0] - bounds[0][0]);
+            
+            calculationDiv.innerHTML = `
+                <strong>Calculated Dimensions:</strong><br>
+                Width: ${width.toFixed(1)}m (${degreeWidth.toFixed(6)}°)<br>
+                Height: ${height.toFixed(1)}m (${degreeHeight.toFixed(6)}°)<br>
+                Area: ${area.toFixed(3)} km²<br><br>
+                
+                <strong>Expected from metadata:</strong><br>
+                Width: 755m<br>
+                Height: 606m<br>
+                Area: 0.46 km²<br><br>
+                
+                <strong>Difference:</strong><br>
+                Width difference: ${(width - 755).toFixed(1)}m<br>
+                Height difference: ${(height - 606).toFixed(1)}m<br>
+                Area difference: ${(area - 0.46).toFixed(3)} km²
+            `;
+            
+            resultsDiv.style.display = 'block';
+            
+            console.log('Calculated size:', { width, height, area });
+        }
+
+        function clearOverlays() {
+            if (testOverlay) {
+                map.removeLayer(testOverlay);
+                testOverlay = null;
+            }
+            if (testRectangle) {
+                map.removeLayer(testRectangle);
+                testRectangle = null;
+            }
+        }
+
+        // Add initial marker at center
+        const center = L.latLng(42.9391, -122.1437);
+        L.marker(center).addTo(map).bindPopup('OR_WizardIsland Center');
+        
+        console.log('Test page loaded. OR_WizardIsland bounds:', bounds);
+    </script>
+</body>
+</html>

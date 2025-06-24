@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 class CoordinateRequest(BaseModel):
     lat: float
     lng: float
-    buffer_km: Optional[float] = 5.0
+    buffer_km: Optional[float] = 12.5
     region_name: Optional[str] = None
 
 router = APIRouter()
@@ -410,6 +410,45 @@ async def download_elevation_coordinates(request: CoordinateRequest):
         print(f"🌍 Downloading elevation data for coordinates: {request.lat:.4f}, {request.lng:.4f}")
         print(f"🔲 BBox: West={bbox.west:.4f}, South={bbox.south:.4f}, East={bbox.east:.4f}, North={bbox.north:.4f}")
         print(f"📐 Size: {(bbox.east-bbox.west)*111:.2f}km x {(bbox.north-bbox.south)*111:.2f}km")
+        
+        # 🔧 IMMEDIATE BOUNDS SAVING: Save requested bounds to metadata.txt before download
+        # This ensures the bounding box represents the REQUESTED AREA, not the file bounds
+        if request.region_name:
+            from pathlib import Path
+            from datetime import datetime
+            
+            # Create output directory structure for the region
+            output_dir = Path("output") / request.region_name
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Create metadata.txt with the REQUESTED bounds immediately
+            metadata_path = output_dir / "metadata.txt"
+            with open(metadata_path, 'w') as f:
+                f.write(f"# LAZ Region Metadata\n")
+                f.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"# Source: Elevation API coordinate request\n\n")
+                f.write(f"Region Name: {request.region_name}\n")
+                f.write(f"Source: Elevation API\n")
+                f.write(f"Request Type: coordinate-based\n\n")
+                f.write(f"# REQUESTED COORDINATES (Original user request)\n")
+                f.write(f"Requested Latitude: {request.lat}\n")
+                f.write(f"Requested Longitude: {request.lng}\n")
+                f.write(f"Buffer Distance (km): {request.buffer_km}\n\n")
+                f.write(f"# REQUESTED BOUNDS (WGS84 - EPSG:4326)\n")
+                f.write(f"# These bounds represent the REQUESTED AREA for LAZ acquisition\n")
+                f.write(f"North Bound: {bbox.north}\n")
+                f.write(f"South Bound: {bbox.south}\n")
+                f.write(f"East Bound: {bbox.east}\n")
+                f.write(f"West Bound: {bbox.west}\n\n")
+                f.write(f"# CENTER COORDINATES (Calculated from requested bounds)\n")
+                f.write(f"Center Latitude: {(bbox.north + bbox.south) / 2}\n")
+                f.write(f"Center Longitude: {(bbox.east + bbox.west) / 2}\n\n")
+                f.write(f"# Area Information\n")
+                f.write(f"Area (sq km): {bbox.area_km2():.4f}\n")
+                f.write(f"Download ID: {download_id}\n")
+            
+            print(f"✅ IMMEDIATE BOUNDS SAVED to metadata.txt for region '{request.region_name}'")
+            print(f"   Bounds: N={bbox.north:.6f}, S={bbox.south:.6f}, E={bbox.east:.6f}, W={bbox.west:.6f}")
         
         # Create download request for elevation data
         download_request = DownloadRequest(

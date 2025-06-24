@@ -113,9 +113,12 @@ class Sentinel2Source(BaseDataSource):
         
         return min(estimated_size, request.max_file_size_mb)
     
-    async def download(self, request: DownloadRequest) -> DownloadResult:
+    async def download(self, request: DownloadRequest, progress_callback=None) -> DownloadResult:
         """Download Sentinel-2 red and NIR bands."""
         try:
+            # Use the passed progress_callback or fall back to the instance callback
+            effective_callback = progress_callback or self.progress_callback
+            
             print(f"\n🛰️ {'='*60}")
             print(f"🛰️ SENTINEL-2 DATA ACQUISITION STARTED")
             print(f"🛰️ {'='*60}")
@@ -168,10 +171,10 @@ class Sentinel2Source(BaseDataSource):
             # Download red and NIR bands with cropping to reduce file size
             print(f"\n📥 Starting band downloads with cropping...")
             print(f"🔴 Downloading and cropping Red band (B04)...")
-            red_path = await self._download_band(item, "B04", "Red", output_dir, request.bbox, self.progress_callback)
+            red_path = await self._download_band(item, "B04", "Red", output_dir, request.bbox, effective_callback)
             
             print(f"🌿 Downloading and cropping NIR band (B08)...")
-            nir_path = await self._download_band(item, "B08", "NIR", output_dir, request.bbox, self.progress_callback)
+            nir_path = await self._download_band(item, "B08", "NIR", output_dir, request.bbox, effective_callback)
             
             if not red_path or not nir_path:
                 print(f"❌ Failed to download required bands")

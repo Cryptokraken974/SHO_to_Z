@@ -1799,7 +1799,7 @@ async def generate_laz_metadata(
                         satellite_request = {
                             "lat": center["lat"],
                             "lng": center["lng"], 
-                            "buffer_km": 5.0,  # 5km buffer around center point
+                            "buffer_km": 12.5,  # 12.5km buffer around center point
                             "start_date": start_date.strftime("%Y-%m-%d"),
                             "end_date": end_date.strftime("%Y-%m-%d"),
                             "bands": ["B04", "B08"],  # Red and NIR bands

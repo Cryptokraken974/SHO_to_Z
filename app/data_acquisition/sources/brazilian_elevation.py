@@ -114,7 +114,7 @@ class BrazilianElevationSource(BaseDataSource):
             data_types=[DataType.ELEVATION],
             resolutions=[DataResolution.HIGH, DataResolution.MEDIUM, DataResolution.LOW],
             coverage_areas=["Brazil", "South America", "Global"],
-            max_area_km2=100.0,  # Reasonable limit for downloads
+            max_area_km2=1000.0,  # Allow for optimal 25km buffer (625 km²) plus margin
             requires_api_key=False  # Can work without API key for some datasets
         )
     
@@ -346,17 +346,17 @@ class BrazilianElevationSource(BaseDataSource):
             bbox=bbox,
             data_type=DataType.ELEVATION,
             resolution=DataResolution.HIGH,
-            max_file_size_mb=25.0,  # Allow for 12-15MB+ optimal files
-            coordinate_system="EPSG:4326"
+            max_file_size_mb=25.0  # Allow for 12-15MB+ optimal files
         )
 
     def _optimize_bbox_for_quality(self, bbox: BoundingBox) -> BoundingBox:
         """Optimize bounding box for maximum quality based on API testing results.
         
-        Testing showed optimal results with 0.225° buffer (25km area) providing:
+        Testing showed optimal results with 0.1125° buffer (25km area) providing:
         - 12-15MB file size (vs 535KB for 5km area)  
         - 1800x1800+ resolution (vs 360x360 for 5km area)
         - Maximum quality without downsampling
+        - Correct 25km × 25km coverage matching map overlay bounds
         """
         center_lat = (bbox.north + bbox.south) / 2
         center_lng = (bbox.east + bbox.west) / 2
@@ -365,7 +365,7 @@ class BrazilianElevationSource(BaseDataSource):
         
         # If area is smaller than optimal 25km, expand to optimal size
         if current_area < 625:  # Less than ~25km x 25km
-            optimal_buffer = 0.225  # 25km buffer for maximum quality without downsampling
+            optimal_buffer = 0.1125  # 12.5km buffer for 25km x 25km area (0.1125° × 2 = 0.225° = ~25km)
             
             optimized_bbox = BoundingBox(
                 west=center_lng - optimal_buffer,

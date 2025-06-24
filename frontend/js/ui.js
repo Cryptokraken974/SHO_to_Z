@@ -1132,7 +1132,7 @@ window.UIManager = {
       const requestBody = {
         lat: latNum,
         lng: lngNum,
-        buffer_km: 5.0,  // 5km radius for 10km x 10km area
+        buffer_km: 12.5,  // 12.5km radius for optimal 25km x 25km area
         bands: ['B04', 'B08']  // Sentinel-2 red and NIR band identifiers
       };
 
@@ -1602,7 +1602,7 @@ window.UIManager = {
       const elevationRequest = {
         lat: latNum,
         lng: lngNum,
-        buffer_km: 2.0
+        buffer_km: 12.5
       };      if (effectiveRegionName) {
         elevationRequest.region_name = effectiveRegionName;
       }
@@ -1727,7 +1727,7 @@ window.UIManager = {
 
     // Generate region name if not provided
     if (!regionName || regionName.trim() === '') {
-      regionName = `${Math.abs(latNum).toFixed(2)}${latNum >= 0 ? 'N' : 'S'}_${Math.abs(lngNum).toFixed(2)}${lngNum >= 0 ? 'E' : 'W'}`;
+      regionName = `${Math.abs(latNum).toFixed(4)}${latNum >= 0 ? 'N' : 'S'}_${Math.abs(lngNum).toFixed(4)}${lngNum >= 0 ? 'E' : 'W'}`;
       $('#region-name-input').val(regionName);
       Utils.log('info', `Auto-generated region name: ${regionName}`);
     }
@@ -1739,7 +1739,7 @@ window.UIManager = {
         region_name: regionName,
         latitude: latNum,
         longitude: lngNum,
-        buffer_km: 5.0,  // Default 5km buffer
+        buffer_km: 12.5,  // Default 12.5km buffer for optimal Copernicus delivery
         resolution: '30m'  // Default 30m resolution
       };
 
@@ -1928,7 +1928,7 @@ window.UIManager = {
         const elevationRequest = {
           lat: latNum,
           lng: lngNum,
-          buffer_km: 5.0,
+          buffer_km: 12.5,
           region_name: effectiveRegionName
         };
 
@@ -1954,10 +1954,10 @@ window.UIManager = {
       
       try {
         const dsmRequestData = {
-          region_name: effectiveRegionName || `${Math.abs(latNum).toFixed(2)}${latNum >= 0 ? 'N' : 'S'}_${Math.abs(lngNum).toFixed(2)}${lngNum >= 0 ? 'E' : 'W'}`,
+          region_name: effectiveRegionName || `${Math.abs(latNum).toFixed(4)}${latNum >= 0 ? 'N' : 'S'}_${Math.abs(lngNum).toFixed(4)}${lngNum >= 0 ? 'E' : 'W'}`,
           latitude: latNum,
           longitude: lngNum,
-          buffer_km: 5.0,
+          buffer_km: 12.5,
           resolution: '30m'
         };
 
@@ -1994,7 +1994,7 @@ window.UIManager = {
       
       try {
         const chmRequestData = {
-          region_name: effectiveRegionName || `${Math.abs(latNum).toFixed(2)}${latNum >= 0 ? 'N' : 'S'}_${Math.abs(lngNum).toFixed(2)}${lngNum >= 0 ? 'E' : 'W'}`,
+          region_name: effectiveRegionName || `${Math.abs(latNum).toFixed(4)}${latNum >= 0 ? 'N' : 'S'}_${Math.abs(lngNum).toFixed(4)}${lngNum >= 0 ? 'E' : 'W'}`,
           latitude: latNum,
           longitude: lngNum
         };
@@ -2031,7 +2031,7 @@ window.UIManager = {
       this.showProgress('🛰️ Step 4/4: Checking NDVI status...');
       
       try {
-        const regionNameForCheck = effectiveRegionName || `${Math.abs(latNum).toFixed(2)}${latNum >= 0 ? 'N' : 'S'}_${Math.abs(lngNum).toFixed(2)}${lngNum >= 0 ? 'E' : 'W'}`;
+        const regionNameForCheck = effectiveRegionName || `${Math.abs(latNum).toFixed(4)}${latNum >= 0 ? 'N' : 'S'}_${Math.abs(lngNum).toFixed(4)}${lngNum >= 0 ? 'E' : 'W'}`;
         
         // Check if NDVI is enabled for this region
         const ndviCheckResponse = await fetch(`/api/regions/${encodeURIComponent(regionNameForCheck)}/ndvi-status`);
@@ -2053,7 +2053,7 @@ window.UIManager = {
             region_name: regionNameForCheck,
             latitude: latNum,
             longitude: lngNum,
-            buffer_km: 5.0
+            buffer_km: 12.5
           };
 
           const sentinelResponse = await fetch('/api/download-sentinel2', {

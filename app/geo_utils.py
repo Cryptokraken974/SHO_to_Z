@@ -905,17 +905,40 @@ def _process_overlay_files(png_path: str, tiff_path: str, world_path: str, proce
                 
             if not bounds and os.path.exists(world_path):
                 print("🌍 Trying to extract bounds from world file...")
-                # Get image dimensions from PNG
-                from PIL import Image
-                with Image.open(png_path) as img:
-                    width, height = img.size
-                print(f"📏 Image dimensions: {width}x{height}")
                 
-                bounds = get_image_bounds_from_world_file(world_path, width, height, epsg_code)
-                if bounds:
-                    print(f"✅ Bounds from world file: {bounds}")
-                else:
-                    print("❌ Failed to extract bounds from world file")
+                # 🎯 PRIORITY: Check for WGS84 world file first (created by coordinate transformation)
+                wgs84_world_path = os.path.splitext(world_path)[0] + "_wgs84.wld"
+                if os.path.exists(wgs84_world_path):
+                    print(f"✅ Found WGS84 world file: {wgs84_world_path}")
+                    
+                    # Get image dimensions from PNG
+                    from PIL import Image
+                    with Image.open(png_path) as img:
+                        width, height = img.size
+                    print(f"📏 Image dimensions: {width}x{height}")
+                    
+                    # Use WGS84 world file directly (no coordinate transformation needed)
+                    bounds = get_image_bounds_from_world_file(wgs84_world_path, width, height, src_epsg=4326)
+                    if bounds:
+                        print(f"✅ Bounds from WGS84 world file: {bounds}")
+                    else:
+                        print("❌ Failed to extract bounds from WGS84 world file")
+                        
+                # Fallback to original world file if WGS84 world file doesn't exist or failed
+                if not bounds:
+                    print(f"🔄 Using original world file: {world_path}")
+                    
+                    # Get image dimensions from PNG
+                    from PIL import Image
+                    with Image.open(png_path) as img:
+                        width, height = img.size
+                    print(f"📏 Image dimensions: {width}x{height}")
+                    
+                    bounds = get_image_bounds_from_world_file(world_path, width, height, epsg_code)
+                    if bounds:
+                        print(f"✅ Bounds from original world file: {bounds}")
+                    else:
+                        print("❌ Failed to extract bounds from original world file")
         elif bounds:
             print(f"✅ Skipping TIFF/world file reading - already have bounds from metadata")
         else:
@@ -966,14 +989,21 @@ def _get_bounds_from_metadata(base_filename: str) -> Optional[Dict]:
     Extract bounds from metadata.txt file. This is the most reliable source of coordinates.
     
     Args:
-        base_filename: The base name of the region (e.g., 'ANDL2940C9715_2014')
+        base_filename: The base name of the region (e.g., 'ANDL2940C9715_2014') or full path to metadata.txt
     
     Returns:
         Dictionary with bounds information or None if not found
     """
     try:
-        # Look for metadata.txt file in the output directory
-        metadata_path = f"output/{base_filename}/metadata.txt"
+        # Handle both full path and base filename
+        if base_filename.endswith('metadata.txt'):
+            metadata_path = base_filename
+        elif base_filename.startswith('output/'):
+            # Already includes output/ prefix
+            metadata_path = f"{base_filename}/metadata.txt"
+        else:
+            # Base filename only
+            metadata_path = f"output/{base_filename}/metadata.txt"
         
         if not os.path.exists(metadata_path):
             print(f"📄 Metadata file not found: {metadata_path}")
@@ -983,6 +1013,10 @@ def _get_bounds_from_metadata(base_filename: str) -> Optional[Dict]:
         
         center_lat = None
         center_lng = None
+        north_bound = None
+        south_bound = None
+        east_bound = None
+        west_bound = None
         
         with open(metadata_path, 'r') as f:
             for line in f:
@@ -991,10 +1025,35 @@ def _get_bounds_from_metadata(base_filename: str) -> Optional[Dict]:
                     center_lat = float(line.split(':')[1].strip())
                 elif line.startswith('Center Longitude:'):
                     center_lng = float(line.split(':')[1].strip())
+                elif line.startswith('North Bound:'):
+                    north_bound = float(line.split(':')[1].strip())
+                elif line.startswith('South Bound:'):
+                    south_bound = float(line.split(':')[1].strip())
+                elif line.startswith('East Bound:'):
+                    east_bound = float(line.split(':')[1].strip())
+                elif line.startswith('West Bound:'):
+                    west_bound = float(line.split(':')[1].strip())
         
-        if center_lat is not None and center_lng is not None:
-            # Create bounds with a small buffer around the center point
-            # This is reasonable since we're dealing with processed LAZ regions
+        # Prefer actual bounds if available, fallback to center + buffer
+        if all(bound is not None for bound in [north_bound, south_bound, east_bound, west_bound]):
+            bounds = {
+                'north': north_bound,
+                'south': south_bound,
+                'east': east_bound,
+                'west': west_bound,
+                'center_lat': center_lat or (north_bound + south_bound) / 2,
+                'center_lng': center_lng or (east_bound + west_bound) / 2,
+                'source': 'metadata.txt_bounds'
+            }
+            
+            print(f"✅ Extracted actual bounds from metadata.txt:")
+            print(f"   Center: ({bounds['center_lat']:.6f}, {bounds['center_lng']:.6f})")
+            print(f"   Bounds: N={bounds['north']:.6f}, S={bounds['south']:.6f}, E={bounds['east']:.6f}, W={bounds['west']:.6f}")
+            
+            return bounds
+            
+        elif center_lat is not None and center_lng is not None:
+            # Fallback: Create bounds with a small buffer around the center point
             buffer = 0.01  # ~1km buffer at equator
             
             bounds = {
@@ -1004,16 +1063,16 @@ def _get_bounds_from_metadata(base_filename: str) -> Optional[Dict]:
                 'west': center_lng - buffer,
                 'center_lat': center_lat,
                 'center_lng': center_lng,
-                'source': 'metadata.txt'
+                'source': 'metadata.txt_center_buffered'
             }
             
-            print(f"✅ Extracted coordinates from metadata.txt:")
+            print(f"✅ Extracted center coordinates from metadata.txt (using buffer):")
             print(f"   Center: ({center_lat:.6f}, {center_lng:.6f})")
             print(f"   Bounds: N={bounds['north']:.6f}, S={bounds['south']:.6f}, E={bounds['east']:.6f}, W={bounds['west']:.6f}")
             
             return bounds
         else:
-            print(f"❌ Could not find both latitude and longitude in metadata.txt")
+            print(f"❌ Could not find coordinates or bounds in metadata.txt")
             return None
             
     except Exception as e:
