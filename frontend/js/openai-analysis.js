@@ -629,18 +629,18 @@ class OpenAIAnalysis {
         try {
             console.log('🔄 Loading regions for OpenAI analysis...');
             
-            // Load regions from OUTPUT folder where processed data and coordinate-based regions are stored
-            const data = await regions().listRegions('output');
+            // Load regions from OUTPUT folder with OpenAI filter (only regions with raster data)
+            const data = await regions().listRegions('output', 'openai');
             console.log('📊 API response:', data);
             
             // Store all regions with their metadata
             this.allRegions = data.regions || [];
-            console.log('📋 All regions loaded from output folder:', this.allRegions.map(r => r.name));
+            console.log('📋 All regions loaded from output folder (OpenAI filter):', this.allRegions.map(r => r.name));
             
             // Apply initial filter (will set this.availableRegions)
             this.applyNdviFilter();
             
-            console.log('✅ Regions loaded successfully from output folder');
+            console.log('✅ Regions loaded successfully from output folder with OpenAI filtering');
         } catch (err) {
             console.error('❌ Failed to load regions:', err);
             // Show error in UI if elements exist

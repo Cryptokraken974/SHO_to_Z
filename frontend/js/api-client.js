@@ -107,10 +107,13 @@ class RegionAPIClient extends BaseAPIClient {
   /**
    * List all available regions
    * @param {string} source - Optional filter: 'input', 'output', or null for both
+   * @param {string} filter_type - Optional filter type: 'openai' for OpenAI analysis (requires rasters), null for general use
    * @returns {Promise<Object>} List of regions
    */
-  async listRegions(source = null) {
-    const params = source ? { source } : {};
+  async listRegions(source = null, filter_type = null) {
+    const params = {};
+    if (source) params.source = source;
+    if (filter_type) params.filter_type = filter_type;
     return this.get('list-regions', params);
   }
 

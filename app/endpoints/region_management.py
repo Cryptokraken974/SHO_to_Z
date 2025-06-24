@@ -209,19 +209,21 @@ def isRegionNDVI(region_name: str) -> bool:
 
 
 @router.get("/api/list-regions")
-async def list_regions(source: str = None):
+async def list_regions(source: str = None, filter_type: str = None):
     """List all region subdirectories in the output directory and LAZ files from the input directory with coordinate metadata
     
     Args:
         source: Optional filter - 'input' for input folder only, 'output' for output folder only, None for both
+        filter_type: Optional filter type - 'openai' for OpenAI analysis (requires rasters), None for general use
     """
-    print(f"\n🔍 API CALL: GET /api/list-regions?source={source or 'all'}")
+    print(f"\n🔍 API CALL: GET /api/list-regions?source={source or 'all'}&filter_type={filter_type or 'general'}")
     print("📂 Backend folder scanning started:")
+    print(f"  🎯 Source filter: {source or 'all folders'}")
+    print(f"  🔧 Filter type: {filter_type or 'general (metadata.txt only)'}")
     
     input_dir = "input"
     
     print(f"  📁 Input directory: {input_dir}")
-    print(f"  🎯 Source filter: {source or 'all folders'}")
     
     regions_with_metadata = []
     
@@ -350,8 +352,23 @@ async def list_regions(source: str = None):
                 metadata_file = os.path.join(item_path, "metadata.txt")
                 lidar_folder = os.path.join(item_path, "lidar")
                 
-                # Only include regions that have both metadata.txt AND lidar folder (rasters generated)
-                if os.path.exists(metadata_file) and os.path.exists(lidar_folder) and os.path.isdir(lidar_folder):
+                # Apply different filtering logic based on filter_type
+                if filter_type == "openai":
+                    # For OpenAI analysis: Only include regions that have both metadata.txt AND lidar folder (rasters generated)
+                    if os.path.exists(metadata_file) and os.path.exists(lidar_folder) and os.path.isdir(lidar_folder):
+                        should_include_region = True
+                    else:
+                        should_include_region = False
+                        if os.path.exists(metadata_file) and not (os.path.exists(lidar_folder) and os.path.isdir(lidar_folder)):
+                            print(f"  ⏭️ Skipping region '{item}' for OpenAI analysis: has metadata but no raster data (missing lidar folder)")
+                else:
+                    # For general use: Include regions that have metadata.txt (regardless of lidar folder)
+                    if os.path.exists(metadata_file):
+                        should_include_region = True
+                    else:
+                        should_include_region = False
+                
+                if should_include_region:
                     # Check if this region is already in our list (avoid duplicates from input scan)
                     existing_region = next((r for r in regions_with_metadata if r["name"] == item), None)
                     
@@ -409,10 +426,6 @@ async def list_regions(source: str = None):
                         regions_with_metadata.append(region_info)
                     else:
                         print(f"  ↪️  Region {item} already found in input scan, skipping duplicate")
-                elif os.path.exists(metadata_file):
-                    # Region has metadata but no lidar folder - skip it for OpenAI analysis
-                    print(f"  ⏭️ Skipping region '{item}': has metadata but no raster data (missing lidar folder)")
-                    continue
     else:
         print(f"  ⏭️ Skipping output folder scan (source={source}, exists={os.path.exists(output_dir)})")
         
