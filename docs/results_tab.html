@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results Tab - User Documentation</title>
+    <link rel="stylesheet" href="style.css"> <!-- Link to a shared CSS file -->
+    <style>
+        /* Basic styles from index.html for standalone viewing */
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; line-height: 1.6; }
+        .container { width: 80%; margin: auto; overflow: hidden; padding: 0 20px; }
+        header { background: #333; color: #fff; padding-top: 30px; min-height: 70px; border-bottom: #0779e4 3px solid; }
+        header a { color: #fff; text-decoration: none; text-transform: uppercase; font-size: 16px; }
+        header ul { padding: 0; margin: 0; list-style: none; float: right; }
+        header li { display: inline; padding: 0 20px 0 20px; }
+        header #branding { float: left; }
+        header #branding h1 { margin: 0; }
+        nav { background: #444; padding: 10px 0; color: #fff; text-align: center; }
+        nav a { color: #fff; padding: 5px 15px; text-decoration: none; }
+        nav a:hover { background: #0779e4; }
+        .main-content { padding: 20px; background: #fff; margin-top: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3, h4 { color: #333; }
+        h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+        h3 { margin-top: 25px; color: #0779e4; }
+        h4 { margin-top: 20px; }
+        .param-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .param-table th, .param-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .param-table th { background-color: #f0f0f0; }
+        .note { background-color: #fff3cd; border-left: 5px solid #ffeeba; padding: 10px; margin: 15px 0; }
+        .tip { background-color: #d1ecf1; border-left: 5px solid #bee5eb; padding: 10px; margin: 15px 0; }
+        .important { background-color: #e2e3e5; border-left: 5px solid #6c757d; padding: 10px; margin: 15px 0; }
+        code { background: #eee; padding: 2px 4px; border-radius: 3px; font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; }
+        pre { background: #eee; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        footer { text-align: center; padding: 20px; margin-top: 20px; color: #fff; background: #333; }
+        .workflow-step { margin-bottom: 10px; padding-left: 20px; position: relative; }
+        .workflow-step::before { content: counter(step-counter); counter-increment: step-counter; background-color: #0779e4; color: white; border-radius: 50%; width: 25px; height: 25px; display: inline-block; text-align: center; line-height: 25px; position: absolute; left: -10px; top: 0; }
+        .workflow-steps { list-style: none; padding-left: 10px; counter-reset: step-counter; }
+        .color-green { background-color: #d4edda; color: #155724; padding: 2px 5px; border-radius: 3px; display: inline-block; }
+        .color-red { background-color: #f8d7da; color: #721c24; padding: 2px 5px; border-radius: 3px; display: inline-block; }
+        .color-gray { background-color: #e2e3e5; color: #383d41; padding: 2px 5px; border-radius: 3px; display: inline-block; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div id="branding">
+                <h1><a href="index.html" style="color:#fff; text-decoration:none;">GeoArchaeology Terrain Processor</a></h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="laz_loading.html">Loading LAZ</a></li>
+                    <li><a href="map_regions.html">Map Regions</a></li>
+                    <li><a href="data_retrieval.html">Get Data</a></li>
+                    <li><a href="ndvi_analysis.html">NDVI Analysis</a></li>
+                    <li><a href="raster_guide.html">Raster Guide</a></li>
+                    <li><a href="openai_analysis.html">OpenAI Analysis</a></li>
+                    <li><a href="results_tab.html" style="color:#0779e4; font-weight:bold;">Results Tab</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="main-content">
+            <a href="index.html">&larr; Back to Home</a>
+            <h2>Results Tab: Reviewing AI-Powered Analyses</h2>
+            <p>The "Results" tab is your central hub for viewing, filtering, and exploring the outputs from the AI analyses conducted via the <a href="openai_analysis.html">"OpenAI Analysis" tab</a>. It provides access to detailed reports, visual evidence with overlays, and options to export your findings.</p>
+
+            <section id="overview-results-tab">
+                <h3>Overview of the Results Tab</h3>
+                <p>This tab allows you to:</p>
+                <ul>
+                    <li>View a list of all completed AI analysis runs.</li>
+                    <li>Quickly identify analyses that detected anomalies through color-coding.</li>
+                    <li>Filter the displayed anomalies within a report based on their type (e.g., "Settlement," "Causeway").</li>
+                    <li>Examine detailed information for each detected anomaly, including confidence scores and the AI's textual interpretation.</li>
+                    <li>Browse the exact raster images used in the analysis, with bounding boxes highlighting the locations of detected anomalies.</li>
+                    <li>Export analysis reports in HTML or PDF format for sharing and archival.</li>
+                    <li>Delete unwanted analysis logs and their associated files.</li>
+                </ul>
+            </section>
+
+            <section id="workflow-results-tab">
+                <h3>Working with the Results Tab: A Step-by-Step Guide</h3>
+                <ol class="workflow-steps">
+                    <li class="workflow-step">
+                        <strong>Navigate to the Tab:</strong> Select the "Results" tab in the application.
+                    </li>
+                    <li class="workflow-step">
+                        <strong>View the List of Analyses:</strong>
+                        <ul>
+                            <li>Upon loading, the left panel will display a list of all previously completed AI analysis runs. These are identified by their unique log filenames (e.g., <code>RegionName_Model_Timestamp_UniqueID_response.json</code>).</li>
+                            <li><strong>Color-Coding:</strong> Each log entry is color-coded for quick assessment:
+                                <ul>
+                                    <li><span class="color-green">Green Background</span>: Indicates that the AI detected potential anomalies in this analysis.</li>
+                                    <li><span class="color-red">Red Background</span>: Indicates that the AI did not report any anomalies.</li>
+                                    <li><span class="color-gray">Gray Background</span>: Anomaly status could not be determined from the log.</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="workflow-step">
+                        <strong>Filter Anomalies (within a loaded report):</strong>
+                        <ul>
+                            <li>In the left panel, you'll find an "Filter by Anomaly Type" section. This section is populated with checkboxes for known archaeological feature types (e.g., "Causeway," "Settlement Platform," derived from the system's visual lexicon).</li>
+                            <li>Checking or unchecking these boxes dynamically filters the anomalies displayed in the main dashboard area *for the currently selected detailed report*. It does not filter the list of log files itself.</li>
+                            <li>Buttons like "Select All" and "Clear All" help manage these filters quickly.</li>
+                        </ul>
+                    </li>
+                    <li class="workflow-step">
+                        <strong>Open and View a Detailed Analysis Report:</strong>
+                        <ul>
+                            <li>Click on any log file name in the left panel to load its detailed analysis into the main dashboard area on the right.</li>
+                            <li>The dashboard will typically display:
+                                <ul>
+                                    <li><strong>Analysis Summary:</strong> Information like the target area ID, whether anomalies were detected, and the total number of anomalies found in this specific report.</li>
+                                    <li><strong>Identified Anomalies List:</strong> Each potential anomaly detected by the AI is presented with details such as:
+                                        <ul>
+                                            <li>Anomaly ID (assigned by the AI or system).</li>
+                                            <li>Classification (e.g., Type: "Settlement Platform", Subtype: "N/A").</li>
+                                            <li>Confidence Scores (a global score for the anomaly and potentially individual scores based on different input images).</li>
+                                            <li>Evidence per Image (textual descriptions from the AI explaining what it observed in each raster image related to this anomaly).</li>
+                                            <li>Archaeological Interpretation (the AI's narrative interpretation of the detected feature).</li>
+                                            <li>Bounding Box Pixels (pixel coordinates like <code>x_min, y_min, x_max, y_max</code> defining the anomaly's location on the source images, relative to the top-left <code>(0,0)</code> corner).</li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="workflow-step">
+                        <strong>Browse Images with Bounding Box Overlays:</strong>
+                        <ul>
+                            <li>Within the detailed view of an anomaly, an image gallery allows you to browse through the specific raster images that were sent to the AI for that analysis.</li>
+                            <li><strong>Crucially, when an image is displayed, any bounding boxes identified by the AI for the currently viewed anomaly are drawn as overlays directly onto that image.</strong> This allows you to visually verify the AI's detections and understand their precise location and extent on each piece of visual evidence.</li>
+                            <li>Mouse-over coordinates (both canvas and original image pixel coordinates) are often displayed to help with precise location.</li>
+                        </ul>
+                        <div class="tip">
+                           <p>Pay close attention to how the bounding boxes align with features visible in different raster types (e.g., a Hillshade vs. a Slope map). This can provide deeper insights into the nature of the detected anomaly.</p>
+                        </div>
+                    </li>
+                    <li class="workflow-step">
+                        <strong>Export Analysis Results:</strong>
+                        <ul>
+                            <li>The dashboard for a detailed analysis report provides export options:
+                                <ul>
+                                    <li><strong>"Export HTML" Button:</strong> Generates a comprehensive HTML report of the current analysis. This report includes the summary, details for all identified anomalies, and embedded versions of the source images with their corresponding bounding boxes drawn. The HTML file is saved to the server (in <code>llm/reports/</code>) and a preview is typically shown in a new browser tab.</li>
+                                    <li><strong>"Download PDF" Button:</strong> Converts the generated HTML report into a PDF document for easy sharing and archival. The system first ensures the HTML report exists (generating it if needed), then uses a server-side tool (like WeasyPrint, if available) for the conversion. The PDF is then made available for download.
+                                        <div class="note"><p>If PDF generation tools are not available on the server, this option might be disabled or result in an error, in which case the HTML export is the recommended alternative.</p></div>
+                                    </li>
+                                </ul>
+                            </li>
+                            <li>An "Exporting..." or "Generating..." modal will appear during these processes.</li>
+                        </ul>
+                    </li>
+                    <li class="workflow-step">
+                        <strong>Delete an Analysis Log (Optional):</strong>
+                        <ul>
+                            <li>If you select a log file in the left panel, a "Delete Selected" button may appear.</li>
+                            <li>After confirming, this action will remove the selected analysis log file from <code>llm/responses/</code>, its corresponding request log from <code>llm/logs/</code>, and the entire unique log folder (including the <code>sent_images/</code> subdirectory with the image copies for that run). This permanently deletes the record of that specific analysis.</li>
+                        </ul>
+                    </li>
+                </ol>
+            </section>
+
+            <section id="reproducibility-traceability">
+                <h3>Ensuring Reproducibility and Traceability</h3>
+                <p>The Results Tab and the underlying logging system are fundamental to maintaining scientific rigor in AI-assisted archaeological analysis:</p>
+                <ul>
+                    <li><strong>Complete Record:</strong> Every analysis run is meticulously logged. By selecting a result, you can access:
+                        <ul>
+                            <li>The exact <strong>prompt</strong> given to the AI.</li>
+                            <li>Copies of the precise <strong>images</strong> (with their bounding boxes) analyzed by the AI, stored in <code>llm/logs/&lt;analysis_folder&gt;/sent_images/</code>.</li>
+                            <li>The specific <strong>AI model</strong> used.</li>
+                            <li>The AI's detailed <strong>JSON response</strong>.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Verification:</strong> You can visually verify the AI's detected anomalies against the source imagery with bounding box overlays.</li>
+                    <li><strong>Transparency:</strong> The process is transparent, allowing you to understand the inputs and outputs of the AI's "black box."</li>
+                    <li><strong>Archival & Comparison:</strong> Exported reports and server-side logs serve as a permanent archive, enabling future review, comparison between different analyses or models, and collaboration.</li>
+                </ul>
+                <div class="important">
+                    <p>This comprehensive logging and result presentation allow archaeologists to use AI tools with greater confidence, critically evaluate their outputs, and maintain high standards of research integrity.</p>
+                </div>
+            </section>
+            <p><a href="index.html">&larr; Back to Home</a></p>
+        </div>
+    </div>
+
+    <footer>
+        <p>GeoArchaeology Terrain Processor &copy; 2024</p>
+    </footer>
+</body>
+</html>
