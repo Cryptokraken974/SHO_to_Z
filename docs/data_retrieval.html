@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>"Get Data" Functionality - User Documentation</title>
+    <link rel="stylesheet" href="style.css"> <!-- Link to a shared CSS file -->
+    <style>
+        /* Basic styles from index.html for standalone viewing */
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; line-height: 1.6; }
+        .container { width: 80%; margin: auto; overflow: hidden; padding: 0 20px; }
+        header { background: #333; color: #fff; padding-top: 30px; min-height: 70px; border-bottom: #0779e4 3px solid; }
+        header a { color: #fff; text-decoration: none; text-transform: uppercase; font-size: 16px; }
+        header ul { padding: 0; margin: 0; list-style: none; float: right; }
+        header li { display: inline; padding: 0 20px 0 20px; }
+        header #branding { float: left; }
+        header #branding h1 { margin: 0; }
+        nav { background: #444; padding: 10px 0; color: #fff; text-align: center; }
+        nav a { color: #fff; padding: 5px 15px; text-decoration: none; }
+        nav a:hover { background: #0779e4; }
+        .main-content { padding: 20px; background: #fff; margin-top: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3, h4 { color: #333; }
+        h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+        h3 { margin-top: 25px; }
+        .param-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .param-table th, .param-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .param-table th { background-color: #f0f0f0; }
+        .note { background-color: #fff3cd; border-left: 5px solid #ffeeba; padding: 10px; margin: 15px 0; }
+        .tip { background-color: #d1ecf1; border-left: 5px solid #bee5eb; padding: 10px; margin: 15px 0; }
+        .important { background-color: #f8d7da; border-left: 5px solid #f5c6cb; padding: 10px; margin: 15px 0; font-weight: bold; }
+        code { background: #eee; padding: 2px 4px; border-radius: 3px; font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; }
+        footer { text-align: center; padding: 20px; margin-top: 20px; color: #fff; background: #333; }
+        .workflow-step { margin-bottom: 10px; padding-left: 20px; position: relative; }
+        .workflow-step::before { content: counter(step-counter); counter-increment: step-counter; background-color: #0779e4; color: white; border-radius: 50%; width: 25px; height: 25px; display: inline-block; text-align: center; line-height: 25px; position: absolute; left: -10px; top: 0; }
+        .workflow-steps { list-style: none; padding-left: 10px; counter-reset: step-counter; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div id="branding">
+                <h1><a href="index.html" style="color:#fff; text-decoration:none;">GeoArchaeology Terrain Processor</a></h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="laz_loading.html">Loading LAZ</a></li>
+                    <li><a href="map_regions.html">Map Regions</a></li>
+                    <li><a href="data_retrieval.html" style="color:#0779e4; font-weight:bold;">Get Data</a></li>
+                    <li><a href="ndvi_analysis.html">NDVI Analysis</a></li>
+                    <li><a href="raster_guide.html">Raster Guide</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="main-content">
+            <a href="index.html">&larr; Back to Home</a>
+            <h2>"Get Data (Elevation + Satellite)" Functionality</h2>
+            <p>Once you have defined a region by <a href="map_regions.html">creating it on the map</a> (from a single point, path, or box), it initially only represents a geographic area. To perform any analysis, you need to populate this region with actual elevation and (optionally) satellite data. This is accomplished using the <strong>"Get Data (Elevation + Satellite)"</strong> button (or a similarly named control in the application).</p>
+
+            <div class="note">
+                <p><strong>Primary Use:</strong> This function is primarily for regions defined manually on the map. Regions created from <a href="laz_loading.html">uploaded LAZ files</a> have their own data processing workflows where terrain data is derived directly from the LAZ file.</p>
+            </div>
+
+            <section id="how-it-works">
+                <h3>How "Get Data" Works</h3>
+                <ol class="workflow-steps">
+                    <li class="workflow-step"><strong>Select Your Region:</strong> From the list of available regions, select the manually created region for which you want to retrieve data.</li>
+                    <li class="workflow-step"><strong>Click "Get Data (Elevation + Satellite)":</strong> This initiates a process to fetch external datasets for your selected region's defined bounding box(es). The process typically involves two main components:
+                        <ul>
+                            <li>Elevation Data Acquisition</li>
+                            <li>Satellite Data Acquisition (this only occurs if you enabled NDVI for the region during its creation)</li>
+                        </ul>
+                    </li>
+                </ol>
+            </section>
+
+            <section id="elevation-data">
+                <h3>Elevation Data Acquisition</h3>
+                <p>The system will attempt to download or generate a Digital Elevation Model (DEM) for your region. This DEM is fundamental for all subsequent terrain analysis.</p>
+                <ul>
+                    <li><strong>Data Sources:</strong> The application intelligently selects the best available data source based on your region's geographic location:
+                        <ul>
+                            <li><strong>USA:</strong> Primarily uses <strong>USGS 3DEP (3D Elevation Program)</strong> data. This is accessed through PDAL (Point Data Abstraction Library) by querying public LiDAR point cloud datasets (EPT format) and processing them into a DEM. The specific module handling this is <code>app/data_acquisition/sources/opentopography.py</code>.</li>
+                            <li><strong>Brazil:</strong> May prioritize specific Brazilian national elevation datasets via the <code>BrazilianElevationSource</code>.</li>
+                            <li><strong>Global Fallback:</strong> For other areas, or if high-resolution data is unavailable, the system might use global DEMs like Copernicus GLO-30 or GLO-90 (details would be in the <code>CopernicusDSMService</code>).</li>
+                        </ul>
+                    </li>
+                    <li><strong>Key Parameters (for USGS 3DEP/OpenTopography):</strong>
+                        <ul>
+                            <li><strong>Bounding Box:</strong> The precise WGS84 geographic extent of your manually defined region.</li>
+                            <li><strong>Resolution:</strong> The system employs a resolution strategy (e.g., "High," "Medium," "Low," which might be user-selectable or a system default). This translates to specific sampling densities for the source LiDAR point clouds (e.g., High might mean sampling at 0.2-meter intervals). The final DEM is often generated at an even finer resolution (e.g., 0.25 times the point cloud sampling interval, so a 1.0m point sample could yield a 0.25m DEM).</li>
+                        </ul>
+                    </li>
+                    <li><strong>Output:</strong> A primary DEM, usually a Digital Terrain Model (DTM representing bare earth), is saved as a GeoTIFF file. This is typically stored in a path like <code>input/&lt;region_name&gt;/lidar/&lt;region_name&gt;_elevation.tiff</code> or similar.</li>
+                </ul>
+                <div class="important">
+                    <p><strong>✨ Automatic Cascade: Full Raster Suite Generation!</strong></p>
+                    <p>A critical feature: Once the primary DEM (e.g., DTM) is successfully acquired or generated (especially from the USGS 3DEP/OpenTopography source), the system <strong>automatically triggers the creation of a comprehensive suite of derivative raster products.</strong> You do not need to generate these individually for manually created regions after fetching the initial DEM.</p>
+                    <p>This includes (refer to the <a href="raster_guide.html">Raster Guide</a> for details on each):</p>
+                    <ul>
+                        <li>Hillshades (multiple illumination angles)</li>
+                        <li>Slope maps</li>
+                        <li>Aspect maps</li>
+                        <li>Color Relief (Hypsometric Tinting)</li>
+                        <li>Canopy Height Model (CHM - if a DSM is also part of the workflow)</li>
+                        <li>Topographic Position Index (TPI)</li>
+                        <li>Terrain Ruggedness Index (TRI)</li>
+                        <li>Roughness maps</li>
+                        <li>Sky View Factor (SVF)</li>
+                        <li>Composite visualizations (e.g., DTM blended with Hillshade, RGB Hillshades)</li>
+                    </ul>
+                    <p>These generated raster files are saved in appropriate subdirectories within <code>output/&lt;region_name&gt;/</code> (e.g., <code>output/&lt;region_name&gt;/lidar/Hillshade/</code>). PNG versions suitable for web display are also typically created (e.g., in <code>output/&lt;region_name&gt;/lidar/png_outputs/</code>).</p>
+                </div>
+            </section>
+
+            <section id="satellite-data-ndvi">
+                <h3>Satellite Data Acquisition (for NDVI)</h3>
+                <p>This part of the "Get Data" process is activated <strong>only if you checked the "Enable NDVI Processing" option</strong> when you initially created the manual region. The system checks the region's <code>metadata.txt</code> for this flag.</p>
+                <ul>
+                    <li><strong>Purpose:</strong> To download Sentinel-2 satellite imagery, specifically the Red and Near-Infrared (NIR) bands, which are necessary for calculating the Normalized Difference Vegetation Index (NDVI).</li>
+                    <li><strong>Data Source:</strong> Imagery is fetched from the <strong>Copernicus Sentinel-2</strong> mission, accessed via the Copernicus Data Space Ecosystem (CDSE).
+                        <div class="tip">
+                            <p><strong>Authentication:</strong> Access to CDSE requires administrator-configured OAuth2 credentials (Client ID & Secret) or a legacy CDSE token.</p>
+                        </div>
+                    </li>
+                    <li><strong>Area of Interest:</strong> The WGS84 bounding box of your manually defined region.</li>
+                    <li><strong>Imagery Selection Parameters:</strong>
+                        <ul>
+                            <li><strong>Bands:</strong> Red (Sentinel-2 Band 4) and NIR (Sentinel-2 Band 8) are essential. The system may download a multi-band GeoTIFF that includes these and potentially other bands like Blue (Band 2) and Green (Band 3) for context or true-color composites.</li>
+                            <li><strong>Time Window:</strong> The system typically searches for the best quality (lowest cloud cover) scenes from a recent period, often the last 1 to 2 years, to ensure relevant data.</li>
+                            <li><strong>Cloud Cover:</strong> It aims for scenes with minimal cloud contamination (e.g., less than 30% cloud cover if possible, potentially configurable or with fallbacks to slightly higher cloud cover if necessary).</li>
+                        </ul>
+                    </li>
+                    <li><strong>Output:</strong>
+                        <ul>
+                            <li>The downloaded Sentinel-2 band data is saved as GeoTIFF files, usually in a path like <code>input/&lt;region_name&gt;/sentinel2/</code>.</li>
+                            <li>PNG versions of these bands are often generated automatically for quick visualization within the application.</li>
+                        </ul>
+                    </li>
+                </ul>
+                <div class="note">
+                    <p><strong>NDVI Calculation is a Subsequent Step:</strong> The "Get Data" function focuses on <em>acquiring</em> the Red and NIR band data. The actual calculation of the NDVI values and generation of the NDVI map is a separate processing step that you can initiate once this satellite data is available for the region. See the <a href="ndvi_analysis.html">NDVI Analysis</a> section for more details.</p>
+                </div>
+            </section>
+
+            <section id="user-feedback">
+                <h3>User Feedback During Acquisition</h3>
+                <p>The application should provide visual feedback on the progress of data acquisition, with messages such as:</p>
+                <ul>
+                    <li>"Fetching elevation data for region <em>[YourRegionName]</em>..."</li>
+                    <li>"Generating Hillshade..."</li>
+                    <li>"Downloading Sentinel-2 imagery..."</li>
+                    <li>"Processing complete."</li>
+                </ul>
+                <p>Once the process is finished, the map will typically update to show the newly acquired raster layers, and these layers will become available in the region's data gallery or layer list for display and analysis.</p>
+            </section>
+
+            <section id="arch-relevance-getdata">
+                <h3>Why This is Important for Archaeologists</h3>
+                <ul>
+                    <li><strong>Data for Custom Areas:</strong> Enables you to obtain detailed terrain and satellite information for precisely defined areas of interest, even if you don't have your own initial datasets.</li>
+                    <li><strong>Automated Workflows Save Time:</strong> The automatic generation of a full suite of raster visualizations (Hillshade, Slope, etc.) from the fetched DEM is a massive time-saver, allowing you to move directly to interpretation.</li>
+                    <li><strong>Targeted Vegetation Prospection:</strong> If NDVI is enabled, fetching Sentinel-2 data specifically for your region allows for focused investigation of vegetation patterns that might reveal buried archaeological sites, ditches, banks, or variations in soil conditions linked to past human activity.</li>
+                    <li><strong>Foundation for Discovery:</strong> This function provides the foundational datasets upon which most subsequent archaeological remote sensing analysis in the application will be built.</li>
+                </ul>
+            </section>
+            <p><a href="index.html">&larr; Back to Home</a></p>
+        </div>
+    </div>
+
+    <footer>
+        <p>GeoArchaeology Terrain Processor &copy; 2024</p>
+    </footer>
+</body>
+</html>

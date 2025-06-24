@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creating Regions from Map - User Documentation</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Basic styles from index.html for standalone viewing */
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; line-height: 1.6; }
+        .container { width: 80%; margin: auto; overflow: hidden; padding: 0 20px; }
+        header { background: #333; color: #fff; padding-top: 30px; min-height: 70px; border-bottom: #0779e4 3px solid; }
+        header a { color: #fff; text-decoration: none; text-transform: uppercase; font-size: 16px; }
+        header ul { padding: 0; margin: 0; list-style: none; float: right; }
+        header li { display: inline; padding: 0 20px 0 20px; }
+        header #branding { float: left; }
+        header #branding h1 { margin: 0; }
+        nav { background: #444; padding: 10px 0; color: #fff; text-align: center; }
+        nav a { color: #fff; padding: 5px 15px; text-decoration: none; }
+        nav a:hover { background: #0779e4; }
+        .main-content { padding: 20px; background: #fff; margin-top: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #333; }
+        h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+        .param-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .param-table th, .param-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .param-table th { background-color: #f0f0f0; }
+        .note { background-color: #fff3cd; border-left: 5px solid #ffeeba; padding: 10px; margin: 15px 0; }
+        .tip { background-color: #d1ecf1; border-left: 5px solid #bee5eb; padding: 10px; margin: 15px 0; }
+        code { background: #eee; padding: 2px 4px; border-radius: 3px; font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; }
+        footer { text-align: center; padding: 20px; margin-top: 20px; color: #fff; background: #333; }
+        .workflow-step { margin-bottom: 10px; padding-left: 20px; position: relative; }
+        .workflow-step::before { content: counter(step-counter); counter-increment: step-counter; background-color: #0779e4; color: white; border-radius: 50%; width: 25px; height: 25px; display: inline-block; text-align: center; line-height: 25px; position: absolute; left: -10px; top: 0; }
+        .workflow-steps { list-style: none; padding-left: 10px; counter-reset: step-counter; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div id="branding">
+                <h1><a href="index.html" style="color:#fff; text-decoration:none;">GeoArchaeology Terrain Processor</a></h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="laz_loading.html">Loading LAZ</a></li>
+                    <li><a href="map_regions.html" style="color:#0779e4; font-weight:bold;">Map Regions</a></li>
+                    <li><a href="data_retrieval.html">Get Data</a></li>
+                    <li><a href="ndvi_analysis.html">NDVI Analysis</a></li>
+                    <li><a href="raster_guide.html">Raster Guide</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="main-content">
+            <a href="index.html">&larr; Back to Home</a>
+            <h2>Creating Regions from the Map</h2>
+            <p>The application allows you to define new regions of interest directly by interacting with the map interface. This is useful when you don't have pre-existing LiDAR files or want to explore specific areas. These manually defined regions can then be used to acquire elevation and satellite data.</p>
+
+            <section id="region-creation-methods">
+                <h3>Methods for Creating Regions</h3>
+                <p>The map interface provides tools to define regions in three ways: from a single point, by drawing a path, or by drawing a box.</p>
+
+                <article id="single-point-region">
+                    <h4>A. Creating a Region from a Single Point</h4>
+                    <ol class="workflow-steps">
+                        <li class="workflow-step"><strong>Select Point Mode (Default):</strong> Ensure you are in the standard map navigation mode (usually active by default, often labeled "Move Mode"). Your cursor should appear as a hand or arrow.</li>
+                        <li class="workflow-step"><strong>Click on the Map:</strong> Click your desired location on the map.</li>
+                        <li class="workflow-step"><strong>Coordinates Populated:</strong> The latitude and longitude of your clicked point will automatically appear in the coordinate input fields (e.g., in a "Get Data" or "Define Region" panel).</li>
+                        <li class="workflow-step"><strong>Enter Region Name:</strong> The system might suggest a name based on coordinates (e.g., <code>12.34N_56.78W</code>). You <strong>should change this</strong> to a meaningful name for your research (e.g., <code>Excavation_Trench_1</code>, <code>Possible_Mound_Area</code>).</li>
+                        <li class="workflow-step"><strong>Enable NDVI (Optional):</strong> If you intend to analyze vegetation for this point-based region, check the "<strong>🌿 Enable NDVI Processing</strong>" box. This will prepare the region for Sentinel-2 satellite imagery acquisition.</li>
+                        <li class="workflow-step"><strong>Create Region:</strong> Click the "Create Region," "Save Place," or a similarly named button.
+                            <ul>
+                                <li>This action tells the backend to register this new region.</li>
+                                <li>The system creates dedicated input (<code>input/&lt;your_region_name&gt;</code>) and output (<code>output/&lt;your_region_name&gt;</code>) folders on the server.</li>
+                                <li>A <code>metadata.txt</code> file is created in the output folder, storing the region name, its center coordinates (the point you clicked), and whether NDVI was enabled. The initial bounds will be very small, centered on the point.</li>
+                            </ul>
+                        </li>
+                    </ol>
+                </article>
+
+                <article id="path-region">
+                    <h4>B. Creating Region(s) from a Drawn Path</h4>
+                    <ol class="workflow-steps">
+                        <li class="workflow-step"><strong>Activate Path Mode:</strong> Select the "Path Drawing Mode" from the map tools. Your cursor will likely change to a crosshair, indicating you can start drawing.</li>
+                        <li class="workflow-step"><strong>Draw Your Path:</strong> Click on the map to place the starting point of your path. Click again for each subsequent vertex (corner) of your path. A line will connect the points as you draw.</li>
+                        <li class="workflow-step"><strong>Finalize Path:</strong> To complete the path, you might need to double-click the last point, press the Enter key, or click a dedicated "Finish Path" button (refer to the application's specific controls).</li>
+                        <li class="workflow-step"><strong>Region Creation Modal:</strong> Once the path is finalized, a dialog box will appear, prompting you for details:
+                            <ul>
+                                <li><strong>Base Region Name:</strong> Enter a descriptive name for this set of regions (e.g., <code>Ancient_Road_Survey</code>, <code>River_Transect</code>).</li>
+                                <li><strong>Number of Regions:</strong> Specify how many distinct regions (segments) you want to create along the drawn path. For instance, if your path is 1km long and you enter '5', the system might divide it into five 200m segments, each becoming a separate region.</li>
+                                <li><strong>Enable NDVI (Optional):</strong> Check this box if you want to enable NDVI processing for all regions created from this path.</li>
+                            </ul>
+                        </li>
+                        <li class="workflow-step"><strong>Confirm Creation:</strong> Click "Create Regions" (or similar) in the modal.
+                            <ul>
+                                <li>The path geometry and your settings are sent to the backend.</li>
+                                <li>The backend divides the path into the specified number of segments. Each segment gets its own calculated bounding box (e.g., a buffered area around that part of the path).</li>
+                                <li>For each new region (named like <code>Ancient_Road_Survey-1</code>, <code>Ancient_Road_Survey-2</code>, etc.), input/output folders and a <code>metadata.txt</code> file (with its specific bounds, center, and NDVI status) are created.</li>
+                            </ul>
+                        </li>
+                    </ol>
+                     <div class="tip">
+                        <p><strong>Path Use Cases:</strong> Paths are ideal for defining linear survey areas, such as following ancient roads, water channels, defensive walls, or for creating systematic survey transects across a landscape.</p>
+                    </div>
+                </article>
+
+                <article id="box-region">
+                    <h4>C. Creating Region(s) from a Drawn Box</h4>
+                    <ol class="workflow-steps">
+                        <li class="workflow-step"><strong>Activate Box Mode:</strong> Select "Box Drawing Mode" from the map tools. Your cursor will change.</li>
+                        <li class="workflow-step"><strong>Draw Your Box:</strong>
+                            <ul>
+                                <li>Click once on the map to set the first corner of your rectangular area.</li>
+                                <li>Move your mouse; you should see a preview of the box being drawn.</li>
+                                <li>Click a second time to set the opposite corner, finalizing the box.</li>
+                            </ul>
+                        </li>
+                        <li class="workflow-step"><strong>Region Creation Modal:</strong> A dialog will appear, asking for:
+                            <ul>
+                                <li><strong>Base Region Name:</strong> Enter a name (e.g., <code>Hillfort_Interior</code>, <code>Field_System_Block_A</code>).</li>
+                                <li><strong>Number of Regions (Tiling):</strong> Specify how many regions to create within this box.
+                                    <ul>
+                                        <li>If '1', the entire box becomes a single region.</li>
+                                        <li>If more than '1' (e.g., '4'), the box might be tiled into a grid of smaller regions (e.g., a 2x2 grid). The exact tiling method depends on the application's implementation.</li>
+                                    </ul>
+                                </li>
+                                <li><strong>Enable NDVI (Optional):</strong> Applies to all regions created from this box.</li>
+                            </ul>
+                        </li>
+                        <li class="workflow-step"><strong>Confirm Creation:</strong> Click "Create Regions."
+                            <ul>
+                                <li>The box geometry and your settings are sent to the backend.</li>
+                                <li>The backend processes the box, tiling it if multiple regions were requested.</li>
+                                <li>Input/output folders and <code>metadata.txt</code> files are created for each new region (e.g., <code>Hillfort_Interior</code> or <code>Hillfort_Interior-1</code>, <code>Hillfort_Interior-2</code>, etc.).</li>
+                            </ul>
+                        </li>
+                    </ol>
+                    <div class="tip">
+                        <p><strong>Box Use Cases:</strong> Boxes are excellent for defining broader study areas like settlement enclosures, agricultural field systems, excavation blocks, or for creating gridded survey areas.</p>
+                    </div>
+                </article>
+            </section>
+
+            <section id="region-naming">
+                <h3>Region Naming Convention</h3>
+                <ul>
+                    <li><strong>Single Point / Single Box Region:</strong> You provide the exact name (e.g., <code>Site_Alpha</code>).</li>
+                    <li><strong>Path / Box (Multiple Regions):</strong> You provide a base name (e.g., <code>SurveyTransect</code>). The system automatically appends a sequential number to differentiate each segment or tile (e.g., <code>SurveyTransect-1</code>, <code>SurveyTransect-2</code>, <code>SurveyTransect-3</code>).</li>
+                </ul>
+            </section>
+
+            <section id="ndvi-option-map">
+                <h3>NDVI Option for Map-Defined Regions</h3>
+                <p>For all methods of creating regions from the map (single point, path, or box), you will find an "<strong>🌿 Enable NDVI Processing</strong>" checkbox.</p>
+                <ul>
+                    <li>If you check this box, the <code>metadata.txt</code> file for the created region(s) will note that NDVI is enabled.</li>
+                    <li>This flag tells the system that when you later use the "Get Data (Elevation + Satellite)" function for this region, it should also attempt to download Sentinel-2 satellite imagery (Red and NIR bands) necessary for NDVI analysis.</li>
+                </ul>
+            </section>
+
+            <section id="next-step-get-data">
+                <h3>Next Step: Retrieving Data</h3>
+                <p>Creating a region from the map defines its geographic extent and your preferences (like NDVI). However, it doesn't automatically download any elevation or satellite data.</p>
+                <p>After defining your region(s), your next step is to select the region and use the <strong>"Get Data (Elevation + Satellite)"</strong> button. This will trigger the actual download of relevant datasets and the automatic generation of terrain rasters. For more details, see the <a href="data_retrieval.html">"Get Data" Functionality</a> section.</p>
+            </section>
+
+            <section id="arch-relevance-map">
+                <h3>Why This is Important for Archaeologists</h3>
+                <ul>
+                    <li><strong>Define Custom Study Zones:</strong> Precisely delineate areas of archaeological interest—be it a specific feature, a survey transect, or a large landscape block—directly on the map without needing external GIS software for initial definitions.</li>
+                    <li><strong>Targeted Data Acquisition:</strong> Focus data retrieval and processing efforts only on the areas relevant to your research, saving time and resources.</li>
+                    <li><strong>Flexible Investigation Strategies:</strong>
+                        <ul>
+                            <li><strong>Paths:</strong> Ideal for surveying linear features (ancient roads, aqueducts, defensive lines) or for systematic landscape transects. Segmenting paths allows for manageable data chunks and comparative analysis along the feature.</li>
+                            <li><strong>Boxes:</strong> Perfect for defining the extent of settlements, field systems, or large excavation areas. Tiling a box can help in managing very large datasets or for focused analysis of sub-zones within a larger area.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Streamlined NDVI Workflow:</strong> Enabling NDVI at the point of region creation ensures that the necessary satellite data is considered when you later fetch data, simplifying the process for vegetation-based archaeological prospection.</li>
+                </ul>
+            </section>
+            <p><a href="index.html">&larr; Back to Home</a></p>
+        </div>
+    </div>
+
+    <footer>
+        <p>GeoArchaeology Terrain Processor &copy; 2024</p>
+    </footer>
+</body>
+</html>
