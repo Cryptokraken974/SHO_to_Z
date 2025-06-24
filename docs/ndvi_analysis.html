@@ -4,58 +4,155 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NDVI Analysis - User Documentation</title>
-    <link rel="stylesheet" href="style.css"> <!-- Link to a shared CSS file -->
+    <!-- <link rel="stylesheet" href="style.css"> Ensure this is created if you uncomment -->
     <style>
-        /* Basic styles from index.html for standalone viewing */
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; line-height: 1.6; }
-        .container { width: 80%; margin: auto; overflow: hidden; padding: 0 20px; }
-        header { background: #333; color: #fff; padding-top: 30px; min-height: 70px; border-bottom: #0779e4 3px solid; }
-        header a { color: #fff; text-decoration: none; text-transform: uppercase; font-size: 16px; }
-        header ul { padding: 0; margin: 0; list-style: none; float: right; }
-        header li { display: inline; padding: 0 20px 0 20px; }
-        header #branding { float: left; }
-        header #branding h1 { margin: 0; }
-        nav { background: #444; padding: 10px 0; color: #fff; text-align: center; }
-        nav a { color: #fff; padding: 5px 15px; text-decoration: none; }
-        nav a:hover { background: #0779e4; }
-        .main-content { padding: 20px; background: #fff; margin-top: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1, h2, h3 { color: #333; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .page-wrapper {
+            display: flex;
+            flex: 1;
+            padding-top: 10px;
+        }
+        header {
+            background: #333;
+            color: #fff;
+            padding: 15px 0;
+            border-bottom: #0779e4 3px solid;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        header .container {
+            width: 90%;
+            margin: auto;
+            overflow: hidden;
+        }
+        header #branding {
+            float: left;
+        }
+        header #branding h1 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+        header #branding h1 a {
+            color: #fff;
+            text-decoration: none;
+        }
+        .left-nav-panel {
+            width: 230px;
+            background: #3a3a3a;
+            color: #fff;
+            padding: 20px 0;
+            overflow-y: auto;
+        }
+        .left-nav-panel nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .left-nav-panel nav li a {
+            display: block;
+            color: #fff;
+            padding: 12px 20px;
+            text-decoration: none;
+            font-size: 1em;
+            border-bottom: 1px solid #4f4f4f;
+        }
+        .left-nav-panel nav li a:hover {
+            background: #0779e4;
+        }
+        .left-nav-panel nav li a.active {
+            background: #0779e4;
+            font-weight: bold;
+        }
+        .content-area {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #f4f4f4;
+        }
+        .content-area .container {
+            width: 95%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding:0;
+        }
+        .main-content {
+            padding: 20px;
+            background: #fff;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #fff;
+            background: #333;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        /* Keep existing content-specific styles */
+        h1, h2, h3, h4 { color: #333; } /* Combined from map_regions and new */
         h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+        h3 { margin-top: 25px; color: #0779e4; } /* From results_tab, good default */
+        h4 { margin-top: 20px; } /* From results_tab, good default */
         .param-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         .param-table th, .param-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         .param-table th { background-color: #f0f0f0; }
         .note { background-color: #fff3cd; border-left: 5px solid #ffeeba; padding: 10px; margin: 15px 0; }
         .tip { background-color: #d1ecf1; border-left: 5px solid #bee5eb; padding: 10px; margin: 15px 0; }
+        .important { background-color: #e2e3e5; border-left: 5px solid #6c757d; padding: 10px; margin: 15px 0; }
+        .warning { background-color: #f8d7da; border-left: 5px solid #f5c6cb; padding: 10px; margin: 15px 0; }
         code { background: #eee; padding: 2px 4px; border-radius: 3px; font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace; }
-        footer { text-align: center; padding: 20px; margin-top: 20px; color: #fff; background: #333; }
+        pre { background: #eee; padding: 10px; border-radius: 3px; overflow-x: auto; }
         .workflow-step { margin-bottom: 10px; padding-left: 20px; position: relative; }
         .workflow-step::before { content: counter(step-counter); counter-increment: step-counter; background-color: #0779e4; color: white; border-radius: 50%; width: 25px; height: 25px; display: inline-block; text-align: center; line-height: 25px; position: absolute; left: -10px; top: 0; }
         .workflow-steps { list-style: none; padding-left: 10px; counter-reset: step-counter; }
+        .color-green { background-color: #d4edda; color: #155724; padding: 2px 5px; border-radius: 3px; display: inline-block; }
+        .color-red { background-color: #f8d7da; color: #721c24; padding: 2px 5px; border-radius: 3px; display: inline-block; }
+        .color-gray { background-color: #e2e3e5; color: #383d41; padding: 2px 5px; border-radius: 3px; display: inline-block; }
+        .raster-type { margin-bottom: 25px; padding-bottom:15px; border-bottom: 1px dotted #ccc; } /* From raster_guide */
+        .raster-type h3 { margin-top: 0; color: #0779e4; } /* From raster_guide */
+
     </style>
 </head>
 <body>
     <header>
         <div class="container">
             <div id="branding">
-                <h1><a href="index.html" style="color:#fff; text-decoration:none;">GeoArchaeology Terrain Processor</a></h1>
+                <h1><a href="index.html">GeoArchaeology Terrain Processor</a></h1>
             </div>
+        </div>
+    </header>
+
+    <div class="page-wrapper">
+        <aside class="left-nav-panel">
             <nav>
                 <ul>
                     <li><a href="index.html">Home</a></li>
                     <li><a href="laz_loading.html">Loading LAZ</a></li>
                     <li><a href="map_regions.html">Map Regions</a></li>
                     <li><a href="data_retrieval.html">Get Data</a></li>
-                    <li><a href="ndvi_analysis.html" style="color:#0779e4; font-weight:bold;">NDVI Analysis</a></li>
+                    <li><a href="ndvi_analysis.html" class="active">NDVI Analysis</a></li>
                     <li><a href="raster_guide.html">Raster Guide</a></li>
+                    <li><a href="openai_analysis.html">OpenAI Analysis</a></li>
+                    <li><a href="results_tab.html">Results Tab</a></li>
                 </ul>
             </nav>
-        </div>
-    </header>
-
-    <div class="container">
-        <div class="main-content">
-            <a href="index.html">&larr; Back to Home</a>
-            <h2>NDVI (Normalized Difference Vegetation Index) Analysis</h2>
+        </aside>
+        <main class="content-area">
+            <div class="container"> <!-- This container holds the main-content div -->
+                <div class="main-content">
+                    <a href="index.html">&larr; Back to Home</a>
+                    <h2>NDVI (Normalized Difference Vegetation Index) Analysis</h2>
             <p>The Normalized Difference Vegetation Index (NDVI) is a powerful tool for assessing vegetation health and density. In archaeology, NDVI can help identify subtle variations in plant growth that may be indicative of buried archaeological features, differences in soil composition due to past human activity, or historic land use patterns.</p>
 
             <section id="enabling-ndvi">
