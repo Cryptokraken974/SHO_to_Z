@@ -7,7 +7,13 @@ import os
 import time
 import json
 import logging
+import tempfile
 import numpy as np
+import rasterio
+import rasterio.windows
+import shutil
+from rasterio.enums import Resampling
+from rasterio.warp import reproject, calculate_default_transform
 from osgeo import gdal, gdalconst
 from typing import Dict, Any, Tuple, Optional, List
 from pathlib import Path
@@ -986,8 +992,8 @@ async def process_enhanced_slope_tiff(tiff_path: str, output_dir: str, parameter
 
 def apply_color_relief(elevation: np.ndarray) -> np.ndarray:
     """
-    Apply color relief mapping to elevation data
-    Returns RGB array
+    Apply gentler elevation-based color relief mapping for archaeological analysis
+    Returns RGB array with smooth transitions between elevation zones
     """
     import matplotlib.pyplot as plt
     from matplotlib.colors import LinearSegmentedColormap
@@ -996,10 +1002,18 @@ def apply_color_relief(elevation: np.ndarray) -> np.ndarray:
     elev_min, elev_max = np.nanmin(elevation), np.nanmax(elevation)
     elev_norm = (elevation - elev_min) / (elev_max - elev_min)
     
-    # Create terrain colormap (blue to green to brown to white)
-    colors = ['#2E4053', '#1ABC9C', '#58D68D', '#F4D03F', '#E67E22', '#FFFFFF']
+    # 🟣 Create gentler elevation-based color ramp with 5 soft color bands
+    # Designed for archaeological visualization with smooth transitions
+    colors = [
+        '#FFFADC',  # Pale cream/yellow (lowest elevation)
+        '#FFE4B5',  # Soft peach/orange  
+        '#FFC098',  # Gentle salmon
+        '#FFA07A',  # Soft coral/light red
+        '#FF8C69'   # Warm light red (highest elevation)
+    ]
+    
     n_bins = 256
-    cmap = LinearSegmentedColormap.from_list('terrain', colors, N=n_bins)
+    cmap = LinearSegmentedColormap.from_list('archaeological_gentle', colors, N=n_bins)
     
     # Apply colormap
     rgb_array = cmap(elev_norm)[:, :, :3]  # Remove alpha channel
@@ -1124,10 +1138,10 @@ async def create_rgb_hillshade(hs_files: Dict[str, str], output_path: str) -> Di
 
 
 async def create_tint_overlay(color_relief_path: str, hillshade_path: str, output_path: str) -> Dict[str, Any]:
-    """Create a color-relief tinted by hillshade intensity."""
+    """Create a gentler elevation-based tint overlay with smooth hillshade blending."""
     start_time = time.time()
 
-    print(f"\n🌄 TINT OVERLAY")
+    print(f"\n🟣 ARCHAEOLOGICAL TINT OVERLAY")
     print(f"📂 Output: {output_path}")
 
     try:
@@ -1157,14 +1171,21 @@ async def create_tint_overlay(color_relief_path: str, hillshade_path: str, outpu
         if hs.ndim == 3:
             hs = np.mean(hs, axis=0)
 
-        # Normalize hillshade to 0-1
+        # Normalize hillshade to 0-1 range with gentle enhancement
         if hs.max() > hs.min():
             hs_norm = (hs - hs.min()) / (hs.max() - hs.min())
+            # Apply gentle contrast enhancement for better archaeological feature visibility
+            hs_norm = np.power(hs_norm, 0.8)  # Slightly brighten shadows
         else:
             hs_norm = np.zeros_like(hs)
 
-        # Apply tint by multiplying each color band by hillshade intensity
-        tinted = color * hs_norm
+        # 🟣 Enhanced blending for archaeological visualization
+        # Use a more sophisticated blending that preserves color information while enhancing relief
+        blend_factor = 0.7  # Preserve more color information than standard tinting
+        
+        # Apply enhanced tint blending
+        # Formula: color * (blend_factor + (1-blend_factor) * hillshade_intensity)
+        tinted = color * (blend_factor + (1 - blend_factor) * hs_norm)
         tinted = np.clip(tinted, 0, 255).astype(np.uint8)
 
         rgb = np.transpose(tinted, (1, 2, 0))  # (H, W, 3)
@@ -1178,11 +1199,13 @@ async def create_tint_overlay(color_relief_path: str, hillshade_path: str, outpu
 
         processing_time = time.time() - start_time
 
-        print(f"✅ Tint overlay created in {processing_time:.2f} seconds")
+        print(f"✅ Archaeological tint overlay created in {processing_time:.2f} seconds")
+        print(f"🎨 Applied gentle elevation-based color ramp with smooth hillshade blending")
         return {
             'status': 'success',
             'output_file': output_path,
-            'processing_time': processing_time
+            'processing_time': processing_time,
+            'visualization_type': 'archaeological_gentle'
         }
 
     except Exception as e:
@@ -1311,73 +1334,229 @@ async def process_chm_tiff(tiff_path: str, output_dir: str, parameters: Dict[str
         dtm_array, dtm_metadata = read_elevation_tiff(dtm_path)
         dsm_array, dsm_metadata = read_elevation_tiff(dsm_path)
         
-        # Handle dimension mismatches by resampling DTM to match DSM
-        if dtm_array.shape != dsm_array.shape:
-            print(f"⚠️ Dimension mismatch detected!")
+        # Handle dimension mismatches by analyzing spatial properties and choosing best approach
+        spatial_alignment_needed = dtm_array.shape != dsm_array.shape
+        
+        if spatial_alignment_needed:
+            print(f"⚠️ Spatial mismatch detected!")
             print(f"   DTM: {dtm_array.shape}")
             print(f"   DSM: {dsm_array.shape}")
-            print(f"🔧 Resampling DTM to match DSM extent and resolution...")
             
-            # Use rasterio for proper geospatial resampling
+            # Analyze spatial properties to determine best alignment strategy
             import rasterio
             from rasterio.enums import Resampling
             from rasterio.warp import reproject, calculate_default_transform
             import tempfile
             
-            # Create a temporary resampled DTM
-            with tempfile.NamedTemporaryFile(suffix='_dtm_resampled.tif', delete=False) as tmp_file:
-                resampled_dtm_path = tmp_file.name
-            
-            try:
-                # Open the original files with rasterio to get proper geospatial info
-                with rasterio.open(dsm_path) as dsm_src, rasterio.open(dtm_path) as dtm_src:
-                    # Get DSM properties to use as target
-                    target_crs = dsm_src.crs
-                    target_transform = dsm_src.transform
-                    target_width = dsm_src.width
-                    target_height = dsm_src.height
+            with rasterio.open(dtm_path) as dtm_src, rasterio.open(dsm_path) as dsm_src:
+                # Get bounds information
+                dtm_bounds = dtm_src.bounds
+                dsm_bounds = dsm_src.bounds
+                dtm_res = dtm_src.res
+                dsm_res = dsm_src.res
+                
+                print(f"   📍 DTM bounds: {dtm_bounds}")
+                print(f"   📍 DSM bounds: {dsm_bounds}")
+                print(f"   📏 DTM resolution: {dtm_res}")
+                print(f"   📏 DSM resolution: {dsm_res}")
+                
+                # Check if DTM is completely within DSM bounds (typical case)
+                dtm_within_dsm = (dtm_bounds.left >= dsm_bounds.left and 
+                                 dtm_bounds.right <= dsm_bounds.right and
+                                 dtm_bounds.bottom >= dsm_bounds.bottom and
+                                 dtm_bounds.top <= dsm_bounds.top)
+                
+                if dtm_within_dsm and abs(dtm_res[0] - dsm_res[0]) < 1e-6:
+                    # BEST CASE: DTM is subset of DSM with same resolution
+                    print(f"🎯 OPTIMAL ALIGNMENT: Cropping DSM to DTM extent (preserves DTM quality)")
                     
-                    # Create output profile for resampled DTM
-                    dtm_profile = dtm_src.profile.copy()
-                    dtm_profile.update({
-                        'crs': target_crs,
-                        'transform': target_transform,
-                        'width': target_width,
-                        'height': target_height
-                    })
+                    # Create temporary cropped DSM
+                    with tempfile.NamedTemporaryFile(suffix='_dsm_cropped.tif', delete=False) as tmp_file:
+                        cropped_dsm_path = tmp_file.name
                     
-                    # Resample DTM to match DSM
-                    with rasterio.open(resampled_dtm_path, 'w', **dtm_profile) as dst:
-                        reproject(
-                            source=rasterio.band(dtm_src, 1),
-                            destination=rasterio.band(dst, 1),
-                            src_transform=dtm_src.transform,
-                            src_crs=dtm_src.crs,
-                            dst_transform=target_transform,
-                            dst_crs=target_crs,
-                            resampling=Resampling.bilinear
-                        )
+                    try:
+                        # Crop DSM to DTM bounds
+                        from rasterio.windows import from_bounds
+                        
+                        # Calculate window for DSM that matches DTM bounds
+                        window = from_bounds(*dtm_bounds, dsm_src.transform)
+                        
+                        # Create profile for cropped DSM
+                        dsm_profile = dsm_src.profile.copy()
+                        dsm_profile.update({
+                            'height': int(window.height),
+                            'width': int(window.width),
+                            'transform': rasterio.windows.transform(window, dsm_src.transform)
+                        })
+                        
+                        # Create cropped DSM
+                        with rasterio.open(cropped_dsm_path, 'w', **dsm_profile) as dst:
+                            dst.write(dsm_src.read(1, window=window), 1)
+                        
+                        # Read the cropped DSM
+                        dsm_array, dsm_metadata = read_elevation_tiff(cropped_dsm_path)
+                        print(f"✅ DSM cropped successfully to shape: {dsm_array.shape}")
+                        
+                        # Clean up temporary file
+                        os.unlink(cropped_dsm_path)
+                        
+                        # Use DTM metadata as reference (since we're preserving DTM extent)
+                        reference_metadata = dtm_metadata
+                        
+                    except Exception as crop_error:
+                        # Clean up temporary file on error
+                        if os.path.exists(cropped_dsm_path):
+                            os.unlink(cropped_dsm_path)
+                        raise RuntimeError(f"Failed to crop DSM to DTM extent: {str(crop_error)}")
                 
-                # Read the resampled DTM
-                dtm_array, dtm_metadata = read_elevation_tiff(resampled_dtm_path)
-                print(f"✅ DTM resampled successfully to shape: {dtm_array.shape}")
-                
-                # Clean up temporary file
-                os.unlink(resampled_dtm_path)
-                
-            except Exception as resample_error:
-                # Clean up temporary file on error
-                if os.path.exists(resampled_dtm_path):
-                    os.unlink(resampled_dtm_path)
-                raise RuntimeError(f"Failed to resample DTM: {str(resample_error)}")
+                else:
+                    # FALLBACK CASE: Need full resampling
+                    print(f"🔧 FALLBACK: Complex spatial alignment required - resampling DSM to DTM")
+                    
+                    # Create temporary resampled DSM
+                    with tempfile.NamedTemporaryFile(suffix='_dsm_resampled.tif', delete=False) as tmp_file:
+                        resampled_dsm_path = tmp_file.name
+                    
+                    try:
+                        # Get DTM properties to use as target
+                        target_crs = dtm_src.crs
+                        target_transform = dtm_src.transform
+                        target_width = dtm_src.width
+                        target_height = dtm_src.height
+                        
+                        # Create output profile for resampled DSM
+                        dsm_profile = dsm_src.profile.copy()
+                        dsm_profile.update({
+                            'crs': target_crs,
+                            'transform': target_transform,
+                            'width': target_width,
+                            'height': target_height
+                        })
+                        
+                        # Resample DSM to match DTM
+                        with rasterio.open(resampled_dsm_path, 'w', **dsm_profile) as dst:
+                            reproject(
+                                source=rasterio.band(dsm_src, 1),
+                                destination=rasterio.band(dst, 1),
+                                src_transform=dsm_src.transform,
+                                src_crs=dsm_src.crs,
+                                dst_transform=target_transform,
+                                dst_crs=target_crs,
+                                resampling=Resampling.bilinear
+                            )
+                        
+                        # Read the resampled DSM
+                        dsm_array, dsm_metadata = read_elevation_tiff(resampled_dsm_path)
+                        print(f"✅ DSM resampled successfully to shape: {dsm_array.shape}")
+                        
+                        # Clean up temporary file
+                        os.unlink(resampled_dsm_path)
+                        
+                        # Use DTM metadata as reference
+                        reference_metadata = dtm_metadata
+                        
+                    except Exception as resample_error:
+                        # Clean up temporary file on error
+                        if os.path.exists(resampled_dsm_path):
+                            os.unlink(resampled_dsm_path)
+                        raise RuntimeError(f"Failed to resample DSM: {str(resample_error)}")
+        else:
+            # No spatial alignment needed
+            reference_metadata = dtm_metadata
         
-        # Verify dimensions now match after resampling
+        # Handle dimension mismatches with intelligent cropping/padding
         if dtm_array.shape != dsm_array.shape:
-            raise ValueError(f"DTM and DSM dimensions still don't match after resampling: DTM {dtm_array.shape} vs DSM {dsm_array.shape}")
+            print(f"⚠️ Dimension mismatch detected: DTM {dtm_array.shape} vs DSM {dsm_array.shape}")
+            print(f"🔧 Applying intelligent alignment to resolve small dimension differences...")
+            
+            # Get target dimensions (use smaller dimensions to avoid extrapolation)
+            target_height = min(dtm_array.shape[0], dsm_array.shape[0])
+            target_width = min(dtm_array.shape[1], dsm_array.shape[1])
+            
+            print(f"📐 Aligning both arrays to: {target_height} x {target_width}")
+            
+            # Crop both arrays to the same dimensions
+            dtm_array = dtm_array[:target_height, :target_width]
+            dsm_array = dsm_array[:target_height, :target_width]
+            
+            # Update metadata to reflect the new dimensions
+            reference_metadata = reference_metadata.copy()
+            reference_metadata['height'] = target_height
+            reference_metadata['width'] = target_width
+            
+            print(f"✅ Arrays aligned successfully: DTM {dtm_array.shape}, DSM {dsm_array.shape}")
+        
+        # Final verification that dimensions now match
+        if dtm_array.shape != dsm_array.shape:
+            raise ValueError(f"Failed to align DTM and DSM dimensions: DTM {dtm_array.shape} vs DSM {dsm_array.shape}")
+        
+        # Check for DSM-DTM data quality issue and source type compatibility
+        print(f"🔍 Checking DSM-DTM data quality and source compatibility...")
+        dtm_valid = dtm_array[~np.isnan(dtm_array) & ~np.isinf(dtm_array)]
+        dsm_valid = dsm_array[~np.isnan(dsm_array) & ~np.isinf(dsm_array)]
+        
+        # Detect if we're using Copernicus DEM as DSM (common issue)
+        dsm_filename = os.path.basename(dsm_path).lower()
+        is_copernicus_dsm = any(x in dsm_filename for x in ['copernicus', 'cop-dem', 'cop_dem'])
+        
+        if is_copernicus_dsm:
+            print(f"⚠️ CRITICAL DATA SOURCE WARNING:")
+            print(f"   Detected Copernicus DEM being used as DSM!")
+            print(f"   ❌ Copernicus DEM is actually a DTM (bare earth), not DSM (surface)")
+            print(f"   🎯 For proper CHM calculation, you need true DSM data sources:")
+            print(f"      • SRTM GL1 (surface elevation in forests)")
+            print(f"      • ALOS World 3D-30m (true DSM)")
+            print(f"      • ASTER GDEM v3 (optical stereo DSM)")
+            print(f"   📋 Current calculation: DTM - DTM = 0 (expected result)")
+        
+        if len(dtm_valid) > 0 and len(dsm_valid) > 0:
+            dtm_range = np.max(dtm_valid) - np.min(dtm_valid)
+            dsm_range = np.max(dsm_valid) - np.min(dsm_valid)
+            
+            # Check if DSM and DTM have identical or nearly identical values
+            identical_ranges = abs(dtm_range - dsm_range) < 0.01
+            identical_means = abs(np.mean(dtm_valid) - np.mean(dsm_valid)) < 0.01
+            
+            if identical_ranges and identical_means:
+                # Additional check: compare actual pixel values
+                diff_array = np.abs(dsm_array - dtm_array)
+                max_diff = np.max(diff_array[~np.isnan(diff_array)])
+                identical_pixels = max_diff < 0.01
+                
+                if identical_pixels:
+                    print(f"⚠️ DATA QUALITY ISSUE CONFIRMED:")
+                    print(f"   DSM and DTM contain identical values (max diff: {max_diff:.3f}m)")
+                    
+                    if is_copernicus_dsm:
+                        print(f"   🎯 ROOT CAUSE: Both datasets are DTM (terrain models)")
+                        print(f"   💡 SOLUTION: Replace DSM with true surface elevation data")
+                        data_quality_warning = "Both DSM and DTM sources are terrain models (DTM). CHM calculation requires true Digital Surface Model (DSM) data that includes vegetation. Consider using SRTM, ALOS World 3D-30m, or ASTER GDEM as DSM source."
+                    else:
+                        print(f"   🎯 Unknown cause of identical elevation values")
+                        data_quality_warning = "DSM and DTM contain identical values. This may indicate both datasets represent terrain rather than surface elevation, or there may be a spatial alignment issue."
+                    
+                    # Create a minimal CHM with appropriate metadata
+                    print(f"🔧 Creating fallback CHM with zero vegetation height...")
+                    chm_array = np.zeros_like(dtm_array, dtype=np.float32)
+                    
+                else:
+                    # Normal CHM calculation
+                    print(f"✅ DSM-DTM data quality check passed")
+                    chm_array = dsm_array.astype(np.float32) - dtm_array.astype(np.float32)
+                    data_quality_warning = None
+            else:
+                # Normal CHM calculation
+                print(f"✅ DSM-DTM data quality check passed")
+                chm_array = dsm_array.astype(np.float32) - dtm_array.astype(np.float32)
+                data_quality_warning = None
+        else:
+            # Fallback if no valid data
+            print(f"⚠️ No valid data found in DSM or DTM")
+            chm_array = np.zeros_like(dtm_array, dtype=np.float32)
+            data_quality_warning = "No valid elevation data found in DSM or DTM files"
         
         # Calculate CHM = DSM - DTM
-        print(f"🔄 Calculating CHM (vegetation height)...")
-        chm_array = dsm_array.astype(np.float32) - dtm_array.astype(np.float32)
+        print(f"🔄 CHM calculation completed")
         
         # Create output filename
         output_filename = f"{base_name.replace('DTM', 'CHM')}.tif"
@@ -1385,22 +1564,34 @@ async def process_chm_tiff(tiff_path: str, output_dir: str, parameters: Dict[str
             output_filename = f"{base_name}_CHM.tif"
         output_path = os.path.join(output_dir, output_filename)
         
-        # Save CHM result
-        save_raster(chm_array, output_path, dtm_metadata, gdal.GDT_Float32, enhanced_quality=True)
+        # Save CHM result using the reference metadata (preserves DTM spatial properties)
+        save_raster(chm_array, output_path, reference_metadata, gdal.GDT_Float32, enhanced_quality=True)
         
-        # Calculate statistics
+        # Calculate statistics and detect data quality issues
         valid_data = chm_array[~np.isnan(chm_array) & ~np.isinf(chm_array)]
+        
         if len(valid_data) > 0:
             min_height = float(np.min(valid_data))
             max_height = float(np.max(valid_data))
             mean_height = float(np.mean(valid_data))
             std_height = float(np.std(valid_data))
             
+            # Additional check if data quality warning wasn't already set
+            if data_quality_warning is None and max_height - min_height < 0.1 and abs(mean_height) < 0.1:
+                data_quality_warning = "CHM shows minimal vegetation height variation. This may indicate both DSM and DTM represent similar elevation surfaces."
+            
             print(f"📊 CHM Statistics:")
             print(f"   Min height: {min_height:.2f}m")
             print(f"   Max height: {max_height:.2f}m")
             print(f"   Mean height: {mean_height:.2f}m")
             print(f"   Std dev: {std_height:.2f}m")
+            
+            if data_quality_warning:
+                print(f"⚠️ Data Quality Warning: {data_quality_warning}")
+        else:
+            min_height = max_height = mean_height = std_height = None
+            if data_quality_warning is None:
+                data_quality_warning = "No valid CHM data calculated"
         
         processing_time = time.time() - start_time
         
@@ -1418,7 +1609,8 @@ async def process_chm_tiff(tiff_path: str, output_dir: str, parameters: Dict[str
                 "max_height": max_height if 'max_height' in locals() else None,
                 "mean_height": mean_height if 'mean_height' in locals() else None,
                 "std_height": std_height if 'std_height' in locals() else None
-            } if 'min_height' in locals() else None
+            } if 'min_height' in locals() else None,
+            "data_quality_warning": data_quality_warning
         }
         
         print(f"✅ CHM processing completed in {processing_time:.2f} seconds")
@@ -1492,6 +1684,16 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
     
     # Create the base output directory if it doesn't exist
     os.makedirs(base_output_dir, exist_ok=True)
+    
+    # Create DTM directory structure from elevation TIFF for CHM generation
+    # This is essential for coordinate-based elevation workflows
+    try:
+        print(f"\n🏔️ Creating DTM structure for CHM compatibility...")
+        dtm_path = create_dtm_from_elevation_tiff(tiff_path, region_folder)
+        print(f"✅ DTM structure created: {os.path.basename(dtm_path)}")
+    except Exception as e:
+        print(f"⚠️ DTM structure creation failed: {e}")
+        print(f"   CHM generation may not work properly")
     
     # Load hillshade definitions from JSON
     hillshade_path = Path(__file__).parent / "pipelines_json" / "hillshade.json"
@@ -1581,7 +1783,7 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                         # Generate short PNG filename based on task name
                         png_name_mapping = {
                             "lrm": "LRM.png",
-                            "sky_view_factor": "SVF.png",
+                            "sky_view_factor": "SVF.png",  # Use enhanced cividis visualization
                             "slope": "Slope.png",
                             "chm": "CHM.png"
                         }
@@ -1610,6 +1812,26 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                                 save_to_consolidated=False
                             )
                             print(f"🌡️ Enhanced LRM PNG: Coolwarm colormap for morphological analysis")
+                        elif task_name == "sky_view_factor":
+                            # Use specialized cividis colormap for enhanced SVF archaeological visualization
+                            from convert import convert_svf_to_cividis_png
+                            converted_png = convert_svf_to_cividis_png(
+                                result["output_file"], 
+                                png_path, 
+                                enhanced_resolution=True,
+                                save_to_consolidated=False
+                            )
+                            print(f"🌌 Enhanced SVF PNG: Cividis colormap for archaeological feature detection")
+                        elif task_name == "chm":
+                            # Use specialized viridis colormap for CHM visualization
+                            from convert import convert_chm_to_viridis_png
+                            converted_png = convert_chm_to_viridis_png(
+                                result["output_file"], 
+                                png_path, 
+                                enhanced_resolution=True,
+                                save_to_consolidated=False
+                            )
+                            print(f"🌳 Enhanced CHM PNG: Viridis colormap for canopy height visualization")
                         else:
                             # Use standard PNG conversion for other raster types
                             converted_png = convert_geotiff_to_png(result["output_file"], png_path)
@@ -1691,44 +1913,44 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
             except Exception as e:
                 print(f"⚠️ PNG conversion failed for hillshade_rgb: {e}")
 
-            # Create tint overlay using color relief
-            color_relief_res = results.get("color_relief")
-            if color_relief_res and color_relief_res.get("status") == "success":
-                try:
-                    tint_output = os.path.join(rgb_dir, "tint_overlay.tif")
-                    tint_result = await create_tint_overlay(
-                        color_relief_res["output_file"], rgb_output, tint_output)
-                    results["tint_overlay"] = tint_result
+            # COMMENTED OUT: Create tint overlay using color relief
+            # color_relief_res = results.get("color_relief")
+            # if color_relief_res and color_relief_res.get("status") == "success":
+            #     try:
+            #         tint_output = os.path.join(rgb_dir, "tint_overlay.tif")
+            #         tint_result = await create_tint_overlay(
+            #             color_relief_res["output_file"], rgb_output, tint_output)
+            #         results["tint_overlay"] = tint_result
 
-                    if tint_result["status"] == "success":
-                        png_output_dir = os.path.join(base_output_dir, "png_outputs")
-                        os.makedirs(png_output_dir, exist_ok=True)
-                        png_name = "TintOverlay.png"
-                        png_path = os.path.join(png_output_dir, png_name)
-                        converted_png = convert_geotiff_to_png(tint_output, png_path)
-                        if converted_png and os.path.exists(converted_png):
-                            tint_result["png_file"] = converted_png
-                            print(f"🖼️ PNG created: {os.path.basename(converted_png)}")
+            #         if tint_result["status"] == "success":
+            #             png_output_dir = os.path.join(base_output_dir, "png_outputs")
+            #             os.makedirs(png_output_dir, exist_ok=True)
+            #             png_name = "TintOverlay.png"
+            #             png_path = os.path.join(png_output_dir, png_name)
+            #             converted_png = convert_geotiff_to_png(tint_output, png_path)
+            #             if converted_png and os.path.exists(converted_png):
+            #                 tint_result["png_file"] = converted_png
+            #                 print(f"🖼️ PNG created: {os.path.basename(converted_png)}")
 
-                        # Create slope overlay if slope relief is available
-                        slope_relief_res = results.get("slope_relief")
-                        if slope_relief_res and slope_relief_res.get("status") == "success":
-                            try:
-                                boosted_output = os.path.join(rgb_dir, "boosted_hillshade.tif")
-                                slope_overlay_res = await create_slope_overlay(
-                                    tint_output,
-                                    slope_relief_res["output_file"],
-                                    boosted_output,
-                                )
-                                results["boosted_hillshade"] = slope_overlay_res
+            #             # Create slope overlay if slope relief is available
+            #             slope_relief_res = results.get("slope_relief")
+            #             if slope_relief_res and slope_relief_res.get("status") == "success":
+            #                 try:
+            #                     boosted_output = os.path.join(rgb_dir, "boosted_hillshade.tif")
+            #                     slope_overlay_res = await create_slope_overlay(
+            #                         tint_output,
+            #                         slope_relief_res["output_file"],
+            #                         boosted_output,
+            #                     )
+            #                     results["boosted_hillshade"] = slope_overlay_res
 
-                                if slope_overlay_res["status"] == "success":
-                                    print(f"✅ Boosted hillshade created: {os.path.basename(boosted_output)}")
-                            except Exception as e:
-                                print(f"⚠️ Slope overlay generation failed: {e}")
+            #                     if slope_overlay_res["status"] == "success":
+            #                         print(f"✅ Boosted hillshade created: {os.path.basename(boosted_output)}")
+            #                 except Exception as e:
+            #                     print(f"⚠️ Slope overlay generation failed: {e}")
 
-                except Exception as e:
-                    print(f"⚠️ Tint overlay generation failed: {e}")
+            #     except Exception as e:
+            #         print(f"⚠️ Tint overlay generation failed: {e}")
 
     # Final progress update
     if progress_callback:
@@ -1760,3 +1982,51 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
         "output_directory": base_output_dir,
         "results": results
     }
+
+def create_dtm_from_elevation_tiff(elevation_tiff_path: str, region_folder: str) -> str:
+    """
+    Create proper DTM directory structure from elevation TIFF for coordinate-based data
+    This enables CHM generation which expects DTM files in output/{region}/lidar/DTM/filled/
+    
+    Args:
+        elevation_tiff_path: Path to the elevation TIFF file
+        region_folder: Region folder name
+        
+    Returns:
+        Path to the created DTM file
+    """
+    print(f"\n🏔️ CREATING DTM STRUCTURE FROM ELEVATION TIFF")
+    print(f"📁 Source: {os.path.basename(elevation_tiff_path)}")
+    print(f"🏷️ Region: {region_folder}")
+    
+    # Create DTM output directory structure
+    dtm_output_dir = os.path.join("output", region_folder, "lidar", "DTM", "filled")
+    os.makedirs(dtm_output_dir, exist_ok=True)
+    
+    # Generate DTM filename that includes region name for CHM endpoint compatibility
+    # CHM endpoint searches for pattern: *{region_name}*DTM*.tif
+    elevation_basename = os.path.splitext(os.path.basename(elevation_tiff_path))[0]
+    dtm_filename = f"{region_folder}_{elevation_basename}_DTM_30m_filled.tif"  # Include region name for pattern match
+    dtm_output_path = os.path.join(dtm_output_dir, dtm_filename)
+    
+    # Copy elevation TIFF to DTM location (since elevation data from coordinates IS the DTM)
+    print(f"📋 Copying elevation data to DTM structure...")
+    print(f"📄 Destination: {dtm_output_path}")
+    
+    try:
+        shutil.copy2(elevation_tiff_path, dtm_output_path)
+        
+        if os.path.exists(dtm_output_path):
+            file_size = os.path.getsize(dtm_output_path) / (1024 * 1024)  # MB
+            print(f"✅ DTM structure created successfully")
+            print(f"📊 File size: {file_size:.2f} MB")
+            print(f"📂 DTM path: {dtm_output_path}")
+            return dtm_output_path
+        else:
+            raise FileNotFoundError(f"Failed to create DTM file at {dtm_output_path}")
+            
+    except Exception as e:
+        error_msg = f"Failed to create DTM structure: {str(e)}"
+        print(f"❌ {error_msg}")
+        logger.error(error_msg, exc_info=True)
+        raise

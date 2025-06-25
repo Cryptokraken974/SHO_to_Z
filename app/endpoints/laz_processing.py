@@ -21,6 +21,7 @@ from ..processing.sky_view_factor import sky_view_factor
 from ..processing.composites import generate_dtm_hillshade_blend
 import os
 import re
+import time
 from pathlib import Path
 import logging
 
@@ -698,7 +699,7 @@ async def api_color_relief(
     region_name: str = Form(None),
     processing_type: str = Form(None),
     display_region_name: str = Form(None),
-    ramp_name: str = Form("arch_subtle"),
+    ramp_name: str = Form("archaeological_gentle"),
     dtm_resolution: float = Form(1.0),
     dtm_csf_cloth_resolution: Optional[float] = Form(None),
     stretch_type: Optional[str] = Form("stddev"),
@@ -842,13 +843,41 @@ async def api_sky_view_factor(
         tif_path = sky_view_factor(effective_input_file, output_region)
         print(f"✅ SVF TIF generated: {tif_path}")
 
-        parsed_stretch_params = _parse_stretch_params(stretch_params_json)
-        image_b64 = convert_geotiff_to_png_base64(
-            tif_path,
-            stretch_type=stretch_type if stretch_type else "stddev",
-            stretch_params=parsed_stretch_params
+        # Use specialized SVF cividis conversion for archaeological visualization
+        from app.convert import convert_svf_to_cividis_png
+        import tempfile
+        import base64
+        
+        # Create temporary PNG using cividis colormap
+        temp_dir = tempfile.gettempdir()
+        temp_png_filename = f"{os.path.splitext(os.path.basename(tif_path))[0]}_cividis_{int(time.time()*1000)}.png"
+        temp_png_path = os.path.join(temp_dir, temp_png_filename)
+        
+        png_path_used = convert_svf_to_cividis_png(
+            tif_path, 
+            png_path=temp_png_path, 
+            save_to_consolidated=True,
+            enhanced_resolution=True
         )
-        print(f"✅ Base64 conversion complete")
+        
+        # Convert to base64
+        print(f"🔄 Converting SVF cividis PNG to base64...")
+        with open(png_path_used, 'rb') as png_file:
+            png_data = png_file.read()
+            image_b64 = base64.b64encode(png_data).decode('utf-8')
+        
+        # Clean up temporary file
+        try:
+            os.remove(png_path_used)
+            # Also remove world files
+            for ext in [".pgw", ".wld", "_wgs84.wld"]:
+                world_file = os.path.splitext(png_path_used)[0] + ext
+                if os.path.exists(world_file):
+                    os.remove(world_file)
+        except OSError:
+            pass
+        
+        print(f"✅ SVF cividis conversion and base64 encoding complete")
         return {"image": image_b64}
     except Exception as e:
         logger.error(f"Error in api_sky_view_factor: {e}", exc_info=True)

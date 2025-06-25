@@ -250,7 +250,7 @@ async def get_raster_overlay_data(region_name: str, processing_type: str):
                 "tint_overlay": ["TintOverlay.png", "tint_overlay.png"],
                 "hillshade_rgb": ["HillshadeRGB.png", "hillshade_rgb.png"],
                 "lrm": ["LRM.png", "lrm.png"],
-                "sky_view_factor": ["SVF.png", "Sky_View_Factor.png", "sky_view_factor.png"],
+                "sky_view_factor": ["SVF.png", "SVF_cividis.png", "Sky_View_Factor.png", "sky_view_factor.png"],
                 "slope": ["Slope.png", "slope.png"],
                 "aspect": ["Aspect.png", "aspect.png"],
                 "chm": ["CHM.png", "Chm.png", "chm.png"],            "hillshade": ["Hillshade.png", "hillshade.png"],

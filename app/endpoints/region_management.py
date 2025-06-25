@@ -1058,7 +1058,7 @@ async def get_region_png_files(region_name: str):
 
 async def _auto_download_dsm_for_region(region_name: str, lat: float, lng: float) -> Dict:
     """
-    Automatically download Copernicus DSM data for a coordinate-based region
+    Automatically download SRTM DSM data for a coordinate-based region
     
     Args:
         region_name: Name of the region
@@ -1069,23 +1069,23 @@ async def _auto_download_dsm_for_region(region_name: str, lat: float, lng: float
         Dictionary with download results
     """
     try:
-        from ..services.copernicus_dsm_service import copernicus_dsm_service
+        from ..services.true_dsm_service import true_dsm_service
         
-        print(f"🌍 Auto-downloading DSM data for region: {region_name}")
+        print(f"🏔️ Auto-downloading SRTM DSM data for region: {region_name}")
         print(f"📍 Coordinates: ({lat}, {lng})")
         
-        # Download DSM with default settings (5km buffer, 30m resolution)
-        result = await copernicus_dsm_service.get_dsm_for_region(
+        # Download SRTM DSM with default settings (12.5km buffer, 1-arcsecond resolution)
+        result = await true_dsm_service.get_srtm_dsm_for_region(
             lat=lat,
             lng=lng,
             region_name=region_name,
             buffer_km=12.5,
-            resolution="30m"
+            resolution=1  # SRTM 1-arcsecond (~30m)
         )
         
         if result.get('success'):
-            print(f"✅ Successfully auto-downloaded DSM for region: {region_name}")
-            print(f"📁 DSM file saved to: {result.get('file_path')}")
+            print(f"✅ Successfully auto-downloaded SRTM DSM for region: {region_name}")
+            print(f"📁 SRTM DSM file saved to: {result.get('file_path')}")
             return {
                 "success": True,
                 "dsm_downloaded": True,
@@ -1112,7 +1112,7 @@ async def _auto_download_dsm_for_region(region_name: str, lat: float, lng: float
 @router.post("/api/regions/{region_name}/download-dsm")
 async def download_dsm_for_region(region_name: str, data: dict = None):
     """
-    Download Copernicus DSM data for an existing region
+    Download SRTM DSM data for an existing region
     
     Args:
         region_name: Name of the region
@@ -1157,24 +1157,24 @@ async def download_dsm_for_region(region_name: str, data: dict = None):
         print(f"📏 Buffer: {buffer_km} km")
         print(f"🔍 Resolution: {resolution}")
         
-        # Import the service
-        from ..services.copernicus_dsm_service import copernicus_dsm_service
+        # Import the SRTM DSM service
+        from ..services.true_dsm_service import true_dsm_service
         
-        # Download DSM data
-        result = await copernicus_dsm_service.get_dsm_for_region(
+        # Download SRTM DSM data
+        result = await true_dsm_service.get_srtm_dsm_for_region(
             lat=lat,
             lng=lng,
             region_name=region_name,
             buffer_km=buffer_km,
-            resolution=resolution
+            resolution=1  # SRTM 1-arcsecond (~30m)
         )
         
         if result.get('success'):
-            print(f"✅ Successfully downloaded DSM for region: {region_name}")
+            print(f"✅ Successfully downloaded SRTM DSM for region: {region_name}")
             
             return JSONResponse(content={
                 "success": True,
-                "message": f"Copernicus DSM downloaded successfully for region '{region_name}'",
+                "message": f"SRTM DSM (True Surface Model) downloaded successfully for region '{region_name}'",
                 "region_name": region_name,
                 "dsm_file": result.get('file_path'),
                 "method": result.get('method'),

@@ -106,11 +106,21 @@ def create_color_table(color_table_path: str, min_elevation: float, max_elevatio
         color_stops_config = [(0.0, "0 0 139"), (0.1, "0 100 255"), (0.2, "0 255 255"), (0.3, "0 255 0"), (0.5, "255 255 0"), (0.7, "255 165 0"), (0.9, "255 69 0"), (1.0, "255 255 255")]
     elif ramp_name == "arch_subtle":
         color_stops_config = [(0.0, "200 180 160"), (0.2, "220 200 180"), (0.4, "180 160 140"), (0.6, "230 210 190"), (0.8, "240 220 200"), (1.0, "255 245 235")]
+    elif ramp_name == "archaeological_gentle":
+        # 🟣 Gentler elevation-based color ramp with 5 soft color bands
+        # Pale yellow -> orange -> salmon -> red -> light red (ascending elevation zones)
+        color_stops_config = [
+            (0.0, "255 250 220"),   # Pale cream/yellow (lowest elevation)
+            (0.25, "255 228 181"),  # Soft peach/orange
+            (0.5, "255 192 152"),   # Gentle salmon
+            (0.75, "255 160 122"),  # Soft coral/light red
+            (1.0, "255 140 105")    # Warm light red (highest elevation)
+        ]
     elif ramp_name == "grayscale":
         color_stops_config = [(0.0, "0 0 0"), (1.0, "255 255 255")]
     else:
         logger.error(f"Unknown ramp_name: {ramp_name}")
-        raise ValueError(f"Unknown ramp_name: {ramp_name}. Available: 'terrain', 'arch_subtle', 'grayscale'.")
+        raise ValueError(f"Unknown ramp_name: {ramp_name}. Available: 'terrain', 'arch_subtle', 'archaeological_gentle', 'grayscale'.")
 
     elevation_range = max_elevation - min_elevation
     if abs(elevation_range) < 1e-6:

@@ -498,46 +498,64 @@ async def download_elevation_coordinates(request: CoordinateRequest):
                 "file_path": result.file_path
             })
             
-            # Generate raster products automatically
+            # Automatically process all raster products from the downloaded elevation TIFF
+            # This mirrors the automatic processing done in OpenTopographySource
             if result.success and result.file_path:
                 try:
-                    from ..processing.raster_generation import RasterGenerator
-                    from pathlib import Path
+                    print(f"\n🚀 Starting automatic raster processing for: {result.file_path}")
                     
-                    # Initialize raster generator
-                    output_dir = Path(result.file_path).parent.parent
-                    raster_generator = RasterGenerator(output_base_dir=str(output_dir))
+                    # Import and run the comprehensive automatic processing
+                    from ..processing.tiff_processing import process_all_raster_products
+                    
+                    # Create a progress callback wrapper for processing
+                    async def processing_progress_callback(update):
+                        if progress_callback:
+                            # Transform processing progress to continue after download
+                            processing_update = {
+                                "type": "raster_processing",
+                                "message": update.get("message", "Processing raster products..."),
+                                "progress": update.get("progress", 0),
+                                "stage": "raster_processing"
+                            }
+                            await progress_callback(processing_update)
                     
                     # Send raster generation started message
                     await progress_callback({
-                        "type": "raster_generation_started",
-                        "message": "Generating raster products automatically...",
-                        "progress": 0
+                        "type": "raster_processing_started",
+                        "message": "Processing DTM and generating comprehensive raster suite...",
+                        "progress": 0,
+                        "stage": "raster_processing"
                     })
                     
-                    # Process the elevation TIFF file
-                    raster_result = await raster_generator.process_single_tiff(
-                        Path(result.file_path),
-                        progress_callback=progress_callback
+                    # Process all raster products with comprehensive pipeline
+                    processing_results = await process_all_raster_products(
+                        str(result.file_path), 
+                        processing_progress_callback,
+                        download_request  # Pass the request object for coordinate information
                     )
                     
-                    if raster_result and raster_result.get("success", False):
+                    if progress_callback:
+                        successful = processing_results.get("successful", 0)
+                        total = processing_results.get("total_tasks", 0)
                         await progress_callback({
-                            "type": "raster_generation_completed",
-                            "message": f"Raster products generated successfully",
+                            "type": "raster_processing_completed",
+                            "message": f"Raster processing completed: {successful}/{total} products generated",
                             "progress": 100,
-                            "products": raster_result.get("products", []),
-                            "png_outputs": raster_result.get("png_outputs", [])
+                            "stage": "completed"
                         })
                     
+                    print(f"✅ Automatic raster processing completed successfully")
+                    
                 except Exception as e:
-                    print(f"⚠️ Automatic raster generation failed: {str(e)}")
-                    # Log the error but don't fail the overall request
-                    await progress_callback({
-                        "type": "raster_generation_error",
-                        "message": f"Automatic raster generation failed: {str(e)}",
-                        "error": str(e)
-                    })
+                    print(f"⚠️ Automatic raster processing failed: {str(e)}")
+                    if progress_callback:
+                        await progress_callback({
+                            "type": "raster_processing_error",
+                            "message": f"Raster processing failed: {str(e)}",
+                            "progress": 100,
+                            "stage": "error"
+                        })
+                    # Don't fail the entire download if processing fails
             
             # Prepare response with routing information
             response_data = {

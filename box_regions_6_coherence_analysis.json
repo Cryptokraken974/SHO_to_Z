@@ -1,0 +1,58 @@
+{
+  "file_properties": [
+    {
+      "path": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/Box_Regions_6/3.787S_63.734W_elevation/Original/3.787S_63.734W_elevation.tiff",
+      "exists": false,
+      "error": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/Box_Regions_6/3.787S_63.734W_elevation/Original/3.787S_63.734W_elevation.tiff: No such file or directory"
+    },
+    {
+      "path": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/Box_Regions_6/lidar/3.787S_63.734W_elevation.tiff",
+      "exists": false,
+      "error": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/Box_Regions_6/lidar/3.787S_63.734W_elevation.tiff: No such file or directory"
+    },
+    {
+      "path": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/output/Box_Regions_6/lidar/DSM/Box_Regions_6_copernicus_dsm_30m.tif",
+      "exists": false,
+      "error": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/output/Box_Regions_6/lidar/DSM/Box_Regions_6_copernicus_dsm_30m.tif: No such file or directory"
+    },
+    {
+      "path": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/output/Box_Regions_6/lidar/Chm/3.787S_63.734W_elevation_CHM.tif",
+      "exists": false,
+      "error": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/output/Box_Regions_6/lidar/Chm/3.787S_63.734W_elevation_CHM.tif: No such file or directory"
+    },
+    {
+      "path": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/Box_Regions_6/3.787S_63.734W_elevation/Visualization/3.787S_63.734W_elevation_color_relief.tif",
+      "exists": false,
+      "error": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/Box_Regions_6/3.787S_63.734W_elevation/Visualization/3.787S_63.734W_elevation_color_relief.tif: No such file or directory"
+    },
+    {
+      "path": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/Box_Regions_6/3.787S_63.734W_elevation/Terrain_Analysis/3.787S_63.734W_elevation_Sky_View_Factor.tif",
+      "exists": false,
+      "error": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/Box_Regions_6/3.787S_63.734W_elevation/Terrain_Analysis/3.787S_63.734W_elevation_Sky_View_Factor.tif: No such file or directory"
+    },
+    {
+      "path": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/Box_Regions_6/3.787S_63.734W_elevation/Terrain_Analysis/3.787S_63.734W_elevation_slope_relief.tif",
+      "exists": false,
+      "error": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/Box_Regions_6/3.787S_63.734W_elevation/Terrain_Analysis/3.787S_63.734W_elevation_slope_relief.tif: No such file or directory"
+    },
+    {
+      "path": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/Box_Regions_6/3.787S_63.734W_elevation/Terrain_Analysis/3.787S_63.734W_elevation_LRM_adaptive.tif",
+      "exists": false,
+      "error": "/Users/samuelhoareau/Desktop/VS_Projects/SHO_to_Z/input/Box_Regions_6/3.787S_63.734W_elevation/Terrain_Analysis/3.787S_63.734W_elevation_LRM_adaptive.tif: No such file or directory"
+    }
+  ],
+  "coherence_analysis": {
+    "coherent": false,
+    "issues": [
+      "No valid reference file found"
+    ],
+    "summary": {
+      "total_files": 8,
+      "valid_files": 0,
+      "crs_values": [],
+      "dimensions": [],
+      "resolutions": []
+    }
+  },
+  "analysis_timestamp": "1750887193.0419283"
+}

@@ -580,7 +580,7 @@ window.UIManager = {
       this.acquireElevationData();
     });
 
-    // Get Copernicus DSM button - Use event delegation
+    // Get SRTM DSM button - Use event delegation
     $(document).on('click', '#get-copernicus-dsm-btn', () => {
       this.acquireCopernicusDSM();
     });
@@ -1642,10 +1642,10 @@ window.UIManager = {
   },
 
   /**
-   * Acquire Copernicus DSM data for the current coordinates
+   * Acquire SRTM DSM data for the current coordinates
    */
   async acquireCopernicusDSM() {
-    Utils.log('info', 'Get Copernicus DSM button clicked');
+    Utils.log('info', 'Get SRTM DSM button clicked');
 
     // Get coordinates from input fields
     let lat = $('#lat-input').val();
@@ -1703,7 +1703,7 @@ window.UIManager = {
         $('#lat-input').val(lat);
         $('#lng-input').val(lng);
         
-        Utils.showNotification('Using current map center for DSM data acquisition', 'info');
+        Utils.showNotification('Using current map center for SRTM DSM data acquisition', 'info');
       } else {
         // Fall back to Portland, Oregon
         lat = 45.5152;
@@ -1712,7 +1712,7 @@ window.UIManager = {
         $('#lat-input').val(lat);
         $('#lng-input').val(lng);
         
-        Utils.showNotification('Using Portland, Oregon coordinates for DSM data acquisition', 'info');
+        Utils.showNotification('Using Portland, Oregon coordinates for SRTM DSM data acquisition', 'info');
       }
     }
 
@@ -1733,19 +1733,19 @@ window.UIManager = {
     }
 
     try {
-      this.showProgress('🌍 Downloading Copernicus DSM data...');
+      this.showProgress('🏔️ Downloading SRTM DSM data (True Surface Model)...');
 
       const requestData = {
         region_name: regionName,
         latitude: latNum,
         longitude: lngNum,
-        buffer_km: 12.5,  // Default 12.5km buffer for optimal Copernicus delivery
-        resolution: '30m'  // Default 30m resolution
+        buffer_km: 12.5,  // Default 12.5km buffer
+        resolution: 1  // SRTM 1-arcsecond (~30m)
       };
 
-      Utils.log('info', 'Sending Copernicus DSM request:', requestData);
+      Utils.log('info', 'Sending SRTM DSM request:', requestData);
 
-      const response = await fetch('/api/download-copernicus-dsm', {
+      const response = await fetch('/api/download-srtm-dsm', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -1761,10 +1761,10 @@ window.UIManager = {
       const result = await response.json();
       
       if (result.success) {
-        Utils.log('info', 'Copernicus DSM download successful:', result);
+        Utils.log('info', 'SRTM DSM download successful:', result);
         
         // Create success message with details
-        let message = `Copernicus DSM downloaded successfully for region '${regionName}'`;
+        let message = `SRTM DSM (True Surface Model) downloaded successfully for region '${regionName}'`;
         if (result.tiles_downloaded) {
           message += ` (${result.tiles_downloaded} tiles merged)`;
         }
@@ -1791,8 +1791,8 @@ window.UIManager = {
       }
 
     } catch (error) {
-      Utils.log('error', 'Error in Copernicus DSM acquisition:', error);
-      Utils.showNotification(`Error downloading DSM data: ${error.message}`, 'error');
+      Utils.log('error', 'Error in SRTM DSM acquisition:', error);
+      Utils.showNotification(`Error downloading SRTM DSM data: ${error.message}`, 'error');
     } finally {
       this.hideProgress();
     }
@@ -1920,6 +1920,10 @@ window.UIManager = {
       // Prepare region name for the acquisition
       const effectiveRegionName = regionName && regionName.trim() !== '' ? regionName.trim() : null;
 
+      // Track step success status for dependency checking
+      let elevationSuccess = false;
+      let dsmSuccess = false;
+
       // Step 1: Acquire elevation data (DTM)
       Utils.log('info', 'Step 1/4: Acquiring elevation data (DTM)...');
       this.showProgress('🏔️ Step 1/4: Acquiring elevation data (DTM)...');
@@ -1940,6 +1944,7 @@ window.UIManager = {
           throw new Error(elevationResult?.error || 'Elevation data acquisition failed');
         }
 
+        elevationSuccess = true;
         Utils.log('info', 'Step 1/4: Elevation data acquisition completed successfully');
         Utils.showNotification('Step 1/4: Elevation data acquired successfully!', 'success', 3000);
       } catch (elevationError) {
@@ -1948,9 +1953,9 @@ window.UIManager = {
         // Continue with other steps even if elevation fails
       }
 
-      // Step 2: Acquire Copernicus DSM data
-      Utils.log('info', 'Step 2/4: Acquiring Copernicus DSM data...');
-      this.showProgress('🌍 Step 2/4: Acquiring Copernicus DSM data...');
+      // Step 2: Acquire SRTM DSM data (True Digital Surface Model)
+      Utils.log('info', 'Step 2/4: Acquiring SRTM DSM data (True Surface Model)...');
+      this.showProgress('🏔️ Step 2/4: Acquiring SRTM DSM data (True Surface Model)...');
       
       try {
         const dsmRequestData = {
@@ -1958,10 +1963,10 @@ window.UIManager = {
           latitude: latNum,
           longitude: lngNum,
           buffer_km: 12.5,
-          resolution: '30m'
+          resolution: 1  // SRTM 1-arcsecond (~30m)
         };
 
-        const dsmResponse = await fetch('/api/download-copernicus-dsm', {
+        const dsmResponse = await fetch('/api/download-srtm-dsm', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -1977,14 +1982,14 @@ window.UIManager = {
         const dsmResult = await dsmResponse.json();
         
         if (!dsmResult.success) {
-          throw new Error(dsmResult.message || 'Copernicus DSM acquisition failed');
+          throw new Error(dsmResult.message || 'SRTM DSM acquisition failed');
         }
 
-        Utils.log('info', 'Step 2/4: Copernicus DSM acquisition completed successfully');
-        Utils.showNotification('Step 2/4: Copernicus DSM acquired successfully!', 'success', 3000);
+        Utils.log('info', 'Step 2/4: SRTM DSM acquisition completed successfully');
+        Utils.showNotification('Step 2/4: SRTM DSM (True Surface Model) acquired successfully!', 'success', 3000);
       } catch (dsmError) {
-        Utils.log('warn', 'Step 2/4: Copernicus DSM acquisition failed:', dsmError);
-        Utils.showNotification(`Step 2/4: Copernicus DSM failed: ${dsmError.message}`, 'warning', 4000);
+        Utils.log('warn', 'Step 2/4: SRTM DSM acquisition failed:', dsmError);
+        Utils.showNotification(`Step 2/4: SRTM DSM failed: ${dsmError.message}`, 'warning', 4000);
         // Continue with next step even if DSM fails
       }
 
@@ -1999,7 +2004,7 @@ window.UIManager = {
           longitude: lngNum
         };
 
-        const chmResponse = await fetch('/api/generate-coordinate-chm', {
+        const chmResponse = await fetch('/api/generate-proper-chm', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -2015,14 +2020,22 @@ window.UIManager = {
         const chmResult = await chmResponse.json();
         
         if (!chmResult.success) {
-          throw new Error(chmResult.message || 'CHM generation failed');
+          // Provide more specific error message with guidance
+          const errorMsg = chmResult.message || 'CHM generation failed';
+          const nextStep = chmResult.next_step;
+          
+          if (nextStep) {
+            throw new Error(`${errorMsg}. Next step: ${nextStep.endpoint}`);
+          } else {
+            throw new Error(errorMsg);
+          }
         }
 
-        Utils.log('info', 'Step 3/4: CHM generation completed successfully');
-        Utils.showNotification('Step 3/4: CHM (vegetation height) generated successfully!', 'success', 3000);
+        Utils.log('info', 'Step 3/4: Proper CHM generation completed successfully');
+        Utils.showNotification('Step 3/4: Proper CHM (SRTM DSM - DTM) generated successfully!', 'success', 3000);
       } catch (chmError) {
-        Utils.log('warn', 'Step 3/4: CHM generation failed:', chmError);
-        Utils.showNotification(`Step 3/4: CHM failed: ${chmError.message}`, 'warning', 4000);
+        Utils.log('warn', 'Step 3/4: Proper CHM generation failed:', chmError);
+        Utils.showNotification(`Step 3/4: Proper CHM failed: ${chmError.message}`, 'warning', 4000);
         // Continue with next step even if CHM fails
       }
 

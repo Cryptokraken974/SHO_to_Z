@@ -82,6 +82,31 @@ def sky_view_factor(input_file: str, region_name: Optional[str] = None,
     out_band.FlushCache()
     out_ds.FlushCache()
 
+    # Generate enhanced archaeological PNG visualization with cividis colormap
+    try:
+        from app.convert import convert_svf_to_cividis_png
+        
+        # Create PNG output directory
+        png_output_dir = Path("output") / region / "lidar" / "png_outputs"
+        png_output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate cividis PNG with enhanced resolution for archaeological analysis
+        print(f"🎨 Generating enhanced SVF cividis visualization...")
+        cividis_png_path = convert_svf_to_cividis_png(
+            str(output_path),
+            png_path=str(png_output_dir / "SVF.png"),
+            save_to_consolidated=True,
+            enhanced_resolution=True
+        )
+        print(f"✅ Enhanced SVF cividis PNG created: {cividis_png_path}")
+        print(f"🏺 Archaeological features highlighted: Depressions (dark) vs Elevated areas (bright)")
+        print(f"🎯 0.0-1.0 normalization with perceptually uniform colormap")
+        
+    except Exception as png_error:
+        print(f"⚠️ Warning: Failed to generate enhanced PNG visualization: {png_error}")
+        # Continue without failing the entire process
+        pass
+
     return str(output_path)
 
 
@@ -160,6 +185,30 @@ async def process_sky_view_factor_tiff(input_tiff_path: str, output_dir: str,
         # Close datasets
         ds = None
         out_ds = None
+        
+        # Generate enhanced archaeological PNG visualization with cividis colormap
+        try:
+            from app.convert import convert_svf_to_cividis_png
+            
+            # Create PNG output directory relative to output_dir
+            png_output_dir = Path(output_dir).parent / "png_outputs"
+            png_output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate cividis PNG with enhanced resolution for archaeological analysis
+            print(f"🎨 Generating enhanced SVF cividis visualization...")
+            cividis_png_path = convert_svf_to_cividis_png(
+                str(output_path),
+                png_path=str(png_output_dir / "SVF.png"),
+                save_to_consolidated=True,
+                enhanced_resolution=True
+            )
+            print(f"✅ Enhanced SVF cividis PNG created: {cividis_png_path}")
+            print(f"🏺 Archaeological features highlighted: Depressions (dark) vs Elevated areas (bright)")
+            
+        except Exception as png_error:
+            print(f"⚠️ Warning: Failed to generate enhanced PNG visualization: {png_error}")
+            # Continue without failing the entire process
+            pass
         
         processing_time = time.time() - start_time
         

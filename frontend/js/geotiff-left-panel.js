@@ -1456,7 +1456,8 @@ class GeoTiffLeftPanel {
             { type: 'sky_view_factor', name: 'Sky View Factor', icon: '☀️' },
             // Composite products (generated after individual ones)
             { type: 'hillshade_rgb', name: 'RGB Hillshade', icon: '🌈' },
-            { type: 'tint_overlay', name: 'Tint Overlay', icon: '🎭' },
+            // COMMENTED OUT: Tint overlay generation disabled
+            // { type: 'tint_overlay', name: 'Tint Overlay', icon: '🎭' },
             { type: 'boosted_hillshade', name: 'Boosted HS', icon: '⚡' }
         ];
 

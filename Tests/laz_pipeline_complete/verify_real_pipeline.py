@@ -40,7 +40,7 @@ EXPECTED_STRUCTURE = {
         "png_outputs/color_relief.png",
         "png_outputs/slope_relief.png",
         "png_outputs/hillshade_rgb.png",
-        "png_outputs/tint_overlay.png",
+        "png_outputs/TintOverlay.png",
         "png_outputs/boosted_hillshade.png"
     ]
 }

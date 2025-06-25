@@ -338,7 +338,7 @@ def get_laz_overlay_data(base_filename: str, processing_type: str, filename_proc
         # Map processing type to new consolidated PNG names (PRIORITY)
         consolidated_png_mapping = {
             'LRM': 'LRM.png',
-            'Sky_View_Factor': 'SVF.png', 
+            'Sky_View_Factor': 'SVF.png',  # Use standard SVF.png filename
             'Slope': 'Slope.png',
             'CHM': 'CHM.png',  # Add CHM support for consolidated PNG directory
             'chm': 'CHM.png',  # Add lowercase chm support (used by gallery)
@@ -418,14 +418,27 @@ def get_laz_overlay_data(base_filename: str, processing_type: str, filename_proc
                 for pattern in search_patterns:
                     matching_files = glob.glob(pattern)
                     if matching_files:
-                        png_file = matching_files[0]  # Use first match
-                        base_name = os.path.splitext(os.path.basename(png_file))[0]
-                        possible_paths.append({
-                            'png': png_file,
-                            'tiff': f"{png_outputs_dir}/{base_name}.tif",
-                            'world': f"{png_outputs_dir}/{base_name}.wld",
-                            'desc': 'PNG outputs consolidated directory (PATTERN MATCH)'
-                        })
+                        # Filter out legacy files if we have a consolidated name expectation
+                        if processing_type in consolidated_png_mapping:
+                            consolidated_name = consolidated_png_mapping[processing_type]
+                            # No special filtering needed - use standard prioritization
+                        
+                        if matching_files:
+                            # Sort by preference: prioritize enhanced files (cividis, etc.)
+                            enhanced_keywords = ['cividis', 'enhanced', 'archaeological']
+                            matching_files.sort(key=lambda f: (
+                                -any(keyword in f.lower() for keyword in enhanced_keywords),  # Enhanced files first (negative for reverse)
+                                f  # Then alphabetical
+                            ))
+                            
+                            png_file = matching_files[0]  # Use best match
+                            base_name = os.path.splitext(os.path.basename(png_file))[0]
+                            possible_paths.append({
+                                'png': png_file,
+                                'tiff': f"{png_outputs_dir}/{base_name}.tif",
+                                'world': f"{png_outputs_dir}/{base_name}.wld",
+                                'desc': 'PNG outputs consolidated directory (PATTERN MATCH)'
+                            })
                         break
 
         # Pattern 1: New unified structure
