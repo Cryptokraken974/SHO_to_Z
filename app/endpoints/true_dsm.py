@@ -286,21 +286,35 @@ async def generate_proper_chm(data: dict):
             
             # Generate PNG visualization with viridis colormap
             try:
-                from ..convert import convert_chm_to_viridis_png
+                from ..convert import convert_chm_to_viridis_png, convert_chm_to_viridis_png_clean
                 
                 # Create png_outputs directory
                 png_output_dir = region_dir / "png_outputs"
                 png_output_dir.mkdir(parents=True, exist_ok=True)
                 
-                png_path = png_output_dir / "CHM.png"
+                # Create matplotlib subdirectory for decorated PNGs
+                matplotlib_dir = png_output_dir / "matplotlib"
+                matplotlib_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Generate matplotlib CHM PNG with decorations (legends, scales)
+                matplotlib_png_path = matplotlib_dir / "CHM_matplot.png"
                 convert_chm_to_viridis_png(
                     chm_output_file,
-                    str(png_path),
+                    str(matplotlib_png_path),
                     enhanced_resolution=True,
                     save_to_consolidated=False
                 )
+                logger.info(f"🖼️ Matplotlib CHM PNG created: {matplotlib_png_path}")
                 
-                logger.info(f"🖼️ CHM PNG created: {png_path}")
+                # Generate clean CHM PNG (no decorations) as main CHM.png
+                clean_png_path = png_output_dir / "CHM.png"
+                convert_chm_to_viridis_png_clean(
+                    chm_output_file,
+                    str(clean_png_path),
+                    enhanced_resolution=True,
+                    save_to_consolidated=False
+                )
+                logger.info(f"🎯 Clean CHM PNG created as main overlay: {clean_png_path}")
                 
             except Exception as png_error:
                 logger.warning(f"⚠️ CHM PNG generation failed: {png_error}")

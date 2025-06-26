@@ -327,58 +327,55 @@ def slope(input_file: str, region_name: str = None) -> str:
         print(f"✅ SLOPE analysis completed successfully in {total_time:.2f} seconds")
         print(f"📐 Slope file: {output_path}")
         
-        # 🎯 ENHANCED SLOPE PNG GENERATION: Generate PNG with inferno colormap
-        # Check if enhanced TIFF was generated (look for _inferno_enhanced suffix)
-        use_enhanced_png = quality_mode_used or "_inferno_enhanced.tif" in output_path
+        # 🎯 STANDARD SLOPE PNG GENERATION: Generate PNG with greyscale visualization (default)
+        print(f"\n📐 STANDARD MODE: Generating standard slope PNG with greyscale visualization")
+        print(f"   🎨 Greyscale colormap: Standard terrain analysis")
+        print(f"   📊 StdDev stretch: Optimal contrast for general use")
+        print(f"   🗺️ Default visualization: Black (flat) → White (steep)")
         
-        if use_enhanced_png:
-            print(f"\n🔥 ENHANCED MODE: Generating enhanced slope PNG with inferno colormap")
-            print(f"   📐 0°-60° linear rescaling for archaeological terrain analysis")
-            print(f"   🎨 Inferno colormap highlights slope-defined anomalies")
-            print(f"   🏛️ Target features: Terraces, scarps, causeway edges")
+        try:
+            from ..convert import convert_slope_to_greyscale_png
+            
+            # Create png_outputs directory structure
+            tif_dir = os.path.dirname(output_path)
+            base_output_dir = os.path.dirname(tif_dir)  # Go up from Slope/ to lidar/
+            png_output_dir = os.path.join(base_output_dir, "png_outputs")
+            os.makedirs(png_output_dir, exist_ok=True)
+            
+            # Generate PNG with standard slope visualization (greyscale, stddev stretch)
+            png_path = os.path.join(png_output_dir, "Slope.png")
+            convert_slope_to_greyscale_png(
+                output_path, 
+                png_path, 
+                enhanced_resolution=True,
+                save_to_consolidated=False,  # Already in the right directory
+                stretch_type="stddev",
+                stretch_params={"num_stddev": 2.0}
+            )
+            print(f"✅ STANDARD SLOPE GREYSCALE PNG created: {png_path}")
+            print(f"📐 Standard greyscale visualization: Flat areas (dark) → Steep terrain (bright)")
+            logger.info(f"Standard slope greyscale PNG generated: {png_path}")
+        except Exception as png_error:
+            print(f"⚠️ Standard slope PNG generation failed: {png_error}")
+            logger.warning(f"Standard slope PNG generation failed: {png_error}")
+            
+            # Fallback to basic convert_geotiff_to_png
             try:
-                from ..convert import convert_slope_to_inferno_png
-                
-                # Create png_outputs directory structure
-                tif_dir = os.path.dirname(output_path)
-                base_output_dir = os.path.dirname(tif_dir)  # Go up from Slope/ to lidar/
-                png_output_dir = os.path.join(base_output_dir, "png_outputs")
-                os.makedirs(png_output_dir, exist_ok=True)
-                
-                # Generate PNG with enhanced slope visualization (inferno colormap, 0-60° scaling)
+                from ..convert import convert_geotiff_to_png
                 png_path = os.path.join(png_output_dir, "Slope.png")
-                convert_slope_to_inferno_png(
+                convert_geotiff_to_png(
                     output_path, 
                     png_path, 
                     enhanced_resolution=True,
-                    save_to_consolidated=False,  # Already in the right directory
-                    max_slope_degrees=60.0  # Archaeological analysis range
+                    save_to_consolidated=False,
+                    stretch_type="stddev",
+                    stretch_params={"num_stddev": 2.0}
                 )
-                print(f"✅ ENHANCED SLOPE INFERNO PNG created: {png_path}")
-                print(f"🔥 Features highlighted: Terraces, scarps, causeway edges")
-                print(f"🎯 Archaeological analysis: Dark (flat) → Bright (steep)")
-                logger.info(f"Enhanced slope inferno PNG generated: {png_path}")
-            except Exception as png_error:
-                print(f"⚠️ Enhanced slope PNG generation failed: {png_error}")
-                logger.warning(f"Enhanced slope PNG generation failed: {png_error}")
-                
-                # Fallback to standard PNG generation
-                try:
-                    from ..convert import convert_geotiff_to_png
-                    png_path = os.path.join(png_output_dir, "Slope.png")
-                    convert_geotiff_to_png(
-                        output_path, 
-                        png_path, 
-                        enhanced_resolution=True,
-                        save_to_consolidated=False,
-                        stretch_type="stddev",
-                        stretch_params={"num_stddev": 2.0}
-                    )
-                    print(f"✅ Fallback slope PNG created: {png_path}")
-                    logger.info(f"Fallback slope PNG generated: {png_path}")
-                except Exception as fallback_error:
-                    print(f"❌ Fallback slope PNG generation also failed: {fallback_error}")
-                    logger.error(f"Both enhanced and fallback slope PNG generation failed: {fallback_error}")
+                print(f"✅ Fallback slope PNG created: {png_path}")
+                logger.info(f"Fallback slope PNG generated: {png_path}")
+            except Exception as fallback_error:
+                print(f"❌ Fallback slope PNG generation also failed: {fallback_error}")
+                logger.error(f"Both standard and fallback slope PNG generation failed: {fallback_error}")
         
         return output_path
         

@@ -297,51 +297,6 @@ async def process_multi_hillshade_tiff(tiff_path: str, output_dir: str, paramete
             "processing_time": time.time() - start_time,
         }
 
-async def process_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Generate slope raster from elevation TIFF
-    """
-    start_time = time.time()
-    
-    print(f"\n📐 SLOPE PROCESSING (TIFF)")
-    print(f"📁 Input: {os.path.basename(tiff_path)}")
-    
-    try:
-        # Read elevation data
-        elevation_array, metadata = read_elevation_tiff(tiff_path)
-        
-        # Calculate slope
-        print(f"🔄 Calculating slope...")
-        slope_array = calculate_slope(elevation_array, metadata)
-        
-        # Create output filename
-        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
-        output_filename = f"{base_name}_slope.tif"
-        output_path = os.path.join(output_dir, output_filename)
-        
-        # Save result with enhanced quality
-        save_raster(slope_array, output_path, metadata, enhanced_quality=True)
-        
-        processing_time = time.time() - start_time
-        
-        result = {
-            "status": "success",
-            "output_file": output_path,
-            "processing_time": processing_time
-        }
-        
-        print(f"✅ Slope completed in {processing_time:.2f} seconds")
-        return result
-        
-    except Exception as e:
-        error_msg = f"Slope processing failed: {str(e)}"
-        print(f"❌ {error_msg}")
-        return {
-            "status": "error",
-            "error": error_msg,
-            "processing_time": time.time() - start_time
-        }
-
 def calculate_slope(elevation: np.ndarray, metadata: Dict[str, Any]) -> np.ndarray:
     """
     Calculate slope in degrees from elevation array
@@ -865,46 +820,55 @@ async def process_enhanced_lrm_tiff(tiff_path: str, output_dir: str, parameters:
             "processing_time": processing_time
         }
 
-async def process_enhanced_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+async def process_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Enhanced slope processing with archaeological features:
-    - Inferno colormap for optimal contrast (dark=flat, bright=steep)
-    - Linear rescaling from 0° to configurable max degrees
-    - Archaeological terrain analysis optimization
+    Standard slope processing with greyscale visualization (default):
+    - Greyscale colormap for general terrain analysis
+    - Configurable stretch methods for optimal contrast
+    - Optional inferno colormap for archaeological analysis
     """
-    print(f"\n📐 ENHANCED SLOPE PROCESSING (TIFF)")
+    print(f"\n📐 SLOPE PROCESSING (TIFF)")
     print(f"📁 Input: {os.path.basename(tiff_path)}")
     start_time = time.time()
     
     try:
-        # Extract parameters with defaults for archaeological analysis
-        use_inferno_colormap = parameters.get("use_inferno_colormap", True)
+        # Extract parameters with defaults for standard analysis
+        use_inferno_colormap = parameters.get("use_inferno_colormap", False)  # Default to greyscale
         max_slope_degrees = parameters.get("max_slope_degrees", 60.0)
-        enhanced_contrast = parameters.get("enhanced_contrast", True)
+        stretch_type = parameters.get("stretch_type", "stddev")
+        stretch_params = parameters.get("stretch_params", {"num_stddev": 2.0})
+        enhanced_contrast = parameters.get("enhanced_contrast", False)  # Default to standard contrast
         
         # Read elevation data
         print(f"📖 Reading elevation TIFF: {os.path.basename(tiff_path)}")
         elevation_array, metadata = read_elevation_tiff(tiff_path)
         print(f"✅ Elevation data loaded: {elevation_array.shape[1]}x{elevation_array.shape[0]} pixels")
         
-        # Enhanced slope calculation with archaeological optimization
-        print(f"\n🔄 Step 1: Calculating slope with enhanced precision...")
+        # Standard slope calculation
+        print(f"\n🔄 Step 1: Calculating slope...")
         slope_array = calculate_slope(elevation_array, metadata)
         
-        # Archaeological analysis range validation
+        # Choose visualization mode
         if use_inferno_colormap:
             print(f"   🔥 ENHANCED INFERNO VISUALIZATION: Archaeological terrain analysis")
             print(f"      📐 Linear rescaling: 0° to {max_slope_degrees}° for optimal contrast")
             print(f"      🎨 Inferno colormap: Dark (flat areas) → Bright (steep terrain)")
             print(f"      🏛️ Archaeological features highlighted: Terraces, scarps, causeway edges")
+        else:
+            print(f"   📐 STANDARD GREYSCALE VISUALIZATION: General terrain analysis")
+            print(f"      🎨 Greyscale colormap: Standard terrain visualization")
+            print(f"      📊 {stretch_type.upper()} stretch: Optimal contrast for general use")
+            if enhanced_contrast:
+                print(f"      ⚡ Enhanced contrast processing: Active")
+            print(f"      🗺️ Visualization: Black (flat) → White (steep)")
         
-        # Slope range analysis for archaeological context
+        # Slope range analysis
         valid_slope = slope_array[~np.isnan(slope_array)]
         if len(valid_slope) > 0:
             slope_min, slope_max = np.nanmin(valid_slope), np.nanmax(valid_slope)
             slope_mean = np.nanmean(valid_slope)
             
-            # Calculate slope distribution for archaeological interpretation
+            # Calculate slope distribution for terrain analysis
             flat_areas = np.sum(valid_slope < 5) / len(valid_slope) * 100
             moderate_slopes = np.sum((valid_slope >= 5) & (valid_slope < 20)) / len(valid_slope) * 100
             steep_terrain = np.sum(valid_slope >= 20) / len(valid_slope) * 100
@@ -915,10 +879,18 @@ async def process_enhanced_slope_tiff(tiff_path: str, output_dir: str, parameter
             print(f"      🟡 Moderate slopes (5°-20°): {moderate_slopes:.1f}%")
             print(f"      🔴 Steep terrain (20°+): {steep_terrain:.1f}%")
             
-            if steep_terrain > 30:
-                print(f"      🏔️ High relief terrain detected - excellent for archaeological analysis")
-            elif flat_areas > 60:
-                print(f"      🏛️ Low relief terrain - subtle features will be enhanced")
+            if use_inferno_colormap:
+                # Archaeological interpretation for inferno mode
+                if steep_terrain > 30:
+                    print(f"      🏔️ High relief terrain detected - excellent for archaeological analysis")
+                elif flat_areas > 60:
+                    print(f"      🏛️ Low relief terrain - subtle features will be enhanced")
+            else:
+                # General terrain interpretation for standard mode
+                if steep_terrain > 30:
+                    print(f"      🏔️ High relief terrain - mountainous/hilly landscape")
+                elif flat_areas > 60:
+                    print(f"      🏞️ Low relief terrain - plains/gentle landscape")
         
         # Generate output filename with enhancement info
         base_name = os.path.splitext(os.path.basename(tiff_path))[0]
@@ -933,25 +905,30 @@ async def process_enhanced_slope_tiff(tiff_path: str, output_dir: str, parameter
         output_filename += ".tif"
         output_path = os.path.join(output_dir, output_filename)
         
-        # Save enhanced slope TIFF
-        print(f"\n💾 Step 2: Saving Enhanced Slope as GeoTIFF...")
+        # Save slope TIFF
+        print(f"\n💾 Step 2: Saving Slope as GeoTIFF...")
         save_raster(slope_array, output_path, metadata, enhanced_quality=True)
         
         processing_time = time.time() - start_time
         
-        # Enhanced completion logging
-        print(f"✅ ENHANCED SLOPE generation completed: {output_filename}")
+        # Completion logging based on mode
+        if use_inferno_colormap:
+            print(f"✅ ENHANCED SLOPE generation completed: {output_filename}")
+        else:
+            print(f"✅ SLOPE generation completed: {output_filename}")
+        
         print(f"   ⏱️ Processing time: {processing_time:.2f} seconds")
-        print(f"   🎯 Enhanced features used:")
-        print(f"      🔥 Inferno colormap: {'Yes' if use_inferno_colormap else 'No'}")
+        print(f"   🎯 Features used:")
+        print(f"      🎨 Colormap: {'Inferno (enhanced)' if use_inferno_colormap else 'Greyscale (standard)'}")
         print(f"      📐 Max slope range: {max_slope_degrees}°")
-        print(f"      🎨 Enhanced contrast: {'Yes' if enhanced_contrast else 'No'}")
+        if enhanced_contrast:
+            print(f"      ⚡ Enhanced contrast: Active")
         
         result = {
             "status": "success",
             "output_file": output_path,
             "processing_time": processing_time,
-            "enhanced_features": {
+            "features": {
                 "inferno_colormap": use_inferno_colormap,
                 "max_slope_degrees": max_slope_degrees,
                 "enhanced_contrast": enhanced_contrast,
@@ -968,22 +945,25 @@ async def process_enhanced_slope_tiff(tiff_path: str, output_dir: str, parameter
             }
         }
 
-        print(f"✅ enhanced slope completed successfully")
-        
-        # 🎯 ENHANCED FEATURES CONFIRMATION
-        print(f"\n{'🔥'*20} ENHANCED SLOPE FEATURES ACTIVE {'🔥'*20}")
-        print(f"✅ Archaeological terrain analysis mode: ENABLED")
-        print(f"✅ Inferno colormap optimization: {'ACTIVE' if use_inferno_colormap else 'DISABLED'}")
-        print(f"✅ Enhanced contrast processing: {'ACTIVE' if enhanced_contrast else 'DISABLED'}")
-        print(f"✅ Slope range optimization: 0° to {max_slope_degrees}° (archaeological standard)")
-        print(f"✅ Terrain classification: {flat_areas:.1f}% flat, {moderate_slopes:.1f}% moderate, {steep_terrain:.1f}% steep")
-        print(f"{'🔥'*70}")
+        if use_inferno_colormap:
+            print(f"✅ enhanced slope completed successfully")
+            
+            # 🎯 ENHANCED FEATURES CONFIRMATION
+            print(f"\n{'🔥'*20} ENHANCED SLOPE FEATURES ACTIVE {'🔥'*20}")
+            print(f"✅ Archaeological terrain analysis mode: ENABLED")
+            print(f"✅ Inferno colormap optimization: ACTIVE")
+            print(f"✅ Enhanced contrast processing: {'ACTIVE' if enhanced_contrast else 'DISABLED'}")
+            print(f"✅ Slope range optimization: 0° to {max_slope_degrees}° (archaeological standard)")
+            print(f"✅ Terrain classification: {flat_areas:.1f}% flat, {moderate_slopes:.1f}% moderate, {steep_terrain:.1f}% steep")
+            print(f"{'🔥'*70}")
+        else:
+            print(f"✅ slope completed successfully")
         
         return result
 
     except Exception as e:
         processing_time = time.time() - start_time
-        print(f"❌ Enhanced Slope processing failed: {str(e)}")
+        print(f"❌ Slope processing failed: {str(e)}")
         return {
             "status": "error",
             "error": str(e),
@@ -1720,13 +1700,13 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
 
     # Add other raster tasks
     print(f"\n🔥 ENHANCED ARCHAEOLOGICAL PROCESSING PIPELINE ACTIVE 🔥")
-    print(f"✅ Enhanced Slope: Inferno colormap + archaeological terrain analysis")
+    print(f"✅ Standard Slope: Greyscale visualization (default) with optional inferno mode")
     print(f"✅ Enhanced LRM: Adaptive sizing + Gaussian filtering + enhanced normalization")
     print(f"✅ Standard processing: Aspect, Color Relief, SVF, CHM")
     print(f"{'='*60}")
     
     processing_tasks.extend([
-        ("slope", process_enhanced_slope_tiff, {}),  # 🔥 ENHANCED: Inferno colormap + archaeological features
+        ("slope", process_slope_tiff, {"use_inferno_colormap": False}),  # 📐 STANDARD: Greyscale visualization (default)
         ("aspect", process_aspect_tiff, {}),
         ("color_relief", process_color_relief_tiff, {}),
         ("slope_relief", process_slope_relief_tiff, {}),
@@ -1792,46 +1772,146 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                         
                         # Convert TIFF to PNG with appropriate colormap function
                         if task_name == "slope":
-                            # Use specialized inferno colormap for enhanced slope visualization
-                            from convert import convert_slope_to_inferno_png
-                            converted_png = convert_slope_to_inferno_png(
-                                result["output_file"], 
-                                png_path, 
-                                enhanced_resolution=True,
-                                save_to_consolidated=False,
-                                max_slope_degrees=60.0  # Archaeological analysis range
-                            )
-                            print(f"🔥 Enhanced slope PNG: Inferno colormap for archaeological terrain analysis")
+                            # Check if inferno colormap was used based on the result parameters
+                            slope_params = result.get("parameters", {})
+                            use_inferno_colormap = slope_params.get("use_inferno_colormap", False)
+                            
+                            if use_inferno_colormap:
+                                # Use specialized inferno colormap for enhanced slope visualization
+                                from convert import convert_slope_to_inferno_png, convert_slope_to_inferno_png_clean
+                                
+                                # Create matplotlib subdirectory for decorated PNGs
+                                matplotlib_dir = os.path.join(png_output_dir, "matplotlib")
+                                os.makedirs(matplotlib_dir, exist_ok=True)
+                                
+                                # Generate matplotlib Slope PNG with decorations (legends, scales)
+                                matplotlib_png_path = os.path.join(matplotlib_dir, "Slope_matplot.png")
+                                convert_slope_to_inferno_png(
+                                    result["output_file"], 
+                                    matplotlib_png_path, 
+                                    enhanced_resolution=True,
+                                    save_to_consolidated=False,
+                                    max_slope_degrees=60.0  # Archaeological analysis range
+                                )
+                                print(f"🖼️ Matplotlib Slope PNG: Inferno colormap with legends and scales")
+                                
+                                # Generate clean Slope PNG (no decorations) as main Slope.png
+                                converted_png = convert_slope_to_inferno_png_clean(
+                                    result["output_file"], 
+                                    png_path, 
+                                    enhanced_resolution=True,
+                                    save_to_consolidated=False,
+                                    max_slope_degrees=60.0  # Archaeological analysis range
+                                )
+                                print(f"🎯 Clean Slope PNG: Inferno colormap, ready for overlay integration")
+                            else:
+                                # Use standard greyscale slope visualization (default)
+                                from convert import convert_slope_to_greyscale_png, convert_slope_to_greyscale_png_clean
+                                
+                                # Create matplotlib subdirectory for decorated PNGs
+                                matplotlib_dir = os.path.join(png_output_dir, "matplotlib")
+                                os.makedirs(matplotlib_dir, exist_ok=True)
+                                
+                                # Generate matplotlib Slope PNG with decorations (legends, scales)
+                                matplotlib_png_path = os.path.join(matplotlib_dir, "Slope_matplot.png")
+                                convert_slope_to_greyscale_png(
+                                    result["output_file"], 
+                                    matplotlib_png_path, 
+                                    enhanced_resolution=True,
+                                    save_to_consolidated=False,
+                                    stretch_type="stddev",
+                                    stretch_params={"num_stddev": 2.0}
+                                )
+                                print(f"🖼️ Matplotlib Slope PNG: Greyscale colormap with legends and scales")
+                                
+                                # Generate clean Slope PNG (no decorations) as main Slope.png
+                                converted_png = convert_slope_to_greyscale_png_clean(
+                                    result["output_file"], 
+                                    png_path, 
+                                    enhanced_resolution=True,
+                                    save_to_consolidated=False,
+                                    stretch_type="stddev",
+                                    stretch_params={"num_stddev": 2.0}
+                                )
+                                print(f"🎯 Clean Slope PNG: Greyscale colormap, ready for overlay integration")
                         elif task_name == "lrm":
                             # Use specialized coolwarm colormap for enhanced LRM visualization
-                            from convert import convert_lrm_to_coolwarm_png
-                            converted_png = convert_lrm_to_coolwarm_png(
+                            from convert import convert_lrm_to_coolwarm_png, convert_lrm_to_coolwarm_png_clean
+                            
+                            # Create matplotlib subdirectory for decorated PNGs
+                            matplotlib_dir = os.path.join(png_output_dir, "matplotlib")
+                            os.makedirs(matplotlib_dir, exist_ok=True)
+                            
+                            # Generate matplotlib LRM PNG with decorations (legends, scales)
+                            matplotlib_png_path = os.path.join(matplotlib_dir, "LRM_matplot.png")
+                            convert_lrm_to_coolwarm_png(
+                                result["output_file"], 
+                                matplotlib_png_path, 
+                                enhanced_resolution=True,
+                                save_to_consolidated=False
+                            )
+                            print(f"🖼️ Matplotlib LRM PNG: Coolwarm colormap with legends and scales")
+                            
+                            # Generate clean LRM PNG (no decorations) as main LRM.png
+                            converted_png = convert_lrm_to_coolwarm_png_clean(
                                 result["output_file"], 
                                 png_path, 
                                 enhanced_resolution=True,
                                 save_to_consolidated=False
                             )
-                            print(f"🌡️ Enhanced LRM PNG: Coolwarm colormap for morphological analysis")
+                            print(f"🎯 Clean LRM PNG: No decorations, ready for overlay integration")
                         elif task_name == "sky_view_factor":
                             # Use specialized cividis colormap for enhanced SVF archaeological visualization
-                            from convert import convert_svf_to_cividis_png
-                            converted_png = convert_svf_to_cividis_png(
+                            from convert import convert_svf_to_cividis_png, convert_svf_to_cividis_png_clean
+                            
+                            # Create matplotlib subdirectory for decorated PNGs
+                            matplotlib_dir = os.path.join(png_output_dir, "matplotlib")
+                            os.makedirs(matplotlib_dir, exist_ok=True)
+                            
+                            # Generate matplotlib SVF PNG with decorations (legends, scales)
+                            matplotlib_png_path = os.path.join(matplotlib_dir, "SVF_matplot.png")
+                            convert_svf_to_cividis_png(
+                                result["output_file"], 
+                                matplotlib_png_path, 
+                                enhanced_resolution=True,
+                                save_to_consolidated=False
+                            )
+                            print(f"🖼️ Matplotlib SVF PNG: Cividis colormap with legends and scales")
+                            
+                            # Generate clean SVF PNG (no decorations) as main SVF.png
+                            converted_png = convert_svf_to_cividis_png_clean(
                                 result["output_file"], 
                                 png_path, 
                                 enhanced_resolution=True,
                                 save_to_consolidated=False
                             )
-                            print(f"🌌 Enhanced SVF PNG: Cividis colormap for archaeological feature detection")
+                            print(f"🎯 Clean SVF PNG: No decorations, ready for overlay integration")
                         elif task_name == "chm":
                             # Use specialized viridis colormap for CHM visualization
-                            from convert import convert_chm_to_viridis_png
-                            converted_png = convert_chm_to_viridis_png(
+                            from convert import convert_chm_to_viridis_png, convert_chm_to_viridis_png_clean
+                            
+                            # Create matplotlib subdirectory for decorated PNGs
+                            matplotlib_dir = os.path.join(png_output_dir, "matplotlib")
+                            os.makedirs(matplotlib_dir, exist_ok=True)
+                            
+                            # Generate matplotlib CHM PNG with decorations (legends, scales)
+                            matplotlib_png_path = os.path.join(matplotlib_dir, "CHM_matplot.png")
+                            convert_chm_to_viridis_png(
+                                result["output_file"], 
+                                matplotlib_png_path, 
+                                enhanced_resolution=True,
+                                save_to_consolidated=False
+                            )
+                            print(f"🖼️ Matplotlib CHM PNG: Viridis colormap with legends and scales")
+                            
+                            # Generate clean CHM PNG (no decorations) as main CHM.png
+                            converted_png = convert_chm_to_viridis_png_clean(
                                 result["output_file"], 
                                 png_path, 
                                 enhanced_resolution=True,
                                 save_to_consolidated=False
                             )
-                            print(f"🌳 Enhanced CHM PNG: Viridis colormap for canopy height visualization")
+                            print(f"🎯 Clean CHM PNG: No decorations, ready for overlay integration")
                         else:
                             # Use standard PNG conversion for other raster types
                             converted_png = convert_geotiff_to_png(result["output_file"], png_path)

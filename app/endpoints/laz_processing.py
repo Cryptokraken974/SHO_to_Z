@@ -582,12 +582,12 @@ async def api_slope(
     region_name: str = Form(None),
     processing_type: str = Form(None), 
     display_region_name: str = Form(None),
-    use_inferno_colormap: bool = Form(True),  # Default to enhanced inferno visualization
-    max_slope_degrees: float = Form(60.0),    # Archaeological analysis range
+    use_inferno_colormap: bool = Form(False),  # Default to standard greyscale visualization
+    max_slope_degrees: float = Form(60.0),     # Still available for inferno mode
     stretch_type: Optional[str] = Form("stddev"),
     stretch_params_json: Optional[str] = Form(None)
 ):
-    """Generate enhanced slope analysis from LAZ file with inferno colormap for archaeological terrain analysis"""
+    """Generate standard slope analysis from LAZ file with greyscale visualization (default) or optional inferno colormap for archaeological terrain analysis"""
     print(f"\n🎯 API CALL: /api/slope (Enhanced)")
     logger.info(f"/api/slope called for region: {region_name}, file: {input_file}, inferno: {use_inferno_colormap}, max_degrees: {max_slope_degrees}")
     effective_input_file = input_file
@@ -601,8 +601,54 @@ async def api_slope(
         tif_path = slope(effective_input_file, output_region)
         print(f"✅ Slope TIF generated: {tif_path}")
 
-        # Use enhanced inferno visualization for archaeological analysis
-        if use_inferno_colormap:
+        # Generate standard greyscale slope visualization by default
+        if not use_inferno_colormap:
+            print(f"📐 STANDARD GREYSCALE VISUALIZATION: Default slope analysis")
+            print(f"   🎨 Greyscale colormap: Standard terrain visualization")
+            print(f"   📊 StdDev stretch: Optimal contrast for general use")
+            print(f"   🗺️ Visualization: Black (flat) → White (steep)")
+            
+            # Create PNG output path
+            png_dir = os.path.join("output", output_region, "lidar", "png_outputs")
+            os.makedirs(png_dir, exist_ok=True)
+            png_path = os.path.join(png_dir, "Slope.png")
+            
+            # Import the standard slope conversion function
+            from ..convert import convert_slope_to_greyscale_png
+            
+            # Generate standard slope PNG for general terrain analysis
+            parsed_stretch_params = _parse_stretch_params(stretch_params_json)
+            if parsed_stretch_params is None:
+                parsed_stretch_params = {"num_stddev": 2.0}
+            
+            final_png_path = convert_slope_to_greyscale_png(
+                tif_path, 
+                png_path,
+                enhanced_resolution=True,
+                save_to_consolidated=False,  # Already in the right directory
+                stretch_type=stretch_type if stretch_type else "stddev",
+                stretch_params=parsed_stretch_params
+            )
+            print(f"✅ Standard slope greyscale PNG generated: {final_png_path}")
+            print(f"📊 Standard visualization optimized for general terrain analysis")
+            
+            # Convert PNG to base64 for display
+            with open(final_png_path, 'rb') as f:
+                png_data = f.read()
+                image_b64 = base64.b64encode(png_data).decode('utf-8')
+            
+            print(f"✅ Standard greyscale base64 conversion complete")
+            return {
+                "image": image_b64,
+                "visualization_type": "standard_greyscale",
+                "stretch_type": stretch_type if stretch_type else "stddev",
+                "stretch_params": parsed_stretch_params,
+                "colormap": "greyscale",
+                "analysis_focus": "general_terrain_analysis"
+            }
+            
+        # Use enhanced inferno visualization for archaeological analysis (optional mode)
+        else:
             print(f"🔥 ENHANCED INFERNO VISUALIZATION: Archaeological terrain analysis")
             print(f"   📐 0°-{max_slope_degrees}° linear rescaling for optimal contrast")
             print(f"   🎨 Inferno colormap: Dark (flat) → Bright (steep)")
@@ -640,15 +686,6 @@ async def api_slope(
                 "colormap": "inferno",
                 "analysis_focus": "slope_defined_anomalies"
             }
-        else:
-            print(f"📊 STANDARD VISUALIZATION: Traditional slope analysis")
-            # Use standard visualization
-            parsed_stretch_params = _parse_stretch_params(stretch_params_json)
-            image_b64 = convert_geotiff_to_png_base64(
-                tif_path,
-                stretch_type=stretch_type if stretch_type else "stddev",
-                stretch_params=parsed_stretch_params
-            )
             print(f"✅ Standard base64 conversion complete")
             return {
                 "image": image_b64,
