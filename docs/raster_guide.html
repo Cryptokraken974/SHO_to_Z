@@ -178,14 +178,30 @@
 
                 <article class="raster-type" id="dsm">
                     <h3>Digital Surface Model (DSM)</h3>
-                    <p><strong>Description:</strong> A DSM represents the elevation of the top surfaces of all features on the landscape, including vegetation canopy, buildings, and the ground.</p>
-                    <p><strong>Archaeological Relevance:</strong> Useful for understanding the current state of the landscape, assessing vegetation cover over sites, and as a basis for deriving the Canopy Height Model (CHM). It can also help in identifying upstanding ruins or structures still visible on the surface.</p>
-                    <p><strong>Generation Parameters:</strong>
-                        <ul>
-                            <li><strong>Input:</strong> LAZ point cloud (all points) or global DSM sources (e.g., Copernicus GLO-30/GLO-90).</li>
-                            <li><strong>Resolution:</strong> Configurable.</li>
-                        </ul>
-                    </p>
+                    <p><strong>Description:</strong> A DSM represents the elevation of the top surfaces of all features on the landscape, including the ground, vegetation canopy, and buildings. It captures the first reflective surface encountered by the sensor.</p>
+                    <p><strong>Sources & Generation:</strong></p>
+                    <ul>
+                        <li><strong>From LAZ/LAS Files:</strong> When you upload LiDAR data, a high-resolution DSM can be generated from the point cloud (typically using all or first returns). This provides a detailed surface model specific to your LAZ data's extent and acquisition time. The resolution will depend on the point density of your LAZ file and processing parameters.</li>
+                        <li><strong>Global DSM (for manually created regions):</strong> When using the "Get Data" function for regions defined on the map, the application can fetch global DSM data. Currently, this is primarily the <strong>Copernicus DEM</strong>, available at GLO-30 (approximately 30-meter resolution) or GLO-90 (approximately 90-meter resolution) a near-global coverage. While SRTM (Shuttle Radar Topography Mission) is a well-known global DSM, the Copernicus DEM is a more recent product that often incorporates and improves upon SRTM data.
+                            <div class="note">
+                                <p><strong>Note on Global DSMs:</strong> These datasets (like Copernicus DEM GLO-30/GLO-90) are excellent for understanding regional topography and landscape context. However, their coarser resolution (e.g., 30m) means they are generally not suitable for detecting small or subtle archaeological earthworks, for which LiDAR-derived DTMs are preferred.</p>
+                            </div>
+                        </li>
+                    </ul>
+                    <p><strong>Archaeological Relevance:</strong></p>
+                    <ul>
+                        <li>Provides context about the current state of the landscape over an archaeological site (e.g., current vegetation cover, presence of modern structures).</li>
+                        <li>Essential for generating a Canopy Height Model (CHM) when subtracted from a DTM.</li>
+                        <li>Can help in identifying extant (still standing) ruins or large-scale landscape modifications if their vertical signature is significant enough to be captured at the DSM's resolution.</li>
+                        <li>Global DSMs are useful for broad area reconnaissance and understanding how a site fits into the wider terrain.</li>
+                    </ul>
+                    <p><strong>Key Characteristics (Global DSMs like Copernicus DEM):</strong></p>
+                    <ul>
+                        <li><strong>Type:</strong> Digital Surface Model (first reflective surface).</li>
+                        <li><strong>Resolution:</strong> Typically ~30 meters (e.g., Copernicus GLO-30) or ~90 meters (e.g., Copernicus GLO-90).</li>
+                        <li><strong>Coverage:</strong> Near-global.</li>
+                        <li><strong>Vertical Accuracy:</strong> Generally lower than LiDAR-derived products (errors can be several meters).</li>
+                    </ul>
                 </article>
 
                 <article class="raster-type" id="chm">
