@@ -1175,59 +1175,51 @@ def convert_slope_to_greyscale_png_clean(
         logger.error(error_msg, exc_info=True)
         raise Exception(error_msg)
 
-def convert_svf_to_cividis_png(
+def convert_slope_to_archaeological_ylord_png(
     tif_path: str,
     png_path: Optional[str] = None,
     enhanced_resolution: bool = True,
-    save_to_consolidated: bool = True
+    save_to_consolidated: bool = True,
+    archaeological_mode: bool = True,
+    apply_transparency: bool = True
 ) -> str:
     """
-    Convert Sky View Factor (SVF) TIF to PNG using cividis colormap with decorations.
+    Convert Slope GeoTIFF to PNG with Archaeological YlOrRd colormap (2°-20° normalization).
+    This uses the optimal archaeological visualization from slope testing (09_Archaeological_YlOrRd_2to20.png).
     
-    Normalizes SVF values between 0.0 (fully enclosed) and 1.0 (fully open)
-    according to archaeological visualization requirements. Uses the cividis 
-    colormap which provides perceptual uniformity and improved readability.
-    Depressions (ditches, trenches) appear darker, raised surfaces brighter.
-    
-    Parameters
-    ----------
-    tif_path: str
-        Path to the input SVF TIF file
-    png_path: Optional[str]
-        Output PNG path (auto-generated if None)
-    enhanced_resolution: bool
-        Use high resolution (300 DPI) if True
-    save_to_consolidated: bool
-        Save copy to consolidated png_outputs directory
+    Args:
+        tif_path: Path to Slope TIF file
+        png_path: Optional output PNG path  
+        enhanced_resolution: Use enhanced processing
+        save_to_consolidated: Copy to consolidated directory
+        archaeological_mode: Use 2°-20° archaeological normalization
+        apply_transparency: Apply transparency masking for background areas
         
-    Returns
-    -------
-    str
-        Path to the generated PNG file
+    Returns:
+        Path to generated PNG file
     """
-    print(f"\n🌌 SVF CIVIDIS COLORIZATION: {os.path.basename(tif_path)}")
-    logger.info(f"SVF cividis colorization for {tif_path}")
+    print(f"\n🏛️ ARCHAEOLOGICAL SLOPE YlOrRd PNG: {os.path.basename(tif_path)}")
+    logger.info(f"Archaeological YlOrRd slope PNG generation for {tif_path}")
     
     start_time = time.time()
     
     try:
         # Generate output path if not provided
         if png_path is None:
-            png_path = os.path.splitext(tif_path)[0] + "_cividis.png"
+            png_path = os.path.splitext(tif_path)[0] + "_slope_archaeological.png"
         
         # Ensure output directory exists
         output_dir = os.path.dirname(png_path)
         if output_dir and not os.path.exists(output_dir):
             os.makedirs(output_dir)
-            print(f"📁 Created output directory: {output_dir}")
         
-        # Open and read SVF data
+        # Open and read Slope data
         ds = gdal.Open(tif_path)
         if ds is None:
-            raise Exception(f"Failed to open SVF TIF: {tif_path}")
+            raise Exception(f"Failed to open Slope TIF: {tif_path}")
         
         band = ds.GetRasterBand(1)
-        svf_data = band.ReadAsArray()
+        slope_data = band.ReadAsArray().astype(np.float32)
         
         # Get georeference info for world file
         geotransform = ds.GetGeoTransform()
@@ -1237,98 +1229,324 @@ def convert_svf_to_cividis_png(
         ds = None
         band = None
         
-        print(f"📏 SVF dimensions: {width}x{height} pixels")
-        print(f"📊 SVF data range: {np.nanmin(svf_data):.3f} to {np.nanmax(svf_data):.3f}")
+        print(f"📏 Slope dimensions: {width}x{height} pixels")
+        print(f"📊 Slope data range: {np.nanmin(slope_data):.2f}° to {np.nanmax(slope_data):.2f}°")
         
         # Handle NoData values
-        nodata_mask = svf_data == -9999
-        svf_data[nodata_mask] = np.nan
+        nodata_mask = slope_data == -9999
+        slope_data[nodata_mask] = np.nan
         
-        # Apply SVF visualization for archaeological analysis
-        valid_data = svf_data[~np.isnan(svf_data)]
+        # Calculate statistics
+        valid_data = slope_data[~np.isnan(slope_data)]
         if len(valid_data) == 0:
-            print("⚠️ No valid SVF data found")
-            # Create empty image
-            fig, ax = plt.subplots(figsize=(10, 8))
-            ax.text(0.5, 0.5, 'No SVF Data Available', ha='center', va='center', 
-                   fontsize=16, transform=ax.transAxes)
-            ax.set_xlim(0, 1)
-            ax.set_ylim(0, 1)
+            raise Exception("No valid slope data found")
+        
+        stats = {
+            'min': np.nanmin(valid_data),
+            'max': np.nanmax(valid_data),
+            'mean': np.nanmean(valid_data),
+            'std': np.nanstd(valid_data),
+            'p2': np.percentile(valid_data, 2),
+            'p98': np.percentile(valid_data, 98)
+        }
+        
+        print(f"📊 Archaeological analysis:")
+        print(f"   📈 Range: {stats['min']:.2f}° to {stats['max']:.2f}°")
+        print(f"   📊 Mean: {stats['mean']:.2f}° ± {stats['std']:.2f}°")
+        print(f"   📊 P2-P98: {stats['p2']:.2f}° to {stats['p98']:.2f}°")
+        
+        # Apply Archaeological 2°-20° normalization (archaeological_2_20 from testing)
+        if archaeological_mode:
+            vmin, vmax = 2.0, 20.0  # Archaeological range from best test
+            print(f"🎯 Using archaeological normalization: {vmin}° to {vmax}°")
+            print(f"   🏛️ Target features: Pathways (2°-8°), Scarps (8°-20°)")
         else:
-            # SVF normalization: ensure data is properly normalized to 0.0-1.0 range
-            actual_min = np.nanmin(valid_data)
-            actual_max = np.nanmax(valid_data)
+            # Legacy mode - use full range
+            vmin, vmax = stats['min'], stats['max']
+            print(f"🎯 Using legacy normalization: {vmin:.2f}° to {vmax:.2f}°")
+        
+        # Normalize to [0, 1] range using archaeological formula
+        normalized_data = np.clip((slope_data - vmin) / (vmax - vmin), 0, 1)
+        
+        print(f"   ✅ Normalized range: {np.nanmin(normalized_data[~np.isnan(normalized_data)]):.3f} to {np.nanmax(normalized_data[~np.isnan(normalized_data)]):.3f}")
+        
+        # Create figure with high quality settings
+        if enhanced_resolution:
+            dpi_value = 300
+            fig, ax = plt.subplots(figsize=(16, 12), dpi=dpi_value)
+        else:
+            dpi_value = 150
+            fig, ax = plt.subplots(figsize=(12, 10), dpi=dpi_value)
+        
+        # Use YlOrRd colormap (Yellow-Orange-Red) from the best test result
+        cmap = plt.cm.YlOrRd
+        print(f"🎨 Applying YlOrRd colormap (Yellow-Orange-Red)")
+        print(f"   🟡 Light yellow: Gentle slopes (2°-5°)")
+        print(f"   🟠 Orange: Moderate slopes (5°-12°)")
+        print(f"   🔴 Dark red: Steep slopes (12°-20°)")
+        
+        # Create masked array for transparency handling
+        if apply_transparency and archaeological_mode:
+            # Apply transparency mask: fade areas outside archaeological range
+            alpha_mask = np.ones_like(normalized_data)
+            alpha_mask[slope_data < 2.0] = 0.3  # Background flat areas
+            alpha_mask[slope_data > 20.0] = 0.5  # Background steep areas
+            alpha_mask[np.isnan(slope_data)] = 0.0  # NoData fully transparent
             
-            print(f"🎨 Applying SVF normalization (0.0 to 1.0):")
-            print(f"   📊 Actual data range: {actual_min:.3f} to {actual_max:.3f}")
-            print(f"   📐 Target range: 0.0 to 1.0")
-            print(f"   🌌 Colormap: Cividis (perceptual uniformity, colorblind-friendly)")
+            # Create RGBA array
+            colors = cmap(normalized_data)
+            colors[:, :, 3] = alpha_mask  # Set alpha channel
             
-            # Normalize SVF data to [0, 1] range
-            if actual_max > actual_min:
-                normalized_data = (svf_data - actual_min) / (actual_max - actual_min)
-            else:
-                # Handle flat SVF case
-                normalized_data = np.full_like(svf_data, 0.5)
+            print(f"   👻 Transparency masking applied:")
+            print(f"      • <2°: 30% opacity (background suppression)")
+            print(f"      • 2°-20°: 100% opacity (archaeological features)")
+            print(f"      • >20°: 50% opacity (background steep)")
+        else:
+            # Standard masked array for NaN handling
+            colors = np.ma.masked_where(np.isnan(normalized_data), normalized_data)
+        
+        # Display the slope image
+        if apply_transparency and archaeological_mode:
+            ax.imshow(colors, aspect='equal', interpolation='nearest',
+                     extent=[0, width, height, 0])
+        else:
+            ax.imshow(colors, cmap=cmap, vmin=0, vmax=1, 
+                     aspect='equal', interpolation='nearest',
+                     extent=[0, width, height, 0])
+        
+        # Add colorbar and title for decorated version
+        if apply_transparency and archaeological_mode:
+            # Create a clean colorbar reference
+            sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
+            sm.set_array([])
+            cbar = plt.colorbar(sm, ax=ax, shrink=0.6, aspect=20)
+        else:
+            cbar = plt.colorbar(ax.images[0], ax=ax, shrink=0.6, aspect=20)
+        
+        cbar.set_label('Slope (degrees)', rotation=270, labelpad=20, fontsize=12)
+        
+        # Set colorbar ticks for archaeological range
+        if archaeological_mode:
+            tick_positions = [2, 5, 8, 12, 16, 20]
+            cbar.set_ticks(tick_positions)
+            cbar.set_ticklabels([f"{t}°" for t in tick_positions])
+        
+        # Add title with archaeological specifications
+        title = f"Archaeological Slope Analysis (YlOrRd)\n{os.path.basename(tif_path)}"
+        if archaeological_mode:
+            title += f"\n2°-20° Archaeological Normalization"
+        ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
+        
+        # Add axes labels
+        ax.set_xlabel("Pixels (East)", fontsize=10)
+        ax.set_ylabel("Pixels (North)", fontsize=10)
+        
+        # Add explanatory text for archaeological interpretation
+        if archaeological_mode:
+            flat_pct = np.sum(slope_data < 2.0) / np.sum(~np.isnan(slope_data)) * 100
+            moderate_pct = np.sum((slope_data >= 2.0) & (slope_data <= 20.0)) / np.sum(~np.isnan(slope_data)) * 100
+            steep_pct = np.sum(slope_data > 20.0) / np.sum(~np.isnan(slope_data)) * 100
             
-            # Ensure normalized data is properly bounded
-            normalized_data = np.clip(normalized_data, 0, 1)
+            explanation_text = f"Archaeological Feature Analysis:\n"
+            explanation_text += f"Flat areas (<2°): {flat_pct:.1f}% | "
+            explanation_text += f"Archaeological range (2°-20°): {moderate_pct:.1f}% | "
+            explanation_text += f"Steep background (>20°): {steep_pct:.1f}%\n"
+            explanation_text += f"YlOrRd colormap optimized for archaeological terrain analysis"
             
-            print(f"   ✅ Normalized range: {np.nanmin(normalized_data[~np.isnan(normalized_data)]):.3f} to {np.nanmax(normalized_data[~np.isnan(normalized_data)]):.3f}")
+            ax.text(0.02, 0.02, explanation_text, transform=ax.transAxes, fontsize=9,
+                   verticalalignment='bottom', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        
+        # Save the PNG
+        plt.savefig(png_path, dpi=dpi_value, bbox_inches='tight', 
+                   facecolor='white', edgecolor='none', format='PNG')
+        plt.close()
+        
+        # Create world file for georeferencing
+        if geotransform:
+            world_file_path = os.path.splitext(png_path)[0] + ".pgw"
+            with open(world_file_path, 'w') as f:
+                f.write(f"{geotransform[1]:.10f}\n")  # pixel size x
+                f.write(f"{geotransform[2]:.10f}\n")  # rotation y
+                f.write(f"{geotransform[4]:.10f}\n")  # rotation x
+                f.write(f"{geotransform[5]:.10f}\n")  # pixel size y (negative)
+                f.write(f"{geotransform[0]:.10f}\n")  # top left x
+                f.write(f"{geotransform[3]:.10f}\n")  # top left y
+            print(f"🌍 Created world file: {os.path.basename(world_file_path)}")
+        
+        # Transform world file to WGS84 if possible
+        world_file_path = os.path.splitext(png_path)[0] + ".pgw"
+        if os.path.exists(world_file_path):
+            success = create_wgs84_world_file(world_file_path, tif_path, png_path)
+            if success:
+                print(f"✅ WGS84 world file created for proper overlay scaling")
+        
+        # Copy to consolidated directory if requested
+        if save_to_consolidated:
+            try:
+                path_parts = tif_path.split(os.sep)
+                region_name = "UnknownRegion"
+                if "output" in path_parts:
+                    idx = path_parts.index("output")
+                    if idx + 1 < len(path_parts): 
+                        region_name = path_parts[idx+1]
+                
+                consolidated_dir = os.path.join("output", region_name, "lidar", "png_outputs")
+                os.makedirs(consolidated_dir, exist_ok=True)
+                
+                # Check if PNG is already in the target directory
+                png_normalized = os.path.normpath(png_path)
+                consolidated_normalized = os.path.normpath(consolidated_dir)
+                
+                if consolidated_normalized not in png_normalized:
+                    import shutil
+                    consolidated_png_path = os.path.join(consolidated_dir, "Slope_archaeological.png")
+                    shutil.copy2(png_path, consolidated_png_path)
+                    
+                    # Copy world files too
+                    for ext in [".pgw", ".wld", "_wgs84.wld"]:
+                        src_world = os.path.splitext(png_path)[0] + ext
+                        if os.path.exists(src_world):
+                            dst_world = os.path.splitext(consolidated_png_path)[0] + ext
+                            shutil.copy2(src_world, dst_world)
+                    
+                    print(f"✅ Copied archaeological slope PNG to consolidated directory")
+                
+            except Exception as e:
+                logger.warning(f"Failed to copy archaeological slope PNG to consolidated directory: {e}")
+        
+        processing_time = time.time() - start_time
+        print(f"✅ Archaeological YlOrRd slope PNG completed in {processing_time:.2f} seconds")
+        print(f"📁 Result: {os.path.basename(png_path)}")
+        
+        return png_path
+        
+    except Exception as e:
+        error_msg = f"Archaeological YlOrRd slope PNG generation failed for {tif_path}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        raise Exception(error_msg)
+
+def convert_slope_to_archaeological_ylord_png_clean(
+    tif_path: str,
+    png_path: Optional[str] = None,
+    enhanced_resolution: bool = True,
+    save_to_consolidated: bool = True,
+    archaeological_mode: bool = True,
+    apply_transparency: bool = True
+) -> str:
+    """
+    Convert Slope GeoTIFF to clean Archaeological YlOrRd PNG (no legends/scales/decorations).
+    This creates overlay-ready slope visualization using the optimal archaeological approach.
+    
+    Args:
+        tif_path: Path to Slope TIF file
+        png_path: Optional output PNG path  
+        enhanced_resolution: Use enhanced processing
+        save_to_consolidated: Copy to consolidated directory
+        archaeological_mode: Use 2°-20° archaeological normalization
+        apply_transparency: Apply transparency masking for background areas
+        
+    Returns:
+        Path to generated clean PNG file
+    """
+    print(f"\n🏛️ CLEAN ARCHAEOLOGICAL SLOPE YlOrRd PNG: {os.path.basename(tif_path)}")
+    logger.info(f"Clean archaeological YlOrRd slope PNG generation for {tif_path}")
+    
+    start_time = time.time()
+    
+    try:
+        # Generate output path if not provided
+        if png_path is None:
+            png_path = os.path.splitext(tif_path)[0] + "_slope_archaeological_clean.png"
+        
+        # Ensure output directory exists
+        output_dir = os.path.dirname(png_path)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
+        # Open and read Slope data
+        ds = gdal.Open(tif_path)
+        if ds is None:
+            raise Exception(f"Failed to open Slope TIF: {tif_path}")
+        
+        band = ds.GetRasterBand(1)
+        slope_data = band.ReadAsArray().astype(np.float32)
+        
+        # Get georeference info for world file
+        geotransform = ds.GetGeoTransform()
+        width = ds.RasterXSize
+        height = ds.RasterYSize
+        
+        ds = None
+        band = None
+        
+        print(f"📏 Slope dimensions: {width}x{height} pixels")
+        print(f"📊 Slope data range: {np.nanmin(slope_data):.2f}° to {np.nanmax(slope_data):.2f}°")
+        
+        # Handle NoData values
+        nodata_mask = slope_data == -9999
+        slope_data[nodata_mask] = np.nan
+        
+        # Apply Archaeological 2°-20° normalization
+        if archaeological_mode:
+            vmin, vmax = 2.0, 20.0  # Archaeological range
+            print(f"🎯 Archaeological normalization: {vmin}° to {vmax}°")
+        else:
+            # Legacy mode
+            valid_data = slope_data[~np.isnan(slope_data)]
+            vmin, vmax = np.nanmin(valid_data), np.nanmax(valid_data)
+            print(f"🎯 Legacy normalization: {vmin:.2f}° to {vmax:.2f}°")
+        
+        # Normalize to [0, 1] range
+        normalized_data = np.clip((slope_data - vmin) / (vmax - vmin), 0, 1)
+        
+        print(f"   ✅ Normalized range: {np.nanmin(normalized_data[~np.isnan(normalized_data)]):.3f} to {np.nanmax(normalized_data[~np.isnan(normalized_data)]):.3f}")
+        
+        # Create figure with exact pixel dimensions (clean version)
+        dpi = 100
+        fig_width = width / dpi
+        fig_height = height / dpi
+        
+        fig = plt.figure(figsize=(fig_width, fig_height), dpi=dpi)
+        ax = fig.add_axes([0, 0, 1, 1])  # Fill entire figure
+        ax.set_xlim(0, width)
+        ax.set_ylim(height, 0)  # Flip Y axis for image convention
+        ax.axis('off')
+        
+        # Use YlOrRd colormap
+        cmap = plt.cm.YlOrRd
+        print(f"🎨 Applying clean YlOrRd colormap")
+        
+        # Create masked array for transparency handling
+        if apply_transparency and archaeological_mode:
+            # Apply transparency mask
+            alpha_mask = np.ones_like(normalized_data)
+            alpha_mask[slope_data < 2.0] = 0.3  # Background flat areas
+            alpha_mask[slope_data > 20.0] = 0.5  # Background steep areas
+            alpha_mask[np.isnan(slope_data)] = 0.0  # NoData fully transparent
             
-            # Create figure with high quality settings
-            if enhanced_resolution:
-                fig, ax = plt.subplots(figsize=(16, 12), dpi=300)
-            else:
-                fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
+            # Create RGBA array
+            colors = cmap(normalized_data)
+            colors[:, :, 3] = alpha_mask  # Set alpha channel
             
-            # Apply cividis colormap for archaeological SVF analysis
-            # Dark blue (0) = enclosed areas (ditches, depressions)
-            # Bright yellow (1) = open areas (ridges, elevated surfaces)
-            # Perfect for distinguishing archaeological features
-            cmap = plt.cm.cividis
+            # Display the slope image with transparency
+            ax.imshow(colors, aspect='equal', interpolation='nearest',
+                     extent=[0, width, height, 0])
             
-            # Create masked array to handle NaN values
+            print(f"   👻 Clean transparency masking applied")
+        else:
+            # Standard masked array for NaN handling
             masked_data = np.ma.masked_where(np.isnan(normalized_data), normalized_data)
             
-            # Display with cividis colormap
-            im = ax.imshow(masked_data, cmap=cmap, vmin=0, vmax=1, 
-                          aspect='equal', interpolation='nearest')
-            
-            # Add colorbar with meaningful labels for archaeological interpretation
-            cbar = plt.colorbar(im, ax=ax, shrink=0.6, pad=0.02)
-            cbar.set_label('Sky View Factor', rotation=270, labelpad=20, fontsize=12)
-            
-            # Set colorbar ticks to show actual SVF values
-            tick_positions = np.linspace(0, 1, 6)
-            tick_labels = [f"{actual_min + pos * (actual_max - actual_min):.2f}" 
-                          for pos in tick_positions]
-            cbar.set_ticks(tick_positions)
-            cbar.set_ticklabels(tick_labels)
-            
-            # Set title and labels for archaeological context
-            ax.set_title(f"SVF - Sky View Factor (Archaeological Analysis)\n{os.path.basename(tif_path)}", 
-                        fontsize=14, fontweight='bold', pad=20)
-            ax.set_xlabel("Pixels (East)", fontsize=10)
-            ax.set_ylabel("Pixels (North)", fontsize=10)
-            
-            # Add explanatory text for archaeological interpretation
-            enclosed_pct = np.sum(normalized_data < 0.3) / np.sum(~np.isnan(normalized_data)) * 100
-            open_pct = np.sum(normalized_data > 0.7) / np.sum(~np.isnan(normalized_data)) * 100
-            
-            textstr = f'Colormap: Cividis\nDark: Enclosed areas (<0.3) - {enclosed_pct:.1f}%\nBright: Open areas (>0.7) - {open_pct:.1f}%\nRange: {actual_min:.2f} to {actual_max:.2f}\nFeatures: Ditches, depressions, ridges'
-            props = dict(boxstyle='round', facecolor='white', alpha=0.8)
-            ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=9,
-                   verticalalignment='top', bbox=props)
+            # Display clean raster image
+            ax.imshow(masked_data, cmap=cmap, vmin=0, vmax=1, 
+                     aspect='equal', interpolation='nearest',
+                     extent=[0, width, height, 0])
         
-        # Save PNG with high quality
-        plt.tight_layout()
-        if enhanced_resolution:
-            plt.savefig(png_path, dpi=300, bbox_inches='tight', 
-                       facecolor='white', edgecolor='none', format='PNG')
-        else:
-            plt.savefig(png_path, dpi=150, bbox_inches='tight', 
-                       facecolor='white', edgecolor='none', format='PNG')
+        # Save clean PNG (no padding, no decorations)
+        plt.savefig(png_path, dpi=dpi,
+                   bbox_inches='tight', pad_inches=0,
+                   facecolor='none', edgecolor='none',
+                   format='PNG', transparent=True)
         
         plt.close()
         
@@ -1370,7 +1588,7 @@ def convert_svf_to_cividis_png(
                 
                 if consolidated_normalized not in png_normalized:
                     import shutil
-                    consolidated_png_path = os.path.join(consolidated_dir, "SVF_cividis.png")
+                    consolidated_png_path = os.path.join(consolidated_dir, "Slope_archaeological_clean.png")
                     shutil.copy2(png_path, consolidated_png_path)
                     
                     # Copy world files too
@@ -1380,19 +1598,19 @@ def convert_svf_to_cividis_png(
                             dst_world = os.path.splitext(consolidated_png_path)[0] + ext
                             shutil.copy2(src_world, dst_world)
                     
-                    print(f"✅ Copied SVF cividis PNG to consolidated directory")
+                    print(f"✅ Copied clean archaeological slope PNG to consolidated directory")
                 
             except Exception as e:
-                logger.warning(f"Failed to copy SVF PNG to consolidated directory: {e}")
+                logger.warning(f"Failed to copy clean archaeological slope PNG to consolidated directory: {e}")
         
         processing_time = time.time() - start_time
-        print(f"✅ SVF cividis colorization completed in {processing_time:.2f} seconds")
-        print(f"🌌 Result: {os.path.basename(png_path)}")
+        print(f"✅ Clean archaeological YlOrRd slope PNG completed in {processing_time:.2f} seconds")
+        print(f"📁 Result: {os.path.basename(png_path)}")
         
         return png_path
         
     except Exception as e:
-        error_msg = f"SVF cividis colorization failed for {tif_path}: {str(e)}"
+        error_msg = f"Clean archaeological YlOrRd slope PNG generation failed for {tif_path}: {str(e)}"
         logger.error(error_msg, exc_info=True)
         raise Exception(error_msg)
 

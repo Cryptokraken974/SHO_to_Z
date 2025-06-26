@@ -1,0 +1,120 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Slope Visualization Comparison - OR Wizard Island</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .header { background: #333; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .stats { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+        .item { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .item img { width: 100%; border-radius: 4px; }
+        .item h3 { margin-top: 10px; color: #333; }
+        .best { border: 3px solid #4CAF50; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Slope Visualization Testing Results</h1>
+        <p>Test File: OR_WizardIsland_slope.tif</p>
+        <p>Generated: 2025-06-26 15:54:24</p>
+    </div>
+    
+    <div class="stats">
+        <h2>📊 Data Statistics</h2>
+        <p><strong>Range:</strong> 0.00° to 88.26°</p>
+        <p><strong>Mean:</strong> 28.09° ± 14.16°</p>
+        <p><strong>Median:</strong> 30.10°</p>
+        <p><strong>P2-P98:</strong> 1.15° to 54.41°</p>
+        <p><strong>Valid Pixels:</strong> 4,906,848 / 4,906,848</p>
+    </div>
+    
+    <div class="grid">
+
+        <div class="item">
+            <img src="01_Standard_Gray_MinMax.png" alt="Standard_Gray_MinMax">
+            <h3>Standard Gray MinMax</h3>
+        </div>
+
+        <div class="item">
+            <img src="02_Standard_Gray_StdDev2.png" alt="Standard_Gray_StdDev2">
+            <h3>Standard Gray StdDev2</h3>
+        </div>
+
+        <div class="item">
+            <img src="03_Standard_Gray_Percentile.png" alt="Standard_Gray_Percentile">
+            <h3>Standard Gray Percentile</h3>
+        </div>
+
+        <div class="item">
+            <img src="04_Terrain_Viridis_StdDev.png" alt="Terrain_Viridis_StdDev">
+            <h3>Terrain Viridis StdDev</h3>
+        </div>
+
+        <div class="item">
+            <img src="05_Terrain_Plasma_StdDev.png" alt="Terrain_Plasma_StdDev">
+            <h3>Terrain Plasma StdDev</h3>
+        </div>
+
+        <div class="item">
+            <img src="06_Terrain_Inferno_StdDev.png" alt="Terrain_Inferno_StdDev">
+            <h3>Terrain Inferno StdDev</h3>
+        </div>
+
+        <div class="item best">
+            <img src="07_Archaeological_Custom_2to20.png" alt="Archaeological_Custom_2to20">
+            <h3>Archaeological Custom 2to20</h3>
+        </div>
+
+        <div class="item best">
+            <img src="08_Archaeological_Viridis_2to20.png" alt="Archaeological_Viridis_2to20">
+            <h3>Archaeological Viridis 2to20</h3>
+        </div>
+
+        <div class="item best">
+            <img src="09_Archaeological_YlOrRd_2to20.png" alt="Archaeological_YlOrRd_2to20">
+            <h3>Archaeological YlOrRd 2to20</h3>
+        </div>
+
+        <div class="item best">
+            <img src="10_Enhanced_Gray_Gamma05.png" alt="Enhanced_Gray_Gamma05">
+            <h3>Enhanced Gray Gamma05</h3>
+        </div>
+
+        <div class="item best">
+            <img src="11_Enhanced_Gray_Gamma15.png" alt="Enhanced_Gray_Gamma15">
+            <h3>Enhanced Gray Gamma15</h3>
+        </div>
+
+        <div class="item best">
+            <img src="12_Enhanced_Viridis_Sqrt.png" alt="Enhanced_Viridis_Sqrt">
+            <h3>Enhanced Viridis Sqrt</h3>
+        </div>
+
+        <div class="item">
+            <img src="13_Specialized_Terrain.png" alt="Specialized_Terrain">
+            <h3>Specialized Terrain</h3>
+        </div>
+
+        <div class="item">
+            <img src="14_Specialized_Gist_Earth.png" alt="Specialized_Gist_Earth">
+            <h3>Specialized Gist Earth</h3>
+        </div>
+
+        <div class="item">
+            <img src="15_Specialized_Copper.png" alt="Specialized_Copper">
+            <h3>Specialized Copper</h3>
+        </div>
+
+    </div>
+    
+    <div style="margin-top: 40px; padding: 20px; background: white; border-radius: 8px;">
+        <h2>🎯 Recommendations</h2>
+        <p><strong>For Archaeological Analysis:</strong> Look for visualizations that enhance subtle terrain features in the 2-20° range.</p>
+        <p><strong>For General Terrain:</strong> Standard gray or viridis colormaps with statistical normalization work well.</p>
+        <p><strong>Enhanced Contrast:</strong> Gamma corrections can help emphasize different slope ranges.</p>
+        <p><em>Items with green borders are recommended for archaeological applications.</em></p>
+    </div>
+</body>
+</html>

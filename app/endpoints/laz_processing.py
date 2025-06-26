@@ -649,44 +649,43 @@ async def api_slope(
             
         # Use enhanced inferno visualization for archaeological analysis (optional mode)
         else:
-            print(f"🔥 ENHANCED INFERNO VISUALIZATION: Archaeological terrain analysis")
-            print(f"   📐 0°-{max_slope_degrees}° linear rescaling for optimal contrast")
-            print(f"   🎨 Inferno colormap: Dark (flat) → Bright (steep)")
-            print(f"   🏛️ Archaeological features highlighted: Terraces, scarps, causeway edges")
+            print(f"🏛️ ENHANCED ARCHAEOLOGICAL VISUALIZATION: YlOrRd optimal terrain analysis")
+            print(f"   📐 2°-20° archaeological normalization for optimal contrast")
+            print(f"   🎨 YlOrRd colormap: Yellow-Orange-Red optimal for archaeological features")
+            print(f"   🏛️ Archaeological features highlighted: Pathways, platforms, scarps, berms")
             
             # Create PNG output path
             png_dir = os.path.join("output", output_region, "lidar", "png_outputs")
             os.makedirs(png_dir, exist_ok=True)
-            png_path = os.path.join(png_dir, "Slope_inferno.png")
+            png_path = os.path.join(png_dir, "Slope_archaeological_ylord.png")
             
-            # Import the enhanced slope conversion function
-            from ..convert import convert_slope_to_inferno_png
+            # Import the enhanced archaeological slope conversion function (YlOrRd optimal)
+            from ..convert import convert_slope_to_archaeological_ylord_png
             
-            # Generate enhanced slope PNG for archaeological analysis with new 2°-20° specifications
-            final_png_path = convert_slope_to_inferno_png(
+            # Generate enhanced slope PNG for archaeological analysis with optimal YlOrRd specifications
+            final_png_path = convert_slope_to_archaeological_ylord_png(
                 tif_path, 
                 png_path,
                 enhanced_resolution=True,
                 save_to_consolidated=False,  # Already in the right directory
-                max_slope_degrees=max_slope_degrees,  # Keep for backward compatibility
-                archaeological_mode=True,  # Enable new 2°-20° archaeological specifications
-                apply_transparency=True   # Apply transparency mask for slopes below 2°
+                archaeological_mode=True,  # Enable 2°-20° archaeological specifications
+                apply_transparency=True   # Apply transparency mask for optimal visualization
             )
             print(f"✅ Enhanced archaeological slope PNG generated: {final_png_path}")
             print(f"🏛️ Archaeological features optimized: Pathways (2°-8°), Scarps (8°-20°), Background (<2°, >20°)")
-            print(f"🎨 Inferno colormap with 2°-20° normalization and transparency masking")
+            print(f"🎨 YlOrRd colormap with 2°-20° normalization and transparency masking (optimal approach)")
             
             # Convert PNG to base64 for display
             with open(final_png_path, 'rb') as f:
                 png_data = f.read()
                 image_b64 = base64.b64encode(png_data).decode('utf-8')
             
-            print(f"✅ Enhanced archaeological inferno base64 conversion complete")
+            print(f"✅ Enhanced archaeological YlOrRd base64 conversion complete")
             return {
                 "image": image_b64,
                 "visualization_type": "archaeological_anomaly_detection",
                 "normalization_range": "2_to_20_degrees",
-                "colormap": "inferno_perceptually_uniform",
+                "colormap": "ylord_optimal_archaeological",
                 "transparency_mask": "below_2_degrees_faded",
                 "feature_emphasis": {
                     "pathways_platforms": "2_to_8_degrees",

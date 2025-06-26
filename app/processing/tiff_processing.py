@@ -851,10 +851,10 @@ async def process_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[s
         
         # Choose visualization mode
         if use_inferno_colormap:
-            print(f"   🔥 ENHANCED INFERNO VISUALIZATION: Archaeological terrain analysis")
-            print(f"      📐 Linear rescaling: 0° to {max_slope_degrees}° for optimal contrast")
-            print(f"      🎨 Inferno colormap: Dark (flat areas) → Bright (steep terrain)")
-            print(f"      🏛️ Archaeological features highlighted: Terraces, scarps, causeway edges")
+            print(f"   🏛️ ENHANCED ARCHAEOLOGICAL VISUALIZATION: YlOrRd optimal terrain analysis")
+            print(f"      📐 Linear rescaling: 2° to 20° archaeological normalization for optimal contrast")
+            print(f"      🎨 YlOrRd colormap: Yellow-Orange-Red optimal for archaeological features")
+            print(f"      🏛️ Archaeological features highlighted: Pathways, platforms, scarps, berms")
         else:
             print(f"   📐 STANDARD GREYSCALE VISUALIZATION: General terrain analysis")
             print(f"      🎨 Greyscale colormap: Standard terrain visualization")
@@ -881,7 +881,7 @@ async def process_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[s
             print(f"      🔴 Steep terrain (20°+): {steep_terrain:.1f}%")
             
             if use_inferno_colormap:
-                # Archaeological interpretation for inferno mode
+                # Archaeological interpretation for YlOrRd mode
                 if steep_terrain > 30:
                     print(f"      🏔️ High relief terrain detected - excellent for archaeological analysis")
                 elif flat_areas > 60:
@@ -898,7 +898,7 @@ async def process_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[s
         
         # Add enhancement suffixes for clarity
         if use_inferno_colormap:
-            output_filename += "_inferno"
+            output_filename += "_archaeological_ylord"
         if enhanced_contrast:
             output_filename += "_enhanced"
             
@@ -913,13 +913,13 @@ async def process_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[s
         
         # Completion logging based on mode
         if use_inferno_colormap:
-            print(f"✅ ENHANCED SLOPE generation completed: {output_filename}")
+            print(f"✅ ENHANCED ARCHAEOLOGICAL SLOPE generation completed: {output_filename}")
         else:
             print(f"✅ SLOPE generation completed: {output_filename}")
         
         print(f"   ⏱️ Processing time: {processing_time:.2f} seconds")
         print(f"   🎯 Features used:")
-        print(f"      🎨 Colormap: {'Inferno (enhanced)' if use_inferno_colormap else 'Greyscale (standard)'}")
+        print(f"      🎨 Colormap: {'YlOrRd (archaeological)' if use_inferno_colormap else 'Greyscale (standard)'}")
         print(f"      📐 Max slope range: {max_slope_degrees}°")
         if enhanced_contrast:
             print(f"      ⚡ Enhanced contrast: Active")
@@ -929,7 +929,7 @@ async def process_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[s
             "output_file": output_path,
             "processing_time": processing_time,
             "features": {
-                "inferno_colormap": use_inferno_colormap,
+                "ylord_archaeological_colormap": use_inferno_colormap,
                 "max_slope_degrees": max_slope_degrees,
                 "enhanced_contrast": enhanced_contrast,
                 "slope_distribution": {
@@ -946,16 +946,16 @@ async def process_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[s
         }
 
         if use_inferno_colormap:
-            print(f"✅ enhanced slope completed successfully")
+            print(f"✅ enhanced archaeological slope completed successfully")
             
             # 🎯 ENHANCED FEATURES CONFIRMATION
-            print(f"\n{'🔥'*20} ENHANCED SLOPE FEATURES ACTIVE {'🔥'*20}")
+            print(f"\n{'🏛️'*20} ENHANCED ARCHAEOLOGICAL SLOPE FEATURES ACTIVE {'🏛️'*20}")
             print(f"✅ Archaeological terrain analysis mode: ENABLED")
-            print(f"✅ Inferno colormap optimization: ACTIVE")
+            print(f"✅ YlOrRd colormap optimization: ACTIVE")
             print(f"✅ Enhanced contrast processing: {'ACTIVE' if enhanced_contrast else 'DISABLED'}")
-            print(f"✅ Slope range optimization: 0° to {max_slope_degrees}° (archaeological standard)")
+            print(f"✅ Slope range optimization: 2° to 20° (archaeological normalization)")
             print(f"✅ Terrain classification: {flat_areas:.1f}% flat, {moderate_slopes:.1f}% moderate, {steep_terrain:.1f}% steep")
-            print(f"{'🔥'*70}")
+            print(f"{'🏛️'*70}")
         else:
             print(f"✅ slope completed successfully")
         
@@ -1702,14 +1702,14 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
             processing_tasks.append((hs["name"], process_hillshade_tiff, params))
 
     # Add other raster tasks
-    print(f"\n🔥 ENHANCED ARCHAEOLOGICAL PROCESSING PIPELINE ACTIVE 🔥")
-    print(f"✅ Standard Slope: Greyscale visualization (default) with optional inferno mode")
+    print(f"\n🏛️ ENHANCED ARCHAEOLOGICAL PROCESSING PIPELINE ACTIVE 🏛️")
+    print(f"✅ Enhanced Slope: YlOrRd archaeological visualization (2°-20° normalization) - default")
     print(f"✅ Enhanced LRM: Adaptive sizing + Gaussian filtering + enhanced normalization")
     print(f"✅ Standard processing: Aspect, Color Relief, SVF, CHM")
     print(f"{'='*60}")
     
     processing_tasks.extend([
-        ("slope", process_slope_tiff, {"use_inferno_colormap": False}),  # 📐 STANDARD: Greyscale visualization (default)
+        ("slope", process_slope_tiff, {"use_inferno_colormap": True}),  # 📐 ENHANCED: YlOrRd Archaeological visualization (default)
         ("aspect", process_aspect_tiff, {}),
         ("color_relief", process_color_relief_tiff, {}),
         ("slope_relief", process_slope_relief_tiff, {}),
@@ -1783,8 +1783,8 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                             use_inferno_colormap = slope_params.get("use_inferno_colormap", False)
                             
                             if use_inferno_colormap:
-                                # Use specialized inferno colormap for enhanced slope visualization
-                                from convert import convert_slope_to_inferno_png, convert_slope_to_inferno_png_clean
+                                # Use specialized Archaeological YlOrRd colormap for optimal slope visualization
+                                from convert import convert_slope_to_archaeological_ylord_png, convert_slope_to_archaeological_ylord_png_clean
                                 
                                 # Create matplotlib subdirectory for decorated PNGs
                                 matplotlib_dir = os.path.join(png_output_dir, "matplotlib")
@@ -1792,28 +1792,26 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                                 
                                 # Generate matplotlib Slope PNG with decorations (legends, scales)
                                 matplotlib_png_path = os.path.join(matplotlib_dir, "Slope_matplot.png")
-                                convert_slope_to_inferno_png(
+                                convert_slope_to_archaeological_ylord_png(
                                     result["output_file"], 
                                     matplotlib_png_path, 
                                     enhanced_resolution=True,
                                     save_to_consolidated=False,
-                                    max_slope_degrees=60.0,  # Legacy parameter for compatibility
                                     archaeological_mode=True,  # Enable 2°-20° archaeological specifications
                                     apply_transparency=True   # Apply transparency mask
                                 )
-                                print(f"🖼️ Matplotlib Slope PNG: Archaeological inferno colormap (2°-20°) with legends")
+                                print(f"🖼️ Matplotlib Slope PNG: Archaeological YlOrRd colormap (2°-20°) with legends - optimal approach")
                                 
                                 # Generate clean Slope PNG (no decorations) as main Slope.png
-                                converted_png = convert_slope_to_inferno_png_clean(
+                                converted_png = convert_slope_to_archaeological_ylord_png_clean(
                                     result["output_file"], 
                                     png_path, 
                                     enhanced_resolution=True,
                                     save_to_consolidated=False,
-                                    max_slope_degrees=60.0,  # Legacy parameter for compatibility
                                     archaeological_mode=True,  # Enable 2°-20° archaeological specifications
                                     apply_transparency=True   # Apply transparency mask
                                 )
-                                print(f"🎯 Clean Slope PNG: Archaeological inferno (2°-20°), ready for overlay integration")
+                                print(f"🎯 Clean Slope PNG: Archaeological YlOrRd (2°-20°), ready for overlay integration - optimal approach")
                             else:
                                 # Use standard greyscale slope visualization (default)
                                 from convert import convert_slope_to_greyscale_png, convert_slope_to_greyscale_png_clean
