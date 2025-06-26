@@ -176,24 +176,29 @@
                 <h3>Elevation Data Acquisition</h3>
                 <p>The system will attempt to download or generate a Digital Elevation Model (DEM) for your region. This DEM is fundamental for all subsequent terrain analysis.</p>
                 <ul>
-                    <li><strong>Data Sources:</strong> The application intelligently selects the best available data source based on your region's geographic location:
+                    <li><strong>Data Sources & Model Types:</strong> The application intelligently selects the best available data source and type of Digital Elevation Model (DEM) based on your region's geographic location and data availability:
                         <ul>
-                            <li><strong>USA:</strong> Primarily uses <strong>USGS 3DEP (3D Elevation Program)</strong> data. This is accessed through PDAL (Point Data Abstraction Library) by querying public LiDAR point cloud datasets (EPT format) and processing them into a DEM. The specific module handling this is <code>app/data_acquisition/sources/opentopography.py</code>.</li>
-                            <li><strong>Brazil:</strong> May prioritize specific Brazilian national elevation datasets via the <code>BrazilianElevationSource</code>.</li>
-                            <li><strong>Global Fallback:</strong> For other areas, or if high-resolution data is unavailable, the system might use global DEMs like Copernicus GLO-30 or GLO-90 (details would be in the <code>CopernicusDSMService</code>).</li>
+                            <li><strong>High-Resolution DTM (USA):</strong> For regions within the USA, the system prioritizes generating a high-resolution <strong>Digital Terrain Model (DTM)</strong> from <strong>USGS 3DEP (3D Elevation Program)</strong> LiDAR data. This is accessed via PDAL EPT queries (<code>app/data_acquisition/sources/opentopography.py</code>). This DTM represents the bare earth, ideal for detailed topographic analysis.</li>
+                            <li><strong>High-Resolution DTM (Brazil):</strong> For regions within Brazil, a similar high-resolution DTM may be generated using specific Brazilian national elevation datasets (via <code>BrazilianElevationSource</code>).</li>
+                            <li><strong>Global DSM (Fallback/General Coverage):</strong> For areas outside of high-resolution LiDAR coverage, or for a general landscape overview, the system can retrieve a global <strong>Digital Surface Model (DSM)</strong>. This is typically the <strong>Copernicus DEM (GLO-30 or GLO-90)</strong>, providing ~30m or ~90m resolution respectively.
+                                <div class="note">
+                                    <p><strong>DTM vs. DSM:</strong> Remember, a DTM aims for bare-earth elevation, while a DSM includes the tops of trees and buildings. The high-resolution sources (like 3DEP) are used to generate DTMs. Global sources like Copernicus DEM provide DSMs.</p>
+                                </div>
+                            </li>
                         </ul>
                     </li>
-                    <li><strong>Key Parameters (for USGS 3DEP/OpenTopography):</strong>
+                    <li><strong>Key Parameters:</strong>
                         <ul>
-                            <li><strong>Bounding Box:</strong> The precise WGS84 geographic extent of your manually defined region.</li>
-                            <li><strong>Resolution:</strong> The system employs a resolution strategy (e.g., "High," "Medium," "Low," which might be user-selectable or a system default). This translates to specific sampling densities for the source LiDAR point clouds (e.g., High might mean sampling at 0.2-meter intervals). The final DEM is often generated at an even finer resolution (e.g., 0.25 times the point cloud sampling interval, so a 1.0m point sample could yield a 0.25m DEM).</li>
+                            <li><strong>Bounding Box:</strong> The WGS84 extent of your manually defined region.</li>
+                            <li><strong>Resolution (for LiDAR-derived DTMs):</strong> If a DTM is generated from LiDAR (e.g., via USGS 3DEP), the system uses a resolution strategy (e.g., "High," "Medium," "Low," potentially user-selectable) that dictates point cloud sampling density. The final DTM is often generated at a very fine resolution (e.g., 0.25m to 1m).</li>
+                            <li><strong>Resolution (for Global DSMs):</strong> Copernicus DEM is typically fetched at its native ~30m (GLO-30) or ~90m (GLO-90) resolution.</li>
                         </ul>
                     </li>
-                    <li><strong>Output:</strong> A primary DEM, usually a Digital Terrain Model (DTM representing bare earth), is saved as a GeoTIFF file. This is typically stored in a path like <code>input/&lt;region_name&gt;/lidar/&lt;region_name&gt;_elevation.tiff</code> or similar.</li>
+                    <li><strong>Output:</strong> The primary elevation product (DTM from LiDAR, or DSM from global sources) is saved as a GeoTIFF file (e.g., <code>input/&lt;region_name&gt;/lidar/&lt;region_name&gt;_elevation.tiff</code> or <code>input/&lt;region_name&gt;/elevation/&lt;region_name&gt;_DSM_30m.tif</code>).</li>
                 </ul>
                 <div class="important">
-                    <p><strong>✨ Automatic Cascade: Full Raster Suite Generation!</strong></p>
-                    <p>A critical feature: Once the primary DEM (e.g., DTM) is successfully acquired or generated (especially from the USGS 3DEP/OpenTopography source), the system <strong>automatically triggers the creation of a comprehensive suite of derivative raster products.</strong> You do not need to generate these individually for manually created regions after fetching the initial DEM.</p>
+                    <p><strong>✨ Automatic Cascade: Full Raster Suite Generation from DTM!</strong></p>
+                    <p>A critical feature: If a high-resolution <strong>DTM</strong> is successfully acquired or generated (e.g., from USGS 3DEP/OpenTopography source), the system <strong>automatically triggers the creation of a comprehensive suite of derivative raster products.</strong> You do not need to generate these individually for manually created regions after fetching the initial DTM.</p>
                     <p>This includes (refer to the <a href="raster_guide.html">Raster Guide</a> for details on each):</p>
                     <ul>
                         <li>Hillshades (multiple illumination angles)</li>
