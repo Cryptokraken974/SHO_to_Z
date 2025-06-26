@@ -1870,7 +1870,7 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                             print(f"🎯 Clean LRM PNG: No decorations, ready for overlay integration")
                         elif task_name == "sky_view_factor":
                             # Use specialized cividis colormap for enhanced SVF archaeological visualization
-                            from convert import convert_svf_to_cividis_png, convert_svf_to_cividis_png_clean
+                            from convert import convert_svf_to_cividis_png_clean
                             
                             # Create matplotlib subdirectory for decorated PNGs
                             matplotlib_dir = os.path.join(png_output_dir, "matplotlib")
@@ -1878,7 +1878,7 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                             
                             # Generate matplotlib SVF PNG with decorations (legends, scales)
                             matplotlib_png_path = os.path.join(matplotlib_dir, "SVF_matplot.png")
-                            convert_svf_to_cividis_png(
+                            convert_svf_to_cividis_png_clean(
                                 result["output_file"], 
                                 matplotlib_png_path, 
                                 enhanced_resolution=True,

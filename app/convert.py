@@ -11,6 +11,7 @@ import tempfile # Added tempfile for base64 conversion temp file
 from pathlib import Path # Added pathlib for Sentinel-2 processing
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from PIL import Image
 
 logger = logging.getLogger(__name__)
@@ -1361,13 +1362,9 @@ def convert_slope_to_archaeological_ylord_png(
             cbar.set_ticks(tick_positions)
             cbar.set_ticklabels([f"{t}°" for t in tick_positions])
         
-        # Add title with archaeological specifications
-        title = f"Archaeological Slope Analysis (YlOrRd)\n{os.path.basename(tif_path)}"
-        if archaeological_mode:
-            title += f"\n2°-20° Archaeological Normalization"
-        ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
-        
-        # Add axes labels
+        # Add title and remove axes for clean visualization
+        ax.set_title(f"Archaeological Slope Analysis (YlOrRd)\n{os.path.basename(tif_path)}", 
+                    fontsize=14, fontweight='bold', pad=20)
         ax.set_xlabel("Pixels (East)", fontsize=10)
         ax.set_ylabel("Pixels (North)", fontsize=10)
         
@@ -1384,7 +1381,7 @@ def convert_slope_to_archaeological_ylord_png(
             explanation_text += f"YlOrRd colormap optimized for archaeological terrain analysis"
             
             ax.text(0.02, 0.02, explanation_text, transform=ax.transAxes, fontsize=9,
-                   verticalalignment='bottom', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+                   verticalalignment='bottom', bbox=dict(boxstyle="round", facecolor="white", alpha=0.8))
         
         # Save the PNG
         plt.savefig(png_path, dpi=dpi_value, bbox_inches='tight', 
@@ -1644,8 +1641,6 @@ def convert_slope_to_archaeological_ylord_png_clean(
         logger.error(error_msg, exc_info=True)
         raise Exception(error_msg)
 
-
-
 def convert_svf_to_cividis_png_clean(
     tif_path: str,
     png_path: Optional[str] = None,
@@ -1653,13 +1648,16 @@ def convert_svf_to_cividis_png_clean(
     save_to_consolidated: bool = True
 ) -> str:
     """
-    Convert SVF GeoTIFF to clean PNG with cividis colormap (no legends/scales/decorations).
-    Specifically designed for overlay-ready SVF visualization for archaeological analysis.
+    Convert SVF GeoTIFF to clean PNG with Archaeological Cividis Enhanced visualization.
+    
+    Uses the optimal Archaeological Cividis Enhanced approach with 5-95 percentile 
+    contrast enhancement for superior archaeological feature detection in SVF data.
+    Produces clean overlay-ready visualization with no legends/scales/decorations.
     
     Args:
         tif_path: Path to SVF TIF file
         png_path: Optional output PNG path  
-        enhanced_resolution: Use enhanced processing
+        enhanced_resolution: Use enhanced processing (300 DPI)
         save_to_consolidated: Copy to consolidated directory
         
     Returns:
@@ -1719,26 +1717,17 @@ def convert_svf_to_cividis_png_clean(
             ax.set_xlim(0, 1)
             ax.set_ylim(0, 1)
         else:
-            # SVF normalization: ensure data is properly normalized to 0.0-1.0 range
+            # Archaeological Cividis Enhanced: Apply 5-95 percentile contrast enhancement
             actual_min = np.nanmin(valid_data)
             actual_max = np.nanmax(valid_data)
+            p5 = np.nanpercentile(valid_data, 5)
+            p95 = np.nanpercentile(valid_data, 95)
             
-            print(f"🎨 Applying SVF normalization (0.0 to 1.0):")
+            print(f"🎨 Applying Archaeological Cividis Enhanced (5-95% percentile):")
             print(f"   📊 Actual data range: {actual_min:.3f} to {actual_max:.3f}")
-            print(f"   📐 Target range: 0.0 to 1.0")
+            print(f"   📈 5-95 percentile range: {p5:.3f} to {p95:.3f}")
             print(f"   🌌 Colormap: Cividis (perceptual uniformity, colorblind-friendly)")
-            
-            # Normalize SVF data to [0, 1] range
-            if actual_max > actual_min:
-                normalized_data = (svf_data - actual_min) / (actual_max - actual_min)
-            else:
-                # Handle flat SVF case
-                normalized_data = np.full_like(svf_data, 0.5)
-            
-            # Ensure normalized data is properly bounded
-            normalized_data = np.clip(normalized_data, 0, 1)
-            
-            print(f"   ✅ Normalized range: {np.nanmin(normalized_data[~np.isnan(normalized_data)]):.3f} to {np.nanmax(normalized_data[~np.isnan(normalized_data)]):.3f}")
+            print(f"   🏺 Optimized for archaeological feature detection")
             
             # Create figure with high quality settings
             if enhanced_resolution:
@@ -1747,16 +1736,16 @@ def convert_svf_to_cividis_png_clean(
                 fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
             
             # Apply cividis colormap for archaeological SVF analysis
-            # Dark blue (0) = enclosed areas (ditches, depressions)
-            # Bright yellow (1) = open areas (ridges, elevated surfaces)
-            # Perfect for distinguishing archaeological features
+            # Dark blue (low SVF) = enclosed areas (ditches, depressions)
+            # Bright yellow (high SVF) = open areas (ridges, elevated surfaces)
+            # 5-95 percentile enhancement maximizes archaeological feature contrast
             cmap = plt.cm.cividis
             
             # Create masked array to handle NaN values (transparent)
-            masked_data = np.ma.masked_where(np.isnan(normalized_data), normalized_data)
+            masked_data = np.ma.masked_where(np.isnan(svf_data), svf_data)
             
-            # Display clean raster image
-            ax.imshow(masked_data, cmap=cmap, vmin=0, vmax=1, 
+            # Display clean raster image with Archaeological Cividis Enhanced contrast
+            ax.imshow(masked_data, cmap=cmap, vmin=p5, vmax=p95, 
                      aspect='equal', interpolation='nearest',
                      extent=[0, width, height, 0])  # Match pixel coordinates
         
@@ -1835,6 +1824,249 @@ def convert_svf_to_cividis_png_clean(
         
     except Exception as e:
         error_msg = f"Clean SVF cividis PNG generation failed for {tif_path}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        raise Exception(error_msg)
+
+def convert_svf_to_archaeological_png(
+    tif_path: str,
+    png_path: Optional[str] = None,
+    enhanced_resolution: bool = True,
+    save_to_consolidated: bool = True,
+    enhancement_type: str = "archaeological_cividis"
+) -> str:
+    """
+    Convert SVF GeoTIFF to archaeological PNG with optimal visualization for feature detection.
+    
+    Implements the Archaeological Cividis Enhanced approach with 5-95 percentile contrast
+    enhancement for optimal detection of archaeological features in SVF data.
+    
+    Args:
+        tif_path: Path to SVF TIF file
+        png_path: Optional output PNG path  
+        enhanced_resolution: Use enhanced processing (300 DPI)
+        save_to_consolidated: Copy to consolidated directory
+        enhancement_type: Type of enhancement ("archaeological_cividis", "standard", "high_contrast")
+        
+    Returns:
+        Path to generated archaeological PNG file
+    """
+    print(f"\n🏺 ARCHAEOLOGICAL SVF PNG: {os.path.basename(tif_path)} ({enhancement_type})")
+    logger.info(f"Archaeological SVF PNG generation for {tif_path} with enhancement: {enhancement_type}")
+    
+    start_time = time.time()
+    
+    try:
+        # Generate output path if not provided
+        if png_path is None:
+            png_path = os.path.splitext(tif_path)[0] + "_archaeological.png"
+        
+        # Ensure output directory exists
+        output_dir = os.path.dirname(png_path)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            print(f"📁 Created output directory: {output_dir}")
+        
+        # Open and read SVF data
+        ds = gdal.Open(tif_path)
+        if ds is None:
+            raise Exception(f"Failed to open SVF TIF: {tif_path}")
+        
+        band = ds.GetRasterBand(1)
+        svf_data = band.ReadAsArray().astype(np.float32)
+        
+        # Get georeference info for world file
+        geotransform = ds.GetGeoTransform()
+        width = ds.RasterXSize
+        height = ds.RasterYSize
+        
+        ds = None
+        band = None
+        
+        print(f"📏 SVF dimensions: {width}x{height} pixels")
+        
+        # Set DPI value based on resolution setting
+        dpi_value = 300 if enhanced_resolution else 200
+        
+        # Handle NoData values
+        nodata_mask = svf_data == -9999
+        svf_data[nodata_mask] = np.nan
+        
+        # Calculate statistics for enhancement
+        valid_data = svf_data[~np.isnan(svf_data)]
+        if len(valid_data) == 0:
+            print("⚠️ No valid SVF data found")
+            # Create empty image
+            fig, ax = plt.subplots(figsize=(10, 8), dpi=dpi_value)
+            ax.text(0.5, 0.5, 'No SVF Data Available', ha='center', va='center', 
+                   fontsize=16, transform=ax.transAxes)
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+        else:
+            # Calculate percentiles for archaeological enhancement
+            actual_min = np.nanmin(valid_data)
+            actual_max = np.nanmax(valid_data)
+            p5 = np.nanpercentile(valid_data, 5)
+            p95 = np.nanpercentile(valid_data, 95)
+            mean_val = np.nanmean(valid_data)
+            std_val = np.nanstd(valid_data)
+            
+            print(f"📊 SVF Statistics:")
+            print(f"   Range: {actual_min:.3f} to {actual_max:.3f}")
+            print(f"   Mean: {mean_val:.3f} ± {std_val:.3f}")
+            print(f"   P5-P95: {p5:.3f} to {p95:.3f}")
+            
+            # Apply enhancement based on type
+            if enhancement_type == "archaeological_cividis":
+                # Archaeological Cividis Enhanced: 5-95 percentile enhancement
+                vmin = p5
+                vmax = p95
+                cmap = plt.cm.cividis
+                enhancement_desc = "5-95% percentile enhancement (optimal for archaeology)"
+            elif enhancement_type == "high_contrast":
+                # High contrast: 2-98 percentile
+                vmin = np.nanpercentile(valid_data, 2)
+                vmax = np.nanpercentile(valid_data, 98)
+                cmap = plt.cm.cividis
+                enhancement_desc = "2-98% percentile enhancement (high contrast)"
+            else:  # standard
+                # Standard: Full range
+                vmin = actual_min
+                vmax = actual_max
+                cmap = plt.cm.cividis
+                enhancement_desc = "Full range normalization (standard)"
+            
+            print(f"🎨 Enhancement: {enhancement_desc}")
+            print(f"   Display range: {vmin:.3f} to {vmax:.3f}")
+            print(f"   Colormap: Cividis (perceptual uniformity, colorblind-friendly)")
+            
+            # Create figure with high quality settings
+            if enhanced_resolution:
+                fig, ax = plt.subplots(figsize=(16, 12), dpi=300)
+            else:
+                fig, ax = plt.subplots(figsize=(12, 10), dpi=200)
+            
+            # Create masked array to handle NaN values (transparent)
+            masked_data = np.ma.masked_where(np.isnan(svf_data), svf_data)
+            
+            # Display archaeological SVF image with optimized contrast
+            im = ax.imshow(masked_data, cmap=cmap, vmin=vmin, vmax=vmax,
+                          aspect='equal', interpolation='nearest',
+                          extent=[0, width, height, 0])  # Match pixel coordinates
+            
+            # Add title and interpretation guide for archaeological analysis
+            if enhancement_type == "archaeological_cividis":
+                title = "Archaeological SVF - Cividis Enhanced"
+                subtitle = "Sky View Factor: Terrain Enclosure Analysis\nDark Blue = Enclosed (ditches, pits) • Yellow = Exposed (ridges, mounds)"
+            else:
+                title = f"Archaeological SVF - {enhancement_type.replace('_', ' ').title()}"
+                subtitle = "Sky View Factor: Terrain Enclosure Analysis"
+            
+            # Add title and subtitle
+            fig.suptitle(title, fontsize=16, fontweight='bold', y=0.95)
+            ax.set_title(subtitle, fontsize=12, pad=20, style='italic')
+            
+            # Add colorbar with archaeological interpretation
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="3%", pad=0.1)
+            cbar = plt.colorbar(im, cax=cax)
+            cbar.set_label('Sky View Factor', rotation=270, labelpad=15, fontsize=10)
+            
+            # Customize colorbar ticks for archaeological interpretation
+            if vmax - vmin > 0:
+                tick_positions = np.linspace(vmin, vmax, 5)
+                cbar.set_ticks(tick_positions)
+                cbar.set_ticklabels([f'{val:.2f}' for val in tick_positions])
+            
+            # Add archaeological interpretation text
+            interpretation_text = (
+                "Archaeological Interpretation:\n"
+                f"• Low SVF ({vmin:.2f}-{vmin + (vmax-vmin)*0.3:.2f}): Enclosed areas\n"
+                "  Ditches, moats, house depressions\n"
+                f"• Medium SVF ({vmin + (vmax-vmin)*0.3:.2f}-{vmin + (vmax-vmin)*0.7:.2f}): Moderate exposure\n"
+                "  Terraces, platforms, field boundaries\n"
+                f"• High SVF ({vmin + (vmax-vmin)*0.7:.2f}-{vmax:.2f}): Open areas\n"
+                "  Mounds, ridges, elevated surfaces"
+            )
+            
+            # Position interpretation text
+            fig.text(0.02, 0.02, interpretation_text, fontsize=9, 
+                    bbox=dict(boxstyle="round,pad=0.5", facecolor="white", alpha=0.8),
+                    verticalalignment='bottom')
+        
+        # Remove axes ticks but keep labels for interpretation
+        ax.set_xticks([])
+        ax.set_yticks([])
+        
+        # Save archaeological PNG with proper spacing
+        plt.tight_layout()
+        plt.savefig(png_path, dpi=dpi_value,
+                   bbox_inches='tight', 
+                   facecolor='white', edgecolor='none',
+                   format='PNG')
+        
+        plt.close()
+        
+        # Create world file for georeferencing
+        if geotransform:
+            world_file_path = os.path.splitext(png_path)[0] + ".pgw"
+            with open(world_file_path, 'w') as f:
+                f.write(f"{geotransform[1]:.10f}\n")  # pixel size x
+                f.write(f"{geotransform[2]:.10f}\n")  # rotation y
+                f.write(f"{geotransform[4]:.10f}\n")  # rotation x
+                f.write(f"{geotransform[5]:.10f}\n")  # pixel size y (negative)
+                f.write(f"{geotransform[0]:.10f}\n")  # top left x
+                f.write(f"{geotransform[3]:.10f}\n")  # top left y
+            print(f"🌍 Created world file: {os.path.basename(world_file_path)}")
+        
+        # Transform world file to WGS84 if possible
+        world_file_path = os.path.splitext(png_path)[0] + ".pgw"
+        if os.path.exists(world_file_path):
+            success = create_wgs84_world_file(world_file_path, tif_path, png_path)
+            if success:
+                print(f"✅ WGS84 world file created for proper overlay scaling")
+        
+        # Copy to consolidated directory if requested
+        if save_to_consolidated:
+            try:
+                path_parts = tif_path.split(os.sep)
+                region_name = "UnknownRegion"
+                if "output" in path_parts:
+                    idx = path_parts.index("output")
+                    if idx + 1 < len(path_parts): 
+                        region_name = path_parts[idx+1]
+                
+                consolidated_dir = os.path.join("output", region_name, "lidar", "png_outputs")
+                os.makedirs(consolidated_dir, exist_ok=True)
+                
+                # Check if PNG is already in the target directory
+                png_normalized = os.path.normpath(png_path)
+                consolidated_normalized = os.path.normpath(consolidated_dir)
+                
+                if consolidated_normalized not in png_normalized:
+                    import shutil
+                    consolidated_png_path = os.path.join(consolidated_dir, f"SVF_{enhancement_type}.png")
+                    shutil.copy2(png_path, consolidated_png_path)
+                    
+                    # Copy world files too
+                    for ext in [".pgw", ".wld", "_wgs84.wld"]:
+                        src_world = os.path.splitext(png_path)[0] + ext
+                        if os.path.exists(src_world):
+                            dst_world = os.path.splitext(consolidated_png_path)[0] + ext
+                            shutil.copy2(src_world, dst_world)
+                    
+                    print(f"✅ Copied archaeological SVF PNG to consolidated directory")
+                
+            except Exception as e:
+                logger.warning(f"Failed to copy archaeological SVF PNG to consolidated directory: {e}")
+        
+        processing_time = time.time() - start_time
+        print(f"✅ Archaeological SVF PNG generation completed in {processing_time:.2f} seconds")
+        print(f"🏺 Result: {os.path.basename(png_path)}")
+        
+        return png_path
+        
+    except Exception as e:
+        error_msg = f"Archaeological SVF PNG generation failed for {tif_path}: {str(e)}"
         logger.error(error_msg, exc_info=True)
         raise Exception(error_msg)
 
@@ -2111,7 +2343,7 @@ def convert_hillshade_rgb_to_archaeological_png(
     Convert Hillshade RGB TIF to Archaeological PNG using optimal enhancement techniques.
     
     Based on the Archaeological Subtle Relief approach that uses 10-90 percentile stretch
-    for optimal archaeological feature detection in RGB hillshade composites.
+    for optimal detection of archaeological features in RGB hillshade composites.
     
     Args:
         tif_path: Path to the hillshade RGB TIF file (3-band RGB composite)
@@ -2136,8 +2368,8 @@ def convert_hillshade_rgb_to_archaeological_png(
         
         # Generate output path if not provided
         if png_path is None:
-            base_dir = os.path.dirname(tif_path)
-            png_path = os.path.join(base_dir, f"{base_name}_archaeological.png")
+            base_path = os.path.dirname(tif_path)
+            png_path = os.path.join(base_path, f"{base_name}_archaeological.png")
         
         # Ensure output directory exists
         output_dir = os.path.dirname(png_path)
@@ -2235,7 +2467,7 @@ def convert_hillshade_rgb_to_archaeological_png(
         if archaeological_mode:
             title = f"ARCHAEOLOGICAL HILLSHADE RGB ANALYSIS\n"
             title += f"Enhancement: {enhancement_type.replace('_', ' ').title()}"
-            ax.set_title(title, fontsize=14, fontweight='bold', pad=25)
+            ax.set_title(title, fontsize=14, fontweight='bold', y=0.95)
         else:
             title = f"Hillshade RGB Composite\n{os.path.basename(tif_path)}"
             ax.set_title(title, fontsize=14, fontweight='bold', pad=20)

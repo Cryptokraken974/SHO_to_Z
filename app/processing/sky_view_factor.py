@@ -84,7 +84,7 @@ def sky_view_factor(input_file: str, region_name: Optional[str] = None,
 
     # Generate enhanced archaeological PNG visualization with cividis colormap
     try:
-        from app.convert import convert_svf_to_cividis_png
+        from app.convert import convert_svf_to_cividis_png_clean
         
         # Create PNG output directory
         png_output_dir = Path("output") / region / "lidar" / "png_outputs"
@@ -92,7 +92,7 @@ def sky_view_factor(input_file: str, region_name: Optional[str] = None,
         
         # Generate cividis PNG with enhanced resolution for archaeological analysis
         print(f"🎨 Generating enhanced SVF cividis visualization...")
-        cividis_png_path = convert_svf_to_cividis_png(
+        cividis_png_path = convert_svf_to_cividis_png_clean(
             str(output_path),
             png_path=str(png_output_dir / "SVF.png"),
             save_to_consolidated=True,
@@ -188,7 +188,7 @@ async def process_sky_view_factor_tiff(input_tiff_path: str, output_dir: str,
         
         # Generate enhanced archaeological PNG visualization with cividis colormap
         try:
-            from app.convert import convert_svf_to_cividis_png
+            from app.convert import convert_svf_to_cividis_png_clean
             
             # Create PNG output directory relative to output_dir
             png_output_dir = Path(output_dir).parent / "png_outputs"
@@ -196,7 +196,7 @@ async def process_sky_view_factor_tiff(input_tiff_path: str, output_dir: str,
             
             # Generate cividis PNG with enhanced resolution for archaeological analysis
             print(f"🎨 Generating enhanced SVF cividis visualization...")
-            cividis_png_path = convert_svf_to_cividis_png(
+            cividis_png_path = convert_svf_to_cividis_png_clean(
                 str(output_path),
                 png_path=str(png_output_dir / "SVF.png"),
                 save_to_consolidated=True,

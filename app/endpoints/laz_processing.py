@@ -891,7 +891,7 @@ async def api_sky_view_factor(
         print(f"✅ SVF TIF generated: {tif_path}")
 
         # Use specialized SVF cividis conversion for archaeological visualization
-        from app.convert import convert_svf_to_cividis_png
+        from app.convert import convert_svf_to_cividis_png_clean
         import tempfile
         import base64
         
@@ -900,7 +900,7 @@ async def api_sky_view_factor(
         temp_png_filename = f"{os.path.splitext(os.path.basename(tif_path))[0]}_cividis_{int(time.time()*1000)}.png"
         temp_png_path = os.path.join(temp_dir, temp_png_filename)
         
-        png_path_used = convert_svf_to_cividis_png(
+        png_path_used = convert_svf_to_cividis_png_clean(
             tif_path, 
             png_path=temp_png_path, 
             save_to_consolidated=True,
