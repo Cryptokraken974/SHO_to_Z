@@ -768,7 +768,10 @@ def convert_chm_to_viridis_png_clean(
         if len(valid_data) == 0:
             print("⚠️ No valid CHM data found")
             # Create empty transparent image
-            fig, ax = plt.subplots(figsize=(width/100, height/100), dpi=300)
+            dpi = 300 if enhanced_resolution else 100
+            width_inch = width / dpi
+            height_inch = height / dpi
+            fig, ax = plt.subplots(figsize=(width_inch, height_inch), dpi=dpi)
             ax.set_xlim(0, width)
             ax.set_ylim(0, height)
             ax.axis('off')
@@ -788,56 +791,37 @@ def convert_chm_to_viridis_png_clean(
             else:
                 normalized_data = np.zeros_like(chm_data)
             
-            # Create figure with high quality settings
-            if enhanced_resolution:
-                fig, ax = plt.subplots(figsize=(16, 12), dpi=300)
-            else:
-                fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
+            # Create figure with exact pixel dimensions (no decorations)
+            dpi = 300 if enhanced_resolution else 100
+            width_inch = width / dpi
+            height_inch = height / dpi
+            
+            fig, ax = plt.subplots(figsize=(width_inch, height_inch), dpi=dpi)
             
             # Apply viridis colormap
             # Low canopy (0) = dark purple (#440154)
             # High vegetation (1) = bright yellow-green (#fde725)
             cmap = plt.cm.viridis
             
-            # Create masked array to handle NaN values
+            # Create masked array to handle NaN values (transparent)
             masked_data = np.ma.masked_where(np.isnan(normalized_data), normalized_data)
             
-            # Display with viridis colormap
-            im = ax.imshow(masked_data, cmap=cmap, vmin=0, vmax=1, 
-                          aspect='equal', interpolation='nearest')
-            
-            # Add colorbar with meaningful labels
-            cbar = plt.colorbar(im, ax=ax, shrink=0.6, pad=0.02)
-            cbar.set_label('Canopy Height (m)', rotation=270, labelpad=20, fontsize=12)
-            
-            # Set colorbar ticks to show actual height values
-            if data_max > data_min:
-                tick_positions = np.linspace(0, 1, 6)
-                tick_labels = [f"{data_min + pos * (data_max - data_min):.1f}" 
-                              for pos in tick_positions]
-                cbar.set_ticks(tick_positions)
-                cbar.set_ticklabels(tick_labels)
-            
-            # Set title and remove axes for clean visualization
-            ax.set_title(f"CHM - Canopy Height Model\n{os.path.basename(tif_path)}", 
-                        fontsize=14, fontweight='bold', pad=20)
-            ax.set_xlabel("Pixels (East)", fontsize=10)
-            ax.set_ylabel("Pixels (North)", fontsize=10)
-            
-            # Add explanatory text
-            textstr = f'Colormap: Viridis\nDark purple: Low canopy areas\nBright yellow-green: High vegetation\nRange: {data_min:.1f}m - {data_max:.1f}m'
-            props = dict(boxstyle='round', facecolor='white', alpha=0.8)
-            ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=9,
-                   verticalalignment='top', bbox=props)
+            # Display clean raster image
+            ax.imshow(masked_data, cmap=cmap, vmin=0, vmax=1, 
+                     aspect='equal', interpolation='nearest',
+                     extent=[0, width, height, 0])  # Match pixel coordinates
         
-        # Save PNG with high quality
-        plt.tight_layout()
-        if enhanced_resolution:
-            plt.savefig(png_path, dpi=300, bbox_inches='tight', 
-                       facecolor='white', edgecolor='none', format='PNG')
-        else:
-            plt.savefig(png_path, dpi=150, bbox_inches='tight', 
-                       facecolor='white', edgecolor='none', format='PNG')
+        # Remove axes, labels, and all decorations
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.axis('off')
+        plt.gca().set_position([0, 0, 1, 1])  # Fill entire figure
+        
+        # Save clean PNG (no padding, no decorations)
+        plt.savefig(png_path, dpi=dpi,
+                   bbox_inches='tight', pad_inches=0,  # No padding
+                   facecolor='none', edgecolor='none',  # Transparent background
+                   format='PNG', transparent=True)
         
         plt.close()
         
