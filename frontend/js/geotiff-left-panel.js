@@ -1576,6 +1576,7 @@ class GeoTiffLeftPanel {
                 const formData = new FormData();
                 formData.append('region_name', regionName);
                 formData.append('file_name', lazFileName);
+                formData.append('display_region_name', this.regionDisplayName || regionName);
                 
                 const response = await fetch('/api/laz/process-all-rasters', {
                     method: 'POST',

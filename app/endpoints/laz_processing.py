@@ -662,29 +662,40 @@ async def api_slope(
             # Import the enhanced slope conversion function
             from ..convert import convert_slope_to_inferno_png
             
-            # Generate enhanced slope PNG for archaeological analysis
+            # Generate enhanced slope PNG for archaeological analysis with new 2°-20° specifications
             final_png_path = convert_slope_to_inferno_png(
                 tif_path, 
                 png_path,
                 enhanced_resolution=True,
                 save_to_consolidated=False,  # Already in the right directory
-                max_slope_degrees=max_slope_degrees
+                max_slope_degrees=max_slope_degrees,  # Keep for backward compatibility
+                archaeological_mode=True,  # Enable new 2°-20° archaeological specifications
+                apply_transparency=True   # Apply transparency mask for slopes below 2°
             )
-            print(f"✅ Enhanced slope inferno PNG generated: {final_png_path}")
-            print(f"🎯 Features optimized for: Flat areas (0°-5°), Moderate slopes (5°-20°), Steep terrain (20°+)")
+            print(f"✅ Enhanced archaeological slope PNG generated: {final_png_path}")
+            print(f"🏛️ Archaeological features optimized: Pathways (2°-8°), Scarps (8°-20°), Background (<2°, >20°)")
+            print(f"🎨 Inferno colormap with 2°-20° normalization and transparency masking")
             
             # Convert PNG to base64 for display
             with open(final_png_path, 'rb') as f:
                 png_data = f.read()
                 image_b64 = base64.b64encode(png_data).decode('utf-8')
             
-            print(f"✅ Enhanced inferno base64 conversion complete")
+            print(f"✅ Enhanced archaeological inferno base64 conversion complete")
             return {
                 "image": image_b64,
-                "visualization_type": "enhanced_inferno_archaeological",
-                "max_slope_degrees": max_slope_degrees,
-                "colormap": "inferno",
-                "analysis_focus": "slope_defined_anomalies"
+                "visualization_type": "archaeological_anomaly_detection",
+                "normalization_range": "2_to_20_degrees",
+                "colormap": "inferno_perceptually_uniform",
+                "transparency_mask": "below_2_degrees_faded",
+                "feature_emphasis": {
+                    "pathways_platforms": "2_to_8_degrees",
+                    "scarps_berms": "8_to_20_degrees",
+                    "background_flat": "below_2_degrees",
+                    "background_steep": "above_20_degrees"
+                },
+                "analysis_focus": "archaeological_terrain_anomalies",
+                "max_slope_degrees": max_slope_degrees  # Legacy parameter
             }
             print(f"✅ Standard base64 conversion complete")
             return {

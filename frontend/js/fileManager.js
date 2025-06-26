@@ -160,11 +160,17 @@ window.FileManager = {
     const regionNameWithoutExt = displayName.replace(/\.[^/.]+$/, '');
     $('#region-name-input').val(regionNameWithoutExt);
     
-    // This block was added to handle LAZ file specific actions
-    if (displayName && displayName.toLowerCase().endsWith('.laz') && regionPath) { // Check regionPath
+    // Handle coordinate population based on region type
+    if (displayName && displayName.toLowerCase().endsWith('.laz') && regionPath) { 
+        // LAZ file specific actions
         UIManager.fetchAndDisplayRegionCoords(regionPath); // Pass the full path
+    } else if (coords && Utils.isValidCoordinate(coords.lat, coords.lng)) {
+        // For map-created regions, populate the coordinate fields so "Get Data" works properly
+        $('#lat-input').val(coords.lat);
+        $('#lng-input').val(coords.lng);
+        Utils.log('info', `Populated coordinate fields for map-created region: ${coords.lat}, ${coords.lng}`);
     } else {
-        // Clear lat/lon fields if not a LAZ file or if they should be specific to LAZ selection
+        // Clear lat/lon fields if no valid coordinates available
         $('#lat-input').val('');
         $('#lng-input').val('');
     }

@@ -206,10 +206,13 @@ def generate_hillshade_with_params(
     print(f"   📂 Full input path: {input_path}")
     print(f"   🧩 Path parts: {input_path.parts}")
     
-    # This logic for determining region_name should be robust.
-    # If region_name is explicitly passed, use it. Otherwise, derive it.
+    # 🎯 PRIORITY FIX: Use provided region_name (display_region_name) to ensure user-friendly folder names
+    # This prevents coordinate-based folder creation like "2.433S_57.248W_elevation_DTM"
     effective_region_name = region_name
-    if effective_region_name is None:
+    if effective_region_name is not None and effective_region_name.strip():
+        print(f"   ✅ [PRIORITY] Using provided region_name (user-friendly): {effective_region_name}")
+        print(f"   🎯 This ensures output goes to: output/{effective_region_name}/... instead of coordinate-based paths")
+    else:
         print(f"   ⚠️ No explicit region_name provided, extracting from file path...")
         if "lidar" in input_path.parts and "input" in input_path.parts:
             try:
@@ -221,8 +224,6 @@ def generate_hillshade_with_params(
         else:
             effective_region_name = input_path.stem # Fallback if not standard project structure
             print(f"   🎯 Non-standard path structure, using input file stem for region: {effective_region_name}")
-    else:
-        print(f"   ✅ Using provided region_name: {effective_region_name}")
         
     print(f"   ✅ [REGION IDENTIFIED] Final effective region name for path construction: {effective_region_name}")
 

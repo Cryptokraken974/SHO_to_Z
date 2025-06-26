@@ -527,7 +527,7 @@ def convert_chm_to_viridis_png(
     print(f"\n🌳 CHM VIRIDIS COLORIZATION: {os.path.basename(tif_path)}")
     logger.info(f"CHM viridis colorization for {tif_path}")
     
-    start_time = time.time()
+    start_time = time.time();
     
     try:
         # Generate output path if not provided
@@ -727,7 +727,7 @@ def convert_chm_to_viridis_png_clean(
     print(f"\n🌳 CHM CLEAN PNG: {os.path.basename(tif_path)}")
     logger.info(f"CHM clean PNG generation for {tif_path}")
     
-    start_time = time.time()
+    start_time = time.time();
     
     try:
         # Generate output path if not provided
@@ -768,8 +768,7 @@ def convert_chm_to_viridis_png_clean(
         if len(valid_data) == 0:
             print("⚠️ No valid CHM data found")
             # Create empty transparent image
-            dpi_value = 300 if enhanced_resolution else 150
-            fig, ax = plt.subplots(figsize=(width/100, height/100), dpi=dpi_value)
+            fig, ax = plt.subplots(figsize=(width/100, height/100), dpi=300)
             ax.set_xlim(0, width)
             ax.set_ylim(0, height)
             ax.axis('off')

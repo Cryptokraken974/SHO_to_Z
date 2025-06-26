@@ -1908,7 +1908,8 @@ async def generate_laz_metadata(
 @router.post("/process-all-rasters")
 async def process_all_laz_rasters(
     region_name: str = Form(...),
-    file_name: str = Form(...)
+    file_name: str = Form(...),
+    display_region_name: str = Form(None)
 ):
     """
     Process all raster products for a LAZ region using the unified processing system
@@ -1966,10 +1967,11 @@ async def process_all_laz_rasters(
         
         # Create a simple request object with region name to ensure proper output folder structure
         class SimpleRequest:
-            def __init__(self, region_name):
+            def __init__(self, region_name, display_region_name=None):
                 self.region_name = region_name
+                self.display_region_name = display_region_name
         
-        request_obj = SimpleRequest(region_name)
+        request_obj = SimpleRequest(region_name, display_region_name)
         
         # Process all raster products
         processing_results = await process_all_raster_products(

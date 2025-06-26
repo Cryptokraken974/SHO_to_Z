@@ -151,14 +151,14 @@ async def process_hillshade_tiff(tiff_path: str, output_dir: str, parameters: Di
         azimuth = parameters.get("azimuth", 315)
         altitude = parameters.get("altitude", 45)
         z_factor = parameters.get("z_factor", 1.0)
+        region_folder = parameters.get("region_folder", "UnknownRegion")
         
         print(f"⚙️ Parameters: azimuth={azimuth}°, altitude={altitude}°, z_factor={z_factor}")
         
         # Create output filename, allow override via parameters
-        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
         output_filename = parameters.get("output_filename")
         if not output_filename:
-            output_filename = f"{base_name}_hillshade.tif"
+            output_filename = f"{region_folder}_hillshade.tif"
         output_path = os.path.join(output_dir, output_filename)
         
         # Read elevation data
@@ -264,8 +264,8 @@ async def process_multi_hillshade_tiff(tiff_path: str, output_dir: str, paramete
 
         print(f"⚙️ Parameters: altitude={altitude}°, azimuths={azimuths}, z_factor={z_factor}")
 
-        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
-        output_filename = parameters.get("output_filename") or f"{base_name}_multi_hillshade.tif"
+        region_folder = parameters.get("region_folder", "UnknownRegion")
+        output_filename = parameters.get("output_filename") or f"{region_folder}_multi_hillshade.tif"
         output_path = os.path.join(output_dir, output_filename)
 
         elevation_array, metadata = read_elevation_tiff(tiff_path)
@@ -330,8 +330,8 @@ async def process_aspect_tiff(tiff_path: str, output_dir: str, parameters: Dict[
         aspect_array = calculate_aspect(elevation_array, metadata)
         
         # Create output filename
-        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
-        output_filename = f"{base_name}_aspect.tif"
+        region_folder = parameters.get("region_folder", "UnknownRegion")
+        output_filename = f"{region_folder}_aspect.tif"
         output_path = os.path.join(output_dir, output_filename)
         
         # Save result with enhanced quality
@@ -393,8 +393,8 @@ async def process_tri_tiff(tiff_path: str, output_dir: str, parameters: Dict[str
         tri_array = calculate_tri(elevation_array)
         
         # Create output filename
-        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
-        output_filename = f"{base_name}_TRI.tif"
+        region_folder = parameters.get("region_folder", "UnknownRegion")
+        output_filename = f"{region_folder}_TRI.tif"
         output_path = os.path.join(output_dir, output_filename)
         
         # Save result with enhanced quality
@@ -461,8 +461,8 @@ async def process_tpi_tiff(tiff_path: str, output_dir: str, parameters: Dict[str
         tpi_array = calculate_tpi(elevation_array, radius)
         
         # Create output filename
-        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
-        output_filename = f"{base_name}_TPI.tif"
+        region_folder = parameters.get("region_folder", "UnknownRegion")
+        output_filename = f"{region_folder}_TPI.tif"
         output_path = os.path.join(output_dir, output_filename)
         
         # Save result with enhanced quality
@@ -531,8 +531,8 @@ async def process_color_relief_tiff(tiff_path: str, output_dir: str, parameters:
         color_array = apply_color_relief(elevation_array)
         
         # Create output filename
-        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
-        output_filename = f"{base_name}_color_relief.tif"
+        region_folder = parameters.get("region_folder", "UnknownRegion")
+        output_filename = f"{region_folder}_color_relief.tif"
         output_path = os.path.join(output_dir, output_filename)
         
         # Save result (3-band RGB) with enhanced quality
@@ -577,8 +577,8 @@ async def process_slope_relief_tiff(tiff_path: str, output_dir: str, parameters:
         print(f"🔄 Applying color relief to slope values...")
         slope_relief = apply_color_relief(slope_array)
 
-        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
-        output_filename = parameters.get("output_filename") or f"{base_name}_slope_relief.tif"
+        region_folder = parameters.get("region_folder", "UnknownRegion")
+        output_filename = parameters.get("output_filename") or f"{region_folder}_slope_relief.tif"
         output_path = os.path.join(output_dir, output_filename)
 
         save_color_raster(slope_relief, output_path, metadata, enhanced_quality=True)
@@ -621,8 +621,8 @@ async def process_lrm_tiff(tiff_path: str, output_dir: str, parameters: Dict[str
         smooth = uniform_filter(elevation_array.astype(np.float32), size=window_size)
         lrm_array = elevation_array.astype(np.float32) - smooth
 
-        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
-        output_filename = f"{base_name}_LRM.tif"
+        region_folder = parameters.get("region_folder", "UnknownRegion")
+        output_filename = f"{region_folder}_LRM.tif"
         output_path = os.path.join(output_dir, output_filename)
 
         save_raster(lrm_array, output_path, metadata, enhanced_quality=True)
@@ -751,8 +751,8 @@ async def process_enhanced_lrm_tiff(tiff_path: str, output_dir: str, parameters:
         print(f"   ✅ Local relief calculation completed")
         
         # Generate output filename with enhancement info
-        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
-        output_filename = f"{base_name}_LRM"
+        region_folder = parameters.get("region_folder", "UnknownRegion")
+        output_filename = f"{region_folder}_LRM"
         
         # Add enhancement suffixes for clarity
         if filter_type == "gaussian":
@@ -838,6 +838,7 @@ async def process_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[s
         stretch_type = parameters.get("stretch_type", "stddev")
         stretch_params = parameters.get("stretch_params", {"num_stddev": 2.0})
         enhanced_contrast = parameters.get("enhanced_contrast", False)  # Default to standard contrast
+        region_folder = parameters.get("region_folder", "UnknownRegion")  # Get user-friendly region name
         
         # Read elevation data
         print(f"📖 Reading elevation TIFF: {os.path.basename(tiff_path)}")
@@ -893,8 +894,7 @@ async def process_slope_tiff(tiff_path: str, output_dir: str, parameters: Dict[s
                     print(f"      🏞️ Low relief terrain - plains/gentle landscape")
         
         # Generate output filename with enhancement info
-        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
-        output_filename = f"{base_name}_slope"
+        output_filename = f"{region_folder}_slope"
         
         # Add enhancement suffixes for clarity
         if use_inferno_colormap:
@@ -1275,7 +1275,8 @@ async def process_chm_tiff(tiff_path: str, output_dir: str, parameters: Dict[str
     try:
         # For CHM calculation, we need both DTM and DSM
         # The tiff_path is typically the DTM, we need to find the corresponding DSM
-        base_name = os.path.splitext(os.path.basename(tiff_path))[0]
+        region_folder = parameters.get("region_folder", "UnknownRegion")
+        base_name = os.path.splitext(os.path.basename(tiff_path))[0]  # Still needed for DSM finding
         
         # Try to find DSM file in the same directory or parent directories
         dtm_path = tiff_path
@@ -1539,9 +1540,7 @@ async def process_chm_tiff(tiff_path: str, output_dir: str, parameters: Dict[str
         print(f"🔄 CHM calculation completed")
         
         # Create output filename
-        output_filename = f"{base_name.replace('DTM', 'CHM')}.tif"
-        if 'DTM' not in output_filename:
-            output_filename = f"{base_name}_CHM.tif"
+        output_filename = f"{region_folder}_CHM.tif"
         output_path = os.path.join(output_dir, output_filename)
         
         # Save CHM result using the reference metadata (preserves DTM spatial properties)
@@ -1636,6 +1635,10 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
         # Extract region name from path: input/<region>/lidar/file.tiff
         region_folder = tiff_path_parts[1]
         print(f"📍 Extracted region from path: {region_folder}")
+    elif request and hasattr(request, 'display_region_name') and request.display_region_name:
+        # Use display region name if provided in request (for user-friendly folder naming)
+        region_folder = request.display_region_name
+        print(f"📍 Using display region from request: {region_folder}")
     elif request and hasattr(request, 'region_name') and request.region_name:
         # Use region name if provided in request
         region_folder = request.region_name
@@ -1733,6 +1736,9 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
             task_output_dir = os.path.join(base_output_dir, task_name.title())
             os.makedirs(task_output_dir, exist_ok=True)
             
+            # Add region_folder to parameters for consistent naming
+            parameters["region_folder"] = region_folder
+            
             # Process the raster product
             result = await process_func(tiff_path, task_output_dir, parameters)
             results[task_name] = result
@@ -1791,9 +1797,11 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                                     matplotlib_png_path, 
                                     enhanced_resolution=True,
                                     save_to_consolidated=False,
-                                    max_slope_degrees=60.0  # Archaeological analysis range
+                                    max_slope_degrees=60.0,  # Legacy parameter for compatibility
+                                    archaeological_mode=True,  # Enable 2°-20° archaeological specifications
+                                    apply_transparency=True   # Apply transparency mask
                                 )
-                                print(f"🖼️ Matplotlib Slope PNG: Inferno colormap with legends and scales")
+                                print(f"🖼️ Matplotlib Slope PNG: Archaeological inferno colormap (2°-20°) with legends")
                                 
                                 # Generate clean Slope PNG (no decorations) as main Slope.png
                                 converted_png = convert_slope_to_inferno_png_clean(
@@ -1801,9 +1809,11 @@ async def process_all_raster_products(tiff_path: str, progress_callback=None, re
                                     png_path, 
                                     enhanced_resolution=True,
                                     save_to_consolidated=False,
-                                    max_slope_degrees=60.0  # Archaeological analysis range
+                                    max_slope_degrees=60.0,  # Legacy parameter for compatibility
+                                    archaeological_mode=True,  # Enable 2°-20° archaeological specifications
+                                    apply_transparency=True   # Apply transparency mask
                                 )
-                                print(f"🎯 Clean Slope PNG: Inferno colormap, ready for overlay integration")
+                                print(f"🎯 Clean Slope PNG: Archaeological inferno (2°-20°), ready for overlay integration")
                             else:
                                 # Use standard greyscale slope visualization (default)
                                 from convert import convert_slope_to_greyscale_png, convert_slope_to_greyscale_png_clean
