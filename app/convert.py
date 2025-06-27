@@ -619,56 +619,37 @@ def convert_chm_to_viridis_png(
             else:
                 normalized_data = np.zeros_like(chm_data)
             
-            # Create figure with high quality settings
-            if enhanced_resolution:
-                fig, ax = plt.subplots(figsize=(16, 12), dpi=300)
-            else:
-                fig, ax = plt.subplots(figsize=(12, 10), dpi=150)
+            # Create figure with exact pixel dimensions (no decorations)
+            dpi = 300 if enhanced_resolution else 100
+            width_inch = width / dpi
+            height_inch = height / dpi
+            
+            fig, ax = plt.subplots(figsize=(width_inch, height_inch), dpi=dpi)
             
             # Apply viridis colormap
             # Low canopy (0) = dark purple (#440154)
             # High vegetation (1) = bright yellow-green (#fde725)
             cmap = plt.cm.viridis
             
-            # Create masked array to handle NaN values
+            # Create masked array to handle NaN values (transparent)
             masked_data = np.ma.masked_where(np.isnan(normalized_data), normalized_data)
             
-            # Display with viridis colormap
-            im = ax.imshow(masked_data, cmap=cmap, vmin=0, vmax=1, 
-                          aspect='equal', interpolation='nearest')
-            
-            # Add colorbar with meaningful labels
-            cbar = plt.colorbar(im, ax=ax, shrink=0.6, pad=0.02)
-            cbar.set_label('Canopy Height (m)', rotation=270, labelpad=20, fontsize=12)
-            
-            # Set colorbar ticks to show actual height values
-            if data_max > data_min:
-                tick_positions = np.linspace(0, 1, 6)
-                tick_labels = [f"{data_min + pos * (data_max - data_min):.1f}" 
-                              for pos in tick_positions]
-                cbar.set_ticks(tick_positions)
-                cbar.set_ticklabels(tick_labels)
-            
-            # Set title and remove axes for clean visualization
-            ax.set_title(f"CHM - Canopy Height Model\n{os.path.basename(tif_path)}", 
-                        fontsize=14, fontweight='bold', pad=20)
-            ax.set_xlabel("Pixels (East)", fontsize=10)
-            ax.set_ylabel("Pixels (North)", fontsize=10)
-            
-            # Add explanatory text
-            textstr = f'Colormap: Viridis\nDark purple: Low canopy areas\nBright yellow-green: High vegetation\nRange: {data_min:.1f}m - {data_max:.1f}m'
-            props = dict(boxstyle='round', facecolor='white', alpha=0.8)
-            ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=9,
-                   verticalalignment='top', bbox=props)
+            # Display clean raster image
+            ax.imshow(masked_data, cmap=cmap, vmin=0, vmax=1, 
+                     aspect='equal', interpolation='nearest',
+                     extent=[0, width, height, 0])  # Match pixel coordinates
         
-        # Save PNG with high quality
-        plt.tight_layout()
-        if enhanced_resolution:
-            plt.savefig(png_path, dpi=300, bbox_inches='tight', 
-                       facecolor='white', edgecolor='none', format='PNG')
-        else:
-            plt.savefig(png_path, dpi=150, bbox_inches='tight', 
-                       facecolor='white', edgecolor='none', format='PNG')
+        # Remove axes, labels, and all decorations
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.axis('off')
+        plt.gca().set_position([0, 0, 1, 1])  # Fill entire figure
+        
+        # Save clean PNG (no padding, no decorations)
+        plt.savefig(png_path, dpi=dpi,
+                   bbox_inches='tight', pad_inches=0,  # No padding
+                   facecolor='none', edgecolor='none',  # Transparent background
+                   format='PNG', transparent=True)
         
         plt.close()
         
@@ -799,10 +780,10 @@ def convert_chm_to_viridis_png_clean(
         if len(valid_data) == 0:
             print("⚠️ No valid CHM data found")
             # Create empty transparent image
-            dpi = 300 if enhanced_resolution else 100
-            width_inch = width / dpi
-            height_inch = height / dpi
-            fig, ax = plt.subplots(figsize=(width_inch, height_inch), dpi=dpi)
+            dpi_value = 300 if enhanced_resolution else 100
+            width_inch = width / dpi_value
+            height_inch = height / dpi_value
+            fig, ax = plt.subplots(figsize=(width_inch, height_inch), dpi=dpi_value)
             ax.set_xlim(0, width)
             ax.set_ylim(0, height)
             ax.axis('off')
@@ -823,11 +804,11 @@ def convert_chm_to_viridis_png_clean(
                 normalized_data = np.zeros_like(chm_data)
             
             # Create figure with exact pixel dimensions (no decorations)
-            dpi = 300 if enhanced_resolution else 100
-            width_inch = width / dpi
-            height_inch = height / dpi
+            dpi_value = 300 if enhanced_resolution else 100
+            width_inch = width / dpi_value
+            height_inch = height / dpi_value
             
-            fig, ax = plt.subplots(figsize=(width_inch, height_inch), dpi=dpi)
+            fig, ax = plt.subplots(figsize=(width_inch, height_inch), dpi=dpi_value)
             
             # Apply viridis colormap
             # Low canopy (0) = dark purple (#440154)
@@ -849,7 +830,7 @@ def convert_chm_to_viridis_png_clean(
         plt.gca().set_position([0, 0, 1, 1])  # Fill entire figure
         
         # Save clean PNG (no padding, no decorations)
-        plt.savefig(png_path, dpi=dpi,
+        plt.savefig(png_path, dpi=dpi_value,
                    bbox_inches='tight', pad_inches=0,  # No padding
                    facecolor='none', edgecolor='none',  # Transparent background
                    format='PNG', transparent=True)
@@ -1856,9 +1837,13 @@ def convert_svf_to_archaeological_png(
     start_time = time.time()
     
     try:
+        # Generate base name for consistent file naming
+        base_name = os.path.splitext(os.path.basename(tif_path))[0]
+        
         # Generate output path if not provided
         if png_path is None:
-            png_path = os.path.splitext(tif_path)[0] + "_archaeological.png"
+            base_path = os.path.dirname(tif_path)
+            png_path = os.path.join(base_path, f"{base_name}_archaeological.png")
         
         # Ensure output directory exists
         output_dir = os.path.dirname(png_path)
@@ -1866,144 +1851,125 @@ def convert_svf_to_archaeological_png(
             os.makedirs(output_dir)
             print(f"📁 Created output directory: {output_dir}")
         
-        # Open and read SVF data
+        # Open and validate RGB hillshade data
         ds = gdal.Open(tif_path)
         if ds is None:
-            raise Exception(f"Failed to open SVF TIF: {tif_path}")
+            raise Exception(f"Failed to open Hillshade RGB TIF: {tif_path}")
         
-        band = ds.GetRasterBand(1)
-        svf_data = band.ReadAsArray().astype(np.float32)
-        
-        # Get georeference info for world file
-        geotransform = ds.GetGeoTransform()
         width = ds.RasterXSize
         height = ds.RasterYSize
+        num_bands = ds.RasterCount
+        
+        if num_bands != 3:
+            raise Exception(f"Expected 3-band RGB composite, found {num_bands} bands")
+        
+        print(f"📏 Dimensions: {width} × {height} pixels")
+        print(f"🎨 Bands: {num_bands} (RGB composite)")
+        
+        # Read RGB bands
+        red_band = ds.GetRasterBand(1).ReadAsArray().astype(np.float32)
+        green_band = ds.GetRasterBand(2).ReadAsArray().astype(np.float32)
+        blue_band = ds.GetRasterBand(3).ReadAsArray().astype(np.float32)
+        
+        # Get geospatial info
+        geotransform = ds.GetGeoTransform()
+        pixel_size = abs(geotransform[1])
         
         ds = None
-        band = None
         
-        print(f"📏 SVF dimensions: {width}x{height} pixels")
+        # Calculate statistics for each band
+        for band_data, band_name, color in [(red_band, "Red", "🔴"), 
+                                           (green_band, "Green", "🟢"), 
+                                           (blue_band, "Blue", "🔵")]:
+            band_stats = {
+                'min': np.min(band_data),
+                'max': np.max(band_data),
+                'mean': np.mean(band_data),
+                'std': np.std(band_data)
+            }
+            print(f"📊 {color} {band_name} band: range {band_stats['min']:.0f}-{band_stats['max']:.0f}, "
+                  f"mean {band_stats['mean']:.1f} ± {band_stats['std']:.1f}")
         
-        # Set DPI value based on resolution setting
-        dpi_value = 300 if enhanced_resolution else 200
-        
-        # Handle NoData values
-        nodata_mask = svf_data == -9999
-        svf_data[nodata_mask] = np.nan
-        
-        # Calculate statistics for enhancement
-        valid_data = svf_data[~np.isnan(svf_data)]
-        if len(valid_data) == 0:
-            print("⚠️ No valid SVF data found")
-            # Create empty image
-            fig, ax = plt.subplots(figsize=(10, 8), dpi=dpi_value)
-            ax.text(0.5, 0.5, 'No SVF Data Available', ha='center', va='center', 
-                   fontsize=16, transform=ax.transAxes)
-            ax.set_xlim(0, 1)
-            ax.set_ylim(0, 1)
+        # Apply archaeological enhancement based on type
+        if enhancement_type == "subtle_relief":
+            # 10-90 percentile stretch - optimal for archaeological features
+            print(f"🎯 Applying subtle relief enhancement (10-90 percentile stretch)")
+            enhanced_red = stretch_band_percentile(red_band, 10, 90)
+            enhanced_green = stretch_band_percentile(green_band, 10, 90)
+            enhanced_blue = stretch_band_percentile(blue_band, 10, 90)
+            
+        elif enhancement_type == "high_contrast":
+            # 0.5-99.5 percentile stretch for maximum contrast
+            print(f"🎯 Applying high contrast enhancement (0.5-99.5 percentile stretch)")
+            enhanced_red = stretch_band_percentile(red_band, 0.5, 99.5)
+            enhanced_green = stretch_band_percentile(green_band, 0.5, 99.5)
+            enhanced_blue = stretch_band_percentile(blue_band, 0.5, 99.5)
+            
+        elif enhancement_type == "shadow_enhanced":
+            # Gamma correction to brighten shadows
+            gamma = 0.7  # Brighten shadows
+            print(f"🎯 Applying shadow enhancement (gamma correction γ={gamma})")
+            enhanced_red = gamma_correct_band(red_band, gamma)
+            enhanced_green = gamma_correct_band(green_band, gamma)
+            enhanced_blue = gamma_correct_band(blue_band, gamma)
+            
         else:
-            # Calculate percentiles for archaeological enhancement
-            actual_min = np.nanmin(valid_data)
-            actual_max = np.nanmax(valid_data)
-            p5 = np.nanpercentile(valid_data, 5)
-            p95 = np.nanpercentile(valid_data, 95)
-            mean_val = np.nanmean(valid_data)
-            std_val = np.nanstd(valid_data)
-            
-            print(f"📊 SVF Statistics:")
-            print(f"   Range: {actual_min:.3f} to {actual_max:.3f}")
-            print(f"   Mean: {mean_val:.3f} ± {std_val:.3f}")
-            print(f"   P5-P95: {p5:.3f} to {p95:.3f}")
-            
-            # Apply enhancement based on type
-            if enhancement_type == "archaeological_cividis":
-                # Archaeological Cividis Enhanced: 5-95 percentile enhancement
-                vmin = p5
-                vmax = p95
-                cmap = plt.cm.cividis
-                enhancement_desc = "5-95% percentile enhancement (optimal for archaeology)"
-            elif enhancement_type == "high_contrast":
-                # High contrast: 2-98 percentile
-                vmin = np.nanpercentile(valid_data, 2)
-                vmax = np.nanpercentile(valid_data, 98)
-                cmap = plt.cm.cividis
-                enhancement_desc = "2-98% percentile enhancement (high contrast)"
-            else:  # standard
-                # Standard: Full range
-                vmin = actual_min
-                vmax = actual_max
-                cmap = plt.cm.cividis
-                enhancement_desc = "Full range normalization (standard)"
-            
-            print(f"🎨 Enhancement: {enhancement_desc}")
-            print(f"   Display range: {vmin:.3f} to {vmax:.3f}")
-            print(f"   Colormap: Cividis (perceptual uniformity, colorblind-friendly)")
-            
-            # Create figure with high quality settings
-            if enhanced_resolution:
-                fig, ax = plt.subplots(figsize=(16, 12), dpi=300)
-            else:
-                fig, ax = plt.subplots(figsize=(12, 10), dpi=200)
-            
-            # Create masked array to handle NaN values (transparent)
-            masked_data = np.ma.masked_where(np.isnan(svf_data), svf_data)
-            
-            # Display archaeological SVF image with optimized contrast
-            im = ax.imshow(masked_data, cmap=cmap, vmin=vmin, vmax=vmax,
-                          aspect='equal', interpolation='nearest',
-                          extent=[0, width, height, 0])  # Match pixel coordinates
-            
-            # Add title and interpretation guide for archaeological analysis
-            if enhancement_type == "archaeological_cividis":
-                title = "Archaeological SVF - Cividis Enhanced"
-                subtitle = "Sky View Factor: Terrain Enclosure Analysis\nDark Blue = Enclosed (ditches, pits) • Yellow = Exposed (ridges, mounds)"
-            else:
-                title = f"Archaeological SVF - {enhancement_type.replace('_', ' ').title()}"
-                subtitle = "Sky View Factor: Terrain Enclosure Analysis"
-            
-            # Add title and subtitle
-            fig.suptitle(title, fontsize=16, fontweight='bold', y=0.95)
-            ax.set_title(subtitle, fontsize=12, pad=20, style='italic')
-            
-            # Add colorbar with archaeological interpretation
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size="3%", pad=0.1)
-            cbar = plt.colorbar(im, cax=cax)
-            cbar.set_label('Sky View Factor', rotation=270, labelpad=15, fontsize=10)
-            
-            # Customize colorbar ticks for archaeological interpretation
-            if vmax - vmin > 0:
-                tick_positions = np.linspace(vmin, vmax, 5)
-                cbar.set_ticks(tick_positions)
-                cbar.set_ticklabels([f'{val:.2f}' for val in tick_positions])
-            
-            # Add archaeological interpretation text
-            interpretation_text = (
-                "Archaeological Interpretation:\n"
-                f"• Low SVF ({vmin:.2f}-{vmin + (vmax-vmin)*0.3:.2f}): Enclosed areas\n"
-                "  Ditches, moats, house depressions\n"
-                f"• Medium SVF ({vmin + (vmax-vmin)*0.3:.2f}-{vmin + (vmax-vmin)*0.7:.2f}): Moderate exposure\n"
-                "  Terraces, platforms, field boundaries\n"
-                f"• High SVF ({vmin + (vmax-vmin)*0.7:.2f}-{vmax:.2f}): Open areas\n"
-                "  Mounds, ridges, elevated surfaces"
-            )
-            
-            # Position interpretation text
-            fig.text(0.02, 0.02, interpretation_text, fontsize=9, 
-                    bbox=dict(boxstyle="round,pad=0.5", facecolor="white", alpha=0.8),
-                    verticalalignment='bottom')
+            # Default to subtle relief
+            print(f"🎯 Using default subtle relief enhancement")
+            enhanced_red = stretch_band_percentile(red_band, 10, 90)
+            enhanced_green = stretch_band_percentile(green_band, 10, 90)
+            enhanced_blue = stretch_band_percentile(blue_band, 10, 90)
         
-        # Remove axes ticks but keep labels for interpretation
+        # Combine enhanced bands
+        rgb_enhanced = np.stack([enhanced_red, enhanced_green, enhanced_blue], axis=-1)
+        rgb_enhanced = np.clip(rgb_enhanced, 0, 255).astype(np.uint8)
+        
+        print(f"🎨 Creating archaeological RGB visualization")
+        
+        # Create high-quality figure
+        if enhanced_resolution:
+            dpi_value = 300
+            fig, ax = plt.subplots(figsize=(14, 10), dpi=dpi_value)
+        else:
+            dpi_value = 200
+            fig, ax = plt.subplots(figsize=(12, 8), dpi=dpi_value)
+        
+        # Display enhanced RGB image
+        ax.imshow(rgb_enhanced, aspect='equal', interpolation='nearest')
+        
+        # Add archaeological title
+        if archaeological_mode:
+            title = f"ARCHAEOLOGICAL HILLSHADE RGB ANALYSIS\n"
+            title += f"Enhancement: {enhancement_type.replace('_', ' ').title()}"
+            ax.set_title(title, fontsize=14, fontweight='bold', y=0.95)
+        else:
+            title = f"Hillshade RGB Composite\n{os.path.basename(tif_path)}"
+            ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
+        
+        # Remove axes for clean visualization
         ax.set_xticks([])
         ax.set_yticks([])
         
-        # Save archaeological PNG with proper spacing
-        plt.tight_layout()
-        plt.savefig(png_path, dpi=dpi_value,
-                   bbox_inches='tight', 
-                   facecolor='white', edgecolor='none',
-                   format='PNG')
+        # Add scale information
+        scale_text = f"Resolution: {pixel_size:.2f}m/pixel"
+        ax.text(0.02, 0.02, scale_text, transform=ax.transAxes, fontsize=10,
+               bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
         
+        # Add archaeological interpretation guide
+        if archaeological_mode:
+            guide_text = f"ARCHAEOLOGICAL RGB HILLSHADE ANALYSIS\n"
+            guide_text += f"Multi-directional relief visualization\n"
+            guide_text += f"Enhancement: {enhancement_type.replace('_', ' ').title()}\n"
+            guide_text += f"Optimized for archaeological feature detection"
+            
+            ax.text(0.02, 0.98, guide_text, transform=ax.transAxes, fontsize=10,
+                   verticalalignment='top',
+                   bbox=dict(boxstyle="round,pad=0.5", facecolor="lightyellow", alpha=0.9))
+        
+        plt.tight_layout()
+        
+        # Save the figure
+        plt.savefig(png_path, dpi=dpi_value, bbox_inches='tight', facecolor='white', edgecolor='none')
         plt.close()
         
         # Create world file for georeferencing
@@ -2018,13 +1984,6 @@ def convert_svf_to_archaeological_png(
                 f.write(f"{geotransform[3]:.10f}\n")  # top left y
             print(f"🌍 Created world file: {os.path.basename(world_file_path)}")
         
-        # Transform world file to WGS84 if possible
-        world_file_path = os.path.splitext(png_path)[0] + ".pgw"
-        if os.path.exists(world_file_path):
-            success = create_wgs84_world_file(world_file_path, tif_path, png_path)
-            if success:
-                print(f"✅ WGS84 world file created for proper overlay scaling")
-        
         # Copy to consolidated directory if requested
         if save_to_consolidated:
             try:
@@ -2032,7 +1991,7 @@ def convert_svf_to_archaeological_png(
                 region_name = "UnknownRegion"
                 if "output" in path_parts:
                     idx = path_parts.index("output")
-                    if idx + 1 < len(path_parts): 
+                    if idx + 1 < len(path_parts):
                         region_name = path_parts[idx+1]
                 
                 consolidated_dir = os.path.join("output", region_name, "lidar", "png_outputs")
@@ -2044,31 +2003,55 @@ def convert_svf_to_archaeological_png(
                 
                 if consolidated_normalized not in png_normalized:
                     import shutil
-                    consolidated_png_path = os.path.join(consolidated_dir, f"SVF_{enhancement_type}.png")
+                    consolidated_png_path = os.path.join(consolidated_dir, f"{base_name}_archaeological.png")
                     shutil.copy2(png_path, consolidated_png_path)
                     
-                    # Copy world files too
-                    for ext in [".pgw", ".wld", "_wgs84.wld"]:
-                        src_world = os.path.splitext(png_path)[0] + ext
-                        if os.path.exists(src_world):
-                            dst_world = os.path.splitext(consolidated_png_path)[0] + ext
-                            shutil.copy2(src_world, dst_world)
+                    # Copy world file too
+                    world_file = os.path.splitext(png_path)[0] + ".pgw"
+                    if os.path.exists(world_file):
+                        consolidated_world = os.path.splitext(consolidated_png_path)[0] + ".pgw"
+                        shutil.copy2(world_file, consolidated_world)
                     
-                    print(f"✅ Copied archaeological SVF PNG to consolidated directory")
+                    print(f"📁 Saved to consolidated: {os.path.basename(consolidated_png_path)}")
                 
             except Exception as e:
-                logger.warning(f"Failed to copy archaeological SVF PNG to consolidated directory: {e}")
+                print(f"⚠️ Failed to save to consolidated directory: {e}")
         
         processing_time = time.time() - start_time
-        print(f"✅ Archaeological SVF PNG generation completed in {processing_time:.2f} seconds")
-        print(f"🏺 Result: {os.path.basename(png_path)}")
+        file_size = os.path.getsize(png_path)
+        
+        print(f"✅ Archaeological Hillshade RGB PNG completed!")
+        print(f"📁 Output: {os.path.basename(png_path)}")
+        print(f"📊 Size: {file_size:,} bytes")
+        print(f"📏 Resolution: {dpi_value} DPI")
+        print(f"⏱️ Processing time: {processing_time:.2f} seconds")
+        print(f"🏛️ Archaeological enhancement: {enhancement_type}")
         
         return png_path
         
     except Exception as e:
-        error_msg = f"Archaeological SVF PNG generation failed for {tif_path}: {str(e)}"
+        error_msg = f"Archaeological Hillshade RGB PNG generation failed for {tif_path}: {str(e)}"
         logger.error(error_msg, exc_info=True)
         raise Exception(error_msg)
+
+
+def stretch_band_percentile(band: np.ndarray, low_percentile: float, high_percentile: float) -> np.ndarray:
+    """Apply percentile-based contrast stretching to a single band."""
+    p_low = np.percentile(band, low_percentile)
+    p_high = np.percentile(band, high_percentile)
+    
+    if p_high > p_low:
+        stretched = (band - p_low) / (p_high - p_low) * 255
+        return np.clip(stretched, 0, 255)
+    else:
+        return band.copy()
+
+
+def gamma_correct_band(band: np.ndarray, gamma: float) -> np.ndarray:
+    """Apply gamma correction to a single band."""
+    normalized = band / 255.0
+    corrected = np.power(normalized, gamma) * 255
+    return np.clip(corrected, 0, 255)
 
 def convert_lrm_to_coolwarm_png(
     input_tiff_path: str, 
@@ -2330,251 +2313,3 @@ def convert_lrm_to_coolwarm_png_clean(
     
     dataset = None
     return output_png_path
-
-def convert_hillshade_rgb_to_archaeological_png(
-    tif_path: str,
-    png_path: Optional[str] = None,
-    enhanced_resolution: bool = True,
-    save_to_consolidated: bool = True,
-    archaeological_mode: bool = True,
-    enhancement_type: str = "subtle_relief"
-) -> str:
-    """
-    Convert Hillshade RGB TIF to Archaeological PNG using optimal enhancement techniques.
-    
-    Based on the Archaeological Subtle Relief approach that uses 10-90 percentile stretch
-    for optimal detection of archaeological features in RGB hillshade composites.
-    
-    Args:
-        tif_path: Path to the hillshade RGB TIF file (3-band RGB composite)
-        png_path: Output PNG path (optional, will be auto-generated if None)
-        enhanced_resolution: Use high-resolution output (300 DPI)
-        save_to_consolidated: Save to consolidated directory
-        archaeological_mode: Apply archaeological-specific enhancements
-        enhancement_type: Type of enhancement ('subtle_relief', 'high_contrast', 'shadow_enhanced')
-    
-    Returns:
-        Path to the created PNG file
-    """
-    print(f"\n🏛️ HILLSHADE RGB TO ARCHAEOLOGICAL PNG")
-    print(f"📂 Input: {os.path.basename(tif_path)}")
-    print(f"🎨 Enhancement: {enhancement_type}")
-    
-    start_time = time.time()
-    
-    try:
-        # Generate base name for consistent file naming
-        base_name = os.path.splitext(os.path.basename(tif_path))[0]
-        
-        # Generate output path if not provided
-        if png_path is None:
-            base_path = os.path.dirname(tif_path)
-            png_path = os.path.join(base_path, f"{base_name}_archaeological.png")
-        
-        # Ensure output directory exists
-        output_dir = os.path.dirname(png_path)
-        if output_dir and not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-            print(f"📁 Created output directory: {output_dir}")
-        
-        # Open and validate RGB hillshade data
-        ds = gdal.Open(tif_path)
-        if ds is None:
-            raise Exception(f"Failed to open Hillshade RGB TIF: {tif_path}")
-        
-        width = ds.RasterXSize
-        height = ds.RasterYSize
-        num_bands = ds.RasterCount
-        
-        if num_bands != 3:
-            raise Exception(f"Expected 3-band RGB composite, found {num_bands} bands")
-        
-        print(f"📏 Dimensions: {width} × {height} pixels")
-        print(f"🎨 Bands: {num_bands} (RGB composite)")
-        
-        # Read RGB bands
-        red_band = ds.GetRasterBand(1).ReadAsArray().astype(np.float32)
-        green_band = ds.GetRasterBand(2).ReadAsArray().astype(np.float32)
-        blue_band = ds.GetRasterBand(3).ReadAsArray().astype(np.float32)
-        
-        # Get geospatial info
-        geotransform = ds.GetGeoTransform()
-        pixel_size = abs(geotransform[1])
-        
-        ds = None
-        
-        # Calculate statistics for each band
-        for band_data, band_name, color in [(red_band, "Red", "🔴"), 
-                                           (green_band, "Green", "🟢"), 
-                                           (blue_band, "Blue", "🔵")]:
-            band_stats = {
-                'min': np.min(band_data),
-                'max': np.max(band_data),
-                'mean': np.mean(band_data),
-                'std': np.std(band_data)
-            }
-            print(f"📊 {color} {band_name} band: range {band_stats['min']:.0f}-{band_stats['max']:.0f}, "
-                  f"mean {band_stats['mean']:.1f} ± {band_stats['std']:.1f}")
-        
-        # Apply archaeological enhancement based on type
-        if enhancement_type == "subtle_relief":
-            # 10-90 percentile stretch - optimal for archaeological features
-            print(f"🎯 Applying subtle relief enhancement (10-90 percentile stretch)")
-            enhanced_red = stretch_band_percentile(red_band, 10, 90)
-            enhanced_green = stretch_band_percentile(green_band, 10, 90)
-            enhanced_blue = stretch_band_percentile(blue_band, 10, 90)
-            
-        elif enhancement_type == "high_contrast":
-            # 0.5-99.5 percentile stretch for maximum contrast
-            print(f"🎯 Applying high contrast enhancement (0.5-99.5 percentile stretch)")
-            enhanced_red = stretch_band_percentile(red_band, 0.5, 99.5)
-            enhanced_green = stretch_band_percentile(green_band, 0.5, 99.5)
-            enhanced_blue = stretch_band_percentile(blue_band, 0.5, 99.5)
-            
-        elif enhancement_type == "shadow_enhanced":
-            # Gamma correction to brighten shadows
-            gamma = 0.7  # Brighten shadows
-            print(f"🎯 Applying shadow enhancement (gamma correction γ={gamma})")
-            enhanced_red = gamma_correct_band(red_band, gamma)
-            enhanced_green = gamma_correct_band(green_band, gamma)
-            enhanced_blue = gamma_correct_band(blue_band, gamma)
-            
-        else:
-            # Default to subtle relief
-            print(f"🎯 Using default subtle relief enhancement")
-            enhanced_red = stretch_band_percentile(red_band, 10, 90)
-            enhanced_green = stretch_band_percentile(green_band, 10, 90)
-            enhanced_blue = stretch_band_percentile(blue_band, 10, 90)
-        
-        # Combine enhanced bands
-        rgb_enhanced = np.stack([enhanced_red, enhanced_green, enhanced_blue], axis=-1)
-        rgb_enhanced = np.clip(rgb_enhanced, 0, 255).astype(np.uint8)
-        
-        print(f"🎨 Creating archaeological RGB visualization")
-        
-        # Create high-quality figure
-        if enhanced_resolution:
-            dpi_value = 300
-            fig, ax = plt.subplots(figsize=(14, 10), dpi=dpi_value)
-        else:
-            dpi_value = 200
-            fig, ax = plt.subplots(figsize=(12, 8), dpi=dpi_value)
-        
-        # Display enhanced RGB image
-        ax.imshow(rgb_enhanced, aspect='equal', interpolation='nearest')
-        
-        # Add archaeological title
-        if archaeological_mode:
-            title = f"ARCHAEOLOGICAL HILLSHADE RGB ANALYSIS\n"
-            title += f"Enhancement: {enhancement_type.replace('_', ' ').title()}"
-            ax.set_title(title, fontsize=14, fontweight='bold', y=0.95)
-        else:
-            title = f"Hillshade RGB Composite\n{os.path.basename(tif_path)}"
-            ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
-        
-        # Remove axes for clean visualization
-        ax.set_xticks([])
-        ax.set_yticks([])
-        
-        # Add scale information
-        scale_text = f"Resolution: {pixel_size:.2f}m/pixel"
-        ax.text(0.02, 0.02, scale_text, transform=ax.transAxes, fontsize=10,
-               bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
-        
-        # Add archaeological interpretation guide
-        if archaeological_mode:
-            guide_text = f"ARCHAEOLOGICAL RGB HILLSHADE ANALYSIS\n"
-            guide_text += f"Multi-directional relief visualization\n"
-            guide_text += f"Enhancement: {enhancement_type.replace('_', ' ').title()}\n"
-            guide_text += f"Optimized for archaeological feature detection"
-            
-            ax.text(0.02, 0.98, guide_text, transform=ax.transAxes, fontsize=10,
-                   verticalalignment='top',
-                   bbox=dict(boxstyle="round,pad=0.5", facecolor="lightyellow", alpha=0.9))
-        
-        plt.tight_layout()
-        
-        # Save the figure
-        plt.savefig(png_path, dpi=dpi_value, bbox_inches='tight', facecolor='white', edgecolor='none')
-        plt.close()
-        
-        # Create world file for georeferencing
-        if geotransform:
-            world_file_path = os.path.splitext(png_path)[0] + ".pgw"
-            with open(world_file_path, 'w') as f:
-                f.write(f"{geotransform[1]:.10f}\n")  # pixel size x
-                f.write(f"{geotransform[2]:.10f}\n")  # rotation y
-                f.write(f"{geotransform[4]:.10f}\n")  # rotation x
-                f.write(f"{geotransform[5]:.10f}\n")  # pixel size y (negative)
-                f.write(f"{geotransform[0]:.10f}\n")  # top left x
-                f.write(f"{geotransform[3]:.10f}\n")  # top left y
-            print(f"🌍 Created world file: {os.path.basename(world_file_path)}")
-        
-        # Copy to consolidated directory if requested
-        if save_to_consolidated:
-            try:
-                path_parts = tif_path.split(os.sep)
-                region_name = "UnknownRegion"
-                if "output" in path_parts:
-                    idx = path_parts.index("output")
-                    if idx + 1 < len(path_parts):
-                        region_name = path_parts[idx+1]
-                
-                consolidated_dir = os.path.join("output", region_name, "lidar", "png_outputs")
-                os.makedirs(consolidated_dir, exist_ok=True)
-                
-                # Check if PNG is already in the target directory
-                png_normalized = os.path.normpath(png_path)
-                consolidated_normalized = os.path.normpath(consolidated_dir)
-                
-                if consolidated_normalized not in png_normalized:
-                    import shutil
-                    consolidated_png_path = os.path.join(consolidated_dir, f"{base_name}_archaeological.png")
-                    shutil.copy2(png_path, consolidated_png_path)
-                    
-                    # Copy world file too
-                    world_file = os.path.splitext(png_path)[0] + ".pgw"
-                    if os.path.exists(world_file):
-                        consolidated_world = os.path.splitext(consolidated_png_path)[0] + ".pgw"
-                        shutil.copy2(world_file, consolidated_world)
-                    
-                    print(f"📁 Saved to consolidated: {os.path.basename(consolidated_png_path)}")
-                
-            except Exception as e:
-                print(f"⚠️ Failed to save to consolidated directory: {e}")
-        
-        processing_time = time.time() - start_time
-        file_size = os.path.getsize(png_path)
-        
-        print(f"✅ Archaeological Hillshade RGB PNG completed!")
-        print(f"📁 Output: {os.path.basename(png_path)}")
-        print(f"📊 Size: {file_size:,} bytes")
-        print(f"📏 Resolution: {dpi_value} DPI")
-        print(f"⏱️ Processing time: {processing_time:.2f} seconds")
-        print(f"🏛️ Archaeological enhancement: {enhancement_type}")
-        
-        return png_path
-        
-    except Exception as e:
-        error_msg = f"Archaeological Hillshade RGB PNG generation failed for {tif_path}: {str(e)}"
-        logger.error(error_msg, exc_info=True)
-        raise Exception(error_msg)
-
-
-def stretch_band_percentile(band: np.ndarray, low_percentile: float, high_percentile: float) -> np.ndarray:
-    """Apply percentile-based contrast stretching to a single band."""
-    p_low = np.percentile(band, low_percentile)
-    p_high = np.percentile(band, high_percentile)
-    
-    if p_high > p_low:
-        stretched = (band - p_low) / (p_high - p_low) * 255
-        return np.clip(stretched, 0, 255)
-    else:
-        return band.copy()
-
-
-def gamma_correct_band(band: np.ndarray, gamma: float) -> np.ndarray:
-    """Apply gamma correction to a single band."""
-    normalized = band / 255.0
-    corrected = np.power(normalized, gamma) * 255
-    return np.clip(corrected, 0, 255)
