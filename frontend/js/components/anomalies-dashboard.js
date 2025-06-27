@@ -94,11 +94,11 @@ window.AnomaliesDashboard = {
 
         let filteredAnomalies;
 
-        // If no filters are active, show NO anomalies (empty result)
+        // If no filters are active, show ALL anomalies
         if (this.activeFilters.size === 0) {
-            filteredAnomalies = [];
+            filteredAnomalies = this.originalAnomaliesData.identified_anomalies;
         } else {
-            // Apply type filters - only show anomalies matching active filters
+            // Apply type filters - only show anomalies matching active (checked) filters
             filteredAnomalies = this.originalAnomaliesData.identified_anomalies.filter(anomaly => {
                 const anomalyType = anomaly.classification?.type || 'Unknown';
                 return this.activeFilters.has(anomalyType);
@@ -158,10 +158,13 @@ window.AnomaliesDashboard = {
             // Determine appropriate message based on filter state
             let message;
             if (this.activeFilters.size === 0) {
-                message = 'No anomaly types selected. Use the filter controls to select anomaly types to display.';
+                // No filters active but no anomalies available
+                message = 'No anomalies identified in this analysis.';
             } else if (this.originalAnomaliesData && this.originalAnomaliesData.identified_anomalies && this.originalAnomaliesData.identified_anomalies.length > 0) {
-                message = 'No anomalies match the selected filter criteria.';
+                // Filters are active but no anomalies match the selected criteria
+                message = 'No anomalies match the selected filter criteria. Try selecting different anomaly types.';
             } else {
+                // No anomalies in the data at all
                 message = 'No anomalies identified.';
             }
             anomaliesContainer.innerHTML = `<p class="no-anomalies">${message}</p>`;

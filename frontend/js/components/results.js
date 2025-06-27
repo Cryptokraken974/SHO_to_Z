@@ -124,12 +124,13 @@ window.ResultsManager = {
     },
 
     /**
-     * Select all anomaly filters
+     * Select all anomaly filters - just clear all filters to show everything
      */
     selectAllAnomalyFilters() {
-        this.activeAnomalyFilters = new Set(this.availableAnomalyTypes);
+        // Clear all filters to show all anomalies
+        this.activeAnomalyFilters.clear();
         
-        // Update checkbox states
+        // Update checkbox states to all checked
         const checkboxes = document.querySelectorAll('.anomaly-filter-checkbox');
         checkboxes.forEach(checkbox => {
             checkbox.checked = true;
@@ -139,12 +140,13 @@ window.ResultsManager = {
     },
 
     /**
-     * Clear all anomaly filters
+     * Clear all anomaly filters - hide ALL anomalies
      */
     clearAllAnomalyFilters() {
-        this.activeAnomalyFilters.clear();
+        // Set a dummy filter that will match nothing to hide all anomalies
+        this.activeAnomalyFilters = new Set(['__HIDE_ALL__']);
         
-        // Update checkbox states
+        // Update checkbox states to all unchecked
         const checkboxes = document.querySelectorAll('.anomaly-filter-checkbox');
         checkboxes.forEach(checkbox => {
             checkbox.checked = false;
