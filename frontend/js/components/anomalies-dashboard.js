@@ -570,8 +570,7 @@ window.AnomaliesDashboard = {
                     'HillshadeRGB.png', 
                     'LRM.png',
                     'Slope.png',
-                    'SVF.png',
-                    'TintOverlay.png'
+                    'SVF.png'
                 ];
                 
                 // Generate images with bounding boxes for each image type
@@ -1028,7 +1027,6 @@ getImageDescription(imageName) {
         'chm': 'Canopy Height Model showing vegetation heights',
         'lrm': 'Local Relief Model highlighting topographic features',
         'svf': 'Sky View Factor indicating terrain openness',
-        'tintoverlay': 'Enhanced terrain visualization with color overlay',
         'ndvi': 'Vegetation index from satellite imagery',
         'dtm': 'Digital Terrain Model showing ground elevation',
         'dsm': 'Digital Surface Model including all features'
@@ -1087,8 +1085,7 @@ showReportPreview(htmlContent) {
                 'HillshadeRGB.png', 
                 'LRM.png',
                 'Slope.png',
-                'SVF.png',
-                'TintOverlay.png'
+                'SVF.png'
             ];
 
             // Create image objects for each standard image type

@@ -1290,7 +1290,6 @@ window.UIManager = {
       { id: 'sky_view_factor', label: 'Sky View Factor', color: '#ffeaa7' },
       // Composite products
       { id: 'hillshade_rgb', label: 'RGB Hillshade', color: '#fdcb6e' },
-      { id: 'tint_overlay', label: 'Tint Overlay', color: '#e84393' },
       { id: 'boosted_hillshade', label: 'Boosted Hillshade', color: '#00cec9' }
     ];
 
@@ -1381,7 +1380,6 @@ window.UIManager = {
       'slope_relief': 'Slope Relief',
       'lrm': 'Local Relief Model',
       'hillshade_rgb': 'RGB Hillshade',
-      'tint_overlay': 'Tint Overlay',
       'boosted_hillshade': 'Boosted Hillshade'
     };
     
