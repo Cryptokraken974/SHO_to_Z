@@ -65,7 +65,7 @@ window.componentManager.register('sidebar', (props = {}) => {
                 <div class="accordion-content bg-[#262626] rounded-lg mt-2 p-3" id="get-data-content">
                     <div class="space-y-3">
                         <!-- Sentinel-2 Test Button -->
-                        <button id="test-sentinel2-btn" class="w-full bg-[#6c757d] hover:bg-[#5a6268] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2 text-sm">🧪 Test Sentinel-2 Download (Debug)</button>
+                        <button id="test-sentinel2-btn" class="w-full bg-[#6c757d] hover:bg-[#5a6268] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2 text-sm">🧪 Get Sentinel-2 Images</button>
                         
                         <!-- Get Elevation Data Button -->
                         <button id="get-lidar-btn" class="w-full bg-[#6c5ce7] hover:bg-[#5a4fcf] text-white px-4 py-3 rounded-lg font-medium transition-colors mt-2">🏔️ Get Elevation Data</button>
